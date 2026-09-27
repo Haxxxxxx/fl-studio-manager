@@ -37,6 +37,9 @@ const NOUNS = [
   "Static",
 ];
 
+const GENRES = ["Trap", "Lo-Fi", "House", "Drill", "Ambient", null, null];
+const ARTISTS = ["You", "You ft. Kadence", "You x Milo", null];
+
 function seededRandom(seed: number) {
   let value = seed;
   return () => {
@@ -62,6 +65,10 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
     const modifiedAtMs = now - Math.min(ageDays, 365) * 24 * 60 * 60 * 1000;
 
     const sizeBytes = Math.floor((0.5 + rand() * 12) * 1024 * 1024);
+    const genre = GENRES[Math.floor(rand() * GENRES.length)];
+    const artist = ARTISTS[Math.floor(rand() * ARTISTS.length)];
+    const tempoBpm = Math.round((80 + rand() * 90) * 10) / 10;
+    const timeSigNum = rand() > 0.85 ? 3 : 4;
 
     projects.push({
       path: `${rootInfo.root}/${name}.flp`,
@@ -70,6 +77,12 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
       sizeBytes,
       modifiedAtMs,
       root: rootInfo.root,
+      genre,
+      artist,
+      tempoBpm,
+      timeSigNum,
+      timeSigDenom: 4,
+      flVersion: "21.2.3.4004",
     });
   }
 

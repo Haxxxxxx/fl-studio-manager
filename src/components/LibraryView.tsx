@@ -18,15 +18,23 @@ import { formatBytes, formatDate } from "../lib/format";
 import { openInFlStudio, revealInFileManager } from "../lib/tauri";
 import type { SortKey } from "../store/useAppStore";
 
+const UNSPECIFIED = "Unspecified";
+
 function folderLabel(path: string): string {
   const parts = path.split(/[/\\]/).filter(Boolean);
   return parts[parts.length - 1] || path;
+}
+
+function formatBpm(bpm: number | null): string {
+  return bpm == null ? "—" : `${bpm % 1 === 0 ? bpm : bpm.toFixed(1)}`;
 }
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "name", label: "Name" },
   { key: "modified", label: "Modified" },
   { key: "size", label: "Size" },
+  { key: "genre", label: "Genre" },
+  { key: "tempo", label: "BPM" },
 ];
 
 export function LibraryView() {
@@ -50,6 +58,8 @@ export function LibraryView() {
   const setSort = useAppStore((s) => s.setSort);
   const folderFilter = useAppStore((s) => s.folderFilter);
   const setFolderFilter = useAppStore((s) => s.setFolderFilter);
+  const genreFilter = useAppStore((s) => s.genreFilter);
+  const setGenreFilter = useAppStore((s) => s.setGenreFilter);
   const favoritesOnly = useAppStore((s) => s.favoritesOnly);
   const setFavoritesOnly = useAppStore((s) => s.setFavoritesOnly);
   const toggleFavorite = useAppStore((s) => s.toggleFavorite);
@@ -58,6 +68,13 @@ export function LibraryView() {
   const folders = useMemo(() => {
     const set = new Set(projects.map((p) => p.root));
     return Array.from(set);
+  }, [projects]);
+
+  const genres = useMemo(() => {
+    const set = new Set(projects.map((p) => p.genre ?? UNSPECIFIED));
+    return Array.from(set).sort((a, b) =>
+      a === UNSPECIFIED ? 1 : b === UNSPECIFIED ? -1 : a.localeCompare(b),
+    );
   }, [projects]);
 
   const filtered = useMemo(() => {
@@ -73,6 +90,9 @@ export function LibraryView() {
     if (folderFilter) {
       list = list.filter((p) => p.root === folderFilter);
     }
+    if (genreFilter) {
+      list = list.filter((p) => (p.genre ?? UNSPECIFIED) === genreFilter);
+    }
     if (favoritesOnly) {
       list = list.filter((p) => settings.favorites.includes(p.path));
     }
@@ -80,9 +100,22 @@ export function LibraryView() {
     return [...list].sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name) * dir;
       if (sortKey === "size") return (a.sizeBytes - b.sizeBytes) * dir;
+      if (sortKey === "genre")
+        return (a.genre ?? "").localeCompare(b.genre ?? "") * dir;
+      if (sortKey === "tempo")
+        return ((a.tempoBpm ?? -1) - (b.tempoBpm ?? -1)) * dir;
       return (a.modifiedAtMs - b.modifiedAtMs) * dir;
     });
-  }, [projects, search, folderFilter, favoritesOnly, settings.favorites, sortKey, sortDir]);
+  }, [
+    projects,
+    search,
+    folderFilter,
+    genreFilter,
+    favoritesOnly,
+    settings.favorites,
+    sortKey,
+    sortDir,
+  ]);
 
   const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.path));
 
@@ -181,7 +214,10 @@ export function LibraryView() {
       </div>
 
       {folders.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-white/10 px-6 py-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-white/5 px-6 py-2">
+          <span className="pr-1 text-[11px] uppercase tracking-wide text-white/25">
+            Folder
+          </span>
           <button
             onClick={() => setFolderFilter(null)}
             className={`rounded-full px-2.5 py-1 text-xs ${
@@ -190,7 +226,7 @@ export function LibraryView() {
                 : "text-white/40 hover:bg-white/5"
             }`}
           >
-            All folders
+            All
           </button>
           {folders.map((folder) => (
             <button
@@ -204,6 +240,40 @@ export function LibraryView() {
             >
               {folderLabel(folder)}
               {folderFilter === folder && <X size={11} />}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {genres.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-white/10 px-6 py-2.5">
+          <span className="pr-1 text-[11px] uppercase tracking-wide text-white/25">
+            Type
+          </span>
+          <button
+            onClick={() => setGenreFilter(null)}
+            className={`rounded-full px-2.5 py-1 text-xs ${
+              genreFilter === null
+                ? "bg-white/15 text-white"
+                : "text-white/40 hover:bg-white/5"
+            }`}
+          >
+            All
+          </button>
+          {genres.map((genre) => (
+            <button
+              key={genre}
+              onClick={() => setGenreFilter(genre === genreFilter ? null : genre)}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${
+                genreFilter === genre
+                  ? "bg-orange-500/20 text-orange-300"
+                  : genre === UNSPECIFIED
+                    ? "text-white/25 hover:bg-white/5"
+                    : "text-white/40 hover:bg-white/5"
+              }`}
+            >
+              {genre}
+              {genreFilter === genre && <X size={11} />}
             </button>
           ))}
         </div>
@@ -309,6 +379,18 @@ export function LibraryView() {
                     </td>
                     <td className="px-2 py-2.5 text-white/40">
                       {formatBytes(project.sizeBytes)}
+                    </td>
+                    <td className="px-2 py-2.5">
+                      {project.genre ? (
+                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-white/60">
+                          {project.genre}
+                        </span>
+                      ) : (
+                        <span className="text-white/20">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2.5 text-white/40">
+                      {formatBpm(project.tempoBpm)}
                     </td>
                     <td
                       className="max-w-[220px] truncate px-2 py-2.5 text-white/40"

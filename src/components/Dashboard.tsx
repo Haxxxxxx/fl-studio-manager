@@ -63,6 +63,22 @@ export function Dashboard() {
     return top;
   }, [projects]);
 
+  // "Unspecified" (genre never set in FL Studio's project-info dialog) is
+  // common and isn't a real identity bucket, so it's always rendered gray
+  // rather than taking a categorical slot — same treatment as "Other".
+  const genreBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of projects) {
+      const label = p.genre?.trim() || "Unspecified";
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 5).map(([name, count]) => ({ name, count }));
+    const rest = sorted.slice(5).reduce((sum, [, count]) => sum + count, 0);
+    if (rest > 0) top.push({ name: "Other", count: rest });
+    return top;
+  }, [projects]);
+
   const activity = useMemo(() => {
     const weeks = 10;
     const now = new Date();
@@ -209,6 +225,36 @@ export function Dashboard() {
             </ResponsiveContainer>
           </ChartCard>
         </div>
+
+        <ChartCard title="Projects by type">
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={genreBreakdown} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+              <CartesianGrid horizontal={false} stroke={GRID_COLOR} />
+              <XAxis type="number" tick={{ fill: AXIS_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fill: "rgba(255,255,255,0.7)", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                width={90}
+              />
+              <Tooltip content={<TooltipCard />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+              <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={16}>
+                {genreBreakdown.map((entry, i) => (
+                  <Cell
+                    key={entry.name}
+                    fill={
+                      entry.name === "Other" || entry.name === "Unspecified"
+                        ? OTHER_COLOR
+                        : SERIES[i % SERIES.length]
+                    }
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
     </div>
   );

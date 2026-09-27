@@ -1,3 +1,4 @@
+mod flp_metadata;
 mod models;
 mod render;
 mod scanner;
