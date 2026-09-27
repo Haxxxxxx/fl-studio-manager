@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectInfo {
     pub path: String,
     pub name: String,
@@ -8,6 +9,12 @@ pub struct ProjectInfo {
     pub size_bytes: u64,
     pub modified_at_ms: i64,
     pub root: String,
+    pub genre: Option<String>,
+    pub artist: Option<String>,
+    pub tempo_bpm: Option<f64>,
+    pub time_sig_num: Option<u8>,
+    pub time_sig_denom: Option<u8>,
+    pub fl_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

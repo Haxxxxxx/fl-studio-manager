@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 export type View = "dashboard" | "library" | "settings";
-export type SortKey = "modified" | "name" | "size";
+export type SortKey = "modified" | "name" | "size" | "genre" | "tempo";
 export type SortDir = "asc" | "desc";
 
 interface RenderJob {
@@ -36,6 +36,7 @@ interface AppState {
   sortKey: SortKey;
   sortDir: SortDir;
   folderFilter: string | null;
+  genreFilter: string | null;
   favoritesOnly: boolean;
 
   setView: (view: View) => void;
@@ -55,6 +56,7 @@ interface AppState {
   toggleFavorite: (path: string) => void;
   setSort: (key: SortKey) => void;
   setFolderFilter: (folder: string | null) => void;
+  setGenreFilter: (genre: string | null) => void;
   setFavoritesOnly: (value: boolean) => void;
 }
 
@@ -73,6 +75,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sortKey: "modified",
   sortDir: "desc",
   folderFilter: null,
+  genreFilter: null,
   favoritesOnly: false,
 
   setView: (view) => set({ view }),
@@ -222,5 +225,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   setFolderFilter: (folder) => set({ folderFilter: folder }),
+  setGenreFilter: (genre) => set({ genreFilter: genre }),
   setFavoritesOnly: (value) => set({ favoritesOnly: value }),
 }));

@@ -6,8 +6,9 @@ Built with [Tauri](https://tauri.app) (Rust) + React/TypeScript.
 
 ## Features
 
-- **Dashboard** — stat tiles (project count, total size, folders linked, favorites) plus two charts: projects by folder and edit activity over the last 10 weeks.
-- **Library** — recursively scans linked folders for `.flp` projects, with search, sortable columns (name/modified/size), per-folder filter chips, and a favorites toggle.
+- **Dashboard** — stat tiles (project count, total size, folders linked, favorites) plus charts: projects by folder, projects by type (genre), and edit activity over the last 10 weeks.
+- **Library** — recursively scans linked folders for `.flp` projects, with search, sortable columns (name/modified/size/genre/BPM), per-folder and per-type (genre) filter chips, and a favorites toggle.
+- **Real project metadata** — genre, artist, tempo (BPM), time signature, and FL Studio version are read directly out of each `.flp` file (see caveat below), so filtering by "type" reflects what's actually set in FL Studio's own Project Info dialog, not just folder location.
 - **Batch export** — select any number of projects and render them all to WAV/MP3/OGG in one go, with live per-project progress.
 - **Open / reveal** — jump straight into FL Studio, or reveal a project in Finder/Explorer.
 - **Sample data** — one click (Dashboard, Library, or Settings) loads ~28 generated projects across 4 folders so you can see the whole UI populated without linking a real folder first. Export is disabled while viewing sample data.
@@ -35,6 +36,16 @@ Practical implications:
 - If a project produces no output within 15 minutes, that project is marked failed and the batch moves on to the next one.
 - This does **not** export individual mixer tracks/stems — only full project mixdowns. Per-track stem export isn't reliably exposed via the CLI.
 
+## How "type" (genre) filtering works — read this too
+
+`.flp` is Image-Line's closed, undocumented binary format. The metadata reader (`src-tauri/src/flp_metadata.rs`) is built from the byte-level format reverse-engineered by the open-source [PyFLP](https://github.com/demberto/PyFLP) project (header layout, event-ID encoding, the exact IDs for title/genre/artist/tempo/time-signature, and the ASCII-vs-UTF-16LE text encoding rule based on FL Studio version). It's covered by unit tests against synthetic `.flp` byte fixtures built to that same spec — but it has **not** been validated against a real FL Studio install, since none was available in the environment this was built in. Try it against your real projects and treat any mis-read field as a bug report waiting to happen.
+
+Practical implications:
+
+- **Genre/Artist are very often empty.** FL Studio doesn't require or default these — many projects will simply show "Unspecified." That's expected, not a bug.
+- Reading is best-effort and defensive: a corrupt, unusual, or unrecognized `.flp` just shows up with no metadata rather than failing the whole scan.
+- Reading metadata means the scanner now opens and partially reads every `.flp` file (not just `stat`s it). It stops early once it's found what it's looking for (title/tempo/time-signature/version, plus genre/artist if found within the first 256KB of the file's event stream), so this should still be fast even for large libraries — but it is slower than a pure filesystem scan.
+
 ## Project layout
 
 ```
@@ -45,6 +56,9 @@ src/                  React frontend
   lib/sampleData.ts     Generated sample-data set for demo mode
 src-tauri/src/
   scanner.rs           Recursive .flp discovery
+  flp_metadata.rs      Best-effort .flp binary metadata parser (genre/artist/tempo/etc), with unit tests
   render.rs            Render orchestration (staging, invoking FL Studio, collecting output)
   settings.rs          Settings persistence + FL Studio auto-detect
 ```
+
+Run the parser's tests with `cd src-tauri && cargo test`.

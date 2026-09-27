@@ -1,3 +1,4 @@
+use crate::flp_metadata;
 use crate::models::ProjectInfo;
 use walkdir::WalkDir;
 
@@ -48,6 +49,10 @@ pub fn scan_projects(folders: Vec<String>) -> Result<Vec<ProjectInfo>, String> {
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_default();
 
+            // Best-effort: a corrupt or oddly-shaped .flp shouldn't fail
+            // the whole scan, it just shows up with no metadata.
+            let flp_meta = flp_metadata::parse_flp_metadata(path).unwrap_or_default();
+
             projects.push(ProjectInfo {
                 path: path.to_string_lossy().to_string(),
                 name,
@@ -55,6 +60,12 @@ pub fn scan_projects(folders: Vec<String>) -> Result<Vec<ProjectInfo>, String> {
                 size_bytes: metadata.len(),
                 modified_at_ms,
                 root: root.clone(),
+                genre: flp_meta.genre,
+                artist: flp_meta.artist,
+                tempo_bpm: flp_meta.tempo_bpm,
+                time_sig_num: flp_meta.time_sig_num,
+                time_sig_denom: flp_meta.time_sig_denom,
+                fl_version: flp_meta.fl_version,
             });
         }
     }

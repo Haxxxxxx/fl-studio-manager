@@ -5,6 +5,15 @@ export interface ProjectInfo {
   sizeBytes: number;
   modifiedAtMs: number;
   root: string;
+  // Read directly out of the .flp binary (best-effort — see
+  // src-tauri/src/flp_metadata.rs). Any of these can be absent: older
+  // projects, or projects where the field was simply never filled in.
+  genre: string | null;
+  artist: string | null;
+  tempoBpm: number | null;
+  timeSigNum: number | null;
+  timeSigDenom: number | null;
+  flVersion: string | null;
 }
 
 export interface Settings {
