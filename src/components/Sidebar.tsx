@@ -1,4 +1,4 @@
-import { Disc3, KanbanSquare, LayoutDashboard, Library, Music2, Plus, Settings as SettingsIcon } from "lucide-react";
+import { Disc3, KanbanSquare, LayoutDashboard, Library, Music2, Plus, Settings as SettingsIcon, Users } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 
 export function Sidebar() {
@@ -10,12 +10,15 @@ export function Sidebar() {
   const openAlbumId = useAppStore((s) => s.openAlbumId);
   const demoMode = useAppStore((s) => s.demoMode);
   const openNewProject = useAppStore((s) => s.openNewProject);
+  const openPerson = useAppStore((s) => s.openPerson);
+  const peopleCount = useAppStore((s) => s.workspace.people.length);
 
   const items = [
     { id: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
     { id: "library" as const, label: "Library", icon: Library, badge: songCount },
     { id: "pipeline" as const, label: "Pipeline", icon: KanbanSquare },
     { id: "albums" as const, label: "Releases", icon: Disc3, badge: albums.length },
+    { id: "people" as const, label: "People", icon: Users, badge: peopleCount },
     { id: "settings" as const, label: "Settings", icon: SettingsIcon },
   ];
 
@@ -47,7 +50,9 @@ export function Sidebar() {
           return (
             <button
               key={item.id}
-              onClick={() => (item.id === "albums" ? openAlbum(null) : setView(item.id))}
+              onClick={() =>
+                item.id === "albums" ? openAlbum(null) : item.id === "people" ? openPerson(null) : setView(item.id)
+              }
               className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors ${
                 active ? "bg-orange-500/15 text-orange-300" : "text-white/60 hover:bg-white/5 hover:text-white/90"
               }`}

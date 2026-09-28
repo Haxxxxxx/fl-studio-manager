@@ -22,6 +22,8 @@ import { formatBytes, formatDateTime } from "../lib/format";
 import { audioSrc, openInFlStudio, revealInFileManager } from "../lib/tauri";
 import { KEYS, albumsOf, backupsBytes, formatBpm, missingPlugins, renderFreshness } from "../lib/songs";
 import type { ProjectInfo } from "../types";
+import { detectKey } from "../lib/people";
+import { SongCredits, SongPitches } from "./SongPeople";
 import { ConfirmButton, StatusSelect, TagEditor, btn, input, sectionLabel } from "./ui";
 
 const KEEP_BACKUPS = 5;
@@ -60,6 +62,7 @@ export function ProjectDrawer() {
   if (!detailPath || !project) return null;
 
   const meta = workspace.songs[project.path] ?? {};
+  const detectedKey = detectKey(project.trackNames);
   const albums = albumsOf(workspace, project.path);
   const otherAlbums = workspace.albums.filter((a) => !albums.includes(a));
   const freshness = renderFreshness(project);
@@ -178,6 +181,15 @@ export function ProjectDrawer() {
                 </option>
               ))}
             </select>
+            {!meta.key && detectedKey && (
+              <button
+                onClick={() => updateSong(project.path, { key: detectedKey })}
+                title="Found in a mixer track name"
+                className="ml-1.5 rounded-full border border-dashed border-white/20 px-2 py-0.5 text-[11px] text-white/60 hover:text-white"
+              >
+                Use {detectedKey}?
+              </button>
+            )}
           </div>
         </div>
 
@@ -248,6 +260,14 @@ export function ProjectDrawer() {
             />
             <Fact label="Project file" value={formatBytes(project.sizeBytes)} />
           </dl>
+        </Section>
+
+        <Section label="Credits">
+          <SongCredits project={project} />
+        </Section>
+
+        <Section label={`Sent to · ${meta.pitches?.length ?? 0}`}>
+          <SongPitches project={project} />
         </Section>
 
         <PluginsAndSamples project={project} />

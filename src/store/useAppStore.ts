@@ -4,6 +4,8 @@ import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleDa
 import { ALBUM_COLORS, EMPTY_WORKSPACE, newId } from "../lib/songs";
 import type {
   PackageResult,
+  Person,
+  Pitch,
   Album,
   ProjectInfo,
   RenderEvent,
@@ -22,7 +24,7 @@ const DEFAULT_SETTINGS: Settings = {
   favorites: [],
 };
 
-export type View = "dashboard" | "library" | "pipeline" | "albums" | "settings";
+export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "settings";
 export type SortKey = "modified" | "name" | "status" | "tempo" | "key" | "versions";
 export type SortDir = "asc" | "desc";
 /** "unsorted" = songs with no status yet. */
@@ -78,6 +80,7 @@ interface AppState {
   /** Song open in the detail drawer. */
   detailPath: string | null;
   openAlbumId: string | null;
+  openPersonId: string | null;
   newProject: NewProjectDraft | null;
 
   setView: (view: View) => void;
@@ -108,6 +111,7 @@ interface AppState {
   setShowTemplates: (value: boolean) => void;
   openDetail: (path: string | null) => void;
   openAlbum: (id: string | null) => void;
+  openPerson: (id: string | null) => void;
   openNewProject: (draft?: Partial<NewProjectDraft>) => void;
   closeNewProject: () => void;
 
@@ -119,6 +123,15 @@ interface AppState {
   createAlbum: (title: string) => string;
   updateAlbum: (id: string, patch: Partial<Omit<Album, "id">>) => void;
   deleteAlbum: (id: string) => void;
+
+  // People (collaborators & contacts), credits and pitches
+  createPerson: (name: string, aliases?: string[]) => string;
+  updatePerson: (id: string, patch: Partial<Omit<Person, "id">>) => void;
+  /** Also removes their credits and pitches. */
+  deletePerson: (id: string) => void;
+  addPitch: (path: string, pitch: Omit<Pitch, "id">) => void;
+  updatePitch: (path: string, id: string, patch: Partial<Omit<Pitch, "id">>) => void;
+  removePitch: (path: string, id: string) => void;
   addTracks: (albumId: string, paths: string[]) => void;
   removeTrack: (albumId: string, path: string) => void;
   moveTrack: (albumId: string, from: number, to: number) => void;
@@ -202,6 +215,7 @@ export const useAppStore = create<AppState>((set, get) => {
     showTemplates: false,
     detailPath: null,
     openAlbumId: null,
+    openPersonId: null,
     newProject: null,
 
     setView: (view) => set({ view }),
@@ -409,6 +423,7 @@ export const useAppStore = create<AppState>((set, get) => {
     setShowTemplates: (value) => set({ showTemplates: value }),
     openDetail: (detailPath) => set({ detailPath }),
     openAlbum: (openAlbumId) => set({ openAlbumId, view: "albums" }),
+    openPerson: (openPersonId) => set({ openPersonId, view: "people" }),
     openNewProject: (draft) =>
       set({ newProject: { albumId: null, status: "idea", ...draft } }),
     closeNewProject: () => set({ newProject: null }),
@@ -448,6 +463,48 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     updateAlbum: (id, patch) => mutateAlbum(id, (a) => ({ ...a, ...patch })),
+
+    createPerson: (name, aliases = []) => {
+      const id = newId();
+      mutateWorkspace((ws) => ({
+        ...ws,
+        people: [...ws.people, { id, name: name.trim() || "Someone", aliases, contact: "", notes: "" }],
+      }));
+      return id;
+    },
+
+    updatePerson: (id, patch) =>
+      mutateWorkspace((ws) => ({ ...ws, people: ws.people.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
+
+    deletePerson: (id) => {
+      mutateWorkspace((ws) => {
+        const songs: Workspace["songs"] = {};
+        for (const [path, meta] of Object.entries(ws.songs)) {
+          songs[path] = {
+            ...meta,
+            credits: meta.credits?.filter((c) => c.personId !== id),
+            pitches: meta.pitches?.filter((p) => p.personId !== id),
+          };
+        }
+        return { ...ws, songs, people: ws.people.filter((p) => p.id !== id) };
+      });
+      if (get().openPersonId === id) set({ openPersonId: null });
+    },
+
+    addPitch: (path, pitch) => {
+      const pitches = get().workspace.songs[path]?.pitches ?? [];
+      get().updateSong(path, { pitches: [...pitches, { ...pitch, id: newId() }] });
+    },
+
+    updatePitch: (path, id, patch) => {
+      const pitches = get().workspace.songs[path]?.pitches ?? [];
+      get().updateSong(path, { pitches: pitches.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
+    },
+
+    removePitch: (path, id) => {
+      const pitches = get().workspace.songs[path]?.pitches ?? [];
+      get().updateSong(path, { pitches: pitches.filter((p) => p.id !== id) });
+    },
 
     deleteAlbum: (id) => {
       mutateWorkspace((ws) => ({ ...ws, albums: ws.albums.filter((a) => a.id !== id) }));

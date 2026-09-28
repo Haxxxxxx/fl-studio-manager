@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useAppStore, type SortKey, type StatusFilter } from "../store/useAppStore";
+import { detectKey } from "../lib/people";
 import { formatDate } from "../lib/format";
 import {
   KEYS,
@@ -409,7 +410,16 @@ export function LibraryView() {
                       <StatusSelect compact value={meta?.status} onChange={(status) => updateSong(project.path, { status })} />
                     </td>
                     <td className="px-2 py-2 tabular-nums text-white/50">{formatBpm(project.tempoBpm)}</td>
-                    <td className="px-2 py-2 text-white/60">{meta?.key ?? <span className="text-white/20">—</span>}</td>
+                    <td className="px-2 py-2 text-white/60">
+                      {meta?.key ??
+                        (detectKey(project.trackNames) ? (
+                          <span className="italic text-white/35" title="Found in a mixer track name — set it in the song panel">
+                            {detectKey(project.trackNames)}?
+                          </span>
+                        ) : (
+                          <span className="text-white/20">—</span>
+                        ))}
+                    </td>
                     <td className="whitespace-nowrap px-2 py-2 text-white/50">{formatDate(project.modifiedAtMs)}</td>
                     <td className="px-2 py-2 tabular-nums text-white/40">{project.backups.length || "—"}</td>
                     <td className="px-2 py-2">

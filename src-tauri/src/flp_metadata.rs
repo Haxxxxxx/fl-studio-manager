@@ -19,6 +19,7 @@ const ID_ARTISTS: u8 = 207; // ProjectID.Artists
 const ID_SAMPLE_PATH: u8 = 196; // ChannelID.SamplePath (may start with %FLStudioUserData% etc.)
 const ID_PLUGIN_INTERNAL_NAME: u8 = 201; // PluginID.InternalName ("Fruity Limiter", "Fruity Wrapper"…)
 const ID_PLUGIN_DATA: u8 = 213; // PluginID.Data — for "Fruity Wrapper", the hosted VST's info
+const ID_INSERT_NAME: u8 = 204; // InsertID.Name — mixer track names ("Main Voice Brea-Q")
 
 // Records inside a Fruity Wrapper data blob: [u32 id][u64 size][payload].
 // IDs confirmed on FL 24/25 projects (54/55/56 hold UTF-8 strings).
@@ -54,6 +55,8 @@ pub struct FlpMetadata {
     pub samples: Vec<String>,
     /// Deduplicated plugin list, in file order.
     pub plugins: Vec<RawPlugin>,
+    /// Named mixer tracks (unnamed ones have no event), deduplicated.
+    pub mixer_names: Vec<String>,
 }
 
 /// Best-effort metadata reader for FL Studio's undocumented `.flp` binary
@@ -177,6 +180,7 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                     | ID_ARTISTS
                     | ID_SAMPLE_PATH
                     | ID_PLUGIN_INTERNAL_NAME
+                    | ID_INSERT_NAME
             ) || (id == ID_PLUGIN_DATA && current_plugin.as_deref() == Some(WRAPPER));
 
             if is_needed && len > 0 && len < 10_000_000 {
@@ -212,6 +216,11 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                         ID_SAMPLE_PATH => {
                             if !text.is_empty() && !meta.samples.contains(&text) {
                                 meta.samples.push(text);
+                            }
+                        }
+                        ID_INSERT_NAME => {
+                            if !text.is_empty() && !meta.mixer_names.contains(&text) {
+                                meta.mixer_names.push(text);
                             }
                         }
                         ID_PLUGIN_INTERNAL_NAME => {

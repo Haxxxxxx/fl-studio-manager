@@ -62,6 +62,57 @@ pub(crate) fn backup_base_name(stem: &str) -> &str {
     stem
 }
 
+/// FL names recorded takes `<project>_<YYYY-MM-DD HH-MM-SS>_<mixer track>`,
+/// plus `_2` / ` - Part_1` / ` (consolidated)` suffixes. Returns the mixer
+/// track part ("Lead Voices - Brea-Q").
+pub(crate) fn recording_label(stem: &str) -> Option<String> {
+    // Find "_YYYY-MM-DD HH-MM-SS_" by shape rather than by project name, so
+    // takes recorded under an older project name still work.
+    let bytes = stem.as_bytes();
+    let is_stamp = |s: &[u8]| {
+        s.len() == 19
+            && s.iter().enumerate().all(|(i, &c)| match i {
+                4 | 7 | 13 | 16 => c == b'-',
+                10 => c == b' ',
+                _ => c.is_ascii_digit(),
+            })
+    };
+    let start = (0..bytes.len().saturating_sub(20))
+        .find(|&i| bytes[i] == b'_' && is_stamp(&bytes[i + 1..i + 20]) && bytes.get(i + 20) == Some(&b'_'))?;
+    let mut label = stem[start + 21..].trim();
+    for suffix in [" (consolidated)"] {
+        label = label.strip_suffix(suffix).unwrap_or(label);
+    }
+    if let Some(i) = label.find(" - Part_") {
+        label = &label[..i];
+    }
+    if let Some((head, tail)) = label.rsplit_once('_') {
+        if !tail.is_empty() && tail.chars().all(|c| c.is_ascii_digit()) {
+            label = head;
+        }
+    }
+    let label = label.trim();
+    (!is_generic_track_name(label)).then(|| label.to_string())
+}
+
+/// "Insert 9", "REC", "Master"… carry no information.
+fn is_generic_track_name(name: &str) -> bool {
+    let lower = name.trim().to_lowercase();
+    if lower.is_empty() || ["rec", "master", "mixer", "current", "untitled"].contains(&lower.as_str()) {
+        return true;
+    }
+    lower
+        .strip_prefix("insert")
+        .is_some_and(|rest| rest.trim().chars().all(|c| c.is_ascii_digit()))
+}
+
+fn push_track_name(names: &mut Vec<String>, name: &str) {
+    let name = name.trim();
+    if !is_generic_track_name(name) && !names.iter().any(|n| n.eq_ignore_ascii_case(name)) {
+        names.push(name.to_string());
+    }
+}
+
 fn by_newest(a: &FileEntry, b: &FileEntry) -> std::cmp::Ordering {
     b.modified_at_ms.cmp(&a.modified_at_ms)
 }
@@ -158,6 +209,13 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
                 recordings_bytes: 0,
                 plugins: resolver.plugins(&flp.plugins),
                 samples: resolver.samples(&flp.samples, path),
+                track_names: {
+                    let mut names = Vec::new();
+                    for n in &flp.mixer_names {
+                        push_track_name(&mut names, n);
+                    }
+                    names
+                },
             });
         }
     }
@@ -216,6 +274,9 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
                 if let Ok(meta) = fs::metadata(rec) {
                     projects[i].recordings_count += 1;
                     projects[i].recordings_bytes += meta.len();
+                }
+                if let Some(label) = recording_label(&stem_of(rec)) {
+                    push_track_name(&mut projects[i].track_names, &label);
                 }
             }
             projects[i].backups.sort_by(by_newest);
@@ -293,6 +354,18 @@ mod tests {
     use crate::models::SampleStatus;
 
     #[test]
+    fn extracts_recording_labels() {
+        let l = |s: &str| recording_label(s);
+        assert_eq!(l("Envy_2025-12-15 18-49-59_Voice 1 - Chouls").as_deref(), Some("Voice 1 - Chouls"));
+        assert_eq!(l("Envy_2025-12-16 22-16-05_Ambiance 2 - Chouls - Part_1").as_deref(), Some("Ambiance 2 - Chouls"));
+        assert_eq!(l("Ft Le Q_2025-05-19 21-32-32_Main Voice - Feal_2").as_deref(), Some("Main Voice - Feal"));
+        assert_eq!(l("Old_Name_2025-05-01 00-54-19_Ambiances 2 - BQ ").as_deref(), Some("Ambiances 2 - BQ"));
+        assert_eq!(l("X_2025-02-01 17-51-18_REC (consolidated)"), None);
+        assert_eq!(l("X_2025-02-01 17-51-18_Insert 9"), None);
+        assert_eq!(l("not a recording"), None);
+    }
+
+    #[test]
     fn matches_exported_file_names_to_songs() {
         assert_eq!(export_song_key("Envy"), "envy");
         assert_eq!(export_song_key("03 - Envy"), "envy");
@@ -337,6 +410,9 @@ mod tests {
         missing_plugins.sort();
         missing_plugins.dedup();
         println!("plugins not installed: {missing_plugins:?}");
+        for p in projects.iter().filter(|p| !p.track_names.is_empty()).take(6) {
+            println!("  {} tracks: {:?}", p.name, p.track_names);
+        }
         for p in projects.iter().take(5) {
             println!("  {} — {} backups, {} renders, {} recordings", p.name, p.backups.len(), p.renders.len(), p.recordings_count);
         }
