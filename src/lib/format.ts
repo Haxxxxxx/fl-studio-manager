@@ -9,6 +9,25 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+export function formatDateTime(ms: number): string {
+  if (!ms) return "—";
+  const date = new Date(ms);
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return sameDay ? `Today ${time}` : `${formatDate(ms)}, ${time}`;
+}
+
+/** "3 days ago", "in 5 weeks" — for release countdowns and recency. */
+export function formatRelative(ms: number): string {
+  const days = Math.round((ms - Date.now()) / (24 * 60 * 60 * 1000));
+  const abs = Math.abs(days);
+  const [n, unit] =
+    abs < 1 ? [0, "today"] : abs < 14 ? [abs, "day"] : abs < 60 ? [Math.round(abs / 7), "week"] : [Math.round(abs / 30), "month"];
+  if (unit === "today") return "today";
+  const label = `${n} ${unit}${n === 1 ? "" : "s"}`;
+  return days < 0 ? `${label} ago` : `in ${label}`;
+}
+
 export function formatDate(ms: number): string {
   if (!ms) return "—";
   const date = new Date(ms);
