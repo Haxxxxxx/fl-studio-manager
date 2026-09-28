@@ -16,11 +16,26 @@ const ID_RTF_COMMENTS: u8 = 198; // ProjectID._RTFComments (legacy)
 const ID_FL_VERSION: u8 = 199; // ProjectID.FLVersion (always ASCII)
 const ID_GENRE: u8 = 206; // ProjectID.Genre
 const ID_ARTISTS: u8 = 207; // ProjectID.Artists
+const ID_SAMPLE_PATH: u8 = 196; // ChannelID.SamplePath (may start with %FLStudioUserData% etc.)
+const ID_PLUGIN_INTERNAL_NAME: u8 = 201; // PluginID.InternalName ("Fruity Limiter", "Fruity Wrapper"…)
+const ID_PLUGIN_DATA: u8 = 213; // PluginID.Data — for "Fruity Wrapper", the hosted VST's info
 
-// If we haven't found genre/artist by this many bytes into the event
-// stream, stop looking — bounds worst-case read for huge projects packed
-// with automation/audio-clip events we don't care about.
-const EARLY_EXIT_SOFT_CAP: u64 = 256 * 1024;
+// Records inside a Fruity Wrapper data blob: [u32 id][u64 size][payload].
+// IDs confirmed on FL 24/25 projects (54/55/56 hold UTF-8 strings).
+const VST_REC_NAME: u32 = 54;
+const VST_REC_PATH: u32 = 55;
+const VST_REC_VENDOR: u32 = 56;
+
+const WRAPPER: &str = "Fruity Wrapper";
+
+/// A plugin instance found in a project. Native FL plugins only have a
+/// name; third-party plugins (hosted by Fruity Wrapper) carry vendor + path.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct RawPlugin {
+    pub name: String,
+    pub vendor: Option<String>,
+    pub path: Option<String>,
+}
 
 #[derive(Debug, Clone, Default, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +50,10 @@ pub struct FlpMetadata {
     pub time_sig_num: Option<u8>,
     pub time_sig_denom: Option<u8>,
     pub ppq: Option<u16>,
+    /// Sample paths as stored (unresolved, deduplicated, in file order).
+    pub samples: Vec<String>,
+    /// Deduplicated plugin list, in file order.
+    pub plugins: Vec<RawPlugin>,
 }
 
 /// Best-effort metadata reader for FL Studio's undocumented `.flp` binary
@@ -80,10 +99,14 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
     // The FLVersion event (always ASCII) tells us which, and per PyFLP it
     // precedes other text events in a well-formed file.
     let mut is_unicode = false;
-    let mut version_seen = false;
     let mut consumed: u64 = 0;
+    // The internal name of the plugin whose events we're inside; its Data
+    // event follows it.
+    let mut current_plugin: Option<String> = None;
 
-    while consumed < data_size {
+    // Reads the whole event stream: plugin and sample events are spread
+    // throughout. Real projects are a few hundred KB, so this stays fast.
+    'events: while consumed < data_size {
         let mut id_buf = [0u8; 1];
         if reader.read_exact(&mut id_buf).is_err() {
             break;
@@ -97,9 +120,10 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                 break;
             }
             consumed += 1;
+            // First occurrence wins: later arrangements repeat these.
             match id {
-                ID_TIME_SIG_NUM => meta.time_sig_num = Some(buf[0]),
-                ID_TIME_SIG_BEAT => meta.time_sig_denom = Some(buf[0]),
+                ID_TIME_SIG_NUM => _ = meta.time_sig_num.get_or_insert(buf[0]),
+                ID_TIME_SIG_BEAT => _ = meta.time_sig_denom.get_or_insert(buf[0]),
                 _ => {}
             }
         } else if id < 128 {
@@ -120,7 +144,7 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                 break;
             }
             consumed += 4;
-            if id == ID_TEMPO {
+            if id == ID_TEMPO && meta.tempo_bpm.is_none() {
                 let value = u32::from_le_bytes(buf);
                 meta.tempo_bpm = Some(value as f64 / 1000.0);
             }
@@ -131,8 +155,8 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
             let mut shift = 0u32;
             loop {
                 let mut b = [0u8; 1];
-                if reader.read_exact(&mut b).is_err() {
-                    return Ok(meta);
+                if reader.read_exact(&mut b).is_err() || shift > 56 {
+                    break 'events;
                 }
                 consumed += 1;
                 len |= ((b[0] & 0x7f) as u64) << shift;
@@ -142,7 +166,7 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                 shift += 7;
             }
 
-            let is_needed_text = matches!(
+            let is_needed = matches!(
                 id,
                 ID_TITLE
                     | ID_COMMENTS
@@ -151,12 +175,14 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                     | ID_FL_VERSION
                     | ID_GENRE
                     | ID_ARTISTS
-            );
+                    | ID_SAMPLE_PATH
+                    | ID_PLUGIN_INTERNAL_NAME
+            ) || (id == ID_PLUGIN_DATA && current_plugin.as_deref() == Some(WRAPPER));
 
-            if is_needed_text && len > 0 && len < 10_000_000 {
+            if is_needed && len > 0 && len < 10_000_000 {
                 let mut payload = vec![0u8; len as usize];
                 if reader.read_exact(&mut payload).is_err() {
-                    return Ok(meta);
+                    break 'events;
                 }
                 consumed += len;
 
@@ -166,8 +192,11 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                     if let Some((major, minor)) = parse_major_minor(&text) {
                         is_unicode = (major, minor) >= (11, 5);
                     }
-                    version_seen = true;
                     meta.fl_version = Some(text);
+                } else if id == ID_PLUGIN_DATA {
+                    if let Some(plugin) = parse_wrapper_data(&payload) {
+                        push_unique(&mut meta.plugins, plugin);
+                    }
                 } else {
                     let text = decode_flp_text(&payload, is_unicode);
                     match id {
@@ -180,26 +209,28 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                         ID_URL => meta.url = Some(text),
                         ID_GENRE => meta.genre = Some(text),
                         ID_ARTISTS => meta.artist = Some(text),
+                        ID_SAMPLE_PATH => {
+                            if !text.is_empty() && !meta.samples.contains(&text) {
+                                meta.samples.push(text);
+                            }
+                        }
+                        ID_PLUGIN_INTERNAL_NAME => {
+                            // Empty = a plain sampler channel; the wrapper's
+                            // real name arrives in its Data event.
+                            if !text.is_empty() && text != WRAPPER {
+                                push_unique(&mut meta.plugins, RawPlugin { name: text.clone(), ..Default::default() });
+                            }
+                            current_plugin = Some(text);
+                        }
                         _ => {}
                     }
                 }
             } else {
                 if skip_bytes(reader, len).is_err() {
-                    return Ok(meta);
+                    break 'events;
                 }
                 consumed += len;
             }
-        }
-
-        let core_done = meta.title.is_some()
-            && meta.tempo_bpm.is_some()
-            && meta.time_sig_num.is_some()
-            && meta.time_sig_denom.is_some()
-            && version_seen;
-        if core_done
-            && (meta.genre.is_some() || meta.artist.is_some() || consumed > EARLY_EXIT_SOFT_CAP)
-        {
-            break;
         }
     }
 
@@ -209,7 +240,51 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
         meta.tempo_bpm = Some(coarse + fine);
     }
 
+    // Some real projects carry garbage here (seen: 522055.422 BPM in "3/1"
+    // from an FL 24 project). FL's tempo range is 10–522 BPM; anything
+    // outside it means the fields can't be trusted, so drop them.
+    if meta.tempo_bpm.is_some_and(|t| !(10.0..=522.0).contains(&t)) {
+        meta.tempo_bpm = None;
+        meta.time_sig_num = None;
+        meta.time_sig_denom = None;
+    }
+    if meta.time_sig_denom.is_some_and(|d| ![2, 4, 8, 16].contains(&d)) {
+        meta.time_sig_num = None;
+        meta.time_sig_denom = None;
+    }
+
     Ok(meta)
+}
+
+/// Fruity Wrapper data: a u32 kind, then `[u32 id][u64 size][payload]`
+/// records. Pulls out the hosted plugin's name, file path and vendor.
+fn parse_wrapper_data(data: &[u8]) -> Option<RawPlugin> {
+    let mut plugin = RawPlugin::default();
+    let mut pos = 4;
+    while pos + 12 <= data.len() {
+        let id = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        let size = u64::from_le_bytes(data[pos + 4..pos + 12].try_into().ok()?) as usize;
+        pos += 12;
+        let payload = data.get(pos..pos.checked_add(size)?)?;
+        pos += size;
+        let text = || {
+            let s = String::from_utf8_lossy(payload).trim_end_matches('\0').trim().to_string();
+            (!s.is_empty()).then_some(s)
+        };
+        match id {
+            VST_REC_NAME => plugin.name = text().unwrap_or_default(),
+            VST_REC_PATH => plugin.path = text(),
+            VST_REC_VENDOR => plugin.vendor = text(),
+            _ => {}
+        }
+    }
+    (!plugin.name.is_empty()).then_some(plugin)
+}
+
+fn push_unique(plugins: &mut Vec<RawPlugin>, plugin: RawPlugin) {
+    if !plugins.iter().any(|p| p.name == plugin.name) {
+        plugins.push(plugin);
+    }
 }
 
 fn skip_bytes<R: Read>(reader: &mut R, mut remaining: u64) -> std::io::Result<()> {
@@ -376,6 +451,68 @@ mod tests {
         assert_eq!(meta.title.as_deref(), Some("Old School Loop"));
         assert_eq!(meta.tempo_bpm, Some(128.25));
         assert_eq!(meta.genre, None);
+    }
+
+    fn push_wrapper_record(buf: &mut Vec<u8>, id: u32, s: &str) {
+        buf.extend_from_slice(&id.to_le_bytes());
+        buf.extend_from_slice(&(s.len() as u64).to_le_bytes());
+        buf.extend_from_slice(s.as_bytes());
+    }
+
+    #[test]
+    fn extracts_plugins_and_samples() {
+        let mut events = Vec::new();
+        push_text_event(&mut events, 199, &ascii_with_nul("25.1.6.4997"));
+        push_text_event(&mut events, 196, &utf16le_with_nul("%FLStudioUserData%\\Projects\\Envy\\Samples\\Kick.wav"));
+        push_text_event(&mut events, 196, &utf16le_with_nul("%FLStudioUserData%\\Projects\\Envy\\Samples\\Kick.wav"));
+        push_text_event(&mut events, 201, &utf16le_with_nul("Fruity Limiter"));
+        push_text_event(&mut events, 201, &utf16le_with_nul("Fruity Wrapper"));
+        let mut blob = 12u32.to_le_bytes().to_vec();
+        push_wrapper_record(&mut blob, 54, "FabFilter Pro-Q 3");
+        push_wrapper_record(&mut blob, 55, "C:\\VST3\\FabFilter Pro-Q 3.vst3");
+        push_wrapper_record(&mut blob, 56, "FabFilter");
+        push_wrapper_record(&mut blob, 99, "ignored");
+        push_text_event(&mut events, 213, &blob);
+        // Data after a *native* plugin must not be read as wrapper records.
+        push_text_event(&mut events, 201, &utf16le_with_nul("Fruity Limiter"));
+        push_text_event(&mut events, 213, &[1, 2, 3, 4, 5]);
+
+        let mut file = Vec::new();
+        file.extend_from_slice(b"FLhd");
+        file.extend_from_slice(&6u32.to_le_bytes());
+        file.extend_from_slice(&0i16.to_le_bytes());
+        file.extend_from_slice(&1u16.to_le_bytes());
+        file.extend_from_slice(&96u16.to_le_bytes());
+        file.extend_from_slice(b"FLdt");
+        file.extend_from_slice(&(events.len() as u32).to_le_bytes());
+        file.extend_from_slice(&events);
+
+        let meta = parse_from_reader(&mut Cursor::new(file)).unwrap();
+        assert_eq!(meta.samples, vec!["%FLStudioUserData%\\Projects\\Envy\\Samples\\Kick.wav"]);
+        let names: Vec<_> = meta.plugins.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, vec!["Fruity Limiter", "FabFilter Pro-Q 3"]);
+        assert_eq!(meta.plugins[1].vendor.as_deref(), Some("FabFilter"));
+        assert_eq!(meta.plugins[1].path.as_deref(), Some("C:\\VST3\\FabFilter Pro-Q 3.vst3"));
+    }
+
+    /// Runs the parser over the user's real projects when FLSM_REAL_PROJECTS
+    /// points at a folder: `FLSM_REAL_PROJECTS="D:\...\Projects" cargo test -- --nocapture real`
+    #[test]
+    fn parses_real_projects_if_available() {
+        let Ok(root) = std::env::var("FLSM_REAL_PROJECTS") else { return };
+        let mut parsed = 0;
+        for entry in walkdir::WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+            let p = entry.path();
+            let is_flp = p.extension().is_some_and(|e| e.eq_ignore_ascii_case("flp"));
+            if !is_flp || p.to_string_lossy().to_lowercase().contains("backup") {
+                continue;
+            }
+            let meta = parse_flp_metadata(p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+            assert!(meta.fl_version.is_some(), "{}: no version", p.display());
+            println!("{:?} {:?} {:?}/{:?}", p.file_name().unwrap(), meta.tempo_bpm, meta.time_sig_num, meta.time_sig_denom);
+            parsed += 1;
+        }
+        assert!(parsed > 0);
     }
 
     #[test]

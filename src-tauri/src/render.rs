@@ -8,7 +8,7 @@ use tauri::{AppHandle, Emitter};
 const RENDER_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const POLL_INTERVAL: Duration = Duration::from_millis(300);
 
-fn unique_output_path(output_folder: &Path, base_name: &str, ext: &str) -> PathBuf {
+pub(crate) fn unique_output_path(output_folder: &Path, base_name: &str, ext: &str) -> PathBuf {
     let candidate = output_folder.join(format!("{base_name}.{ext}"));
     if !candidate.exists() {
         return candidate;
@@ -32,6 +32,7 @@ fn render_one(
     project_path: &str,
     output_folder: &Path,
     format: &str,
+    output_name: Option<&str>,
 ) -> Result<PathBuf, String> {
     let src = Path::new(project_path);
     let file_name = src
@@ -110,7 +111,7 @@ fn render_one(
 
     fs::create_dir_all(output_folder)
         .map_err(|e| format!("could not create output folder: {e}"))?;
-    let dest = unique_output_path(output_folder, &base_name, format);
+    let dest = unique_output_path(output_folder, output_name.unwrap_or(&base_name), format);
     let copy_result = fs::copy(&rendered_file, &dest);
     cleanup(&temp_dir);
     copy_result.map_err(|e| format!("could not move rendered file: {e}"))?;
@@ -141,27 +142,46 @@ fn find_rendered_file(dir: &Path, base_name: &str, format: &str) -> Option<PathB
     None
 }
 
+/// Renders sequentially on a worker thread (a batch can take many minutes;
+/// a sync command would block the UI thread the whole time).
+/// `output_names`, when given, lines up with `project_paths` and names each
+/// file (e.g. "01 - Envy" for an album export) instead of the project name.
 #[tauri::command]
-pub fn render_projects(
+pub async fn render_projects(
     app: AppHandle,
     project_paths: Vec<String>,
     output_folder: String,
     fl_studio_path: String,
     format: String,
+    output_names: Option<Vec<String>>,
 ) -> Result<(), String> {
     if fl_studio_path.trim().is_empty() {
         return Err("FL Studio executable path is not set (see Settings)".to_string());
     }
-    let output_folder = PathBuf::from(output_folder);
+    tauri::async_runtime::spawn_blocking(move || {
+        render_all(&app, project_paths, PathBuf::from(output_folder), &fl_studio_path, &format, output_names)
+    })
+    .await
+    .map_err(|e| format!("render worker failed: {e}"))
+}
 
-    for project_path in project_paths {
+fn render_all(
+    app: &AppHandle,
+    project_paths: Vec<String>,
+    output_folder: PathBuf,
+    fl_studio_path: &str,
+    format: &str,
+    output_names: Option<Vec<String>>,
+) {
+    for (i, project_path) in project_paths.into_iter().enumerate() {
+        let output_name = output_names.as_ref().and_then(|n| n.get(i)).map(String::as_str);
         let project_name = Path::new(&project_path)
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| project_path.clone());
 
         emit(
-            &app,
+            app,
             RenderEvent {
                 project_path: project_path.clone(),
                 project_name: project_name.clone(),
@@ -171,9 +191,9 @@ pub fn render_projects(
             },
         );
 
-        match render_one(&fl_studio_path, &project_path, &output_folder, &format) {
+        match render_one(fl_studio_path, &project_path, &output_folder, format, output_name) {
             Ok(dest) => emit(
-                &app,
+                app,
                 RenderEvent {
                     project_path: project_path.clone(),
                     project_name: project_name.clone(),
@@ -183,7 +203,7 @@ pub fn render_projects(
                 },
             ),
             Err(message) => emit(
-                &app,
+                app,
                 RenderEvent {
                     project_path: project_path.clone(),
                     project_name: project_name.clone(),
@@ -194,6 +214,4 @@ pub fn render_projects(
             ),
         }
     }
-
-    Ok(())
 }

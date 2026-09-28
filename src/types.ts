@@ -1,3 +1,10 @@
+export interface FileEntry {
+  path: string;
+  sizeBytes: number;
+  modifiedAtMs: number;
+}
+
+/** One song: the main .flp plus what FL keeps around it (see scanner.rs). */
 export interface ProjectInfo {
   path: string;
   name: string;
@@ -6,14 +13,44 @@ export interface ProjectInfo {
   modifiedAtMs: number;
   root: string;
   // Read directly out of the .flp binary (best-effort — see
-  // src-tauri/src/flp_metadata.rs). Any of these can be absent: older
-  // projects, or projects where the field was simply never filled in.
+  // src-tauri/src/flp_metadata.rs). Empty/untrusted values come back null.
   genre: string | null;
   artist: string | null;
   tempoBpm: number | null;
   timeSigNum: number | null;
   timeSigDenom: number | null;
   flVersion: string | null;
+  isTemplate: boolean;
+  /** FL's auto-backups of this project, newest first. */
+  backups: FileEntry[];
+  /** Mixdowns next to the .flp (e.g. Envy.wav), newest first. */
+  renders: FileEntry[];
+  recordingsCount: number;
+  recordingsBytes: number;
+  plugins: PluginInfo[];
+  samples: SampleInfo[];
+}
+
+export interface PluginInfo {
+  name: string;
+  vendor: string | null;
+  /** Third-party only; null for FL's native plugins. */
+  installed: boolean | null;
+}
+
+/** ok = where the project says; relocated = found by name in the song's
+ * folder (project was moved, FL can usually find it); missing = gone. */
+export type SampleStatus = "ok" | "relocated" | "missing";
+
+export interface SampleInfo {
+  path: string;
+  status: SampleStatus;
+}
+
+export interface TemplateInfo {
+  name: string;
+  category: string;
+  path: string;
 }
 
 export interface Settings {
@@ -35,3 +72,51 @@ export interface RenderEvent {
   message: string | null;
   outputPath: string | null;
 }
+
+// ---- Workspace: the app's own data, which FL Studio doesn't store ----
+
+export type SongStatus = "idea" | "wip" | "mixing" | "mastering" | "done";
+
+export interface SongMeta {
+  status?: SongStatus;
+  tags?: string[];
+  notes?: string;
+  /** Musical key, e.g. "Am", "F#". FL doesn't store one. */
+  key?: string;
+  /** Hidden from the library, board and stats (the yearly "clear out"). */
+  archived?: boolean;
+}
+
+export interface PackageResult {
+  projectPath: string;
+  zipPath: string | null;
+  bytes: number;
+  included: number;
+  missing: string[];
+  error: string | null;
+}
+
+export type AlbumKind = "album" | "ep" | "single" | "mixtape";
+
+export interface Album {
+  id: string;
+  title: string;
+  kind: AlbumKind;
+  color: string;
+  /** ISO date (yyyy-mm-dd), or null if no target date yet. */
+  releaseDate: string | null;
+  notes: string;
+  /** Ordered tracklist, by .flp path. */
+  trackPaths: string[];
+  createdAtMs: number;
+}
+
+export interface Workspace {
+  version: 1;
+  /** Keyed by .flp path. */
+  songs: Record<string, SongMeta>;
+  albums: Album[];
+}
+
+/** Whether the newest mixdown is newer than the last save of the project. */
+export type RenderFreshness = "fresh" | "stale" | "none";

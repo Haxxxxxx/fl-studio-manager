@@ -1,5 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+/// A file on disk related to a project (a backup .flp, a rendered mixdown…).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEntry {
+    pub path: String,
+    pub size_bytes: u64,
+    pub modified_at_ms: i64,
+}
+
+/// One song: the main .flp plus everything FL Studio keeps around it.
+/// Backups (FL's `Backup/<name> (overwritten at 16h12).flp` files) are
+/// grouped under their project instead of being listed as projects.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectInfo {
@@ -15,6 +27,56 @@ pub struct ProjectInfo {
     pub time_sig_num: Option<u8>,
     pub time_sig_denom: Option<u8>,
     pub fl_version: Option<String>,
+    /// Lives under a `Templates` folder — FL's user-template location.
+    pub is_template: bool,
+    /// Newest first.
+    pub backups: Vec<FileEntry>,
+    /// Audio files next to the .flp whose name starts with the project name
+    /// (e.g. `Envy.wav` beside `Envy.flp`). Newest first.
+    pub renders: Vec<FileEntry>,
+    /// Recorded takes in the sibling `Audio/` folder (FL names them
+    /// `<project>_<date>_<track>.wav`).
+    pub recordings_count: u32,
+    pub recordings_bytes: u64,
+    pub plugins: Vec<PluginInfo>,
+    pub samples: Vec<SampleInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginInfo {
+    pub name: String,
+    pub vendor: Option<String>,
+    /// Third-party plugins only: whether it's installed on this machine.
+    /// `None` for FL's native plugins (always available).
+    pub installed: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SampleStatus {
+    /// At the path the project stores.
+    Ok,
+    /// Not there, but a file with the same name is inside the song's folder
+    /// (the project was moved) — FL can usually find it.
+    Relocated,
+    Missing,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SampleInfo {
+    /// Resolved path (%FLStudioUserData% etc. expanded).
+    pub path: String,
+    pub status: SampleStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateInfo {
+    pub name: String,
+    pub category: String,
+    pub path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

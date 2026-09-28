@@ -36,6 +36,18 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
 pub fn detect_fl_studio() -> Option<String> {
     #[cfg(target_os = "windows")]
     {
+        // FL's installer records the exact exe here, wherever it was installed
+        // (e.g. D:\Programmes\Image-Line\FL64.exe).
+        use winreg::enums::HKEY_LOCAL_MACHINE;
+        let from_registry = winreg::RegKey::predef(HKEY_LOCAL_MACHINE)
+            .open_subkey("SOFTWARE\\Image-Line\\Shared\\Paths")
+            .and_then(|k| k.get_value::<String, _>("FL Studio"))
+            .ok()
+            .filter(|p| std::path::Path::new(p).exists());
+        if from_registry.is_some() {
+            return from_registry;
+        }
+
         let program_files =
             std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
         let base = std::path::Path::new(&program_files).join("Image-Line");

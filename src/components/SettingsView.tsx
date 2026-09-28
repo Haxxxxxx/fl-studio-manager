@@ -19,6 +19,7 @@ export function SettingsView() {
   const demoMode = useAppStore((s) => s.demoMode);
   const loadDemoData = useAppStore((s) => s.loadDemoData);
   const exitDemoMode = useAppStore((s) => s.exitDemoMode);
+  const startRender = useAppStore((s) => s.startRender);
   const [detecting, setDetecting] = useState(false);
   const [testState, setTestState] = useState<
     { status: "idle" } | { status: "running" } | { status: "done"; path: string } | { status: "error"; message: string }
@@ -54,7 +55,7 @@ export function SettingsView() {
       });
       return;
     }
-    const sample = projects[0];
+    const sample = projects.find((p) => !p.isTemplate);
     if (!sample) {
       setTestState({
         status: "error",
@@ -63,26 +64,18 @@ export function SettingsView() {
       return;
     }
     setTestState({ status: "running" });
-    const unlisten = await api.onRenderProgress((event) => {
-      if (event.projectPath !== sample.path) return;
-      if (event.status === "done" && event.outputPath) {
-        setTestState({ status: "done", path: event.outputPath });
-        unlisten();
-      } else if (event.status === "error") {
-        setTestState({ status: "error", message: event.message ?? "Render failed" });
-        unlisten();
-      }
-    });
     try {
-      await api.renderProjects({
-        projectPaths: [sample.path],
-        outputFolder: settings.outputFolder,
-        flStudioPath: settings.flStudioPath,
-        format: settings.renderFormat,
-      });
+      // Through the store, so the render panel and the "already rendering"
+      // guard see it like any other export.
+      await startRender([sample.path]);
+      const job = useAppStore.getState().renderJobs.get(sample.path);
+      if (job?.status === "done" && job.outputPath) {
+        setTestState({ status: "done", path: job.outputPath });
+      } else {
+        setTestState({ status: "error", message: job?.message ?? "Render failed" });
+      }
     } catch (e) {
       setTestState({ status: "error", message: e instanceof Error ? e.message : String(e) });
-      unlisten();
     }
   }
 
