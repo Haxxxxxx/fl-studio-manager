@@ -302,6 +302,8 @@ export function Dashboard() {
           </Card>
         </div>
 
+        <PitchesCard />
+
         {workspace.albums.length > 0 && (
           <Card title="Releases">
             <div className="flex flex-col gap-3">
@@ -485,6 +487,65 @@ function ActivityHeatmap() {
 }
 
 const CRITICAL = "#d03b3b";
+const FOLLOW_UP_DAYS = 14;
+
+/** Beats sent with no answer for two weeks, and recent wins. */
+function PitchesCard() {
+  const songsMeta = useAppStore((s) => s.workspace.songs);
+  const people = useAppStore((s) => s.workspace.people);
+  const projects = useAppStore((s) => s.projects);
+  const openDetail = useAppStore((s) => s.openDetail);
+
+  const { followUps, wins, total } = useMemo(() => {
+    const names = new Map(people.map((p) => [p.id, p.name]));
+    const songNames = new Map(projects.map((p) => [p.path, p.name]));
+    const cutoff = new Date(Date.now() - FOLLOW_UP_DAYS * DAY).toISOString().slice(0, 10);
+    const all = Object.entries(songsMeta).flatMap(([path, meta]) =>
+      (meta.pitches ?? []).map((pitch) => ({
+        path,
+        pitch,
+        song: songNames.get(path) ?? path.split(/[/\\]/).pop() ?? path,
+        who: names.get(pitch.personId) ?? "Unknown",
+      })),
+    );
+    return {
+      total: all.length,
+      followUps: all
+        .filter((x) => (x.pitch.outcome === "sent" || x.pitch.outcome === "listened") && x.pitch.date <= cutoff)
+        .sort((a, b) => a.pitch.date.localeCompare(b.pitch.date)),
+      wins: all
+        .filter((x) => x.pitch.outcome === "placed" || x.pitch.outcome === "sold")
+        .sort((a, b) => b.pitch.date.localeCompare(a.pitch.date)),
+    };
+  }, [songsMeta, people, projects]);
+
+  if (total === 0) return null;
+  const Row = ({ x, right }: { x: (typeof followUps)[number]; right: string }) => (
+    <button onClick={() => openDetail(x.path)} className="flex w-full items-center gap-2 rounded px-1 py-1 text-left text-xs hover:bg-white/[0.03]">
+      <span className="min-w-0 flex-1 truncate text-white/85">{x.song}</span>
+      <span className="w-32 truncate text-white/50">→ {x.who}</span>
+      <span className="w-24 text-right text-white/40">{right}</span>
+    </button>
+  );
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <Card title={`Follow up — no answer after ${FOLLOW_UP_DAYS} days`}>
+        {followUps.length === 0 ? (
+          <div className="text-xs text-white/35">Nothing waiting.</div>
+        ) : (
+          followUps.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={formatRelative(new Date(x.pitch.date).getTime())} />)
+        )}
+      </Card>
+      <Card title={`Wins — placed or sold · ${wins.length}`}>
+        {wins.length === 0 ? (
+          <div className="text-xs text-white/35">None logged yet. {total} send{total === 1 ? "" : "s"} tracked.</div>
+        ) : (
+          wins.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={x.pitch.outcome === "sold" ? "Sold" : "Placed"} />)
+        )}
+      </Card>
+    </div>
+  );
+}
 
 function usePluginStats() {
   const songs = useVisibleSongs();

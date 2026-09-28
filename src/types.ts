@@ -29,6 +29,8 @@ export interface ProjectInfo {
   recordingsBytes: number;
   plugins: PluginInfo[];
   samples: SampleInfo[];
+  /** Named mixer tracks + recorded-take labels ("Lead Voices - Nova"). */
+  trackNames: string[];
 }
 
 export interface PluginInfo {
@@ -85,6 +87,37 @@ export interface SongMeta {
   key?: string;
   /** Hidden from the library, board and stats (the yearly "clear out"). */
   archived?: boolean;
+  credits?: Credit[];
+  pitches?: Pitch[];
+}
+
+/** A collaborator or contact. Aliases are how they appear in track names
+ * ("NV", "Novah" for Nova). */
+export interface Person {
+  id: string;
+  name: string;
+  aliases: string[];
+  contact: string;
+  notes: string;
+}
+
+export interface Credit {
+  personId: string;
+  role: string;
+  /** Percentage share, if agreed. */
+  split?: number;
+}
+
+export type PitchOutcome = "sent" | "listened" | "interested" | "placed" | "sold" | "passed";
+
+/** "Sent this beat to X on date — what happened." */
+export interface Pitch {
+  id: string;
+  personId: string;
+  /** yyyy-mm-dd */
+  date: string;
+  outcome: PitchOutcome;
+  note?: string;
 }
 
 export interface PackageResult {
@@ -116,6 +149,7 @@ export interface Workspace {
   /** Keyed by .flp path. */
   songs: Record<string, SongMeta>;
   albums: Album[];
+  people: Person[];
 }
 
 /** Whether the newest mixdown is newer than the last save of the project. */

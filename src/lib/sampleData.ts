@@ -16,6 +16,7 @@ const NOUNS = [
 const STATUSES: (SongStatus | undefined)[] = ["idea", "wip", "wip", "mixing", "mastering", "done", "done", undefined];
 const TAGS = ["dark", "chill", "club", "vocals", "808", "sample-based", "collab"];
 const DAY = 24 * 60 * 60 * 1000;
+const VOCALISTS = ["Kadence", "Milo", "Nova"];
 
 const PLUGINS: { name: string; vendor: string | null }[] = [
   { name: "FLEX", vendor: null },
@@ -104,6 +105,11 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
         path: `${folder}/Samples/sample ${s + 1}.wav`,
         status: rand() > 0.96 ? ("missing" as const) : rand() > 0.85 ? ("relocated" as const) : ("ok" as const),
       })),
+      trackNames: [
+        "Instru",
+        "Bus Voices",
+        ...VOCALISTS.filter(() => rand() > 0.6).map((v) => `Lead Voices - ${v}`),
+      ],
     });
   }
 
@@ -124,9 +130,27 @@ export function generateSampleWorkspace(projects: ProjectInfo[]): Workspace {
   }
   const paths = projects.map((p) => p.path);
   const inTwoMonths = new Date(Date.now() + 60 * DAY).toISOString().slice(0, 10);
+  const daysAgo = (d: number) => new Date(Date.now() - d * DAY).toISOString().slice(0, 10);
+
+  // Kadence and Milo are known people (Nova is left for the suggestions),
+  // plus a label A&R who gets pitched beats.
+  const people = [
+    { id: "p-kadence", name: "Kadence", aliases: ["KD"], contact: "@kadence", notes: "" },
+    { id: "p-milo", name: "Milo", aliases: [], contact: "", notes: "Prefers dark, slow stuff." },
+    { id: "p-anr", name: "Sam (Night Owl Records)", aliases: [], contact: "sam@example.com", notes: "" },
+  ];
+  const outcomes = ["sent", "listened", "interested", "placed", "passed"] as const;
+  paths.slice(0, 8).forEach((path, i) => {
+    songs[path].pitches = [
+      { id: `pitch-${i}`, personId: i % 2 ? "p-anr" : "p-milo", date: daysAgo(3 + i * 6), outcome: outcomes[i % outcomes.length] },
+    ];
+  });
+  songs[paths[0]].credits = [{ personId: "p-kadence", role: "Vocals", split: 50 }];
+
   return {
     version: 1,
     songs,
+    people,
     albums: [
       {
         id: "demo-album",

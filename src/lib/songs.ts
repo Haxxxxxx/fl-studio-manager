@@ -19,7 +19,7 @@ export function statusInfo(status: SongStatus | undefined) {
 // Album cover colors — the dark categorical slots, in fixed order.
 export const ALBUM_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#9085e9", "#e66767"];
 
-export const EMPTY_WORKSPACE: Workspace = { version: 1, songs: {}, albums: [] };
+export const EMPTY_WORKSPACE: Workspace = { version: 1, songs: {}, albums: [], people: [] };
 
 export function renderFreshness(p: ProjectInfo): RenderFreshness {
   const latest = p.renders[0];
