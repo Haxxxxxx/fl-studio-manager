@@ -1,10 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, ClipboardCopy, FolderOpen, Minus, Pause, Play, Plus, Rocket, RotateCcw } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ClipboardCopy, FolderOpen, Minus, Pause, Play, Plus, Rocket, RotateCcw, Sparkles } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
-import { buildKit, demoAnalysis, formatDuration, kitChecks, kitFiles, kitSnippets, METADATA_FIELDS, type Check as KitCheck, type KitField } from "../lib/launchKit";
+import {
+  aiSummary,
+  buildKit,
+  demoAnalysis,
+  formatDuration,
+  kitChecks,
+  kitFiles,
+  kitSnippets,
+  LOW_CONFIDENCE,
+  METADATA_FIELDS,
+  type Check as KitCheck,
+  type KitField,
+  type KitInput,
+} from "../lib/launchKit";
+import { draftCopy, reviewKit } from "../lib/ai";
+import { formatRelative } from "../lib/format";
 import { songLabel, statusInfo } from "../lib/songs";
-import type { AudioAnalysis, ProjectInfo, Snippet } from "../types";
+import type { AiFieldReview, AudioAnalysis, ProjectInfo, Snippet } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { btn, btnPrimary, input } from "./ui";
 
@@ -14,6 +29,7 @@ const SNIPPET_COLORS = ["#3987e5", "#d95926", "#199e70"];
 const SOURCE_STYLE: Record<KitField["source"], { label: string; className: string }> = {
   detected: { label: "Detected", className: "bg-emerald-500/15 text-emerald-300" },
   suggested: { label: "Suggested", className: "bg-sky-500/15 text-sky-300" },
+  ai: { label: "AI draft", className: "bg-violet-500/15 text-violet-300" },
   edited: { label: "Edited", className: "bg-orange-500/15 text-orange-300" },
   missing: { label: "Needs you", className: "bg-red-500/15 text-red-300" },
 };
@@ -84,12 +100,14 @@ export function LaunchKitView() {
   }
 
   const meta = workspace.songs[project.path] ?? {};
-  const fields = buildKit({ project, meta, people: workspace.people, albums: workspace.albums, analysis });
+  const kitInput: KitInput = { project, meta, people: workspace.people, albums: workspace.albums, analysis };
+  const fields = buildKit(kitInput);
   const snippets = kitSnippets(analysis, meta);
   const extra = kitChecks(project);
   const all: KitCheck[] = [...extra, ...fields.flatMap((f) => (f.check ? [f.check] : []))];
   const missing = all.filter((c) => c.level === "missing").length;
-  const warnings = all.length - missing;
+  const ai = aiSummary(fields);
+  const warnings = all.length - missing + ai.flagged;
   const accepted = meta.launchKit?.acceptedAtMs;
   const byId = (id: KitField["id"]) => fields.find((f) => f.id === id)!;
 
@@ -136,7 +154,7 @@ export function LaunchKitView() {
               </option>
             ))}
           </select>
-          <KitStatus missing={missing} warnings={warnings} accepted={!!accepted} />
+          <KitStatus missing={missing} warnings={warnings} accepted={!!accepted} aiVerified={ai.verified} />
           <div className="ml-auto flex gap-2">
             <button
               onClick={() => acceptKit(project.path)}
@@ -187,6 +205,7 @@ export function LaunchKitView() {
           </div>
 
           <div className="flex flex-col gap-5">
+            <AiPanel path={project.path} input={kitInput} fields={fields} />
             <Card title="Snippets for reels and stories">
               <Snippets
                 project={project}
@@ -211,7 +230,7 @@ export function LaunchKitView() {
   );
 }
 
-function KitStatus({ missing, warnings, accepted }: { missing: number; warnings: number; accepted: boolean }) {
+function KitStatus({ missing, warnings, accepted, aiVerified }: { missing: number; warnings: number; accepted: boolean; aiVerified: boolean }) {
   if (missing) {
     return (
       <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs text-red-200">
@@ -222,6 +241,7 @@ function KitStatus({ missing, warnings, accepted }: { missing: number; warnings:
   return (
     <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${accepted ? "bg-emerald-500/15 text-emerald-200" : "bg-white/10 text-white/70"}`}>
       <CheckCircle2 size={12} /> {accepted ? "Reviewed, ready to export" : "Ready to review"}
+      {aiVerified && " · AI-verified"}
       {warnings ? ` · ${warnings} to check` : ""}
     </span>
   );
@@ -291,6 +311,145 @@ function FieldRow({ field, onChange, bare = false }: { field: KitField; onChange
         />
       )}
       {field.check && <CheckLine check={field.check} />}
+      {field.review && <AiLine review={field.review} onUse={(v) => onChange(v)} />}
+    </div>
+  );
+}
+
+const VERDICT_LABEL: Record<AiFieldReview["verdict"], string> = {
+  ok: "AI: looks right",
+  check: "AI: worth a look",
+  wrong: "AI: looks wrong",
+};
+
+function AiLine({ review, onUse }: { review: AiFieldReview & { stale: boolean }; onUse: (v: string) => void }) {
+  const low = review.confidence < LOW_CONFIDENCE;
+  const tone = review.stale
+    ? "text-white/30"
+    : review.verdict === "wrong"
+      ? "text-red-300"
+      : review.verdict === "check" || low
+        ? "text-amber-300"
+        : "text-emerald-300/80";
+  return (
+    <div className="flex flex-col gap-1">
+      <div className={`flex items-start gap-1.5 text-xs ${tone}`}>
+        <Sparkles size={12} className="mt-px shrink-0" />
+        <span>
+          <span className="font-medium">{VERDICT_LABEL[review.verdict]}</span> · {Math.round(review.confidence * 100)}% sure
+          {low && !review.stale && <span className="ml-1 rounded bg-amber-500/15 px-1 text-[10px]">low confidence</span>}
+          {review.reason && ` · ${review.reason}`}
+          {review.stale && " (checked an earlier value)"}
+        </span>
+      </div>
+      {review.suggestion && !review.stale && (
+        <div className="ml-[18px] flex items-center gap-2 text-xs text-white/55">
+          <span className="min-w-0 truncate" title={review.suggestion}>
+            Suggests: <span className="text-white/80">{review.suggestion}</span>
+          </span>
+          <button onClick={() => onUse(review.suggestion!)} className="shrink-0 rounded bg-white/10 px-2 py-0.5 text-white/80 hover:bg-white/15">
+            Use
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Draft copy with Gemini, then check every field. Off without a key. */
+function AiPanel({ path, input, fields }: { path: string; input: KitInput; fields: KitField[] }) {
+  const aiStatus = useAppStore((s) => s.aiStatus);
+  const settings = useAppStore((s) => s.settings);
+  const setKitAi = useAppStore((s) => s.setKitAi);
+  const setKitEdit = useAppStore((s) => s.setKitEdit);
+  const setView = useAppStore((s) => s.setView);
+  const [running, setRunning] = useState<"draft" | "review" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!aiStatus?.configured) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-violet-400/20 bg-violet-500/[0.06] p-4 text-sm">
+        <Sparkles size={16} className="shrink-0 text-violet-300" />
+        <span className="flex-1 text-white/60">AI drafts and checks are off. They need a free Gemini API key.</span>
+        <button onClick={() => setView("settings")} className={btn}>
+          Add a key
+        </button>
+      </div>
+    );
+  }
+
+  const model = settings.aiModel || aiStatus.defaultModel;
+  const summary = aiSummary(fields);
+  const drafts = input.meta.launchKit?.ai?.drafts;
+  const reviewedAt = input.meta.launchKit?.ai?.review?.atMs;
+
+  async function run(withDraft: boolean) {
+    setError(null);
+    try {
+      let current = fields;
+      if (withDraft) {
+        setRunning("draft");
+        const d = await draftCopy(input, fields, settings);
+        const newDrafts = { ...d, model, atMs: Date.now() };
+        // Asking for new copy replaces hand edits of those two fields.
+        setKitEdit(path, "captions", undefined);
+        setKitEdit(path, "coverBrief", undefined);
+        setKitAi(path, { drafts: newDrafts });
+        const kit = input.meta.launchKit ?? {};
+        const { captions: _c, coverBrief: _b, ...edits } = kit.edits ?? {};
+        current = buildKit({ ...input, meta: { ...input.meta, launchKit: { ...kit, edits, ai: { ...kit.ai, drafts: newDrafts } } } });
+      }
+      setRunning("review");
+      const review = await reviewKit(input, current, settings);
+      setKitAi(path, { review: { fields: review, model, atMs: Date.now() } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  const line =
+    summary.state === "unchecked"
+      ? "Not checked yet."
+      : summary.state === "stale"
+        ? "Some values changed since the last check."
+        : summary.verified
+          ? "Every field looks right."
+          : [
+              summary.flagged && `${summary.flagged} field${summary.flagged === 1 ? "" : "s"} to look at.`,
+              summary.skipped && `${summary.skipped} field${summary.skipped === 1 ? "" : "s"} not checked. Re-check.`,
+            ]
+              .filter(Boolean)
+              .join(" ") || "No problems found.";
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-violet-400/20 bg-violet-500/[0.06] p-4">
+      <div className="flex items-center gap-2">
+        <Sparkles size={15} className="text-violet-300" />
+        <span className="text-[11px] font-medium uppercase tracking-wide text-violet-200/70">AI layer · {model}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => run(true)} disabled={!!running} className={btnPrimary}>
+          <Sparkles size={14} /> {running === "draft" ? "Writing…" : "Write captions & brief"}
+        </button>
+        <button onClick={() => run(false)} disabled={!!running} className={btn}>
+          <Check size={14} /> {running === "review" ? "Checking every field…" : summary.state === "unchecked" ? "Check kit" : "Re-check"}
+        </button>
+        {drafts && !running && (
+          <button onClick={() => setKitAi(path, { drafts: undefined })} className="text-xs text-white/40 hover:text-white" title="Back to the template text">
+            Discard AI drafts
+          </button>
+        )}
+      </div>
+      <div className={`text-xs ${summary.verified ? "text-emerald-300" : summary.state === "checked" ? "text-amber-300" : "text-white/50"}`}>
+        {line}
+        {reviewedAt && <span className="text-white/35"> · checked {formatRelative(reviewedAt)}</span>}
+      </div>
+      {error && <div className="text-xs text-red-300">{error}</div>}
+      <div className="text-[11px] leading-relaxed text-white/30">
+        Sends the song name, tags, notes, mixer track names, credits and these fields to Google Gemini. No audio, no file paths. On the free tier Google may use them to improve its products.
+      </div>
     </div>
   );
 }

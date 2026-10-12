@@ -1,4 +1,5 @@
 mod actions;
+mod ai;
 mod audio;
 mod flp_metadata;
 mod models;
@@ -32,6 +33,9 @@ pub fn run() {
             package::package_projects,
             audio::analyze_audio,
             audio::export_launch_kit,
+            ai::ai_status,
+            ai::set_ai_key,
+            ai::ai_generate_json,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

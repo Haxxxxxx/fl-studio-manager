@@ -12,6 +12,8 @@ import type {
   RenderStatus,
   Settings,
   SongMeta,
+  AiStatus,
+  KitAiMeta,
   KitFieldId,
   SongStatus,
   Workspace,
@@ -23,6 +25,8 @@ const DEFAULT_SETTINGS: Settings = {
   outputFolder: null,
   renderFormat: "wav",
   favorites: [],
+  aiModel: null,
+  aiLanguage: null,
 };
 
 export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "settings";
@@ -124,6 +128,11 @@ interface AppState {
   setKitEdit: (path: string, id: KitFieldId, value: string | undefined) => void;
   setSnippetStart: (path: string, label: string, startSec: number | undefined) => void;
   acceptKit: (path: string) => void;
+  /** Merge AI drafts/review into a song's kit. */
+  setKitAi: (path: string, patch: Partial<KitAiMeta>) => void;
+  /** null until loaded; whether a Gemini key is set. */
+  aiStatus: AiStatus | null;
+  refreshAiStatus: () => Promise<void>;
   openNewProject: (draft?: Partial<NewProjectDraft>) => void;
   closeNewProject: () => void;
 
@@ -251,6 +260,7 @@ export const useAppStore = create<AppState>((set, get) => {
       }
       set({ settings });
       await loadWorkspace();
+      get().refreshAiStatus();
       set({ settingsLoaded: true });
 
       if (!get().unlisten) {
@@ -477,6 +487,17 @@ export const useAppStore = create<AppState>((set, get) => {
     acceptKit: (path) => {
       const kit = get().workspace.songs[path]?.launchKit ?? {};
       get().updateSong(path, { launchKit: { ...kit, acceptedAtMs: Date.now() } });
+    },
+
+    setKitAi: (path, patch) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      get().updateSong(path, { launchKit: { ...kit, ai: { ...kit.ai, ...patch } } });
+    },
+
+    aiStatus: null,
+    refreshAiStatus: async () => {
+      const aiStatus = await api.aiStatus().catch(() => null);
+      set({ aiStatus });
     },
     openNewProject: (draft) =>
       set({ newProject: { albumId: null, status: "idea", ...draft } }),

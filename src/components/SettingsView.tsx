@@ -134,6 +134,8 @@ export function SettingsView() {
           </div>
         </section>
 
+        <AiSettings />
+
         <section>
           <h2 className="text-sm font-semibold text-white/90">FL Studio executable</h2>
           <p className="mt-1 text-xs text-white/40">
@@ -239,5 +241,99 @@ export function SettingsView() {
         </section>
       </div>
     </div>
+  );
+}
+
+const AI_LANGUAGES = ["English", "French", "Spanish", "German", "Portuguese", "Italian"];
+const field =
+  "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none";
+
+/** Gemini key (write-only from here), model and copy language. */
+function AiSettings() {
+  const aiStatus = useAppStore((s) => s.aiStatus);
+  const refreshAiStatus = useAppStore((s) => s.refreshAiStatus);
+  const settings = useAppStore((s) => s.settings);
+  const updateSettings = useAppStore((s) => s.updateSettings);
+  const [key, setKey] = useState("");
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  async function saveKey(value: string | null) {
+    setMessage(null);
+    try {
+      await api.setAiKey(value);
+      await refreshAiStatus();
+      setKey("");
+      setMessage({ kind: "ok", text: value ? "Key saved on this computer." : "Key removed." });
+    } catch (e) {
+      setMessage({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  const status = !aiStatus?.configured
+    ? "Off: no key yet"
+    : aiStatus.source === "env"
+      ? "On: using GEMINI_API_KEY from the environment"
+      : "On: key saved on this computer";
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-white/90">AI (Launch Kit drafts and checks)</h2>
+      <p className="mt-1 text-xs text-white/40">
+        Uses Google Gemini on its free tier. Get a free key at{" "}
+        <button onClick={() => api.openExternal("https://aistudio.google.com/apikey")} className="text-orange-300 underline">
+          aistudio.google.com/apikey
+        </button>
+        . Everything works without it; the AI only adds drafts and a second opinion.
+      </p>
+      <div className={`mt-3 text-xs ${aiStatus?.configured ? "text-emerald-300" : "text-white/50"}`}>{status}</div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder={aiStatus?.configured ? "Paste a new key to replace it" : "Paste your Gemini API key"}
+          autoComplete="off"
+          spellCheck={false}
+          className={field}
+        />
+        <button onClick={() => saveKey(key)} disabled={!key.trim()} className="rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-400 disabled:opacity-40">
+          Save
+        </button>
+        {aiStatus?.source === "settings" && (
+          <button onClick={() => saveKey(null)} className="rounded-md border border-white/15 px-3 py-2 text-sm text-white/70 hover:bg-white/5">
+            Remove
+          </button>
+        )}
+      </div>
+      {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <label className="text-xs text-white/50">
+          Model
+          <input
+            defaultValue={settings.aiModel ?? ""}
+            onBlur={(e) => updateSettings({ aiModel: e.target.value.trim() || null })}
+            placeholder={aiStatus?.defaultModel ?? "gemini-3.8-flash"}
+            className={`${field} mt-1`}
+          />
+        </label>
+        <label className="text-xs text-white/50">
+          Language for captions and briefs
+          <select
+            value={settings.aiLanguage ?? "English"}
+            onChange={(e) => updateSettings({ aiLanguage: e.target.value === "English" ? null : e.target.value })}
+            className={`${field} mt-1`}
+          >
+            {AI_LANGUAGES.map((l) => (
+              <option key={l}>{l}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-white/30">
+        The key stays on this computer (its own file in the app config folder, not settings.json) and is never shown again. AI calls
+        send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. On the free tier Google
+        may use them to improve its products.
+      </p>
+    </section>
   );
 }

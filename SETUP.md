@@ -46,6 +46,16 @@ npm run tauri dev      # first run compiles the Rust side — a few minutes, the
 2. **Look around without a folder:** **Load sample data** fills every view with generated songs. Nothing is saved while it's on; linking a real folder leaves sample mode.
 3. **Optional, for exporting:** in Settings, check the FL Studio path (auto-detected), and pick an export folder. Use **Test render** before a batch export.
 
+## Optional: AI for the Launch Kit
+
+The Launch Kit works without AI. With a free Gemini API key it also writes captions and a cover concept, and double-checks every field before you export (verdict, confidence, suggested fix).
+
+1. Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Signing in with a Google account is enough, no billing needed.
+2. In the app: **Settings → AI**, paste the key, **Save**. Developers can set `GEMINI_API_KEY` in the environment instead; it takes precedence.
+3. Optional: pick the language for captions. The default model is `gemini-3.8-flash`; change it there if Google renames models.
+
+The key is stored only on that computer (`ai.json` in the app config folder, owner-only on macOS) and the UI never shows it again. Each crew member uses their own key, so free-tier limits are per person. AI calls send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. **On the free tier Google may use what you send to improve its products.**
+
 ## Where your data lives
 
 Stages, tags, notes, releases, people and settings are FL Manager's own data. FL Studio doesn't store them. They live in the app config folder:

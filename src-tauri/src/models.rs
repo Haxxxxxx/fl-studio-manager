@@ -91,6 +91,12 @@ pub struct Settings {
     pub render_format: String,
     #[serde(default)]
     pub favorites: Vec<String>,
+    /// Gemini model id; None = the default (ai::DEFAULT_MODEL).
+    #[serde(default)]
+    pub ai_model: Option<String>,
+    /// Language for AI-written captions and briefs ("English", "French"…).
+    #[serde(default)]
+    pub ai_language: Option<String>,
 }
 
 impl Default for Settings {
@@ -101,6 +107,8 @@ impl Default for Settings {
             output_folder: None,
             render_format: "wav".to_string(),
             favorites: Vec::new(),
+            ai_model: None,
+            ai_language: None,
         }
     }
 }

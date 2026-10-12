@@ -61,6 +61,10 @@ export interface Settings {
   outputFolder: string | null;
   renderFormat: RenderFormat;
   favorites: string[];
+  /** Gemini model id; null = the default. */
+  aiModel: string | null;
+  /** Language for AI-written copy; null = English. */
+  aiLanguage: string | null;
 }
 
 export type RenderFormat = "wav" | "mp3" | "ogg";
@@ -116,6 +120,29 @@ export interface LaunchKitMeta {
   snippetStarts?: Record<string, number>;
   /** Set by "Accept all"; cleared by any later edit. */
   acceptedAtMs?: number;
+  ai?: KitAiMeta;
+}
+
+export interface AiFieldReview {
+  verdict: "ok" | "check" | "wrong";
+  /** How sure the model is of its verdict, 0–1. */
+  confidence: number;
+  reason: string;
+  suggestion?: string;
+  /** The value that was checked; a different current value = stale. */
+  checkedValue: string;
+}
+
+export interface KitAiMeta {
+  /** AI-written text, used unless the user edited the field. */
+  drafts?: { captions: string; coverBrief: string; model: string; atMs: number };
+  review?: { fields: Partial<Record<KitFieldId, AiFieldReview>>; model: string; atMs: number };
+}
+
+export interface AiStatus {
+  configured: boolean;
+  source: "env" | "settings" | null;
+  defaultModel: string;
 }
 
 export interface Snippet {
