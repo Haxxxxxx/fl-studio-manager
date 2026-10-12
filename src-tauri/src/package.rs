@@ -32,7 +32,7 @@ pub struct PackageResult {
 /// these directly and relinks the samples by file name.
 fn package_one(resolver: &mut Resolver, project: &Path, out_dir: &Path) -> Result<PackageResult, String> {
     let meta = flp_metadata::parse_flp_metadata(project)?;
-    let (samples, missing) = resolver.package_files(&meta.samples, project);
+    let (samples, mut missing) = resolver.package_files(&meta.samples, project);
     let stem = project.file_stem().unwrap_or_default().to_string_lossy().to_string();
 
     fs::create_dir_all(out_dir).map_err(|e| format!("could not create output folder: {e}"))?;
@@ -42,8 +42,9 @@ fn package_one(resolver: &mut Resolver, project: &Path, out_dir: &Path) -> Resul
     let partial = dest.with_extension("zip.part");
     let result = write_zip(&partial, project, &samples);
     match result {
-        Ok(included) => {
+        Ok((included, unreadable)) => {
             fs::rename(&partial, &dest).map_err(|e| format!("could not finish package: {e}"))?;
+            missing.extend(unreadable);
             Ok(PackageResult {
                 project_path: project.to_string_lossy().to_string(),
                 bytes: fs::metadata(&dest).map(|m| m.len()).unwrap_or(0),
@@ -60,20 +61,21 @@ fn package_one(resolver: &mut Resolver, project: &Path, out_dir: &Path) -> Resul
     }
 }
 
-fn write_zip(dest: &Path, project: &Path, samples: &[PathBuf]) -> Result<u32, String> {
+/// Returns how many samples went in, and the ones that couldn't be read.
+fn write_zip(dest: &Path, project: &Path, samples: &[PathBuf]) -> Result<(u32, Vec<String>), String> {
     let file = File::create(dest).map_err(|e| format!("could not create zip: {e}"))?;
     let mut zip = zip::ZipWriter::new(BufWriter::new(file));
     let mut names = HashSet::new();
     let mut included = 0u32;
 
-    let mut add = |zip: &mut zip::ZipWriter<BufWriter<File>>, path: &Path| -> Result<bool, String> {
+    let mut add = |zip: &mut zip::ZipWriter<BufWriter<File>>, path: &Path, mut src: File| -> Result<bool, String> {
         let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
         // Flat layout: two different files with the same name can't both go
         // in; the first wins (FL's own export has the same limitation).
         if !names.insert(name.to_lowercase()) {
             return Ok(false);
         }
-        let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+        let size = src.metadata().map(|m| m.len()).unwrap_or(0);
         let store = path
             .extension()
             .and_then(|e| e.to_str())
@@ -83,20 +85,29 @@ fn write_zip(dest: &Path, project: &Path, samples: &[PathBuf]) -> Result<u32, St
             .large_file(size >= u32::MAX as u64);
         zip.start_file(name.as_str(), options)
             .map_err(|e| format!("zip error on {name}: {e}"))?;
-        let mut src = File::open(path).map_err(|e| format!("could not read {}: {e}", path.display()))?;
         std::io::copy(&mut src, zip).map_err(|e| format!("could not add {name}: {e}"))?;
         Ok(true)
     };
 
-    add(&mut zip, project)?;
+    let project_file = File::open(project).map_err(|e| format!("could not read {}: {e}", project.display()))?;
+    add(&mut zip, project, project_file)?;
+    let mut unreadable = Vec::new();
     for sample in samples {
-        if add(&mut zip, sample)? {
-            included += 1;
+        // A sample that exists but can't be read (permission denied, e.g.
+        // macOS-protected folders; or a folder, not a file) is reported like
+        // a missing one instead of failing the whole song.
+        match File::open(sample).ok().filter(|f| f.metadata().is_ok_and(|m| m.is_file())) {
+            Some(src) => {
+                if add(&mut zip, sample, src)? {
+                    included += 1;
+                }
+            }
+            None => unreadable.push(sample.to_string_lossy().to_string()),
         }
     }
     let mut inner = zip.finish().map_err(|e| format!("could not finish zip: {e}"))?;
     inner.flush().map_err(|e| format!("could not write zip: {e}"))?;
-    Ok(included)
+    Ok((included, unreadable))
 }
 
 /// Packages each project into `<output>/<subfolder?>/<song>.zip`, emitting a
@@ -185,6 +196,8 @@ mod tests {
         events.extend(text_event(196, &song.join("Audio").join("take1.wav").to_string_lossy()));
         events.extend(text_event(196, &root.join("Beats").join("beat.mp3").to_string_lossy()));
         events.extend(text_event(196, "C:\\gone\\lost.wav"));
+        // Exists but isn't a readable file: reported, doesn't sink the package.
+        events.extend(text_event(196, &root.join("Beats").to_string_lossy()));
         let mut flp = b"FLhd".to_vec();
         flp.extend_from_slice(&6u32.to_le_bytes());
         flp.extend_from_slice(&[0, 0, 1, 0, 96, 0]);
@@ -198,7 +211,10 @@ mod tests {
         let mut resolver = Resolver::new(None);
         let result = package_one(&mut resolver, &project, &out).unwrap();
         assert_eq!(result.included, 2);
-        assert_eq!(result.missing, vec!["C:\\gone\\lost.wav".to_string()]);
+        assert_eq!(
+            result.missing,
+            vec!["C:\\gone\\lost.wav".to_string(), root.join("Beats").to_string_lossy().to_string()]
+        );
 
         let zip_path = result.zip_path.unwrap();
         assert!(zip_path.ends_with("Envy.zip"));

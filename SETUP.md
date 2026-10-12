@@ -71,4 +71,4 @@ Stages, tags, notes, releases, people and settings are FL Manager's own data. FL
 Developed and verified mainly on Windows. On macOS, browsing, stats, pipeline, releases, people, playback and packaging work. Two features are **untested on macOS, so don't demo them there yet**:
 
 - **Export / Test render**: FL's command-line renderer flags are only verified on Windows.
-- **New song from FL's factory templates**: FL's templates live elsewhere inside the macOS app bundle. Your own templates in a linked `Templates/` folder still work.
+- **New song from FL's factory templates**: the app searches the FL Studio `.app` bundle for its `Data/Templates` folder, but this hasn't been checked against a real Mac install. Your own templates (any `.flp` in a `Templates/` folder inside a linked folder) always work.

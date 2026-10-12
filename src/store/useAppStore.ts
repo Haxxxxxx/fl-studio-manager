@@ -297,10 +297,12 @@ export const useAppStore = create<AppState>((set, get) => {
 
     removeWatchedFolder: async (folder) => {
       const current = get().settings;
-      await get().updateSettings({
-        watchedFolders: current.watchedFolders.filter((f) => f !== folder),
-      });
+      const remaining = current.watchedFolders.filter((f) => f !== folder);
+      await get().updateSettings({ watchedFolders: remaining });
       await get().rescan();
+      if (remaining.length === 0) {
+        set({ suggestedFolder: await api.detectProjectsFolder().catch(() => null) });
+      }
     },
 
     rescan: async () => {

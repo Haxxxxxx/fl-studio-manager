@@ -586,12 +586,17 @@ function PitchesCard() {
 function usePluginStats() {
   const songs = useVisibleSongs();
   return useMemo(() => {
-    const stats = new Map<string, { name: string; count: number; thirdParty: boolean; missing: boolean }>();
+    // count = songs using it; missingCount = songs where it didn't resolve
+    // (can differ per song: projects store different plugin paths).
+    const stats = new Map<string, { name: string; count: number; missingCount: number; thirdParty: boolean; missing: boolean }>();
     for (const p of songs) {
       for (const plugin of p.plugins) {
-        const s = stats.get(plugin.name) ?? { name: plugin.name, count: 0, thirdParty: plugin.installed !== null, missing: false };
+        const s = stats.get(plugin.name) ?? { name: plugin.name, count: 0, missingCount: 0, thirdParty: plugin.installed !== null, missing: false };
         s.count += 1;
-        if (plugin.installed === false) s.missing = true;
+        if (plugin.installed === false) {
+          s.missing = true;
+          s.missingCount += 1;
+        }
         stats.set(plugin.name, s);
       }
     }
@@ -736,7 +741,7 @@ function HealthCard() {
                 onClick={() => showSongs(p.name)}
                 className="rounded bg-red-500/10 px-2 py-0.5 text-[11px] text-red-200 hover:bg-red-500/20"
               >
-                {p.name} · {p.count} song{p.count === 1 ? "" : "s"}
+                {p.name} · {p.missingCount} song{p.missingCount === 1 ? "" : "s"}
               </button>
             ))}
           </div>
