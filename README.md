@@ -26,8 +26,10 @@ Statuses, tags, notes and releases are the app's own data (FL doesn't store them
 
 ## Getting started
 
+**New machine or sharing with the crew? See [SETUP.md](SETUP.md)**: prerequisites per OS, first launch, installing unsigned builds, troubleshooting.
+
 ```bash
-npm install
+npm ci
 npm run tauri dev      # launch in development
 npm run tauri build    # produce a distributable app
 ```

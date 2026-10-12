@@ -88,9 +88,7 @@ export function LibraryView() {
   const startRender = useAppStore((s) => s.startRender);
   const rendering = useAppStore((s) => s.rendering);
   const settings = useAppStore((s) => s.settings);
-  const setView = useAppStore((s) => s.setView);
   const demoMode = useAppStore((s) => s.demoMode);
-  const loadDemoData = useAppStore((s) => s.loadDemoData);
   const sortKey = useAppStore((s) => s.sortKey);
   const sortDir = useAppStore((s) => s.sortDir);
   const setSort = useAppStore((s) => s.setSort);
@@ -200,7 +198,7 @@ export function LibraryView() {
   }
 
   if (settings.watchedFolders.length === 0 && !demoMode) {
-    return <EmptyLibrary onLink={() => setView("settings")} onDemo={loadDemoData} />;
+    return <EmptyLibrary />;
   }
 
   return (
@@ -532,25 +530,51 @@ function BulkSelect({
   );
 }
 
-export function EmptyLibrary({ onLink, onDemo }: { onLink: () => void; onDemo: () => void }) {
+/** First run: no folder linked. Offers FL's default folder when it exists. */
+export function EmptyLibrary() {
+  const suggested = useAppStore((s) => s.suggestedFolder);
+  const linkFolder = useAppStore((s) => s.linkFolder);
+  const addWatchedFolder = useAppStore((s) => s.addWatchedFolder);
+  const loadDemoData = useAppStore((s) => s.loadDemoData);
+  const [error, setError] = useState<string | null>(null);
+  const run = (fn: () => Promise<void>) => () => {
+    setError(null);
+    fn().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  };
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/30">
         <FolderSearch size={28} />
       </div>
-      <div className="text-base font-medium text-white/80">No project folders linked yet</div>
-      <div className="max-w-sm text-sm text-white/40">
-        Point FL Manager at the folder where your FL Studio projects live — usually
-        Documents\Image-Line\FL Studio\Projects.
-      </div>
+      <div className="text-base font-medium text-white/80">No project folder linked yet</div>
+      {suggested ? (
+        <div className="max-w-md text-sm text-white/40">
+          Found your FL Studio projects folder:
+          <div className="mt-1.5 truncate rounded bg-white/5 px-2 py-1 font-mono text-xs text-white/60" title={suggested}>
+            {suggested}
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-sm text-sm text-white/40">
+          Point FL Manager at the folder where your FL Studio projects live — by default
+          Documents/Image-Line/FL Studio/Projects.
+        </div>
+      )}
       <div className="mt-2 flex gap-2">
-        <button onClick={onLink} className={btnPrimary}>
-          Link a project folder
+        {suggested && (
+          <button onClick={run(() => linkFolder(suggested))} className={btnPrimary}>
+            Use this folder
+          </button>
+        )}
+        <button onClick={run(addWatchedFolder)} className={suggested ? btn : btnPrimary}>
+          {suggested ? "Choose another…" : "Link a project folder"}
         </button>
-        <button onClick={onDemo} className={btn}>
+        <button onClick={loadDemoData} className={btn}>
           Load sample data
         </button>
       </div>
+      {error && <div className="max-w-md text-xs text-red-300">{error}</div>}
     </div>
   );
 }

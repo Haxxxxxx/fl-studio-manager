@@ -26,7 +26,7 @@ import {
   saveTimestamps,
   statusInfo,
 } from "../lib/songs";
-import { useVisibleSongs } from "./LibraryView";
+import { EmptyLibrary, useVisibleSongs } from "./LibraryView";
 import { ProgressBar } from "./AlbumsView";
 import { StatusDot, btn, btnPrimary } from "./ui";
 
@@ -54,6 +54,8 @@ export function Dashboard() {
   const openAlbum = useAppStore((s) => s.openAlbum);
   const openNewProject = useAppStore((s) => s.openNewProject);
   const setStatusFilter = useAppStore((s) => s.setStatusFilter);
+  const watchedFolders = useAppStore((s) => s.settings.watchedFolders);
+  const scanning = useAppStore((s) => s.scanning);
 
   const statusOf = (path: string) => workspace.songs[path]?.status;
 
@@ -113,23 +115,28 @@ export function Dashboard() {
   }, [songs]);
 
   if (songs.length === 0) {
+    if (!demoMode && watchedFolders.length === 0) return <EmptyLibrary />;
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/30">
           <FolderSearch size={28} />
         </div>
-        <div className="text-base font-medium text-white/80">Nothing to show yet</div>
-        <div className="max-w-sm text-sm text-white/40">
-          Link your FL Studio projects folder in Settings, or load sample data to look around.
-        </div>
-        <div className="mt-2 flex gap-2">
-          <button onClick={() => setView("settings")} className={btnPrimary}>
-            Link a project folder
-          </button>
-          <button onClick={loadDemoData} className={btn}>
-            Load sample data
-          </button>
-        </div>
+        <div className="text-base font-medium text-white/80">{scanning ? "Scanning your projects…" : "No songs found yet"}</div>
+        {!scanning && (
+          <>
+            <div className="max-w-sm text-sm text-white/40">
+              No .flp projects in your linked folders. Check the folders in Settings, or load sample data to look around.
+            </div>
+            <div className="mt-2 flex gap-2">
+              <button onClick={() => setView("settings")} className={btnPrimary}>
+                Open Settings
+              </button>
+              <button onClick={loadDemoData} className={btn}>
+                Load sample data
+              </button>
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -180,7 +187,7 @@ export function Dashboard() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openInFlStudio(p.path);
+                          openInFlStudio(p.path).catch((err) => console.error("couldn't open in FL Studio", err));
                         }}
                         className="flex items-center gap-1 text-white/40 opacity-0 hover:text-orange-300 group-hover:opacity-100"
                       >
@@ -254,7 +261,7 @@ export function Dashboard() {
           <Card title="Plugin toolkit — songs using each">
             <PluginToolkit />
           </Card>
-          <Card title="Will this PC open your songs?">
+          <Card title="Will this computer open your songs?">
             <HealthCard />
           </Card>
         </div>
@@ -382,35 +389,55 @@ function ActivityHeatmap() {
   const [hover, setHover] = useState<{ day: number; x: number; y: number } | null>(null);
 
   const lastSave = useMemo(() => Math.max(0, ...songs.map((p) => p.modifiedAtMs)), [songs]);
-  const { days, max, activeDays, streak, busiest } = useMemo(() => {
+  const { days, max, activeDays, streak, longest, busiest, months } = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     // Grid starts on the Monday HEATMAP_WEEKS weeks back.
     const start = new Date(today);
     start.setDate(today.getDate() - ((today.getDay() + 6) % 7) - (HEATMAP_WEEKS - 1) * 7);
-    const startMs = start.getTime();
-    const total = Math.floor((today.getTime() - startMs) / DAY) + 1;
-    const days = Array.from({ length: total }, (_, i) => ({ ms: startMs + i * DAY, saves: 0, songs: new Set<string>() }));
+    // Calendar days, not 24h steps: a DST change makes one day 23 or 25h
+    // long, which would shift every later cell's date (or drop today).
+    const dayIndex = (d: Date) =>
+      Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) -
+        Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / DAY);
+    const total = dayIndex(today) + 1;
+    const days = Array.from({ length: total }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return { date: d, saves: 0, songs: new Set<string>() };
+    });
     for (const p of songs) {
       for (const t of saveTimestamps(p)) {
-        const d = new Date(t);
-        d.setHours(0, 0, 0, 0);
-        const idx = Math.round((d.getTime() - startMs) / DAY);
+        const idx = dayIndex(new Date(t));
         if (idx >= 0 && idx < total) {
           days[idx].saves += 1;
           days[idx].songs.add(p.name);
         }
       }
     }
+    // Today doesn't break the streak until it's over.
     let streak = 0;
-    for (let i = total - 1; i >= 0 && days[i].saves > 0; i--) streak++;
+    for (let i = days[total - 1].saves ? total - 1 : total - 2; i >= 0 && days[i].saves > 0; i--) streak++;
+    let longest = 0;
+    let run = 0;
+    for (const d of days) {
+      run = d.saves ? run + 1 : 0;
+      longest = Math.max(longest, run);
+    }
     const busiest = days.reduce((a, b) => (b.saves > a.saves ? b : a), days[0]);
+    // Month label over the first column containing the 1st of that month.
+    const months: (string | null)[] = Array.from({ length: Math.ceil(total / 7) }, (_, w) => {
+      const firstOfMonth = days.slice(w * 7, w * 7 + 7).find((d) => d.date.getDate() === 1);
+      return firstOfMonth ? firstOfMonth.date.toLocaleDateString(undefined, { month: "short" }) : null;
+    });
     return {
       days,
       max: Math.max(1, ...days.map((d) => d.saves)),
       activeDays: days.filter((d) => d.saves > 0).length,
       streak,
+      longest,
       busiest,
+      months,
     };
   }, [songs]);
 
@@ -422,11 +449,19 @@ function ActivityHeatmap() {
     <div className="relative">
       <div className="flex gap-4">
         <div className="flex gap-[2px] overflow-x-auto pb-1">
+          <div className="mr-1 flex flex-col gap-[2px] pt-[15px] text-[9px] leading-[11px] text-white/30">
+            {["Mon", "", "Wed", "", "Fri", "", ""].map((d, i) => (
+              <span key={i} className="h-[11px]">{d}</span>
+            ))}
+          </div>
           {Array.from({ length: weeks }, (_, w) => (
             <div key={w} className="flex flex-col gap-[2px]">
+              <span className="h-[13px] w-[11px] overflow-visible whitespace-nowrap text-[9px] leading-[11px] text-white/30">
+                {months[w]}
+              </span>
               {days.slice(w * 7, w * 7 + 7).map((d, i) => (
                 <div
-                  key={d.ms}
+                  key={d.date.getTime()}
                   onMouseEnter={(e) => {
                     const r = e.currentTarget.getBoundingClientRect();
                     const parent = e.currentTarget.closest(".relative")!.getBoundingClientRect();
@@ -452,9 +487,10 @@ function ActivityHeatmap() {
           ) : (
             lastSave > 0 && <HeroStat label="Last session" value={formatRelative(lastSave)} />
           )}
+          {longest > 1 && <HeroStat label="Longest streak" value={`${longest} days`} />}
           {busiest.saves > 0 && (
             <div className="text-[11px] text-white/40">
-              Busiest: {new Date(busiest.ms).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {busiest.saves} saves
+              Busiest: {busiest.date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {busiest.saves} saves
             </div>
           )}
         </div>
@@ -472,7 +508,7 @@ function ActivityHeatmap() {
           style={{ left: hover.x, top: hover.y - 6 }}
         >
           <div className="text-white/50">
-            {new Date(hovered.ms).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+            {hovered.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
           </div>
           <div className="font-medium text-white">
             {hovered.saves} save{hovered.saves === 1 ? "" : "s"}
@@ -621,7 +657,7 @@ function PluginToolkit() {
       </div>
       {list.some((s) => s.missing) && (
         <div className="mt-2 flex items-center gap-1 text-[10px] text-white/40">
-          <AlertTriangle size={10} className="text-red-300" /> Not installed on this PC
+          <AlertTriangle size={10} className="text-red-300" /> Not installed on this computer
         </div>
       )}
     </div>
@@ -649,20 +685,28 @@ function HealthCard() {
     return c;
   }, [songs]);
   const affected = songs.filter(hasProblems).length;
+  const clean = songs.length - affected;
+  const pct = songs.length ? Math.floor((clean / songs.length) * 100) : 100;
 
   if (!affected && !samples.relocated) {
     return (
-      <div className="flex items-center gap-2 py-4 text-sm text-emerald-300">
-        <CheckCircle2 size={16} /> Every song has its plugins and samples.
+      <div className="flex flex-col gap-2 py-2">
+        <div className="flex items-baseline gap-2">
+          <span className="text-3xl font-semibold text-emerald-300">100%</span>
+          <span className="text-xs text-white/50">of {songs.length} songs open cleanly on this computer</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-emerald-300">
+          <CheckCircle2 size={16} /> Every song has its plugins and samples.
+        </div>
       </div>
     );
   }
   return (
     <div className="flex flex-col gap-3 text-xs">
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-semibold text-white">{affected}</span>
+        <span className={`text-3xl font-semibold ${affected ? "text-white" : "text-emerald-300"}`}>{pct}%</span>
         <span className="text-white/50">
-          of {songs.length} songs won't open cleanly here
+          of {songs.length} songs open cleanly on this computer
         </span>
         {affected > 0 && (
           <button
@@ -672,9 +716,13 @@ function HealthCard() {
             }}
             className="ml-auto text-white/45 hover:text-white"
           >
-            Show them →
+            Show {affected} →
           </button>
         )}
+      </div>
+      <div className="flex h-2 gap-[2px]" title={`${clean} open cleanly · ${affected} missing plugins or samples`}>
+        {clean > 0 && <div className="rounded-l bg-emerald-500/70 last:rounded-r" style={{ flexGrow: clean }} />}
+        {affected > 0 && <div className="rounded-r first:rounded-l" style={{ flexGrow: affected, background: CRITICAL }} />}
       </div>
       {missingPlugins.length > 0 && (
         <div>

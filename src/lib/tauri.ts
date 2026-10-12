@@ -28,6 +28,11 @@ export async function detectFlStudio(): Promise<string | null> {
   return invoke("detect_fl_studio");
 }
 
+/** FL's default `Documents/Image-Line/FL Studio/Projects`, if it exists. */
+export async function detectProjectsFolder(): Promise<string | null> {
+  return invoke("detect_projects_folder");
+}
+
 export async function renderProjects(args: {
   projectPaths: string[];
   outputFolder: string;

@@ -16,6 +16,17 @@ pub struct Resolver {
     folder_files: HashMap<PathBuf, HashMap<String, PathBuf>>,
 }
 
+/// Paths stored in a .flp use the separators of the OS it was saved on. A
+/// project made on Windows and opened on macOS has `C:\…\kick.wav`, where
+/// `\` isn't a separator — normalize so file names and folders resolve.
+fn native(raw: &str) -> String {
+    if cfg!(windows) {
+        raw.to_string()
+    } else {
+        raw.replace('\\', "/")
+    }
+}
+
 fn lower_file_name(p: &Path) -> Option<String> {
     p.file_name().map(|n| n.to_string_lossy().to_lowercase())
 }
@@ -57,9 +68,23 @@ fn plugin_dirs() -> Vec<PathBuf> {
     {
         dirs.push(PathBuf::from(p));
     }
+    // Per-user installs (many installers default to these).
+    #[cfg(target_os = "windows")]
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        dirs.push(Path::new(&local).join("Programs").join("Common").join("VST3"));
+        dirs.push(Path::new(&local).join("Programs").join("Common").join("CLAP"));
+    }
     #[cfg(target_os = "macos")]
-    for d in ["/Library/Audio/Plug-Ins/VST3", "/Library/Audio/Plug-Ins/VST", "/Library/Audio/Plug-Ins/CLAP", "/Library/Audio/Plug-Ins/Components"] {
-        dirs.push(PathBuf::from(d));
+    {
+        let mut roots = vec![PathBuf::from("/Library/Audio/Plug-Ins")];
+        if let Ok(home) = std::env::var("HOME") {
+            roots.push(Path::new(&home).join("Library/Audio/Plug-Ins"));
+        }
+        for root in roots {
+            for d in ["VST3", "VST", "CLAP", "Components"] {
+                dirs.push(root.join(d));
+            }
+        }
     }
     dirs
 }
@@ -121,13 +146,14 @@ impl Resolver {
 
     /// Where a stored sample path actually is on disk right now, if anywhere.
     fn locate(&mut self, raw: &str, project: &Path) -> (String, SampleStatus, Option<PathBuf>) {
+        // Shown as stored (what FL displays); looked up with native separators.
         let path = self.expand(raw, project);
-        if self.exists(&path) {
-            let found = PathBuf::from(&path);
-            return (path, SampleStatus::Ok, Some(found));
+        let on_disk = native(&path);
+        if self.exists(&on_disk) {
+            return (path, SampleStatus::Ok, Some(PathBuf::from(on_disk)));
         }
         let folder = project.parent().unwrap_or(project).to_path_buf();
-        let moved = lower_file_name(Path::new(&path))
+        let moved = lower_file_name(Path::new(&on_disk))
             .and_then(|n| self.files_in_song_folder(&folder).get(&n).cloned());
         match moved {
             Some(p) => (path, SampleStatus::Relocated, Some(p)),
@@ -167,9 +193,9 @@ impl Resolver {
                 // a project saved on another PC (VST2 .dll on D:\…) still
                 // counts as installed if the same plugin is here in any
                 // format: match the stored path, its file stem, or the name.
-                let installed = p.path.as_ref().map(|path| {
-                    self.exists(path)
-                        || lower_file_stem(Path::new(path)).is_some_and(|s| self.installed_plugins.contains(&s))
+                let installed = p.path.as_deref().map(native).map(|path| {
+                    self.exists(&path)
+                        || lower_file_stem(Path::new(&path)).is_some_and(|s| self.installed_plugins.contains(&s))
                         || self.installed_plugins.contains(&p.name.to_lowercase())
                 });
                 PluginInfo {
