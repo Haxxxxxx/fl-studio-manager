@@ -19,7 +19,7 @@ const ID_ARTISTS: u8 = 207; // ProjectID.Artists
 const ID_SAMPLE_PATH: u8 = 196; // ChannelID.SamplePath (may start with %FLStudioUserData% etc.)
 const ID_PLUGIN_INTERNAL_NAME: u8 = 201; // PluginID.InternalName ("Fruity Limiter", "Fruity Wrapper"…)
 const ID_PLUGIN_DATA: u8 = 213; // PluginID.Data — for "Fruity Wrapper", the hosted VST's info
-const ID_INSERT_NAME: u8 = 204; // InsertID.Name — mixer track names ("Main Voice Brea-Q")
+const ID_INSERT_NAME: u8 = 204; // InsertID.Name — mixer track names ("Main Voice Nova")
 
 // Records inside a Fruity Wrapper data blob: [u32 id][u64 size][payload].
 // IDs confirmed on FL 24/25 projects (54/55/56 hold UTF-8 strings).
@@ -249,7 +249,7 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
         meta.tempo_bpm = Some(coarse + fine);
     }
 
-    // Some real projects carry garbage here (seen: 522055.422 BPM in "3/1"
+    // Some real projects carry garbage here (seen: 522055.422 BPM
     // from an FL 24 project). FL's tempo range is 10–522 BPM; anything
     // outside it means the fields can't be trusted, so drop them.
     if meta.tempo_bpm.is_some_and(|t| !(10.0..=522.0).contains(&t)) {

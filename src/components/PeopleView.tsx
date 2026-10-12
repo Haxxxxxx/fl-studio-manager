@@ -101,7 +101,7 @@ function PeopleList() {
               ))}
             </div>
             <div className="mt-2 text-[11px] text-white/30">
-              Same person under several spellings (BQ, Breaq…)? Add one, then add the others as aliases on their page.
+              Same person under several spellings (NV, Novah…)? Add one, then add the others as aliases on their page.
             </div>
           </div>
         )}
@@ -190,7 +190,7 @@ function PersonDetail({ person }: { person: Person }) {
           <div>
             <div className={`${sectionLabel} mb-2`}>Also appears as</div>
             <TagEditor tags={person.aliases} suggestions={[]} onChange={(aliases) => updatePerson(person.id, { aliases })} />
-            <div className="mt-1 text-[11px] text-white/30">Spellings used in track names (BQ, Breaq…). Case doesn't matter.</div>
+            <div className="mt-1 text-[11px] text-white/30">Spellings used in track names (NV, Novah…). Case doesn't matter.</div>
           </div>
           <div>
             <div className={`${sectionLabel} mb-2`}>Contact</div>

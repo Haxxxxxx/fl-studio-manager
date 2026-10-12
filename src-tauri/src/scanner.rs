@@ -64,7 +64,7 @@ pub(crate) fn backup_base_name(stem: &str) -> &str {
 
 /// FL names recorded takes `<project>_<YYYY-MM-DD HH-MM-SS>_<mixer track>`,
 /// plus `_2` / ` - Part_1` / ` (consolidated)` suffixes. Returns the mixer
-/// track part ("Lead Voices - Brea-Q").
+/// track part ("Lead Voices - Nova").
 pub(crate) fn recording_label(stem: &str) -> Option<String> {
     // Find "_YYYY-MM-DD HH-MM-SS_" by shape rather than by project name, so
     // takes recorded under an older project name still work.
@@ -363,10 +363,10 @@ mod tests {
     #[test]
     fn extracts_recording_labels() {
         let l = |s: &str| recording_label(s);
-        assert_eq!(l("Envy_2025-12-15 18-49-59_Voice 1 - Chouls").as_deref(), Some("Voice 1 - Chouls"));
-        assert_eq!(l("Envy_2025-12-16 22-16-05_Ambiance 2 - Chouls - Part_1").as_deref(), Some("Ambiance 2 - Chouls"));
+        assert_eq!(l("Envy_2025-12-15 18-49-59_Voice 1 - Kairo").as_deref(), Some("Voice 1 - Kairo"));
+        assert_eq!(l("Envy_2025-12-16 22-16-05_Ambiance 2 - Kairo - Part_1").as_deref(), Some("Ambiance 2 - Kairo"));
         assert_eq!(l("Ft Le Q_2025-05-19 21-32-32_Main Voice - Feal_2").as_deref(), Some("Main Voice - Feal"));
-        assert_eq!(l("Old_Name_2025-05-01 00-54-19_Ambiances 2 - BQ ").as_deref(), Some("Ambiances 2 - BQ"));
+        assert_eq!(l("Old_Name_2025-05-01 00-54-19_Ambiances 2 - NV ").as_deref(), Some("Ambiances 2 - NV"));
         assert_eq!(l("X_2025-02-01 17-51-18_REC (consolidated)"), None);
         assert_eq!(l("X_2025-02-01 17-51-18_Insert 9"), None);
         assert_eq!(l("not a recording"), None);
