@@ -1,4 +1,4 @@
-import { Disc3, KanbanSquare, LayoutDashboard, Library, Music2, Plus, Settings as SettingsIcon, Users } from "lucide-react";
+import { Disc3, KanbanSquare, LayoutDashboard, Library, Music2, Plus, Rocket, Settings as SettingsIcon, Users } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 
 export function Sidebar() {
@@ -19,6 +19,7 @@ export function Sidebar() {
     { id: "pipeline" as const, label: "Pipeline", icon: KanbanSquare },
     { id: "albums" as const, label: "Releases", icon: Disc3, badge: albums.length },
     { id: "people" as const, label: "People", icon: Users, badge: peopleCount },
+    { id: "launch" as const, label: "Launch Kit", icon: Rocket },
     { id: "settings" as const, label: "Settings", icon: SettingsIcon },
   ];
 
