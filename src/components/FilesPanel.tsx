@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Clapperboard, Disc3, FileAudio, History, Image, Layers, Mic, Music2, Package, Rocket } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
-import { cleanTitle } from "../lib/launchKit";
+import { kitTitleFor } from "../lib/launchKit";
 import { formatBytes, formatRelative } from "../lib/format";
 import type { ProjectInfo } from "../types";
 import { FileRow } from "../ui";
@@ -28,7 +28,7 @@ export function FilesPanel({ project }: { project: ProjectInfo }) {
   const openLaunchKit = useAppStore((s) => s.openLaunchKit);
   const [kit, setKit] = useState<api.KitFile[] | null>(null);
   // The kit folder is named after the kit's title (as the export does).
-  const kitTitle = meta?.launchKit?.edits?.title || cleanTitle(project.name) || project.name;
+  const kitTitle = kitTitleFor(project, meta);
 
   useEffect(() => {
     let live = true;

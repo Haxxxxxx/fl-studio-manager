@@ -27,6 +27,15 @@ export function NewProjectModal() {
 
   const userTemplates = useMemo(() => projects.filter((p) => p.isTemplate), [projects]);
 
+  // The modal stays mounted: re-pick the location each time it opens, so a
+  // folder linked (or removed) since the app started is reflected.
+  const folders = settings.watchedFolders;
+  useEffect(() => {
+    if (!draft) return;
+    setParentFolder((current) => (folders.includes(current) ? current : folders[0] ?? ""));
+    setError(null);
+  }, [draft, folders]);
+
   useEffect(() => {
     if (!draft) return;
     setStatus(draft.status);
@@ -70,10 +79,18 @@ export function NewProjectModal() {
         albumId: albumId || null,
         status,
       });
-      close();
       setName("");
       openDetail(path);
-      if (openAfter) await api.openInFlStudio(path);
+      if (openAfter) {
+        try {
+          await api.openInFlStudio(path);
+        } catch (e) {
+          // The song exists; say so here instead of on a closed modal.
+          setError(`Created ${trimmed}, but it didn't open: ${e instanceof Error ? e.message : String(e)}. Open it from the song panel.`);
+          return;
+        }
+      }
+      close();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
