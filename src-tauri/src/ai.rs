@@ -146,6 +146,8 @@ const MAX_RETRIES: u32 = 4;
 const FALLBACK_RETRIES: u32 = 2;
 /// Longest server-suggested wait we sit through; longer (daily quota) fails fast.
 const MAX_WAIT: Duration = Duration::from_secs(20);
+/// Hard cap on one AI action, retries and fallback included.
+const DEADLINE: Duration = Duration::from_secs(120);
 
 /// Transient per Google's guidance: rate limits, timeouts, server errors.
 fn retryable(status: u16) -> bool {
@@ -267,7 +269,10 @@ pub async fn ai_generate_json(
         .build()
         .map_err(|e| format!("could not start the HTTP client: {e}"))?;
 
-    let (used, result) = generate_with_fallback(&client, ENDPOINT, &key, &model, &body).await;
+    // Retries on a busy free tier can add up: never leave the button spinning.
+    let (used, result) = tokio::time::timeout(DEADLINE, generate_with_fallback(&client, ENDPOINT, &key, &model, &body))
+        .await
+        .map_err(|_| "Gemini didn't answer within 2 minutes (busy or rate-limited). Try again later.".to_string())?;
     let v = result.map_err(|f| match f {
         Failure::Http(status, v) => explain_error(status, &v, &model),
         Failure::Other(message) => message,
