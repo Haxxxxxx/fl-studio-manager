@@ -109,12 +109,12 @@ Goal: the existing app runs cleanly and impresses on first demo.
 Goal: from personal monitor to crew tool, and build the deal-breaker.
 
 **1a. Shared crew dashboard**
-- [ ] Multi-user: each crew member's FL Studio projects visible to the group
+- [x] Multi-user: each crew member's FL Studio projects visible to the group _(opt-in per song; metadata only; Supabase EU + web dashboard)_
 - [x] Board view of all tracks by lifecycle stage (Creation → Promotion) _(local: your own projects; shared once multi-user lands)_
 - [x] Who's working on what, last activity per project, stalled tracks _(dashboard: Crew + Stalled cards)_
-- [ ] Decide which stats matter **to the group** vs. only to me, and surface the group ones
+- [x] Decide which stats matter **to the group** vs. only to me, and surface the group ones _(Dashboard: Me / Crew switch)_
 - [x] Release calendar (planned and past release dates)
-- [ ] Clear view of **where each track's files live** (project, stems, bounces, artwork)
+- [x] Clear view of **where each track's files live** (project, stems, bounces, artwork) _(song panel → Files; stems not tracked yet)_
 
 **1b. Launch Kit MVP**
 - [ ] Extract everything possible from the FL Studio project / exported audio (BPM, key, duration, stems, timestamps, contributors)
