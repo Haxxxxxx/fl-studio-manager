@@ -249,7 +249,7 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
         meta.tempo_bpm = Some(coarse + fine);
     }
 
-    // Some real projects carry garbage here (seen: 522055.422 BPM in "3/1"
+    // Some real projects carry garbage here (seen: 522055.422 BPM
     // from an FL 24 project). FL's tempo range is 10–522 BPM; anything
     // outside it means the fields can't be trusted, so drop them.
     if meta.tempo_bpm.is_some_and(|t| !(10.0..=522.0).contains(&t)) {

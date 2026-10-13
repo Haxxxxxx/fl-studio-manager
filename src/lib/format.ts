@@ -1,3 +1,6 @@
+/** What the OS calls the place deleted files go. */
+export const TRASH_NAME = navigator.userAgent.includes("Mac") ? "Trash" : "Recycle Bin";
+
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];

@@ -172,6 +172,13 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
             if !entry.file_type().is_file() || !has_ext(path, &["flp"]) {
                 continue;
             }
+            // macOS metadata twins (`._Envy.flp`, `__MACOSX/`) from unzipped
+            // packages or exFAT drives aren't projects.
+            if entry.file_name().to_string_lossy().starts_with("._")
+                || path.components().any(|c| c.as_os_str() == "__MACOSX")
+            {
+                continue;
+            }
             // Overlapping linked folders would otherwise list a project twice.
             if !seen.insert(path.to_string_lossy().to_lowercase()) {
                 continue;

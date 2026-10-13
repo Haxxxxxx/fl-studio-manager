@@ -18,6 +18,7 @@ pub fn run() {
             settings::get_settings,
             settings::save_settings,
             settings::detect_fl_studio,
+            settings::detect_projects_folder,
             render::render_projects,
             workspace::get_workspace,
             workspace::save_workspace,

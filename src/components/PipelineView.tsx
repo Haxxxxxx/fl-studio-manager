@@ -21,8 +21,6 @@ export function PipelineView() {
   const openNewProject = useAppStore((s) => s.openNewProject);
   const settings = useAppStore((s) => s.settings);
   const demoMode = useAppStore((s) => s.demoMode);
-  const setView = useAppStore((s) => s.setView);
-  const loadDemoData = useAppStore((s) => s.loadDemoData);
   const [dragOver, setDragOver] = useState<string | null>(null);
 
   const columns = useMemo(() => {
@@ -32,7 +30,7 @@ export function PipelineView() {
   }, [songs, workspace.songs]);
 
   if (settings.watchedFolders.length === 0 && !demoMode) {
-    return <EmptyLibrary onLink={() => setView("settings")} onDemo={loadDemoData} />;
+    return <EmptyLibrary />;
   }
 
   return (

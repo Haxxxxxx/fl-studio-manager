@@ -53,6 +53,8 @@ interface AppState {
   settings: Settings;
   settingsLoaded: boolean;
   startupError: string | null;
+  /** FL's default projects folder when found and nothing is linked yet. */
+  suggestedFolder: string | null;
   workspace: Workspace;
   /** False if the stored workspace couldn't be read — see loadWorkspace. */
   workspaceWritable: boolean;
@@ -88,6 +90,8 @@ interface AppState {
   init: () => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   addWatchedFolder: () => Promise<void>;
+  /** Link a known folder (e.g. the suggested one) and scan it. */
+  linkFolder: (folder: string) => Promise<void>;
   removeWatchedFolder: (folder: string) => Promise<void>;
   rescan: () => Promise<void>;
   toggleSelected: (path: string) => void;
@@ -150,6 +154,7 @@ interface AppState {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let scanSeq = 0;
 
 export const useAppStore = create<AppState>((set, get) => {
   /** Apply a change to the workspace and persist it (debounced, so typing
@@ -192,6 +197,7 @@ export const useAppStore = create<AppState>((set, get) => {
     settings: DEFAULT_SETTINGS,
     settingsLoaded: false,
     startupError: null,
+    suggestedFolder: null,
     workspace: EMPTY_WORKSPACE,
     workspaceWritable: false,
     projects: [],
@@ -255,6 +261,9 @@ export const useAppStore = create<AppState>((set, get) => {
 
       if (settings.watchedFolders.length > 0) {
         await get().rescan().catch((e) => set({ startupError: `Scanning failed: ${String(e)}` }));
+      } else {
+        // Fresh machine: offer FL's default folder as a one-click link.
+        set({ suggestedFolder: await api.detectProjectsFolder().catch(() => null) });
       }
     },
 
@@ -267,10 +276,19 @@ export const useAppStore = create<AppState>((set, get) => {
 
     addWatchedFolder: async () => {
       const folder = await api.pickFolder();
-      if (!folder) return;
+      if (folder) await get().linkFolder(folder);
+    },
+
+    linkFolder: async (folder) => {
       const current = get().settings;
       if (current.watchedFolders.includes(folder)) return;
-      set({ demoMode: false });
+      // Leaving sample data: drop its fake albums/people before anything
+      // can be saved over the real workspace.
+      if (get().demoMode) {
+        set({ demoMode: false, projects: [], selected: new Set(), detailPath: null, openAlbumId: null });
+        await loadWorkspace();
+      }
+      set({ suggestedFolder: null });
       await get().updateSettings({
         watchedFolders: [...current.watchedFolders, folder],
       });
@@ -279,10 +297,12 @@ export const useAppStore = create<AppState>((set, get) => {
 
     removeWatchedFolder: async (folder) => {
       const current = get().settings;
-      await get().updateSettings({
-        watchedFolders: current.watchedFolders.filter((f) => f !== folder),
-      });
+      const remaining = current.watchedFolders.filter((f) => f !== folder);
+      await get().updateSettings({ watchedFolders: remaining });
       await get().rescan();
+      if (remaining.length === 0) {
+        set({ suggestedFolder: await api.detectProjectsFolder().catch(() => null) });
+      }
     },
 
     rescan: async () => {
@@ -292,12 +312,15 @@ export const useAppStore = create<AppState>((set, get) => {
         set({ projects: [] });
         return;
       }
+      // Scans can overlap (window focus + adding a folder); only the newest
+      // one may write, so a slow stale scan can't hide a new folder.
+      const id = ++scanSeq;
       set({ scanning: true });
       try {
         const projects = await api.scanProjects(folders, get().settings.outputFolder);
-        set({ projects });
+        if (id === scanSeq && !get().demoMode) set({ projects });
       } finally {
-        set({ scanning: false });
+        if (id === scanSeq) set({ scanning: false });
       }
     },
 

@@ -45,7 +45,7 @@ function candidateFrom(track: string): string | null {
   // "Lead Voices - Nova" → "Nova"
   const dash = track.lastIndexOf(" - ");
   let tail = dash >= 0 ? track.slice(dash + 3) : "";
-  // "Lead Voice Kairo" / "Voice 1 NV" / "Lead voice Echo Vale" → the words
+  // "Lead Voice Kairo" / "Voice 1 NV" / "Lead voice Lil Ember" → the words
   // after the voice word, minus take numbers.
   if (!tail) {
     const words = track.split(/\s+/);

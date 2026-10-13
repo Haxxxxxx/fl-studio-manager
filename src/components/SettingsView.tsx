@@ -4,6 +4,8 @@ import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import type { RenderFormat } from "../types";
 
+const IS_MAC = navigator.userAgent.includes("Mac");
+
 const FORMATS: { id: RenderFormat; label: string }[] = [
   { id: "wav", label: "WAV" },
   { id: "mp3", label: "MP3" },
@@ -207,6 +209,12 @@ export function SettingsView() {
             documented feature. Run one test render on a real project before
             trusting a big batch export.
           </p>
+          {IS_MAC && (
+            <p className="mt-1 text-xs text-amber-300/80">
+              Only verified on Windows so far. If FL Studio opens normally instead of rendering, quit it — the
+              render gives up after 15 minutes.
+            </p>
+          )}
           <button
             onClick={handleTestRender}
             disabled={testState.status === "running" || demoMode}

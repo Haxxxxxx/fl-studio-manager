@@ -26,8 +26,10 @@ Statuses, tags, notes and releases are the app's own data (FL doesn't store them
 
 ## Getting started
 
+**New machine or sharing with the crew? See [SETUP.md](SETUP.md)**: prerequisites per OS, first launch, installing unsigned builds, troubleshooting.
+
 ```bash
-npm install
+npm ci
 npm run tauri dev      # launch in development
 npm run tauri build    # produce a distributable app
 ```
@@ -55,7 +57,7 @@ Practical implications:
 Practical implications:
 
 - **Genre/Artist/Title are usually empty.** FL stores them as empty strings unless you fill in Project Info; they come back as null. That's why organization is done with the app's own stages, tags and releases instead.
-- Tempo outside FL's 10–522 BPM range (seen in the wild: 522055 BPM in "3/1") is treated as garbage and dropped along with the time signature.
+- Tempo outside FL's 10–522 BPM range (seen in the wild: 522055 BPM) is treated as garbage and dropped along with the time signature.
 - Reading is best-effort and defensive: a corrupt, unusual, or unrecognized `.flp` just shows up with no metadata rather than failing the whole scan.
 - Reading metadata means the scanner now opens and partially reads every `.flp` file (not just `stat`s it). It stops early once it's found what it's looking for (title/tempo/time-signature/version, plus genre/artist if found within the first 256KB of the file's event stream), so this should still be fast even for large libraries — but it is slower than a pure filesystem scan.
 

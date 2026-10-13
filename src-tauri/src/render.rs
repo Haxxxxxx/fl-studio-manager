@@ -2,7 +2,8 @@ use crate::models::{RenderEvent, RenderStatus};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 
 const RENDER_TIMEOUT: Duration = Duration::from_secs(15 * 60);
@@ -43,19 +44,26 @@ fn render_one(
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| "Untitled".to_string());
 
+    // Unique per render: a reused folder could hand a stale file from an
+    // earlier failed render to find_rendered_file.
+    static RENDER_SEQ: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let temp_dir = std::env::temp_dir().join(format!(
-        "flsm-render-{}-{}",
+        "flsm-render-{}-{nanos}-{}",
         std::process::id(),
-        Instant::now().elapsed().as_nanos()
+        RENDER_SEQ.fetch_add(1, Ordering::Relaxed)
     ));
     fs::create_dir_all(&temp_dir).map_err(|e| format!("could not create staging folder: {e}"))?;
-
-    let staged_flp = temp_dir.join(file_name);
-    fs::copy(src, &staged_flp).map_err(|e| format!("could not stage project file: {e}"))?;
 
     let cleanup = |dir: &Path| {
         let _ = fs::remove_dir_all(dir);
     };
+
+    let staged_flp = temp_dir.join(file_name);
+    if let Err(e) = fs::copy(src, &staged_flp) {
+        cleanup(&temp_dir);
+        return Err(format!("could not stage project file: {e}"));
+    }
 
     let mut child = match Command::new(fl_studio_path)
         .arg("/R")
@@ -109,8 +117,10 @@ fn render_one(
         }
     };
 
-    fs::create_dir_all(output_folder)
-        .map_err(|e| format!("could not create output folder: {e}"))?;
+    if let Err(e) = fs::create_dir_all(output_folder) {
+        cleanup(&temp_dir);
+        return Err(format!("could not create output folder: {e}"));
+    }
     let dest = unique_output_path(output_folder, output_name.unwrap_or(&base_name), format);
     let copy_result = fs::copy(&rendered_file, &dest);
     cleanup(&temp_dir);
