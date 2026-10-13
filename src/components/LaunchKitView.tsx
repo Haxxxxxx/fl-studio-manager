@@ -383,6 +383,8 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
   const summary = aiSummary(fields);
   const drafts = input.meta.launchKit?.ai?.drafts;
   const reviewedAt = input.meta.launchKit?.ai?.review?.atMs;
+  const answeredBy = [drafts?.model, input.meta.launchKit?.ai?.review?.model];
+  const backupUsed = answeredBy.find((m) => m && m !== model);
 
   async function run(withDraft: boolean) {
     setError(null);
@@ -396,7 +398,8 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
         setRunning("draft");
         const d = await draftCopy(input, fields, settings);
         if (!stillValid()) return;
-        const newDrafts = { ...d, model, atMs: Date.now() };
+        // d.model is the model that answered (the backup one if Gemini was busy).
+        const newDrafts = { ...d, atMs: Date.now() };
         // Asking for new copy replaces hand edits of those two fields.
         setKitEdit(path, "captions", undefined);
         setKitEdit(path, "coverBrief", undefined);
@@ -406,9 +409,9 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
         current = buildKit({ ...input, meta: { ...input.meta, launchKit: { ...kit, edits, ai: { ...kit.ai, drafts: newDrafts } } } });
       }
       setRunning("review");
-      const review = await reviewKit(input, current, settings);
+      const checked = await reviewKit(input, current, settings);
       if (!stillValid()) return;
-      setKitAi(path, { review: { fields: review, model, atMs: Date.now() } });
+      setKitAi(path, { review: { fields: checked.review, model: checked.model, atMs: Date.now() } });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -453,6 +456,12 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
         {line}
         {reviewedAt && <span className="text-white/35"> · checked {formatRelative(reviewedAt)}</span>}
       </div>
+      {running && (
+        <div className="text-[11px] text-white/40">If Gemini is busy this retries on its own; it gives up after 2 minutes.</div>
+      )}
+      {backupUsed && !running && (
+        <div className="text-[11px] text-white/40">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>
+      )}
       {error && <div className="text-xs text-red-300">{error}</div>}
       <div className="text-[11px] leading-relaxed text-white/30">
         Sends the song name, tags, notes, mixer track names, credits and these fields to Google Gemini. No audio, no file paths. On the free tier Google may use them to improve its products.
