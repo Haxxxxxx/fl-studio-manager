@@ -1,8 +1,9 @@
+import { statusInfo } from "../lib/songs";
 import { crewText } from "../lib/crewMessages";
 import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { crewErrorMessage, supabase } from "../lib/supabase";
-import { localStageMoves, remoteStageMoves, shareElsewhere, sharedHere, sharedPayloads, staleShareIds, type ShareScope } from "../lib/crewSync";
+import { shareElsewhere, sharedHere, sharedPayloads, stageSync, staleShareIds, type ShareScope, type StageSync } from "../lib/crewSync";
 import type { CrewMemberRow, CrewSongRow, CrewSummary, SongStatus } from "../types";
 import { useAppStore } from "./useAppStore";
 
@@ -74,6 +75,8 @@ interface CrewState {
   moveShares: (paths: string[]) => Promise<void>;
   /** Move any crew song on the shared board. */
   moveCrewSong: (songId: string, stage: SongStatus | null) => Promise<void>;
+  /** A crewmate moved my song while my move was waiting: keep theirs or mine. */
+  resolveStageConflict: (path: string, keep: "theirs" | "mine") => void;
   syncNow: () => Promise<void>;
 }
 
@@ -167,14 +170,35 @@ export const useCrewStore = create<CrewState>((set, get) => {
     applyRemoteMoves();
   }
 
-  /** Apply stage moves made on the crew board to my local songs. */
+  /** Apply the crew's stage moves to my local songs (adopt, settle, or flag
+   * a conflict). Sending my own waiting moves is push()'s job. */
   function applyRemoteMoves() {
-    const uid = get().userId;
-    if (!uid || !canSync()) return;
-    const app = useAppStore.getState();
-    for (const m of remoteStageMoves(get().songs, app.workspace, uid)) {
-      app.updateSong(m.path, { status: m.stage, stageUpdatedAtMs: m.atMs });
+    const sc = scope();
+    if (!sc || !canSync()) return;
+    for (const a of stageSync(get().songs, useAppStore.getState().workspace, sc)) {
+      if (a.kind !== "push") applyStage(a);
     }
+  }
+
+  function applyStage(a: Exclude<StageSync, { kind: "push" }>) {
+    const app = useAppStore.getState();
+    if (a.kind === "adopt") {
+      app.updateSong(a.path, { status: a.stage, stageBaseAt: a.at, stagePending: false, stageConflict: undefined, stageUpdatedAtMs: Date.parse(a.at) });
+    } else if (a.kind === "settle") {
+      app.updateSong(a.path, { stageBaseAt: a.at, stagePending: false, stageConflict: undefined });
+    } else {
+      app.updateSong(a.path, { stageConflict: a.conflict });
+    }
+  }
+
+  /** move_song_stage: applied only if the song is still at `expected`. */
+  async function moveStage(id: string, stage: SongStatus | null, expected: string | null) {
+    if (!supabase) throw new Error("crew sharing is off");
+    const { data, error } = await supabase.rpc("move_song_stage", { p_song: id, p_stage: stage, p_expected_at: expected });
+    if (error) throw error;
+    const r = (Array.isArray(data) ? data[0] : data) as { applied: boolean; stage: SongStatus | null; stage_updated_at: string; stage_updated_by: string | null };
+    set({ songs: get().songs.map((s) => (s.id === id ? { ...s, stage: r.stage, stage_updated_at: r.stage_updated_at, stage_updated_by: r.stage_updated_by } : s)) });
+    return r;
   }
 
   function subscribe(crewId: string | null) {
@@ -270,10 +294,16 @@ export const useCrewStore = create<CrewState>((set, get) => {
       .map(({ stage: _stage, ...rest }) => rest)
       .filter((r) => lastPushed.get(r.id) !== JSON.stringify(r) && rejected.get(r.id) !== JSON.stringify(r));
     for (const r of await upsertRows(changed, false)) lastPushed.set(r.id, JSON.stringify(r));
-    // My stage moves the crew hasn't seen (newer than the row's).
-    for (const m of localStageMoves(get().songs, workspace, sc)) {
-      const { error } = await supabase.rpc("set_song_stage", { p_song: m.id, p_stage: m.stage });
-      if (error) throw error;
+    // Stage: the crew's moves first, then mine, each sent with the version it
+    // was made on (a crewmate's move in between makes it a conflict).
+    for (const a of stageSync(get().songs, workspace, sc)) {
+      if (a.kind !== "push") {
+        applyStage(a);
+        continue;
+      }
+      const r = await moveStage(a.id, a.stage, a.base);
+      if (r.applied) applyStage({ kind: "settle", path: a.path, at: r.stage_updated_at });
+      else applyStage({ kind: "conflict", path: a.path, conflict: { mine: a.stage, theirs: r.stage, by: r.stage_updated_by, at: r.stage_updated_at } });
     }
     // Rows I explicitly stopped sharing.
     const stale = staleShareIds(get().songs, workspace, sc);
@@ -558,14 +588,34 @@ export const useCrewStore = create<CrewState>((set, get) => {
     moveCrewSong: async (songId, stage) => {
       if (!supabase) return;
       const before = get().songs;
-      set({ songs: before.map((s) => (s.id === songId ? { ...s, stage, stage_updated_at: new Date().toISOString(), stage_updated_by: get().userId } : s)) });
-      const { error } = await supabase.rpc("set_song_stage", { p_song: songId, p_stage: stage });
-      if (error) {
+      const row = before.find((s) => s.id === songId);
+      // Optimistic stage only: the version stays the one this move was made on.
+      set({ songs: before.map((s) => (s.id === songId ? { ...s, stage } : s)) });
+      let r;
+      try {
+        r = await moveStage(songId, stage, row?.stage_updated_at ?? null);
+      } catch (e) {
         set({ songs: before });
-        throw new Error(crewErrorMessage(error));
+        throw new Error(crewErrorMessage(e));
       }
-      // The realtime echo carries the server's stamp; refetch if it's slow.
-      void cycle();
+      applyRemoteMoves();
+      if (!r.applied) {
+        const who = get().members.find((m) => m.user_id === r.stage_updated_by)?.display_name ?? crewText("someone");
+        throw new Error(crewText("movedMeanwhile", undefined, { who, stage: statusInfo(r.stage ?? undefined).label }));
+      }
+    },
+
+    resolveStageConflict: (path, keep) => {
+      const app = useAppStore.getState();
+      const c = app.workspace.songs[path]?.stageConflict;
+      if (!c) return;
+      if (keep === "theirs") {
+        app.updateSong(path, { status: c.theirs ?? undefined, stageBaseAt: c.at, stagePending: false, stageConflict: undefined, stageUpdatedAtMs: Date.parse(c.at) });
+      } else {
+        // Mine again, now on top of their version: the next sync sends it.
+        app.updateSong(path, { stageBaseAt: c.at, stagePending: true, stageConflict: undefined });
+        void cycle();
+      }
     },
 
     syncNow: () => cycle(),
