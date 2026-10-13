@@ -4,7 +4,11 @@ Two ways to get FL Manager running: **install a build** someone shared with you 
 
 ## Option A — install a shared build
 
-Builds are made with `npm run tauri build` (see below) and end up in `src-tauri/target/release/bundle/`:
+**Easiest:** download the latest installer from the repo's **Releases** page on GitHub: `FL Manager_<version>_x64-setup.exe` for Windows, the `.dmg` for macOS (universal: Apple Silicon and Intel). They're built in the cloud by `.github/workflows/release.yml` and already point at the crew server.
+
+To publish a new one: push a version tag (`git tag v0.2.0 && git push origin v0.2.0`) or run **Actions → Release builds → Run workflow**, then open **Releases**, check the draft and **Publish**. The crew server settings come from the repo variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Settings → Secrets and variables → Actions → Variables).
+
+Local builds are made with `npm run tauri build` (see below) and end up in `src-tauri/target/release/bundle/`:
 
 | OS | File to share |
 |---|---|

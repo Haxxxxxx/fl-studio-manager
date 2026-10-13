@@ -1,0 +1,75 @@
+# Builds the desktop installers in the cloud and attaches them to a draft
+# GitHub Release: Windows (.exe installer + .msi) and macOS (universal .dmg,
+# Apple Silicon + Intel).
+#
+# Run it: push a version tag (git tag v0.2.0 && git push origin v0.2.0), or
+# Actions → "Release builds" → Run workflow. Then open Releases, check the
+# draft, and Publish.
+#
+# The crew server settings (public URL + public anon key) come from the
+# repository variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+# (Settings → Secrets and variables → Actions → Variables). They're public by
+# design: row-level security in the database is what protects the data.
+name: Release builds
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+    runs-on: ${{ matrix.platform }}
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - run: npm test
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: "FL Manager ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"
+          releaseBody: |
+            Desktop builds of FL Manager.
+
+            **Windows:** download the `_x64-setup.exe` and run it. If Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
+
+            **macOS:** download the `.dmg`, drag FL Manager to Applications. The app isn't notarized yet: the first time, right-click it → **Open** → **Open**. If macOS says it's "damaged", run `xattr -cr "/Applications/FL Manager.app"` in Terminal once.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
