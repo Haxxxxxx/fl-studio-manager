@@ -1,3 +1,4 @@
+import { DetectedFolders } from "./DetectedFolders";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -518,10 +519,10 @@ function BulkSelect({
   );
 }
 
-/** First run: no folder linked. Offers FL's default folder when it exists. */
+/** First run: no folder linked. Proposes every DAW folder found. */
 export function EmptyLibrary() {
-  const suggested = useAppStore((s) => s.suggestedFolder);
-  const linkSuggestedFolder = useAppStore((s) => s.linkSuggestedFolder);
+  const detected = useAppStore((s) => s.detectedFolders);
+  const suggested = (detected?.length ?? 0) > 0;
   const addWatchedFolder = useAppStore((s) => s.addWatchedFolder);
   const loadDemoData = useAppStore((s) => s.loadDemoData);
   const [error, setError] = useState<string | null>(null);
@@ -537,10 +538,10 @@ export function EmptyLibrary() {
       </div>
       <div className="text-base font-medium text-cream">No project folder linked yet</div>
       {suggested ? (
-        <div className="max-w-md text-sm text-engrave">
-          Found a projects folder:
-          <div className="mt-1.5 truncate rounded bg-raised px-2 py-1 font-mono text-xs text-body" title={suggested}>
-            {suggested}
+        <div className="w-full max-w-xl text-sm text-engrave">
+          Found these DAW folders on this computer. Link the ones you use:
+          <div className="mt-3">
+            <DetectedFolders compact />
           </div>
         </div>
       ) : (
@@ -550,13 +551,8 @@ export function EmptyLibrary() {
         </div>
       )}
       <div className="mt-2 flex gap-2">
-        {suggested && (
-          <button onClick={run(linkSuggestedFolder)} className={btnPrimary}>
-            Use this folder
-          </button>
-        )}
         <button onClick={run(addWatchedFolder)} className={suggested ? btn : btnPrimary}>
-          {suggested ? "Choose another…" : "Link a project folder"}
+          {suggested ? "Another folder…" : "Link a project folder"}
         </button>
         <button onClick={loadDemoData} className={btn}>
           Load sample data

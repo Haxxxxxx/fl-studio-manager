@@ -5,6 +5,7 @@ import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/s
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
 import { canRenderInApp, dawOf, splitRenderable } from "../lib/daws";
 import type {
+  DetectedFolder,
   CaptionLang,
   PackagePlan,
   PackageResult,
@@ -74,7 +75,8 @@ interface AppState {
   setPipelineBoard: (board: "mine" | "crew") => void;
   dismissErrors: () => void;
   /** FL's default projects folder when found and nothing is linked yet. */
-  suggestedFolder: string | null;
+  /** DAW default folders found on this computer; null = not looked yet. */
+  detectedFolders: DetectedFolder[] | null;
   workspace: Workspace;
   /** False if the stored workspace couldn't be read — see loadWorkspace. */
   workspaceWritable: boolean;
@@ -119,8 +121,10 @@ interface AppState {
   updateSettings: (patch: Partial<Omit<Settings, "watchedFolders" | "flStudioPath" | "outputFolder" | "ffmpegPath">>) => Promise<void>;
   /** Native picker (in Rust); links the folder and scans it. */
   addWatchedFolder: () => Promise<void>;
-  /** Link the detected default projects folder (the first-run suggestion) and scan it. */
-  linkSuggestedFolder: () => Promise<void>;
+  /** Look for every DAW's default projects folder (never links anything). */
+  detectFolders: () => Promise<void>;
+  /** Link one detected folder (the user confirmed it) and scan it. */
+  linkDetected: (path: string) => Promise<void>;
   removeWatchedFolder: (folder: string) => Promise<void>;
   pickOutputFolder: () => Promise<void>;
   pickFlStudio: () => Promise<void>;
@@ -284,7 +288,6 @@ export const useAppStore = create<AppState>((set, get) => {
       restoreRealFavorites();
       await loadWorkspace();
     }
-    set({ suggestedFolder: null });
     keepPaths(saved);
     await scanOrReport();
   }
@@ -332,7 +335,7 @@ export const useAppStore = create<AppState>((set, get) => {
     pipelineBoard: "mine",
     setPipelineBoard: (board) => set({ pipelineBoard: board }),
     dismissErrors: () => set({ startupError: null, saveError: null }),
-    suggestedFolder: null,
+    detectedFolders: null,
     workspace: EMPTY_WORKSPACE,
     workspaceWritable: false,
     projects: [],
@@ -402,8 +405,8 @@ export const useAppStore = create<AppState>((set, get) => {
       if (settings.watchedFolders.length > 0) {
         await get().rescan().catch((e) => set({ startupError: `Scanning failed: ${String(e)}` }));
       } else {
-        // Fresh machine: offer FL's default folder as a one-click link.
-        set({ suggestedFolder: await api.detectProjectsFolder().catch(() => null) });
+        // Fresh machine: propose every DAW folder found (the user links them).
+        await get().detectFolders();
       }
     },
 
@@ -420,17 +423,21 @@ export const useAppStore = create<AppState>((set, get) => {
       if (next.watchedFolders.length !== before.length) await linked(next);
     },
 
-    linkSuggestedFolder: async () => {
-      await linked(await api.linkDetectedProjectsFolder());
+    detectFolders: async () => {
+      set({ detectedFolders: await api.detectDawFolders().catch(() => []) });
+    },
+
+    linkDetected: async (path) => {
+      await linked(await api.linkDetectedFolder(path));
+      set((s) => ({ detectedFolders: s.detectedFolders?.map((f) => (f.path === path ? { ...f, linked: true } : f)) ?? null }));
     },
 
     removeWatchedFolder: async (folder) => {
       const next = await api.removeWatchedFolder(folder);
       keepPaths(next);
       await scanOrReport();
-      if (next.watchedFolders.length === 0) {
-        set({ suggestedFolder: await api.detectProjectsFolder().catch(() => null) });
-      }
+      // Unlinking a detected folder makes it a proposal again.
+      await get().detectFolders();
     },
 
     pickOutputFolder: async () => {

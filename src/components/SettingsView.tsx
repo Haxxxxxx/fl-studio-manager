@@ -3,6 +3,7 @@ import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react"
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import { CrewPanel } from "./CrewPanel";
+import { DetectedFolders } from "./DetectedFolders";
 import { canRenderInApp } from "../lib/daws";
 import { aiDisclosure } from "../lib/ai";
 import type { CaptionLang, RenderFormat } from "../types";
@@ -135,6 +136,17 @@ export function SettingsView() {
               <FolderPlus size={15} />
               Add project folder
             </button>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-sm font-semibold text-cream">Auto-detect DAWs</h2>
+          <p className="mt-1 text-xs text-engrave">
+            Each DAW's default projects folder found on this computer (FL Studio, Studio One, REAPER, Ableton Live, Cubase, Bitwig, Pro
+            Tools). Nothing is added until you click Link.
+          </p>
+          <div className="mt-3">
+            <DetectedFolders />
           </div>
         </section>
 

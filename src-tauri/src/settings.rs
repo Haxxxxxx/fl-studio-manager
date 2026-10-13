@@ -100,11 +100,16 @@ pub async fn pick_watched_folder(app: AppHandle) -> Result<Settings, String> {
     }
 }
 
-/// Links the detected default projects folder (first-run suggestion).
+/// Links one of the DAW folders detection found (Settings → Auto-detect
+/// DAWs, first-run screen). Only a folder Rust itself detected is accepted,
+/// so the webview still can't add an arbitrary path.
 #[tauri::command]
-pub fn link_detected_projects_folder(app: AppHandle) -> Result<Settings, String> {
-    let folder = detect_projects_folder(app.clone()).ok_or("No default projects folder was found.")?;
-    add_watched(&app, Path::new(&folder))
+pub fn link_detected_folder(app: AppHandle, path: String) -> Result<Settings, String> {
+    let found = detected_folders(&app);
+    if !found.iter().any(|(_, p)| p.to_string_lossy() == path) {
+        return Err(format!("not a detected DAW folder: {path}"));
+    }
+    add_watched(&app, Path::new(&path))
 }
 
 /// Unlinks a folder (only ever shrinks what the app may touch).
@@ -175,37 +180,78 @@ pub fn clear_path_setting(app: AppHandle, which: String) -> Result<Settings, Str
     Ok(saved)
 }
 
-/// FL's default projects folder, `<Documents>/Image-Line/FL Studio/Projects`
-/// on both Windows and macOS, if it exists on this machine. Offered as a
-/// one-click suggestion on first run; the user can link any folder instead.
-#[tauri::command]
-pub fn detect_projects_folder(app: AppHandle) -> Option<String> {
-    let docs = app.path().document_dir().ok()?;
-    let music = app.path().audio_dir().ok();
-    default_project_folders(&docs, music.as_deref())
-        .into_iter()
-        .find(|p| p.is_dir())
-        .map(|p| p.to_string_lossy().to_string())
-}
-
-/// Each DAW's usual projects folder, most specific first (same names on
-/// macOS and Windows, under Documents unless noted).
-fn default_project_folders(docs: &std::path::Path, music: Option<&std::path::Path>) -> Vec<std::path::PathBuf> {
+/// Each DAW's usual projects folder, same names on macOS and Windows, under
+/// Documents unless noted.
+fn default_project_folders(docs: &Path, music: Option<&Path>) -> Vec<(&'static str, PathBuf)> {
     let mut out = vec![
-        docs.join("Image-Line").join("FL Studio").join("Projects"),
-        docs.join("Studio One").join("Songs"),
-        docs.join("REAPER Media"),
-        docs.join("Ableton").join("Projects"),
-        docs.join("Cubase Projects"),
-        docs.join("Bitwig Studio").join("Projects"),
-        docs.join("Pro Tools"),
+        ("FL Studio", docs.join("Image-Line").join("FL Studio").join("Projects")),
+        ("Studio One", docs.join("Studio One").join("Songs")),
+        ("REAPER", docs.join("REAPER Media")),
+        ("Ableton Live", docs.join("Ableton").join("Projects")),
+        ("Cubase", docs.join("Cubase Projects")),
+        ("Cubase", docs.join("Steinberg").join("Cubase Projects")),
+        ("Bitwig Studio", docs.join("Bitwig Studio").join("Projects")),
+        ("Pro Tools", docs.join("Pro Tools")),
     ];
     // Ableton on macOS keeps its folder under ~/Music. Not the bare
     // `Ableton` folder: that's the User Library and Factory Packs.
     if let Some(m) = music {
-        out.push(m.join("Ableton").join("Projects"));
+        out.push(("Ableton Live", m.join("Ableton").join("Projects")));
     }
     out
+}
+
+/// The default DAW folders that exist on this machine.
+fn existing_folders(docs: &Path, music: Option<&Path>) -> Vec<(&'static str, PathBuf)> {
+    default_project_folders(docs, music).into_iter().filter(|(_, p)| p.is_dir()).collect()
+}
+
+fn detected_folders(app: &AppHandle) -> Vec<(&'static str, PathBuf)> {
+    let Ok(docs) = app.path().document_dir() else { return Vec::new() };
+    let music = app.path().audio_dir().ok();
+    existing_folders(&docs, music.as_deref())
+}
+
+/// Projects of any DAW in a folder (a few levels deep), capped: it's a hint
+/// for the user, not a scan.
+fn count_projects(dir: &Path) -> usize {
+    walkdir::WalkDir::new(dir)
+        .max_depth(4)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file() && crate::daws::Daw::of_project(e.path()).is_some())
+        .take(999)
+        .count()
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectedFolder {
+    pub daw: String,
+    pub path: String,
+    /// Projects found inside (up to 999).
+    pub projects: usize,
+    /// Already linked in Settings.
+    pub linked: bool,
+}
+
+fn describe(found: Vec<(&'static str, PathBuf)>, linked: &[String]) -> Vec<DetectedFolder> {
+    found
+        .into_iter()
+        .map(|(daw, path)| {
+            let s = path.to_string_lossy().to_string();
+            DetectedFolder { daw: daw.to_string(), projects: count_projects(&path), linked: linked.contains(&s), path: s }
+        })
+        .collect()
+}
+
+/// Every DAW's default projects folder found on this machine, to propose
+/// (never linked silently). Read-only.
+#[tauri::command]
+pub async fn detect_daw_folders(app: AppHandle) -> Result<Vec<DetectedFolder>, String> {
+    let linked = load(&app)?.watched_folders;
+    let found = detected_folders(&app);
+    tauri::async_runtime::spawn_blocking(move || describe(found, &linked)).await.map_err(|e| e.to_string())
 }
 
 /// Best-effort auto-detection of the FL Studio executable. This covers the
@@ -320,5 +366,34 @@ mod tests {
         assert!(usable_folder(Path::new(r"\\host\share")).is_err());
         assert!(usable_folder(Path::new("/definitely/not/here")).is_err());
         assert!(usable_folder(&std::env::temp_dir()).is_ok());
+    }
+
+    #[test]
+    fn detects_every_daw_folder_not_just_the_first() {
+        let docs = std::env::temp_dir().join(format!("flsm-detect-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&docs);
+        let fl = docs.join("Image-Line").join("FL Studio").join("Projects");
+        let s1 = docs.join("Studio One").join("Songs");
+        fs::create_dir_all(fl.join("Envy")).unwrap();
+        fs::create_dir_all(s1.join("Glow")).unwrap();
+        fs::write(fl.join("Envy").join("Envy.flp"), b"x").unwrap();
+        fs::write(s1.join("Glow").join("Glow.song"), b"x").unwrap();
+        fs::write(s1.join("Glow").join("Glow (2).song"), b"x").unwrap();
+
+        let found = describe(existing_folders(&docs, None), &[fl.to_string_lossy().to_string()]);
+        let _ = fs::remove_dir_all(&docs);
+        let summary: Vec<(&str, usize, bool)> = found.iter().map(|f| (f.daw.as_str(), f.projects, f.linked)).collect();
+        assert_eq!(summary, vec![("FL Studio", 1, true), ("Studio One", 2, false)]);
+    }
+
+    #[test]
+    fn only_folders_that_exist_are_proposed() {
+        let docs = std::env::temp_dir().join(format!("flsm-detect-none-{}", std::process::id()));
+        assert!(existing_folders(&docs, None).is_empty());
+        // Every supported DAW has at least one default location.
+        let daws: std::collections::HashSet<&str> = default_project_folders(Path::new("/docs"), Some(Path::new("/music"))).into_iter().map(|(d, _)| d).collect();
+        for d in ["FL Studio", "Studio One", "REAPER", "Ableton Live", "Cubase", "Bitwig Studio", "Pro Tools"] {
+            assert!(daws.contains(d), "{d}");
+        }
     }
 }
