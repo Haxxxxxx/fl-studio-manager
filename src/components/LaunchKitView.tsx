@@ -452,7 +452,7 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
         {reviewedAt && <span className="text-white/35"> · checked {formatRelative(reviewedAt)}</span>}
       </div>
       {running && (
-        <div className="text-[11px] text-white/40">If Gemini is busy this retries on its own and can take up to a minute.</div>
+        <div className="text-[11px] text-white/40">If Gemini is busy this retries on its own; it gives up after 2 minutes.</div>
       )}
       {backupUsed && !running && (
         <div className="text-[11px] text-white/40">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>
