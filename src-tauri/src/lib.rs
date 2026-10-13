@@ -1,4 +1,5 @@
 mod actions;
+mod audio;
 mod flp_metadata;
 mod models;
 mod package;
@@ -29,6 +30,8 @@ pub fn run() {
             actions::restore_backup,
             actions::trash_backups,
             package::package_projects,
+            audio::analyze_audio,
+            audio::export_launch_kit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

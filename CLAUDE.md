@@ -4,7 +4,8 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 
 ## Where we are
 - Phase 0 (stabilize + demo-ready) is nearly done. The remaining items are the crew pitch and scrubbing git history before the repo can go public.
-- Next big feature: the **Launch Kit** (Phase 1b), the demo moment. The shared crew dashboard (1a) needs a backend decision first.
+- **Launch Kit** (Phase 1b) first slice is in: `src/lib/launchKit.ts` (generate, verify, export files), `src-tauri/src/audio.rs` (mixdown analysis and snippet clips), `src/components/LaunchKitView.tsx`. The kit is regenerated from the project every time; the workspace stores only user edits (`SongMeta.launchKit`).
+- Not built yet: the AI pass (it plugs into `verify()` in launchKit.ts, returning the same `Check` shape; the provider and API key are still undecided), AI-written captions and briefs (templates today), and stems. The shared crew dashboard (1a) needs a backend decision first.
 
 ## Commands
 - `npm ci && npm run tauri dev`: run the app. Setup per OS: [SETUP.md](SETUP.md).

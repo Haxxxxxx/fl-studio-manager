@@ -12,6 +12,7 @@ import type {
   RenderStatus,
   Settings,
   SongMeta,
+  KitFieldId,
   SongStatus,
   Workspace,
 } from "../types";
@@ -24,7 +25,7 @@ const DEFAULT_SETTINGS: Settings = {
   favorites: [],
 };
 
-export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "settings";
+export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "settings";
 export type SortKey = "modified" | "name" | "status" | "tempo" | "key" | "versions";
 export type SortDir = "asc" | "desc";
 /** "unsorted" = songs with no status yet. */
@@ -83,6 +84,8 @@ interface AppState {
   detailPath: string | null;
   openAlbumId: string | null;
   openPersonId: string | null;
+  /** Song shown in the Launch Kit view. */
+  launchPath: string | null;
   newProject: NewProjectDraft | null;
 
   setView: (view: View) => void;
@@ -116,6 +119,11 @@ interface AppState {
   openDetail: (path: string | null) => void;
   openAlbum: (id: string | null) => void;
   openPerson: (id: string | null) => void;
+  openLaunchKit: (path: string | null) => void;
+  /** undefined resets the field to its generated value. */
+  setKitEdit: (path: string, id: KitFieldId, value: string | undefined) => void;
+  setSnippetStart: (path: string, label: string, startSec: number | undefined) => void;
+  acceptKit: (path: string) => void;
   openNewProject: (draft?: Partial<NewProjectDraft>) => void;
   closeNewProject: () => void;
 
@@ -222,6 +230,7 @@ export const useAppStore = create<AppState>((set, get) => {
     detailPath: null,
     openAlbumId: null,
     openPersonId: null,
+    launchPath: null,
     newProject: null,
 
     setView: (view) => set({ view }),
@@ -447,6 +456,28 @@ export const useAppStore = create<AppState>((set, get) => {
     openDetail: (detailPath) => set({ detailPath }),
     openAlbum: (openAlbumId) => set({ openAlbumId, view: "albums" }),
     openPerson: (openPersonId) => set({ openPersonId, view: "people" }),
+    openLaunchKit: (launchPath) => set({ launchPath, view: "launch", detailPath: null }),
+
+    setKitEdit: (path, id, value) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      const edits = { ...kit.edits };
+      if (value === undefined) delete edits[id];
+      else edits[id] = value;
+      get().updateSong(path, { launchKit: { ...kit, edits, acceptedAtMs: undefined } });
+    },
+
+    setSnippetStart: (path, label, startSec) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      const snippetStarts = { ...kit.snippetStarts };
+      if (startSec === undefined) delete snippetStarts[label];
+      else snippetStarts[label] = startSec;
+      get().updateSong(path, { launchKit: { ...kit, snippetStarts, acceptedAtMs: undefined } });
+    },
+
+    acceptKit: (path) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      get().updateSong(path, { launchKit: { ...kit, acceptedAtMs: Date.now() } });
+    },
     openNewProject: (draft) =>
       set({ newProject: { albumId: null, status: "idea", ...draft } }),
     closeNewProject: () => set({ newProject: null }),

@@ -6,6 +6,7 @@ import { PipelineView } from "./components/PipelineView";
 import { AlbumsView } from "./components/AlbumsView";
 import { PeopleView } from "./components/PeopleView";
 import { SettingsView } from "./components/SettingsView";
+import { LaunchKitView } from "./components/LaunchKitView";
 import { RenderPanel } from "./components/RenderPanel";
 import { PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
@@ -52,9 +53,10 @@ export default function App() {
       {view === "pipeline" && <PipelineView />}
       {view === "albums" && <AlbumsView />}
       {view === "people" && <PeopleView />}
+      {view === "launch" && <LaunchKitView />}
       {view === "settings" && <SettingsView />}
       {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
-      {view !== "settings" && <ProjectDrawer key={detailPath ?? ""} />}
+      {view !== "settings" && view !== "launch" && <ProjectDrawer key={detailPath ?? ""} />}
       <NewProjectModal />
       <RenderPanel />
       <PackagePanel />
