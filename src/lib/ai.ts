@@ -1,5 +1,5 @@
 import * as api from "./tauri";
-import { briefSpecs, isoDate, parseDate, type KitField, type KitInput } from "./launchKit";
+import { artistLine, briefSpecs, isoDate, parseDate, type KitField, type KitInput } from "./launchKit";
 import { detectKey, detectedPeople } from "./people";
 import type { AiFieldReview, KitFieldId, Settings } from "../types";
 
@@ -9,6 +9,9 @@ import type { AiFieldReview, KitFieldId, Settings } from "../types";
 // flag things but never quietly rewrite measured values.
 
 const MEASURED: KitFieldId[] = ["bpm", "duration"];
+/** Facts only the crew can know: the model may flag them, never fill them in
+ * (an invented ISRC or songwriter name would go straight to the distributor). */
+const NEVER_SUGGEST: KitFieldId[] = ["isrc", "upc", "songwriters", "trackNumber"];
 const LONG_TEXT: KitFieldId[] = ["captions", "coverBrief"];
 
 /** Facts about the song, as sent to the model. No file paths or usernames. */
@@ -77,7 +80,7 @@ export async function draftCopy(input: KitInput, fields: KitField[], settings: S
   const value = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
   const captions = `ANNOUNCE\n${s("announce")}\n\nTEASER (post with the Hook snippet)\n${s("teaser")}\n\nRELEASE DAY\n${s("releaseDay")}`;
   const coverBrief = [
-    ...briefSpecs(value("title"), value("artists")),
+    ...briefSpecs(value("title"), artistLine(value("artists"), value("featuring"))),
     "",
     `Concept: ${s("concept")}`,
     `Palette: ${s("palette")}`,
@@ -136,6 +139,7 @@ export function sanitizeReview(raw: unknown, fields: KitField[]): Partial<Record
     if (
       verdict === "ok" ||
       MEASURED.includes(field.id) ||
+      NEVER_SUGGEST.includes(field.id) ||
       suggestion === field.value ||
       suggestion.length > limit ||
       (field.id === "releaseDate" && !parseDate(suggestion)) ||
