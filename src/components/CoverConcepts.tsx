@@ -126,7 +126,7 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-white/5 pt-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-white/40">Cover concepts · FLUX</span>
+        <span className="text-[12px] font-semibold text-white/58">Cover concepts · FLUX</span>
         <div className="ml-auto flex flex-wrap gap-2">
           <button onClick={generateFour} disabled={running || !brief.trim()} className={session.concepts.length ? btn : btnPrimary}>
             <Images size={14} /> {running ? "Painting…" : session.concepts.length ? "4 new concepts" : "Generate 4 concepts"}
@@ -167,10 +167,10 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
               ) : c.error ? (
                 <span className="absolute inset-0 flex items-center justify-center p-3 text-center text-[11px] leading-snug text-red-300">{c.error}</span>
               ) : (
-                <span className="absolute inset-0 flex animate-pulse items-center justify-center text-[11px] text-white/35">Painting…</span>
+                <span className="absolute inset-0 flex animate-pulse items-center justify-center text-[11px] text-white/55">Painting…</span>
               )}
               {session.picked === i && (
-                <span className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <span className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-medium text-[#0f0f12]">
                   <Check size={10} /> Picked
                 </span>
               )}
@@ -202,7 +202,7 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
       )}
 
       {picked && (
-        <details className="text-[11px] text-white/40">
+        <details className="text-[11px] text-white/58">
           <summary className="cursor-pointer hover:text-white/70">
             Prompt sent to FLUX (seed {picked.seed}
             {picked.image && !picked.image.seedApplied ? ", not applied by Cloudflare" : ""})
@@ -215,7 +215,7 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
         Concepts are drafts at {size?.width && size.height ? `${size.width} × ${size.height}` : "1024 × 1024"} px. Distributors need 3000 × 3000:
         a designer (or an upscaler) makes the final from the pick and adds the title and artist name, which FLUX leaves out on purpose.
       </div>
-      <div className="text-[11px] leading-relaxed text-white/30">
+      <div className="text-[11px] leading-relaxed text-white/50">
         Each concept uses about {Math.round(NEURONS_PER_IMAGE)} of Cloudflare's {FREE_NEURONS_PER_DAY.toLocaleString("en")} free daily neurons (about {PER_DAY} a day).
         Only the image prompt goes to Cloudflare: it's built from this brief, without the title, names or notes.
       </div>

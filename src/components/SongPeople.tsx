@@ -13,7 +13,7 @@ export const OUTCOMES: { id: PitchOutcome; label: string; tone: string }[] = [
   { id: "interested", label: "Interested", tone: "text-sky-300" },
   { id: "placed", label: "Placed", tone: "text-emerald-300" },
   { id: "sold", label: "Sold", tone: "text-emerald-300" },
-  { id: "passed", label: "Passed", tone: "text-white/35" },
+  { id: "passed", label: "Passed", tone: "text-white/55" },
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -43,7 +43,7 @@ function PersonPicker({ onPick, label }: { onPick: (personId: string) => void; l
           {label}
         </button>
         {people.length > 0 && (
-          <button type="button" onClick={() => setNaming(false)} className="text-white/40 hover:text-white">
+          <button type="button" onClick={() => setNaming(false)} className="text-white/58 hover:text-white">
             <X size={13} />
           </button>
         )}
@@ -104,7 +104,7 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
                 </option>
               ))}
             </select>
-            <label className="flex items-center gap-0.5 text-white/40" title="Agreed split (%)">
+            <label className="flex items-center gap-0.5 text-white/58" title="Agreed split (%)">
               <input
                 type="number"
                 min={0}
@@ -122,7 +122,7 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
               />
               %
             </label>
-            <button onClick={() => setCredits(credits.filter((_, j) => j !== i))} className="text-white/30 hover:text-white">
+            <button onClick={() => setCredits(credits.filter((_, j) => j !== i))} className="text-white/50 hover:text-white">
               <X size={12} />
             </button>
           </div>
@@ -132,7 +132,7 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
 
       {suggested.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1">
-          <span className="text-[11px] text-white/35">In this session:</span>
+          <span className="text-[11px] text-white/55">In this session:</span>
           {suggested.map((p) => (
             <button
               key={p.id}
@@ -164,14 +164,14 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
 
   return (
     <div>
-      {sorted.length === 0 && <div className="mb-2 text-xs text-white/35">Not sent to anyone yet.</div>}
+      {sorted.length === 0 && <div className="mb-2 text-xs text-white/55">Not sent to anyone yet.</div>}
       <div className="flex flex-col gap-1.5">
         {sorted.map((p) => {
           const outcome = OUTCOMES.find((o) => o.id === p.outcome);
           return (
             <div key={p.id} className="group text-xs">
               <div className="flex items-center gap-2">
-                <Send size={11} className="shrink-0 text-white/30" />
+                <Send size={11} className="shrink-0 text-white/50" />
                 <button onClick={() => openPerson(p.personId)} className="min-w-0 flex-1 truncate text-left text-white/85 hover:underline">
                   {byId.get(p.personId)?.name ?? "Unknown"}
                 </button>
@@ -192,7 +192,7 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
                     </option>
                   ))}
                 </select>
-                <button onClick={() => removePitch(project.path, p.id)} className="text-white/30 opacity-0 hover:text-white group-hover:opacity-100">
+                <button onClick={() => removePitch(project.path, p.id)} className="text-white/50 opacity-0 hover:text-white group-hover:opacity-100">
                   <X size={12} />
                 </button>
               </div>
@@ -200,7 +200,7 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
                 value={p.note ?? ""}
                 onChange={(e) => updatePitch(project.path, p.id, { note: e.target.value })}
                 placeholder="Note (feedback, price, link…)"
-                className="ml-5 mt-0.5 w-[calc(100%-1.25rem)] bg-transparent text-[11px] text-white/50 placeholder:text-white/20 focus:outline-none"
+                className="ml-5 mt-0.5 w-[calc(100%-1.25rem)] bg-transparent text-[11px] text-white/50 placeholder:text-white/50 focus:outline-none"
               />
             </div>
           );

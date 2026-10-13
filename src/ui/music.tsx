@@ -10,11 +10,16 @@ import { input } from "./base";
 /** Whether the newest mixdown is current, outdated, or missing. */
 export function MixdownBadge({ project }: { project: ProjectInfo }) {
   const f = renderFreshness(project);
-  if (f === "none") return <span className="text-xs text-white/20">—</span>;
+  if (f === "none")
+    return (
+      <span className="text-xs text-white/45" aria-label="No mixdown">
+        —
+      </span>
+    );
   if (f === "fresh")
     return (
-      <span className="flex items-center gap-1 text-xs text-emerald-400/90" title="Mixdown is newer than the last save">
-        <CheckCircle2 size={12} /> Current
+      <span className="flex items-center text-emerald-400/80" title="Mixdown is newer than the last save" role="img" aria-label="Mixdown current">
+        <CheckCircle2 size={13} />
       </span>
     );
   return (
@@ -31,7 +36,7 @@ export function SongLines({ items, onOpen }: { items: { id: string; title: strin
       {items.map((it) => (
         <button key={it.id} onClick={() => onOpen(it.id)} className="flex items-center gap-3 rounded px-1 py-1 text-left text-xs hover:bg-white/[0.04]">
           <span className="min-w-0 flex-1 truncate text-white/85">{it.title}</span>
-          {it.sub && <span className="text-white/45">{it.sub}</span>}
+          {it.sub && <span className="text-white/62">{it.sub}</span>}
           <span className="w-20 text-right tabular-nums text-white/55">{it.right}</span>
         </button>
       ))}
@@ -43,13 +48,13 @@ export function SongLines({ items, onOpen }: { items: { id: string; title: strin
 export function FileRow({ icon, label, detail, onReveal }: { icon: React.ReactNode; label: string; detail: string; onReveal?: () => void }) {
   return (
     <div className="group flex min-w-0 items-center gap-2 rounded px-1 py-0.5 hover:bg-white/[0.03]">
-      <span className="text-white/35">{icon}</span>
+      <span className="text-white/55">{icon}</span>
       <span className="w-[92px] shrink-0 text-white/55">{label}</span>
       <span className="min-w-0 flex-1 truncate text-white/75" title={detail}>
         {detail}
       </span>
       {onReveal && (
-        <button onClick={onReveal} title="Show in folder" className="shrink-0 rounded p-0.5 text-white/30 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100">
+        <button onClick={onReveal} title="Show in folder" className="shrink-0 rounded p-0.5 text-white/50 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100">
           <FolderOpen size={12} />
         </button>
       )}
@@ -105,7 +110,7 @@ export function CheckLine({ check }: { check: KitCheck }) {
 export function AiLine({ review, onUse }: { review: AiFieldReview & { stale: boolean }; onUse: (v: string) => void }) {
   const low = review.confidence < LOW_CONFIDENCE;
   const tone = review.stale
-    ? "text-white/30"
+    ? "text-white/50"
     : review.verdict === "wrong"
       ? "text-red-300"
       : review.verdict === "check" || low
@@ -145,11 +150,11 @@ export function FieldRow({ field, onChange, bare = false }: { field: KitField; o
       <div className="flex items-center gap-2">
         {!bare && <span className="text-xs font-medium text-white/70">{field.label}</span>}
         <span className={`rounded px-1.5 py-px text-[10px] font-medium ${source.className}`}>{source.label}</span>
-        <span className="min-w-0 flex-1 truncate text-[11px] text-white/35" title={field.note}>
+        <span className="min-w-0 flex-1 truncate text-[11px] text-white/55" title={field.note}>
           {field.note}
         </span>
         {field.source === "edited" && (
-          <button onClick={() => onChange(undefined)} title="Back to the generated value" className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white">
+          <button onClick={() => onChange(undefined)} title="Back to the generated value" className="flex items-center gap-1 text-[11px] text-white/58 hover:text-white">
             <RotateCcw size={11} /> Reset
           </button>
         )}
@@ -161,7 +166,7 @@ export function FieldRow({ field, onChange, bare = false }: { field: KitField; o
                 setTimeout(() => setCopied(false), 1200);
               });
             }}
-            className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white"
+            className="flex items-center gap-1 text-[11px] text-white/58 hover:text-white"
           >
             <ClipboardCopy size={11} /> {copied ? "Copied" : "Copy"}
           </button>

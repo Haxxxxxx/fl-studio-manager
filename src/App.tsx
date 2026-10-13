@@ -29,7 +29,7 @@ function RelinkNotice() {
         <span className="font-medium text-white">
           Kept the details of {relinked.length} renamed or moved song{relinked.length === 1 ? "" : "s"}
         </span>
-        <button onClick={dismiss} className="text-white/45 hover:text-white">
+        <button onClick={dismiss} className="text-white/62 hover:text-white">
           OK
         </button>
       </div>
@@ -39,7 +39,7 @@ function RelinkNotice() {
             {fileName(r.from)} → <span className="text-white">{r.reason === "moved" ? `moved (${fileName(r.to)})` : fileName(r.to)}</span>
           </li>
         ))}
-        {relinked.length > 5 && <li className="text-white/40">+{relinked.length - 5} more</li>}
+        {relinked.length > 5 && <li className="text-white/58">+{relinked.length - 5} more</li>}
       </ul>
     </div>
   );
@@ -72,7 +72,7 @@ export default function App() {
 
   if (!settingsLoaded) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0f0f12] text-sm text-white/40">
+      <div className="flex h-screen items-center justify-center bg-[#0f0f12] text-sm text-white/58">
         Loading...
       </div>
     );

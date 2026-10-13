@@ -32,14 +32,14 @@ export function Sidebar() {
         </div>
         <div>
           <div className="text-sm font-semibold text-white">FL Manager</div>
-          <div className="text-[11px] text-white/40">{demoMode ? "Sample data" : "Studio workspace"}</div>
+          <div className="text-[11px] text-white/58">{demoMode ? "Sample data" : "Studio workspace"}</div>
         </div>
       </div>
 
       <div className="px-3 pb-2">
         <button
           onClick={() => openNewProject()}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-orange-500 py-2 text-sm font-medium text-white hover:bg-orange-400"
+          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-orange-500 py-2 text-sm font-medium text-[#0f0f12] hover:bg-orange-400"
         >
           <Plus size={15} /> New song
         </button>
@@ -73,7 +73,7 @@ export function Sidebar() {
 
       {albums.length > 0 && (
         <div className="mt-2 flex min-h-0 flex-col px-2">
-          <div className="px-3 pb-1 text-[10px] font-medium uppercase tracking-wide text-white/30">Releases</div>
+          <div className="px-3 pb-1 text-[12px] font-semibold text-white/50">Releases</div>
           <div className="overflow-auto">
             {albums.map((a) => (
               <button
@@ -85,7 +85,7 @@ export function Sidebar() {
               >
                 <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: a.color }} />
                 <span className="truncate">{a.title}</span>
-                <span className="ml-auto text-white/30">{a.trackPaths.length}</span>
+                <span className="ml-auto text-white/50">{a.trackPaths.length}</span>
               </button>
             ))}
           </div>
