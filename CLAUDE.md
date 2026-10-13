@@ -11,12 +11,16 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 
 - **Cover concepts:** FLUX.1 [schnell] on Cloudflare Workers AI (free 10k neurons/day). `src-tauri/src/cover.rs` holds the account ID + token (`cover.json` in the config dir, or `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`), calls the model and saves `cover-concept.jpg` into the kit folder. `src/lib/cover.ts` turns the cover brief into a prompt: square, no text, no real likeness, no title or names. `src/components/CoverConcepts.tsx` is the 2x2 picker. Images stay in memory. The workspace stores only the pick's seed, prompt and saved path (`LaunchKitMeta.cover`).
 - **Phase 1a (local part):** stages are the roadmap lifecycle (`creation → production → prep → release → promotion`, workspace v2; `migrateWorkspace` in `src/lib/songs.ts` maps the old ids and keeps `legacyStatus`). "Finished" = `isFinished()` = Prep or later. `src/lib/calendar.ts` + `CalendarView` = release calendar (dated releases + Launch Kit dates, with readiness checks). `src/lib/crew.ts` + `CrewCards` = next release, stalled tracks (21+ days without a save in Creation/Production), who's on what.
-- Not built yet: multi-user sharing (needs a backend decision), where-files-live view, stems, distributor-specific export formats.
+- **Crew backend (Phase 1a, shared part):** Supabase in the EU (eu-west-1), design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Only metadata is shared (title, stage, key, bpm, tags, credits, dates), never audio, paths, samples, notes or track names. Schema + RLS + security-definer functions in `supabase/migrations/`, pgTAP tests in `supabase/tests/database/` (`supabase test db`). Desktop: `src/lib/supabase.ts` (client is null without `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`), `src/lib/crewSync.ts` (pure payload/merge helpers), `src/store/useCrewStore.ts` (debounced push, realtime pull, never syncs demo data), `CrewPanel` / `CrewBoard`. A song is deleted remotely only when it was explicitly unshared, never because a scan missed it. Web dashboard: `web/` (static Vite app for Vercel, reuses `src/` pure modules via `@shared`; data goes browser → Supabase, never through Vercel). Only the anon key ever ships in an app.
+- **Files view:** `FilesPanel` in the song drawer; `src-tauri/src/files.rs` lists the song's Launch Kit folder.
+- Not built yet: group vs personal stats, design identity (1c), stems, distributor-specific export formats.
 
 ## Commands
 - `npm ci && npm run tauri dev`: run the app. Setup per OS: [SETUP.md](SETUP.md).
 - `npm run build`: tsc + vite (must stay clean).
 - `cd src-tauri && cargo test`: Rust tests.
+- `supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor` then `supabase test db`: database tests. Sign-in emails land in Mailpit (http://127.0.0.1:54324).
+- `cd web && npm ci && npm run dev`: web dashboard on port 5175.
 
 ## Rules
 - Developed on Windows and macOS. Crew members use both. `.flp` files store paths with the saving OS's separators (see `native()` in `src-tauri/src/resolve.rs`).
