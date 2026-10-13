@@ -22,6 +22,7 @@ import type { AiFieldReview, AudioAnalysis, ProjectInfo, Snippet } from "../type
 import { useVisibleSongs } from "./LibraryView";
 import { SongPicker } from "./SongPicker";
 import { ShortsPanel } from "./ShortsPanel";
+import { CoverConcepts } from "./CoverConcepts";
 import { btn, btnPrimary, input } from "./ui";
 
 // Snippet colors: the dark categorical slots, in fixed order (as elsewhere).
@@ -224,6 +225,7 @@ export function LaunchKitView() {
             />
             <Card title="Cover art brief">
               <FieldRow field={byId("coverBrief")} onChange={(v) => setKitEdit(project.path, "coverBrief", v)} bare />
+              <CoverConcepts key={project.path} path={project.path} title={byId("title").value || project.name} artists={byId("artists").value} brief={byId("coverBrief").value} />
             </Card>
             <Card title="Captions">
               <FieldRow field={byId("captions")} onChange={(v) => setKitEdit(project.path, "captions", v)} bare />

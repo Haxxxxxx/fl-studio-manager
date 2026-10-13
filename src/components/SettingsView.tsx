@@ -138,6 +138,8 @@ export function SettingsView() {
 
         <ShortsSettings />
 
+        <CoverSettings />
+
         <section>
           <h2 className="text-sm font-semibold text-white/90">FL Studio executable</h2>
           <p className="mt-1 text-xs text-white/40">
@@ -390,6 +392,94 @@ function AiSettings() {
         The key stays on this computer (its own file in the app config folder, not settings.json) and is never shown again. AI calls
         send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. On the free tier Google
         may use them to improve its products.
+      </p>
+    </section>
+  );
+}
+
+/** Where the Workers AI page offers "Use REST API": account ID + token template. */
+const CF_WORKERS_AI_URL = "https://dash.cloudflare.com/?to=/:account/ai/workers-ai";
+
+/** Cloudflare account ID + API token for FLUX cover concepts (write-only). */
+function CoverSettings() {
+  const coverStatus = useAppStore((s) => s.coverStatus);
+  const refreshCoverStatus = useAppStore((s) => s.refreshCoverStatus);
+  const [accountId, setAccountId] = useState("");
+  const [token, setToken] = useState("");
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  async function save(remove: boolean) {
+    setMessage(null);
+    try {
+      await api.setCoverCredentials(remove ? null : accountId, remove ? null : token);
+      await refreshCoverStatus();
+      setAccountId("");
+      setToken("");
+      setMessage({ kind: "ok", text: remove ? "Cloudflare credentials removed." : "Saved on this computer." });
+    } catch (e) {
+      setMessage({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  const status = !coverStatus?.configured
+    ? "Off: no Cloudflare credentials yet"
+    : coverStatus.source === "env"
+      ? "On: using CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN from the environment"
+      : "On: credentials saved on this computer";
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-white/90">Cover art (Cloudflare Workers AI, free)</h2>
+      <p className="mt-1 text-xs leading-relaxed text-white/40">
+        Paints cover concepts from the Launch Kit brief with FLUX.1 [schnell]. Cloudflare's free allowance (10,000 neurons a day) is about
+        170 images a day, no card needed. On the{" "}
+        <button onClick={() => api.openExternal(CF_WORKERS_AI_URL)} className="text-orange-300 underline">
+          Workers AI page of the Cloudflare dashboard
+        </button>
+        , pick <span className="text-white/60">Use REST API</span>, copy the <span className="text-white/60">Account ID</span>, then{" "}
+        <span className="text-white/60">Create a Workers AI API Token</span> (a custom token needs Workers AI Read and Edit).
+      </p>
+      <div className={`mt-3 text-xs ${coverStatus?.configured ? "text-emerald-300" : "text-white/50"}`}>{status}</div>
+      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2">
+        <input
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value)}
+          placeholder="Account ID (32 characters)"
+          aria-label="Cloudflare account ID"
+          autoComplete="off"
+          spellCheck={false}
+          className={field}
+        />
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder={coverStatus?.configured ? "Paste a new token to replace it" : "API token"}
+          aria-label="Cloudflare API token"
+          autoComplete="off"
+          spellCheck={false}
+          className={field}
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={() => save(false)}
+            disabled={!accountId.trim() || !token.trim()}
+            className="rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-400 disabled:opacity-40"
+          >
+            Save
+          </button>
+          {coverStatus?.source === "settings" && (
+            <button onClick={() => save(true)} className="rounded-md border border-white/15 px-3 py-2 text-sm text-white/70 hover:bg-white/5">
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
+      <p className="mt-2 text-[11px] leading-relaxed text-white/30">
+        Both stay on this computer (their own owner-only file in the app config folder, not settings.json) and are never shown again.
+        Only the image prompt is sent to Cloudflare: it's built from the cover brief, without the song title, names or notes. No audio,
+        no file paths.
       </p>
     </section>
   );
