@@ -58,7 +58,7 @@ The Launch Kit works without AI. With a free Gemini API key it also writes capti
 2. In the app: **Settings → AI**, paste the key, **Save**. Developers can set `GEMINI_API_KEY` in the environment instead; it takes precedence.
 3. Optional: pick the language for captions. The default model is `gemini-3.8-flash`; change it there if Google renames models.
 
-The key is stored only on that computer (`ai.json` in the app config folder, owner-only on macOS) and the UI never shows it again. Each crew member uses their own key, so free-tier limits are per person. AI calls send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. **On the free tier Google may use what you send to improve its products.**
+The key is stored only on that computer (`ai.json` in the app config folder, owner-only on macOS) and the UI never shows it again. Each crew member uses their own key, so free-tier limits are per person. AI calls send the song name (the project file's name), stage, tags, tempo, key, credits, release dates and the kit fields. Never audio, file paths, sample names or your track names (only a key or a crew member's name spotted in them). Notes are sent only with **Check kit**, and only when **Include notes when checking a kit** is on (off by default); drafts never use them. **On the free tier Google may use what you send to improve its products.**
 
 ## Optional: 9:16 shorts (free, on your computer)
 
@@ -79,13 +79,13 @@ The Launch Kit can paint four cover concepts from the cover art brief with FLUX.
 5. In the app: **Settings → Cover art**, paste both, **Save**. Developers can set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` instead. When both are set they take precedence.
 6. In a Launch Kit, under **Cover art brief**, click **Generate 4 concepts**. Click one to pick it, then **More like this** (four more from the same prompt) or **Save to kit** (writes `cover-concept.jpg` into `<export folder>/Launch Kits/<song>/`).
 
-Concepts are drafts at 1024 × 1024 px. Distributors need 3000 × 3000, so a designer (or an upscaler) makes the final from the pick and adds the title. FLUX is told to leave text out because it spells badly. The credentials stay on that computer (`cover.json` in the app config folder, owner-only on macOS) and the UI never shows them again. Only the image prompt goes to Cloudflare. It's built from the brief, without the song title, artist names or notes.
+Concepts are drafts at 1024 × 1024 px. Distributors need 3000 × 3000, so a designer (or an upscaler) makes the final from the pick and adds the title. FLUX is told to leave text out because it spells badly. The credentials stay on that computer (`cover.json` in the app config folder, owner-only on macOS) and the UI never shows them again. Only the image prompt goes to Cloudflare. It's built from the brief's concept, imagery, palette, tags and any free text you write in it, with the song title, artist names and the Notes line taken out.
 
 ## Optional: the crew (shared board, EU servers)
 
 Sign in with an emailed code, create a crew or join one with an 8-letter invite code, then tick **Share with <your crew>** in a song's drawer (or use **Crew** in the Library for several songs). Everyone in the crew sees shared songs on **Pipeline → Crew** and on the web dashboard, and can move their stage. Moves sync live.
 
-Only metadata leaves your computer: title, stage, key, BPM, tags, credits (names, roles, splits) and release dates. Audio, file paths, samples, notes and FL track names never do. Data is stored by Supabase in Ireland (eu-west-1). Stop sharing a song and it's deleted from the crew board.
+Crew sharing sends facts only: title (the cleaned-up file name, or the one you type under **Crew sees it as**), stage, key, BPM, tags, credits (names, roles, splits), release date, whether there's a mixdown, whether the Launch Kit is accepted, and when the project was last saved. Crewmates also see your crew and display names; your email stays with the sign-in service. Audio, file paths, samples, notes and track names never leave your computer through sharing (the optional AI features are the only thing that sends more, see above). Data is stored by Supabase in Ireland (eu-west-1). Stop sharing a song and it's deleted from the crew board.
 
 Builds made for the crew already include the server address. If you run from source, copy `.env.example` to `.env.local` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the public anon key, never the service_role key). Without them the Crew section says sharing isn't set up and everything else works as before.
 

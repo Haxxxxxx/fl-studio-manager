@@ -84,6 +84,8 @@ export interface Settings {
   aiModel: string | null;
   /** Language for AI-written copy; null = English. */
   aiLanguage: string | null;
+  /** Send the song's notes with "Check kit" (off by default). */
+  aiIncludeNotes: boolean;
   /** ffmpeg for shorts; null = found automatically. */
   ffmpegPath: string | null;
 }
@@ -121,6 +123,8 @@ export interface SongMeta {
    * push or delete it. Missing = shared before scoping (adopted on next sync). */
   shareCrewId?: string;
   shareUserId?: string;
+  /** The title the crew sees; empty = cleaned-up project file name. */
+  shareTitle?: string;
   tags?: string[];
   notes?: string;
   /** Musical key, e.g. "Am", "F#". FL doesn't store one. */

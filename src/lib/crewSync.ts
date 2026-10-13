@@ -71,9 +71,11 @@ const tagCost = (t: string) => 4 + Math.ceil(utf8(t) / 4) * 4;
 /** Upper bound of one { name, role, split } object in jsonb (headers, keys, numeric). */
 const creditCost = (c: { name: string; role: string }) => 64 + utf8(c.name) + utf8(c.role);
 
-/** A title that passes btrim(title) between 1 and 200. */
-export function sharedTitle(projectName: string): string {
-  const t = chars((cleanTitle(projectName) || projectName).trim(), TITLE_MAX).trim();
+/** A title that passes btrim(title) between 1 and 200: the one the user set
+ * for the crew, else the cleaned-up project file name. */
+export function sharedTitle(projectName: string, override?: string): string {
+  const chosen = override?.trim();
+  const t = chars(chosen || (cleanTitle(projectName) || projectName).trim(), TITLE_MAX).trim();
   return t || "Untitled";
 }
 
@@ -118,7 +120,7 @@ export function sharedSongPayload(project: ProjectInfo, meta: SongMeta, ws: Work
   return {
     id: meta.shareId!,
     crew_id: scope.crewId,
-    title: sharedTitle(project.name),
+    title: sharedTitle(project.name, meta.shareTitle),
     stage: meta.status ?? null,
     bpm,
     musical_key: key || null,

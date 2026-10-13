@@ -231,7 +231,7 @@ function Privacy() {
           <div>
             <div className="text-xs font-bold tracking-wider text-chassis/70">WHAT TRAVELS</div>
             <ul className="mt-3 flex flex-col gap-1.5">
-              {["title", "stage", "bpm · key · tags", "credits · splits", "release date", "mixdown: yes / no"].map((x) => (
+              {["title", "stage", "bpm · key · tags", "credits · splits", "release date", "mixdown: yes / no", "kit accepted · last saved"].map((x) => (
                 <li key={x} className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[#1f8a4c]" /> {x}
                 </li>
@@ -249,6 +249,10 @@ function Privacy() {
             </ul>
           </div>
         </div>
+        <p className="mt-10 max-w-2xl font-mono text-xs leading-relaxed text-chassis/70">
+          Optional AI, with your own free Gemini key: the song name, tags, tempo, key, credits and Launch Kit text go to Google, and on
+          the free tier Google may use them. Your notes only if you turn that on. Never audio, files or track names.
+        </p>
       </div>
     </section>
   );

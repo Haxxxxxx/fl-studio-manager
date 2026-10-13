@@ -218,7 +218,8 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
       </div>
       <div className="text-[11px] leading-relaxed text-engrave">
         Each concept uses about {Math.round(NEURONS_PER_IMAGE)} of Cloudflare's {FREE_NEURONS_PER_DAY.toLocaleString("en")} free daily neurons (about {PER_DAY} a day).
-        Only the image prompt goes to Cloudflare: it's built from this brief, without the title, names or notes.
+        Only the image prompt goes to Cloudflare: this brief's concept, imagery, palette, tags and any free text you add, without the
+        title, artist names or the Notes line (see it under "Prompt sent to FLUX").
       </div>
     </div>
   );

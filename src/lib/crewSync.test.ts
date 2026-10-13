@@ -171,3 +171,33 @@ describe("orphanedShares", () => {
     expect(orphanedShares([project("/here.flp")], local, scope)).toEqual(["/gone.flp"]);
   });
 });
+
+describe("what a shared song sends (allow-list)", () => {
+  const p = {
+    path: "/Users/someone/Music/Night Run v3.flp",
+    name: "Night Run v3",
+    tempoBpm: 140,
+    renders: ["/Users/someone/Music/Night Run.wav"],
+    trackNames: ["Kick - SomePack_Vol3"],
+    samples: ["/Users/someone/Samples/kick.wav"],
+    modifiedAtMs: Date.UTC(2026, 9, 1),
+  } as unknown as ProjectInfo;
+  const meta = { shared: true, shareId: "s1", notes: "private lyric", tags: ["dark"], key: "Am" };
+
+  it("sends exactly the listed fields, never notes, paths, samples or track names", () => {
+    const [payload] = sharedPayloads([p], ws({ [p.path]: meta }), scope);
+    expect(Object.keys(payload).sort()).toEqual(
+      ["bpm", "credits", "crew_id", "has_mixdown", "id", "kit_accepted", "last_saved_at", "musical_key", "release_date", "stage", "tags", "title"].sort(),
+    );
+    const all = JSON.stringify(payload);
+    for (const leak of ["private lyric", "/Users/", "SomePack", "kick.wav"]) expect(all).not.toContain(leak);
+    expect(payload.title).toBe("Night Run");
+    expect(payload.has_mixdown).toBe(true);
+  });
+
+  it("uses the title typed for the crew instead of the file name", () => {
+    const [payload] = sharedPayloads([p], ws({ [p.path]: { ...meta, shareTitle: "  Midnight Run  " } }), scope);
+    expect(payload.title).toBe("Midnight Run");
+    expect(sharedTitle("Night Run v3", "   ")).toBe("Night Run");
+  });
+});

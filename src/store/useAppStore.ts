@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS: Settings = {
   favorites: [],
   aiModel: null,
   aiLanguage: null,
+  aiIncludeNotes: false,
   ffmpegPath: null,
 };
 

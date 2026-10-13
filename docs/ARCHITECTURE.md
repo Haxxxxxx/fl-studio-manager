@@ -9,15 +9,15 @@ How Hivo goes from a personal monitor to a crew tool, with **all crew data store
    reads FL projects locally                          phones and laptops without FL Studio
    shares chosen songs' metadata ──┐          ┌── reads/updates the crew board
                                    ▼          ▼
-                         Supabase (EU region: Paris, eu-west-3)
+                         Supabase (EU region: Ireland, eu-west-1)
                          Postgres + Auth (email code) + Realtime
                          row-level security: only your crew sees your crew's data
 ```
 
-- **Supabase** (Paris, `eu-west-3`) holds everything the crew shares: the database, sign-in, and live updates. You choose the region when the project is created, and it can't change afterwards.
-- **Web dashboard** is a **static app** (Vite + React, reusing the desktop app's code) hosted on Vercel. The browser talks **directly** to Supabase in Paris, so **crew data never passes through Vercel's servers**. Vercel only serves the app's code, from its global CDN, like any static website.
-- **Server-side code**, if a later feature needs it (social publishing webhooks, distributor APIs), runs as Vercel Functions **pinned to Paris (`cdg1`)** in `vercel.json`. Functions default to the US (`iad1`) otherwise.
-- **Desktop app** stays the source of truth for each member's own projects. FL files, audio and file paths never leave the computer.
+- **Supabase** (Ireland, `eu-west-1`) holds everything the crew shares: the database, sign-in, and live updates. You choose the region when the project is created, and it can't change afterwards.
+- **Web dashboard** is a **static app** (Vite + React, reusing the desktop app's code) hosted on Vercel. The browser talks **directly** to Supabase in Ireland, so **crew data never passes through Vercel's servers**. Vercel only serves the app's code, from its global CDN, like any static website.
+- **Server-side code**, if a later feature needs it (social publishing webhooks, distributor APIs), runs as Vercel Functions **pinned to Dublin (`dub1`)**, next to the database, in `vercel.json`. Functions default to the US (`iad1`) otherwise.
+- **Desktop app** stays the source of truth for each member's own projects. FL files, audio and file paths never leave the computer. The optional AI features (Gemini text, Cloudflare cover concepts) are separate from crew sharing and send song facts and kit text to those providers, never audio, paths or track names; notes only if the user turns that on.
 
 ## What is shared, and what never is
 
@@ -25,11 +25,12 @@ Sharing is **opt-in per song** (and per release). For a shared song the crew see
 
 | Shared | Never shared |
 |---|---|
-| Title, stage, BPM, key, tags | Audio, mixdowns, stems, snippets |
+| Title (editable for the crew), stage, BPM, key, tags | Audio, mixdowns, stems, snippets |
 | Credits (who's on it, role, split) | File paths, folder names, usernames |
 | Release date, release membership | Sample and plugin lists |
 | "Has a mixdown", "Launch Kit accepted" | Notes (private by default) |
 | Last FL save date | Mixer track names |
+| Crew and display names (sign-in email stays in Supabase Auth) | |
 
 ## Accounts and crews
 
