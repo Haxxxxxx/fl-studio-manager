@@ -1,0 +1,367 @@
+//! 9:16 shorts for reels/stories/TikTok, rendered locally with ffmpeg (free,
+//! offline): the layout image the app draws (art, title, artist, release
+//! line) + an animated waveform + the snippet cut from the real mixdown.
+
+use crate::audio::safe_name;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+/// Output size: what Reels, TikTok and Shorts expect.
+pub const WIDTH: u32 = 1080;
+pub const HEIGHT: u32 = 1920;
+/// Waveform box. The layout image leaves this area free (src/lib/shorts.ts).
+pub const WAVE_W: u32 = 920;
+pub const WAVE_H: u32 = 240;
+pub const WAVE_Y: u32 = 1250;
+const FPS: u32 = 30;
+const RENDER_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// ffmpeg locations to try when it isn't on PATH. Apps opened from Finder
+/// don't inherit the shell's PATH, so Homebrew's folder must be listed.
+fn candidate_paths() -> Vec<PathBuf> {
+    let exe = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    let mut out: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).map(|d| d.join(exe)).collect())
+        .unwrap_or_default();
+    #[cfg(not(windows))]
+    for d in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/opt/local/bin"] {
+        out.push(Path::new(d).join(exe));
+    }
+    #[cfg(windows)]
+    {
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            out.push(Path::new(&local).join("Microsoft").join("WinGet").join("Links").join(exe));
+        }
+        if let Ok(pf) = std::env::var("ProgramFiles") {
+            out.push(Path::new(&pf).join("ffmpeg").join("bin").join(exe));
+        }
+        out.push(PathBuf::from("C:\\ffmpeg\\bin").join(exe));
+    }
+    out
+}
+
+/// The configured path if it exists, else FFMPEG_PATH, else the first
+/// ffmpeg found on PATH or in the usual install folders.
+pub fn find_ffmpeg(configured: Option<&str>) -> Option<PathBuf> {
+    let configured = configured.map(str::trim).filter(|p| !p.is_empty()).map(PathBuf::from);
+    let env = std::env::var_os("FFMPEG_PATH").map(PathBuf::from);
+    configured.into_iter().chain(env).chain(candidate_paths()).find(|p| p.is_file())
+}
+
+/// Best available H.264 encoder from `ffmpeg -encoders` output.
+fn pick_encoder(encoders: &str) -> Option<&'static str> {
+    ["libx264", "h264_videotoolbox", "h264_mf", "libopenh264"]
+        .into_iter()
+        .find(|e| encoders.lines().any(|l| l.split_whitespace().nth(1) == Some(*e)))
+}
+
+fn encoder_for(ffmpeg: &Path) -> Result<&'static str, String> {
+    let out = Command::new(ffmpeg)
+        .args(["-hide_banner", "-encoders"])
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| format!("couldn't run ffmpeg at {}: {e}", ffmpeg.display()))?;
+    pick_encoder(&String::from_utf8_lossy(&out.stdout))
+        .ok_or_else(|| "This ffmpeg has no H.264 encoder. Install a full build (brew install ffmpeg / winget install Gyan.FFmpeg).".to_string())
+}
+
+fn encoder_args(encoder: &str) -> Vec<String> {
+    let v: &[&str] = match encoder {
+        "libx264" => &["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-profile:v", "high"],
+        "h264_videotoolbox" => &["-c:v", "h264_videotoolbox", "-b:v", "8M", "-profile:v", "high"],
+        other => return vec!["-c:v".into(), other.into(), "-b:v".into(), "8M".into()],
+    };
+    v.iter().map(|s| s.to_string()).collect()
+}
+
+/// The full ffmpeg argument list for one short (pure, so it's testable).
+pub fn build_args(layout: &Path, master: &Path, start: f64, length: f64, encoder: &str, out: &Path) -> Vec<String> {
+    let fade_out = (length - 0.6).max(0.0);
+    let filter = format!(
+        "[1:a]asplit=2[aw][ao];\
+         [aw]showwaves=s={WAVE_W}x{WAVE_H}:mode=cline:draw=full:rate={FPS}:scale=sqrt:colors=0xE8743B,format=rgba[w];\
+         [0:v]scale={WIDTH}:{HEIGHT},setsar=1,format=rgba[bg];\
+         [bg][w]overlay=x=(W-w)/2:y={WAVE_Y}:shortest=1,format=yuv420p[v];\
+         [ao]afade=t=in:st=0:d=0.3,afade=t=out:st={fade_out:.3}:d=0.6[a]"
+    );
+    let mut args: Vec<String> = [
+        "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+        "-loop", "1", "-framerate", &FPS.to_string(), "-i", &layout.to_string_lossy(),
+        "-ss", &format!("{start:.3}"), "-t", &format!("{length:.3}"), "-i", &master.to_string_lossy(),
+        "-filter_complex", &filter,
+        "-map", "[v]", "-map", "[a]",
+        "-t", &format!("{length:.3}"), "-r", &FPS.to_string(),
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    args.extend(encoder_args(encoder));
+    args.extend(
+        ["-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart"]
+            .iter()
+            .map(|s| s.to_string()),
+    );
+    args.push(out.to_string_lossy().to_string());
+    args
+}
+
+/// Runs ffmpeg, killing it if it hangs; returns the end of stderr on failure.
+fn run_ffmpeg(ffmpeg: &Path, args: &[String]) -> Result<(), String> {
+    let mut child = Command::new(ffmpeg)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("couldn't start ffmpeg: {e}"))?;
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if status.success() {
+                    return Ok(());
+                }
+                let mut err = String::new();
+                if let Some(mut s) = child.stderr.take() {
+                    let _ = s.read_to_string(&mut err);
+                }
+                let tail: String = err.lines().rev().take(3).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" / ");
+                return Err(format!("ffmpeg failed: {}", if tail.is_empty() { status.to_string() } else { tail }));
+            }
+            Ok(None) if started.elapsed() > RENDER_TIMEOUT => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("ffmpeg took too long and was stopped".to_string());
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+            Err(e) => return Err(format!("error waiting for ffmpeg: {e}")),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShortsStatus {
+    pub path: Option<String>,
+    pub encoder: Option<String>,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn shorts_status(ffmpeg_path: Option<String>) -> ShortsStatus {
+    tauri::async_runtime::spawn_blocking(move || match find_ffmpeg(ffmpeg_path.as_deref()) {
+        None => ShortsStatus { path: None, encoder: None, error: None },
+        Some(p) => match encoder_for(&p) {
+            Ok(e) => ShortsStatus { path: Some(p.to_string_lossy().into()), encoder: Some(e.into()), error: None },
+            Err(err) => ShortsStatus { path: Some(p.to_string_lossy().into()), encoder: None, error: Some(err) },
+        },
+    })
+    .await
+    .unwrap_or(ShortsStatus { path: None, encoder: None, error: Some("couldn't check for ffmpeg".into()) })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShortClip {
+    pub label: String,
+    pub start_sec: f64,
+    pub length_sec: f64,
+    /// The 1080×1920 layout PNG, base64 (drawn by the app).
+    pub layout_png: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShortResult {
+    pub label: String,
+    pub path: Option<String>,
+    pub error: Option<String>,
+}
+
+fn decode_base64(s: &str) -> Result<Vec<u8>, String> {
+    // Small std-only decoder: the layout PNG arrives as standard base64.
+    let s = s.split_once(',').map_or(s, |(head, body)| if head.starts_with("data:") { body } else { s });
+    let val = |c: u8| -> Option<u32> {
+        Some(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return None,
+        } as u32)
+    };
+    let clean: Vec<u8> = s.bytes().filter(|c| !c.is_ascii_whitespace() && *c != b'=').collect();
+    let mut out = Vec::with_capacity(clean.len() * 3 / 4);
+    for chunk in clean.chunks(4) {
+        let mut n = 0u32;
+        for (i, c) in chunk.iter().enumerate() {
+            n |= val(*c).ok_or("invalid base64 in layout image")? << (18 - 6 * i);
+        }
+        out.push((n >> 16) as u8);
+        if chunk.len() > 2 {
+            out.push((n >> 8) as u8);
+        }
+        if chunk.len() > 3 {
+            out.push(n as u8);
+        }
+    }
+    Ok(out)
+}
+
+/// Renders each clip to `<export>/Launch Kits/<song>/shorts/<label>.mp4`.
+#[tauri::command]
+pub async fn render_shorts(
+    ffmpeg_path: Option<String>,
+    master: String,
+    clips: Vec<ShortClip>,
+    output_folder: String,
+    folder_name: String,
+) -> Result<Vec<ShortResult>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let ffmpeg = find_ffmpeg(ffmpeg_path.as_deref())
+            .ok_or("ffmpeg isn't installed (or wasn't found). See Settings → Shorts.")?;
+        let encoder = encoder_for(&ffmpeg)?;
+        let master = PathBuf::from(&master);
+        if !master.is_file() {
+            return Err(format!("The mixdown is missing: {}", master.display()));
+        }
+        let out_dir = PathBuf::from(&output_folder)
+            .join(crate::scanner::LAUNCH_KITS_DIR)
+            .join(safe_name(&folder_name))
+            .join("shorts");
+        fs::create_dir_all(&out_dir).map_err(|e| format!("could not create {}: {e}", out_dir.display()))?;
+        let temp = std::env::temp_dir().join(format!("flsm-shorts-{}", std::process::id()));
+        fs::create_dir_all(&temp).map_err(|e| format!("could not create a temp folder: {e}"))?;
+
+        let results = clips
+            .iter()
+            .map(|clip| {
+                let render = || -> Result<PathBuf, String> {
+                    if !(clip.length_sec > 0.0 && clip.length_sec <= 90.0 && clip.start_sec >= 0.0) {
+                        return Err("invalid clip range".to_string());
+                    }
+                    let layout = temp.join(format!("{}.png", safe_name(&clip.label)));
+                    fs::write(&layout, decode_base64(&clip.layout_png)?).map_err(|e| format!("could not write the layout: {e}"))?;
+                    let out = out_dir.join(format!("{}.mp4", safe_name(&clip.label)));
+                    let result = run_ffmpeg(&ffmpeg, &build_args(&layout, &master, clip.start_sec, clip.length_sec, encoder, &out));
+                    let _ = fs::remove_file(&layout);
+                    result.map(|_| out)
+                };
+                match render() {
+                    Ok(p) => ShortResult { label: clip.label.clone(), path: Some(p.to_string_lossy().into()), error: None },
+                    Err(e) => ShortResult { label: clip.label.clone(), path: None, error: Some(e) },
+                }
+            })
+            .collect();
+        let _ = fs::remove_dir_all(&temp);
+        Ok(results)
+    })
+    .await
+    .map_err(|e| format!("rendering failed: {e}"))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn picks_the_best_encoder() {
+        let listing = " V....D libx264rgb  libx264 RGB\n V....D h264_videotoolbox VideoToolbox\n V....D libx264 H.264\n";
+        assert_eq!(pick_encoder(listing), Some("libx264"));
+        assert_eq!(pick_encoder(" V....D h264_videotoolbox VT\n"), Some("h264_videotoolbox"));
+        assert_eq!(pick_encoder(" V....D mpeg4 MPEG-4\n"), None);
+    }
+
+    #[test]
+    fn builds_a_nine_by_sixteen_command() {
+        let args = build_args(Path::new("/tmp/l.png"), Path::new("/tmp/m.wav"), 12.5, 15.0, "libx264", Path::new("/tmp/o.mp4"));
+        let joined = args.join(" ");
+        assert!(joined.contains("-ss 12.500 -t 15.000 -i /tmp/m.wav"), "{joined}");
+        assert!(joined.contains("scale=1080:1920"));
+        // Default draw=scale makes the strokes ~6% opaque (murky on dark).
+        assert!(joined.contains("draw=full"));
+        assert!(joined.contains("afade=t=out:st=14.400:d=0.6"));
+        assert!(joined.contains("-c:v libx264") && joined.contains("-c:a aac"));
+        assert_eq!(args.last().unwrap(), "/tmp/o.mp4");
+    }
+
+    #[test]
+    fn decodes_base64() {
+        assert_eq!(decode_base64("aGVsbG8=").unwrap(), b"hello");
+        assert_eq!(decode_base64("data:image/png;base64,aGk=").unwrap(), b"hi");
+        assert!(decode_base64("a$b=").is_err());
+    }
+
+    #[test]
+    fn finds_a_configured_ffmpeg() {
+        let fake = std::env::temp_dir().join(format!("flsm-fake-ffmpeg-{}", std::process::id()));
+        fs::write(&fake, b"").unwrap();
+        assert_eq!(find_ffmpeg(Some(fake.to_str().unwrap())), Some(fake.clone()));
+        let _ = fs::remove_file(&fake);
+    }
+
+    /// Manual check: render a layout PNG drawn by the app.
+    /// `FLSM_SHORT_LAYOUT=layout.png FLSM_SHORT_OUT=out.mp4 cargo test given_layout`
+    #[test]
+    fn renders_a_given_layout() {
+        let (Ok(layout), Ok(out)) = (std::env::var("FLSM_SHORT_LAYOUT"), std::env::var("FLSM_SHORT_OUT")) else { return };
+        let ffmpeg = find_ffmpeg(None).expect("ffmpeg");
+        let rate = 44100u32;
+        // A pulsing tone so the waveform visibly moves.
+        let tone: Vec<f32> = (0..rate * 8)
+            .map(|i| {
+                let t = i as f64 / rate as f64;
+                let env = 0.25 + 0.6 * (t * std::f64::consts::PI * 2.0).sin().abs();
+                (env * (t * 220.0 * std::f64::consts::TAU).sin()) as f32
+            })
+            .collect();
+        let master = std::env::temp_dir().join(format!("flsm-given-{}.wav", std::process::id()));
+        crate::audio::write_wav(&master, &tone, 1, rate).unwrap();
+        let result = run_ffmpeg(&ffmpeg, &build_args(Path::new(&layout), &master, 0.0, 6.0, encoder_for(&ffmpeg).unwrap(), Path::new(&out)));
+        let _ = fs::remove_file(&master);
+        result.expect("render");
+    }
+
+    /// Real render when ffmpeg is installed (skipped otherwise): a 3 s
+    /// short must come out 1080×1920 H.264 + AAC, about 3 s long.
+    #[test]
+    fn renders_a_real_short_if_ffmpeg_is_installed() {
+        let Some(ffmpeg) = find_ffmpeg(None) else {
+            eprintln!("ffmpeg not found; skipping");
+            return;
+        };
+        let encoder = encoder_for(&ffmpeg).expect("H.264 encoder");
+        let dir = std::env::temp_dir().join(format!("flsm-shorts-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let rate = 44100u32;
+        let tone: Vec<f32> = (0..rate * 6).map(|i| (0.4 * (i as f64 * 440.0 * std::f64::consts::TAU / rate as f64).sin()) as f32).collect();
+        let master = dir.join("mix.wav");
+        crate::audio::write_wav(&master, &tone, 1, rate).unwrap();
+        let layout = dir.join("layout.png");
+        let made = Command::new(&ffmpeg)
+            .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=0x15110e:s=1080x1920", "-frames:v", "1"])
+            .arg(&layout)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let out = dir.join("short.mp4");
+        run_ffmpeg(&ffmpeg, &build_args(&layout, &master, 1.0, 3.0, encoder, &out)).expect("render");
+        let probe = Command::new(ffmpeg.with_file_name(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" }))
+            .args(["-v", "error", "-show_entries", "stream=codec_name,width,height:format=duration", "-of", "default=nw=1"])
+            .arg(&out)
+            .output();
+        let _ = fs::remove_dir_all(&dir);
+        let Ok(probe) = probe else { return };
+        let info = String::from_utf8_lossy(&probe.stdout);
+        assert!(info.contains("codec_name=h264"), "{info}");
+        assert!(info.contains("codec_name=aac"), "{info}");
+        assert!(info.contains("width=1080") && info.contains("height=1920"), "{info}");
+        let duration: f64 = info.lines().find_map(|l| l.strip_prefix("duration=")).and_then(|d| d.parse().ok()).unwrap();
+        assert!((duration - 3.0).abs() < 0.25, "duration {duration}");
+    }
+}

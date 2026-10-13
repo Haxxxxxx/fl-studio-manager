@@ -185,7 +185,7 @@ fn pick_snippets(energy: &[f32], duration: f64, bpm: Option<f64>) -> Vec<Snippet
     out
 }
 
-fn write_wav(path: &Path, samples: &[f32], channels: u16, rate: u32) -> std::io::Result<()> {
+pub(crate) fn write_wav(path: &Path, samples: &[f32], channels: u16, rate: u32) -> std::io::Result<()> {
     let mut w = BufWriter::new(File::create(path)?);
     let data_len = (samples.len() * 2) as u32;
     w.write_all(b"RIFF")?;

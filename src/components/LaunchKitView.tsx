@@ -21,6 +21,7 @@ import { formatRelative } from "../lib/format";
 import type { AiFieldReview, AudioAnalysis, ProjectInfo, Snippet } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { SongPicker } from "./SongPicker";
+import { ShortsPanel } from "./ShortsPanel";
 import { CoverConcepts } from "./CoverConcepts";
 import { btn, btnPrimary, input } from "./ui";
 
@@ -202,7 +203,7 @@ export function LaunchKitView() {
           </div>
 
           <div className="flex flex-col gap-5">
-            <AiPanel key={project.path} path={project.path} input={kitInput} fields={fields} />
+            <AiPanel key={`ai:${project.path}`} path={project.path} input={kitInput} fields={fields} />
             <Card title="Snippets for reels and stories">
               <Snippets
                 project={project}
@@ -214,6 +215,14 @@ export function LaunchKitView() {
                 onMove={(label, start) => setSnippetStart(project.path, label, start)}
               />
             </Card>
+            <ShortsPanel
+              key={`shorts:${project.path}`}
+              project={project}
+              fields={fields}
+              snippets={snippets}
+              analysisLoading={loading}
+              analysisError={analysisError}
+            />
             <Card title="Cover art brief">
               <FieldRow field={byId("coverBrief")} onChange={(v) => setKitEdit(project.path, "coverBrief", v)} bare />
               <CoverConcepts key={project.path} path={project.path} title={byId("title").value || project.name} artists={byId("artists").value} brief={byId("coverBrief").value} />
@@ -454,7 +463,7 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
         {reviewedAt && <span className="text-white/35"> · checked {formatRelative(reviewedAt)}</span>}
       </div>
       {running && (
-        <div className="text-[11px] text-white/40">If Gemini is busy this retries on its own and can take up to a minute.</div>
+        <div className="text-[11px] text-white/40">If Gemini is busy this retries on its own; it gives up after 2 minutes.</div>
       )}
       {backupUsed && !running && (
         <div className="text-[11px] text-white/40">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>

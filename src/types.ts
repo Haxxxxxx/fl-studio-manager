@@ -65,6 +65,8 @@ export interface Settings {
   aiModel: string | null;
   /** Language for AI-written copy; null = English. */
   aiLanguage: string | null;
+  /** ffmpeg for shorts; null = found automatically. */
+  ffmpegPath: string | null;
 }
 
 export type RenderFormat = "wav" | "mp3" | "ogg";
