@@ -1,6 +1,7 @@
 mod actions;
 mod ai;
 mod audio;
+mod cover;
 mod flp_metadata;
 mod models;
 mod package;
@@ -39,6 +40,10 @@ pub fn run() {
             ai::ai_generate_json,
             shorts::shorts_status,
             shorts::render_shorts,
+            cover::cover_status,
+            cover::set_cover_credentials,
+            cover::generate_cover,
+            cover::save_cover,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

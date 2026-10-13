@@ -5,6 +5,8 @@ import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type {
   AiStatus,
   AudioAnalysis,
+  CoverImage,
+  CoverStatus,
   PackageResult,
   ProjectInfo,
   RenderEvent,
@@ -166,6 +168,27 @@ export async function renderShorts(args: {
   folderName: string;
 }): Promise<ShortResult[]> {
   return invoke("render_shorts", args);
+}
+
+/** Whether Cloudflare Workers AI credentials are set (never the values). */
+export async function coverStatus(): Promise<CoverStatus> {
+  return invoke("cover_status");
+}
+
+/** Saves the Cloudflare account ID + API token on this machine; both null
+ * removes them. */
+export async function setCoverCredentials(accountId: string | null, token: string | null): Promise<void> {
+  return invoke("set_cover_credentials", { accountId, token });
+}
+
+/** One FLUX.1 [schnell] cover concept (retries on the Rust side). */
+export async function generateCover(prompt: string, seed: number | null): Promise<CoverImage> {
+  return invoke("generate_cover", { prompt, seed });
+}
+
+/** Writes `<outputFolder>/Launch Kits/<folderName>/cover-concept.jpg`. */
+export async function saveCover(args: { outputFolder: string; folderName: string; imageB64: string }): Promise<string> {
+  return invoke("save_cover", args);
 }
 
 /** URL the webview can stream a local audio file from (asset protocol). */
