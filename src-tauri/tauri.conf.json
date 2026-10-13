@@ -20,7 +20,32 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: asset: http://asset.localhost",
+        "media-src": "'self' asset: http://asset.localhost",
+        "font-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost https://chrbpaoljulntuvousnz.supabase.co wss://chrbpaoljulntuvousnz.supabase.co",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'none'",
+        "frame-src": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'unsafe-inline'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: asset: http://asset.localhost",
+        "media-src": "'self' asset: http://asset.localhost",
+        "font-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost ws://localhost:1420 http://127.0.0.1:54321 ws://127.0.0.1:54321 https://chrbpaoljulntuvousnz.supabase.co wss://chrbpaoljulntuvousnz.supabase.co",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'none'",
+        "frame-src": "'none'"
+      },
       "assetProtocol": {
         "enable": true,
         "scope": []
