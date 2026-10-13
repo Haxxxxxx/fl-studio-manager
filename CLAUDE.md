@@ -18,6 +18,7 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 ## Commands
 - `npm ci && npm run tauri dev`: run the app. Setup per OS: [SETUP.md](SETUP.md).
 - `npm run build`: tsc + vite (must stay clean).
+- `npm test`: Vitest unit tests for the pure modules in `src/lib` (`*.test.ts`).
 - `cd src-tauri && cargo test`: Rust tests.
 - `supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor` then `supabase test db`: database tests. Sign-in emails land in Mailpit (http://127.0.0.1:54324).
 - `cd web && npm ci && npm run dev`: web dashboard on port 5175.
@@ -26,3 +27,4 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 - Developed on Windows and macOS. Crew members use both. `.flp` files store paths with the saving OS's separators (see `native()` in `src-tauri/src/resolve.rs`).
 - No hardcoded paths, usernames, real artist names or keys in code, tests or docs. Use placeholders.
 - App data (statuses, releases, people) lives in `workspace.json` in the app config dir, keyed by `.flp` path. Never write to `.flp` files.
+- The desktop CSP (`src-tauri/tauri.conf.json` → `security.csp` / `devCsp`) and `web/vercel.json` pin the Supabase project URL. If the project ever changes, update them along with `.env.local`.

@@ -1,5 +1,5 @@
 use crate::flp_metadata;
-use crate::models::{FileEntry, ProjectInfo};
+use crate::models::{FileEntry, ProjectInfo, StemsInfo};
 use crate::resolve::Resolver;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -223,6 +223,9 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
                 renders: Vec::new(),
                 recordings_count: 0,
                 recordings_bytes: 0,
+                flp_title: non_empty(flp.title.clone()),
+                comment: non_empty(flp.comment.clone()),
+                stems: None,
                 plugins: resolver.plugins(&flp.plugins),
                 samples: resolver.samples(&flp.samples, path),
                 track_names: {
@@ -269,14 +272,40 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
         let dir = PathBuf::from(&projects[indices[0]].folder);
         let siblings: Vec<PathBuf> = read_files(&dir);
         let recordings: Vec<PathBuf> = read_files(&dir.join("Audio"));
+        let stem_dirs: Vec<PathBuf> = read_dirs(&dir)
+            .into_iter()
+            .filter(|d| d.file_name().map(|n| n.to_string_lossy().to_lowercase().contains("stem")).unwrap_or(false))
+            .collect();
 
         for &i in indices {
             let name = projects[i].name.to_lowercase();
+            // FL's split-mixer export: `<name>_<track>.wav`, one per track.
+            // Two or more of them are stems, not mixdowns.
+            let split_prefix = format!("{name}_");
+            let split: Vec<&PathBuf> = siblings
+                .iter()
+                .filter(|p| has_ext(p, AUDIO_EXTS) && stem_of(p).to_lowercase().starts_with(&split_prefix))
+                .collect();
+            let split_are_stems = split.len() >= 2;
             let mut renders: Vec<FileEntry> = siblings
                 .iter()
                 .filter(|p| has_ext(p, AUDIO_EXTS) && stem_of(p).to_lowercase().starts_with(&name))
+                .filter(|p| !(split_are_stems && stem_of(p).to_lowercase().starts_with(&split_prefix)))
                 .filter_map(|p| file_entry(p))
                 .collect();
+            // A stems folder belongs to this song if it's the only song in the
+            // folder, or the stems folder is named after it.
+            let own_dir = stem_dirs
+                .iter()
+                .find(|d| d.file_name().map(|n| n.to_string_lossy().to_lowercase().contains(&name)).unwrap_or(false))
+                .or_else(|| (indices.len() == 1).then(|| stem_dirs.first()).flatten());
+            projects[i].stems = if let Some(sd) = own_dir {
+                stems_info(sd, &read_files(sd))
+            } else if split_are_stems {
+                stems_info(&dir, &split.iter().map(|p| (*p).clone()).collect::<Vec<_>>())
+            } else {
+                None
+            };
             if let Some(exported) = exports.get(&name) {
                 renders.extend(exported.iter().cloned());
             }
@@ -333,6 +362,23 @@ fn merge_plugin_aliases(projects: &mut [ProjectInfo]) {
         }
         project.plugins = merged;
     }
+}
+
+fn read_dirs(dir: &Path) -> Vec<PathBuf> {
+    fs::read_dir(dir)
+        .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_dir()).collect())
+        .unwrap_or_default()
+}
+
+/// Audio files among `files` as a stems summary; None if there are none.
+fn stems_info(folder: &Path, files: &[PathBuf]) -> Option<StemsInfo> {
+    let audio: Vec<FileEntry> = files.iter().filter(|p| has_ext(p, AUDIO_EXTS)).filter_map(|p| file_entry(p)).collect();
+    (!audio.is_empty()).then(|| StemsInfo {
+        folder: folder.to_string_lossy().to_string(),
+        count: audio.len() as u32,
+        bytes: audio.iter().map(|f| f.size_bytes).sum(),
+        newest_ms: audio.iter().map(|f| f.modified_at_ms).max().unwrap_or(0),
+    })
 }
 
 fn read_files(dir: &Path) -> Vec<PathBuf> {
@@ -472,5 +518,54 @@ mod tests {
         assert_eq!(p.renders.len(), 1);
         assert_eq!(p.recordings_count, 1);
         assert_eq!(p.recordings_bytes, 3);
+        assert!(p.stems.is_none());
+    }
+
+    #[test]
+    fn split_mixer_exports_are_stems_not_renders() {
+        let root = std::env::temp_dir().join(format!("flsm-stems-split-{}", std::process::id()));
+        let song = root.join("Envy");
+        fs::create_dir_all(&song).unwrap();
+        fs::write(song.join("Envy.flp"), b"x").unwrap();
+        fs::write(song.join("Envy.wav"), b"x").unwrap();
+        fs::write(song.join("Envy_Kick.wav"), b"ab").unwrap();
+        fs::write(song.join("Envy_Vox.wav"), b"abc").unwrap();
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        let p = &projects[0];
+        assert_eq!(p.renders.len(), 1, "only Envy.wav is a mixdown");
+        assert!(p.renders[0].path.ends_with("Envy.wav"));
+        let stems = p.stems.as_ref().expect("split exports are stems");
+        assert_eq!((stems.count, stems.bytes), (2, 5));
+    }
+
+    #[test]
+    fn a_single_suffixed_file_is_still_a_render() {
+        let root = std::env::temp_dir().join(format!("flsm-stems-single-{}", std::process::id()));
+        let song = root.join("Envy");
+        fs::create_dir_all(&song).unwrap();
+        fs::write(song.join("Envy.flp"), b"x").unwrap();
+        fs::write(song.join("Envy_master.wav"), b"x").unwrap();
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(projects[0].renders.len(), 1);
+        assert!(projects[0].stems.is_none());
+    }
+
+    #[test]
+    fn a_stems_folder_belongs_to_its_song() {
+        let root = std::env::temp_dir().join(format!("flsm-stems-dir-{}", std::process::id()));
+        let shared = root.join("Beats");
+        fs::create_dir_all(shared.join("Envy Stems")).unwrap();
+        fs::write(shared.join("Envy.flp"), b"x").unwrap();
+        fs::write(shared.join("Other.flp"), b"x").unwrap();
+        fs::write(shared.join("Envy Stems/Drums.wav"), b"abcd").unwrap();
+        fs::write(shared.join("Envy Stems/notes.txt"), b"x").unwrap();
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        let envy = projects.iter().find(|p| p.name == "Envy").unwrap();
+        let other = projects.iter().find(|p| p.name == "Other").unwrap();
+        assert_eq!(envy.stems.as_ref().map(|s| (s.count, s.bytes)), Some((1, 4)));
+        assert!(other.stems.is_none(), "a stems folder named after another song isn't this one's");
     }
 }

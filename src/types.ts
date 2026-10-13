@@ -5,6 +5,13 @@ export interface FileEntry {
 }
 
 /** One song: the main .flp plus what FL keeps around it (see scanner.rs). */
+export interface StemsInfo {
+  folder: string;
+  count: number;
+  bytes: number;
+  newestMs: number;
+}
+
 export interface ProjectInfo {
   path: string;
   name: string;
@@ -27,6 +34,12 @@ export interface ProjectInfo {
   renders: FileEntry[];
   recordingsCount: number;
   recordingsBytes: number;
+  /** Title and comment from FL Studio's project info (File → Project info). */
+  flpTitle?: string | null;
+  comment?: string | null;
+  /** Exported stems: a stems folder next to the project, or FL's split-mixer
+   * export (`<name>_<track>.wav`, two or more) beside the .flp. */
+  stems: StemsInfo | null;
   plugins: PluginInfo[];
   samples: SampleInfo[];
   /** Named mixer tracks + recorded-take labels ("Lead Voices - Nova"). */
@@ -126,7 +139,18 @@ export type KitFieldId =
   | "explicit"
   | "releaseDate"
   | "coverBrief"
-  | "captions";
+  | "captions"
+  // Distribution (what DistroKid, TuneCore, CD Baby, Amuse… ask for)
+  | "featuring"
+  | "songwriters"
+  | "label"
+  | "copyright"
+  | "language"
+  | "isrc"
+  | "upc"
+  | "releaseTitle"
+  | "releaseType"
+  | "trackNumber";
 
 /** The user's side of a launch kit. Everything else is regenerated from the
  * project each time, so the .flp stays the source of truth. */
@@ -207,6 +231,18 @@ export interface Snippet {
   lengthSec: number;
 }
 
+/** The mixdown file itself, for the distributor checks. */
+export interface MasterSpec {
+  container: string;
+  sampleRate: number;
+  channels: number;
+  /** null for lossy formats (MP3/OGG). */
+  bitsPerSample: number | null;
+  /** Highest absolute sample, 0–1 (1 = 0 dBFS). */
+  peak: number;
+  clippedSamples: number;
+}
+
 export interface AudioAnalysis {
   durationSec: number;
   windowSec: number;
@@ -215,6 +251,8 @@ export interface AudioAnalysis {
   snippets: Snippet[];
   /** Estimated from the audio (Krumhansl–Schmuckler); missing for sample data. */
   key?: { key: string; confidence: number } | null;
+  /** Missing for sample data. */
+  master?: MasterSpec;
 }
 
 /** A collaborator or contact. Aliases are how they appear in track names
