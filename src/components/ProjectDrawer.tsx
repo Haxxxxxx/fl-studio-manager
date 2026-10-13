@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { TRASH_NAME, formatBytes, formatDateTime } from "../lib/format";
-import { audioSrc, openInFlStudio, revealInFileManager } from "../lib/tauri";
+import { audioSrc, backupsOnRiskyVolumes, openInFlStudio, revealInFileManager } from "../lib/tauri";
 import { KEYS, albumsOf, backupsBytes, formatBpm, missingPlugins, renderFreshness } from "../lib/songs";
 import type { ProjectInfo } from "../types";
 import { detectKey } from "../lib/people";
@@ -57,6 +57,8 @@ export function ProjectDrawer() {
   const [versionName, setVersionName] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [showAllBackups, setShowAllBackups] = useState(false);
+  /** Backups to clean up that sit on a drive with no Recycle Bin: waiting for an explicit OK. */
+  const [permanent, setPermanent] = useState<{ project: string; paths: string[]; risky: number } | null>(null);
 
   const allTags = useMemo(() => {
     const counts = new Map<string, number>();
@@ -391,9 +393,44 @@ export function ProjectDrawer() {
                 </>
               }
               confirmLabel={`Move ${oldBackups.length} to ${TRASH_NAME}? Click again`}
-              onConfirm={() => run(() => trashBackups(oldBackups.map((b) => b.path)), (n) => `Moved ${n} backups to the ${TRASH_NAME}`)}
+              onConfirm={() =>
+                run(
+                  async () => {
+                    const paths = oldBackups.map((b) => b.path);
+                    // Removable or network drive: no Recycle Bin, so ask first.
+                    const risky = await backupsOnRiskyVolumes(paths);
+                    if (risky.length > 0) {
+                      setPermanent({ project: project.path, paths, risky: risky.length });
+                      return -1;
+                    }
+                    return trashBackups(paths);
+                  },
+                  (n) => (n === -1 ? "Nothing deleted yet: read the warning below." : `Moved ${n} backups to the ${TRASH_NAME}`),
+                )
+              }
               className={`${btn} mt-3 text-xs`}
             />
+          )}
+          {permanent && permanent.project === project.path && (
+            <div className="mt-2 rounded-md border border-red-400/30 bg-red-500/[0.06] px-3 py-2 text-xs text-red-200/90">
+              {permanent.risky === permanent.paths.length ? "These backups are" : `${permanent.risky} of these backups are`} on a removable or
+              network drive, which has no {TRASH_NAME}: they would be <b className="font-semibold">deleted permanently</b>.
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => {
+                    const paths = permanent.paths;
+                    setPermanent(null);
+                    void run(() => trashBackups(paths, true), (n) => `Deleted ${n} backups`);
+                  }}
+                  className="rounded border border-red-400/40 px-2 py-1 text-red-200 hover:bg-red-500/10"
+                >
+                  Delete permanently
+                </button>
+                <button onClick={() => setPermanent(null)} className="rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised">
+                  Keep them
+                </button>
+              </div>
+            </div>
           )}
           {oldBackups.length > 0 && (
             <div className="mt-1 text-[11px] text-engrave">Keeps the {KEEP_BACKUPS} most recent.</div>

@@ -197,7 +197,7 @@ interface AppState {
   }) => Promise<string>;
   duplicateProject: (path: string, newName: string) => Promise<string>;
   restoreBackup: (backupPath: string, projectPath: string) => Promise<string>;
-  trashBackups: (paths: string[]) => Promise<number>;
+  trashBackups: (paths: string[], allowPermanent?: boolean) => Promise<number>;
 }
 
 /** Flush a pending debounced workspace save (set once the store exists). */
@@ -817,8 +817,8 @@ export const useAppStore = create<AppState>((set, get) => {
       return created;
     },
 
-    trashBackups: async (paths) => {
-      const count = await api.trashBackups(paths);
+    trashBackups: async (paths, allowPermanent) => {
+      const count = await api.trashBackups(paths, allowPermanent);
       await get().rescan();
       return count;
     },
