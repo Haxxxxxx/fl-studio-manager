@@ -191,6 +191,18 @@ export async function saveCover(args: { outputFolder: string; folderName: string
   return invoke("save_cover", args);
 }
 
+export interface KitFile {
+  path: string;
+  /** Inside the kit folder, e.g. "snippets/Hook 15s.wav". */
+  relative: string;
+  sizeBytes: number;
+}
+
+/** What's in `<outputFolder>/Launch Kits/<folderName>/` (empty if never exported). */
+export async function kitFiles(outputFolder: string, folderName: string): Promise<KitFile[]> {
+  return invoke("kit_files", { outputFolder, folderName });
+}
+
 /** URL the webview can stream a local audio file from (asset protocol). */
 export function audioSrc(path: string): string {
   return convertFileSrc(path);

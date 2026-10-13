@@ -14,6 +14,7 @@ import { PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { useAppStore } from "./store/useAppStore";
+import { useCrewStore } from "./store/useCrewStore";
 
 export default function App() {
   const init = useAppStore((s) => s.init);
@@ -24,6 +25,7 @@ export default function App() {
 
   useEffect(() => {
     init();
+    void useCrewStore.getState().init();
   }, [init]);
 
   // Coming back from FL Studio: pick up new saves, backups and mixdowns.

@@ -535,15 +535,18 @@ export const useAppStore = create<AppState>((set, get) => {
     closeNewProject: () => set({ newProject: null }),
 
     updateSong: (path, patch) =>
-      mutateWorkspace((ws) => ({
-        ...ws,
-        songs: { ...ws.songs, [path]: { ...ws.songs[path], ...patch } },
-      })),
+      mutateWorkspace((ws) => {
+        // A local stage change is stamped so crew sync can order it against
+        // moves made on the crew board (which bring their own stamp).
+        const stamped = "status" in patch && patch.stageUpdatedAtMs === undefined ? { ...patch, stageUpdatedAtMs: Date.now() } : patch;
+        return { ...ws, songs: { ...ws.songs, [path]: { ...ws.songs[path], ...stamped } } };
+      }),
 
     setStatus: (paths, status) =>
       mutateWorkspace((ws) => {
         const songs = { ...ws.songs };
-        for (const p of paths) songs[p] = { ...songs[p], status };
+        const now = Date.now();
+        for (const p of paths) songs[p] = { ...songs[p], status, stageUpdatedAtMs: now };
         return { ...ws, songs };
       }),
 

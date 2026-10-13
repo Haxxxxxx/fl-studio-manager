@@ -77,6 +77,14 @@ The Launch Kit can paint four cover concepts from the cover art brief with FLUX.
 
 Concepts are drafts at 1024 × 1024 px. Distributors need 3000 × 3000, so a designer (or an upscaler) makes the final from the pick and adds the title. FLUX is told to leave text out because it spells badly. The credentials stay on that computer (`cover.json` in the app config folder, owner-only on macOS) and the UI never shows them again. Only the image prompt goes to Cloudflare. It's built from the brief, without the song title, artist names or notes.
 
+## Optional: the crew (shared board, EU servers)
+
+Sign in with an emailed code, create a crew or join one with an 8-letter invite code, then tick **Share with <your crew>** in a song's drawer (or use **Crew** in the Library for several songs). Everyone in the crew sees shared songs on **Pipeline → Crew** and on the web dashboard, and can move their stage. Moves sync live.
+
+Only metadata leaves your computer: title, stage, key, BPM, tags, credits (names, roles, splits) and release dates. Audio, file paths, samples, notes and FL track names never do. Data is stored by Supabase in Ireland (eu-west-1). Stop sharing a song and it's deleted from the crew board.
+
+Builds made for the crew already include the server address. If you run from source, copy `.env.example` to `.env.local` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the public anon key, never the service_role key). Without them the Crew section says sharing isn't set up and everything else works as before.
+
 ## Where your data lives
 
 Stages, tags, notes, releases, people and settings are FL Manager's own data. FL Studio doesn't store them. They live in the app config folder:

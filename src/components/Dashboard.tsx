@@ -29,6 +29,10 @@ import {
 } from "../lib/songs";
 import { EmptyLibrary, useVisibleSongs } from "./LibraryView";
 import { CrewCards } from "./CrewCards";
+import { useCrewStore } from "../store/useCrewStore";
+import { crewStats, RECENT_DAYS } from "../lib/crewStats";
+import { STALLED_DAYS } from "../lib/crew";
+import { pathsByShareId } from "../lib/crewSync";
 import { ProgressBar } from "./AlbumsView";
 import { StatusDot, btn, btnPrimary } from "./ui";
 
@@ -45,7 +49,7 @@ const HEAT = ["rgba(255,255,255,0.05)", "rgba(217,89,38,0.35)", "rgba(217,89,38,
 const DAY = 24 * 60 * 60 * 1000;
 const HEATMAP_WEEKS = 53;
 
-export function Dashboard() {
+function MyDashboard() {
   const songs = useVisibleSongs();
   const workspace = useAppStore((s) => s.workspace);
   const demoMode = useAppStore((s) => s.demoMode);
@@ -812,6 +816,166 @@ function Card({ title, action, children }: { title: string; action?: React.React
         {action}
       </div>
       {children}
+    </div>
+  );
+}
+
+type Scope = "me" | "crew";
+
+/** "Me" = this computer's songs and studio habits. "Crew" = group stats from
+ * shared songs only (roadmap 1a). The switch appears once you're in a crew. */
+export function Dashboard() {
+  const inCrew = useCrewStore((s) => s.enabled && !!s.userId && !!s.activeCrewId);
+  const crewName = useCrewStore((s) => s.crews.find((c) => c.id === s.activeCrewId)?.name ?? "Crew");
+  const hasLocal = useAppStore((s) => s.projects.length > 0 || s.settings.watchedFolders.length > 0);
+  const [picked, setPicked] = useState<Scope | null>(null);
+  // Members with no FL folders of their own land on the crew view.
+  const scope: Scope = inCrew ? (picked ?? (hasLocal ? "me" : "crew")) : "me";
+
+  if (!inCrew) return <MyDashboard />;
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex justify-center border-b border-white/5 px-8 pb-2 pt-4">
+        <div role="tablist" aria-label="Dashboard scope" className="flex rounded-md border border-white/10 p-0.5 text-xs">
+          {(["me", "crew"] as const).map((s) => (
+            <button
+              key={s}
+              role="tab"
+              aria-selected={scope === s}
+              onClick={() => setPicked(s)}
+              className={`rounded px-3 py-1 ${scope === s ? "bg-white/10 text-white" : "text-white/50 hover:text-white"}`}
+            >
+              {s === "me" ? "Me" : crewName}
+            </button>
+          ))}
+        </div>
+      </div>
+      {scope === "me" ? <MyDashboard /> : <CrewDashboard />}
+    </div>
+  );
+}
+
+function CrewDashboard() {
+  const songs = useCrewStore((s) => s.songs);
+  const members = useCrewStore((s) => s.members);
+  const userId = useCrewStore((s) => s.userId);
+  const workspace = useAppStore((s) => s.workspace);
+  const openDetail = useAppStore((s) => s.openDetail);
+  const setView = useAppStore((s) => s.setView);
+  const stats = useMemo(() => crewStats(songs, members), [songs, members]);
+  const localPath = useMemo(() => pathsByShareId(workspace), [workspace]);
+  // Your own shared songs open their panel; others' songs open the crew board.
+  const open = (id: string) => {
+    const path = localPath.get(id);
+    if (path) openDetail(path);
+    else setView("pipeline");
+  };
+  const who = (id: string, name: string) => (id === userId ? "You" : name);
+
+  if (songs.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-white/45">
+        No crew stats yet: nothing is shared. Share songs from their panel or the Library, and ask the crew to do the same.
+      </div>
+    );
+  }
+
+  const max = Math.max(1, ...stats.byStage.map((s) => s.count));
+  return (
+    <div className="min-w-0 flex-1 overflow-auto px-8 py-7">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5">
+        <div className="grid grid-cols-4 gap-3">
+          <StatTile icon={<Music2 size={15} />} label="Shared songs" value={stats.total} />
+          <StatTile icon={<Sparkles size={15} />} label="In progress" value={stats.inProgress} />
+          <StatTile icon={<Trophy size={15} />} label="Finished" value={stats.finished} />
+          <StatTile icon={<PlayCircle size={15} />} label={`Moved · ${RECENT_DAYS} days`} value={stats.movedRecently} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          <Card title="Crew pipeline">
+            <div className="flex flex-col gap-2">
+              {stats.byStage.map((s) => {
+                const info = statusInfo(s.id ?? undefined);
+                return (
+                  <div key={s.id ?? "none"} className="flex items-center gap-3 text-xs">
+                    <span className="flex w-24 items-center gap-2 text-white/65">
+                      <StatusDot color={info.color} /> {info.label}
+                    </span>
+                    <div className="h-2 flex-1 rounded bg-white/5">
+                      <div className="h-2 rounded" style={{ width: `${(s.count / max) * 100}%`, background: info.color }} />
+                    </div>
+                    <span className="w-6 text-right tabular-nums text-white/70">{s.count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card title="Who's on what">
+            <div className="flex flex-col gap-2 text-xs">
+              {stats.members.map((m) => (
+                <div key={m.userId} className="flex items-center gap-3">
+                  <span className="min-w-0 flex-1 truncate text-white/80">{who(m.userId, m.name)}</span>
+                  <span className="tabular-nums text-white/55" title="Shared songs · finished (Prep or later)">
+                    {m.songs} song{m.songs === 1 ? "" : "s"} · {m.finished} done
+                  </span>
+                  <span className="w-20 text-right tabular-nums text-white/45" title={`Songs they last moved in the past ${RECENT_DAYS} days`}>
+                    {m.recentMoves ? `${m.recentMoves} moved` : "—"}
+                  </span>
+                  <span className="w-24 text-right text-white/40">{m.lastActivityMs ? formatRelative(m.lastActivityMs) : "nothing shared"}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          <Card title={`Ready to ship · ${stats.readyToShip.length}`}>
+            {stats.readyToShip.length === 0 ? (
+              <p className="text-xs text-white/45">Nothing in Prep with a mixdown and an accepted Launch Kit yet.</p>
+            ) : (
+              <SongLines items={stats.readyToShip.map((s) => ({ id: s.id, title: s.title, right: s.release_date ?? "no date" }))} onOpen={open} />
+            )}
+          </Card>
+          <Card title="Coming out">
+            {stats.upcoming.length === 0 ? (
+              <p className="text-xs text-white/45">No release dates on shared songs. Set them in the Launch Kit.</p>
+            ) : (
+              <SongLines
+                items={stats.upcoming.slice(0, 6).map((u) => ({ id: u.song.id, title: u.song.title, sub: who(u.song.owner_id, u.owner), right: u.date }))}
+                onOpen={open}
+              />
+            )}
+          </Card>
+        </div>
+
+        <Card title={`Stalled — no save or move in ${STALLED_DAYS}+ days`}>
+          {stats.stalled.length === 0 ? (
+            <p className="flex items-center gap-2 text-xs text-white/55">
+              <CheckCircle2 size={13} className="text-emerald-400" /> Everything in Creation or Production moved recently.
+            </p>
+          ) : (
+            <SongLines
+              items={stats.stalled.map((x) => ({ id: x.song.id, title: x.song.title, sub: who(x.song.owner_id, x.owner), right: `${x.days} days` }))}
+              onOpen={open}
+            />
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function SongLines({ items, onOpen }: { items: { id: string; title: string; sub?: string; right: string }[]; onOpen: (id: string) => void }) {
+  return (
+    <div className="flex flex-col">
+      {items.map((it) => (
+        <button key={it.id} onClick={() => onOpen(it.id)} className="flex items-center gap-3 rounded px-1 py-1 text-left text-xs hover:bg-white/[0.04]">
+          <span className="min-w-0 flex-1 truncate text-white/85">{it.title}</span>
+          {it.sub && <span className="text-white/45">{it.sub}</span>}
+          <span className="w-20 text-right tabular-nums text-white/55">{it.right}</span>
+        </button>
+      ))}
     </div>
   );
 }
