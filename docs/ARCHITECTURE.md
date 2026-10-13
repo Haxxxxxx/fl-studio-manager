@@ -45,7 +45,7 @@ Sharing is **opt-in per song** (and per release). For a shared song the crew see
 
 - **Push:** when you share a song, or its local data changes, the desktop app upserts that song's shared fields. Every shared song has a stable id stored in the local workspace.
 - **Pull and live updates:** the desktop app and the web app subscribe to the crew's songs. If someone moves *your* song to another stage on the board, your desktop app applies it.
-- **Conflicts:** the stage is last-write-wins on `stage_updated_at`, and every other field is owner-only, so there's nothing to merge.
+- **Conflicts:** a stage move carries the version it was made on (`move_song_stage`, compared with `stage_updated_at`); no computer's clock is trusted. If a crewmate moved the song since, the move isn't applied: on the board the crewmate's move stands and the app says so; for a move waiting on the owner's computer (offline, or sent late), the owner sees "X moved it to Y meanwhile: keep theirs or yours?". Every other field is owner-only, so there's nothing to merge.
 - **Offline:** the desktop app works fully offline, as today. Sharing catches up the next time it's online.
 
 ## Security

@@ -59,6 +59,11 @@ const TEXT = {
     en: "No code yet? Ask your crew's owner to make one in Hivo (Settings → Crew → New invite code).",
     fr: "Pas encore de code ? Demande au propriétaire du crew d'en créer un dans Hivo (Settings → Crew → New invite code).",
   },
+  movedMeanwhile: {
+    en: "{who} moved it to {stage} just before you. Move it again if you still want to.",
+    fr: "{who} l'a déplacé dans {stage} juste avant toi. Redéplace-le si tu veux toujours.",
+  },
+  someone: { en: "A crewmate", fr: "Quelqu'un du crew" },
   signInHint: {
     en: "Your crew admin adds your email first. Then you get a 6-digit code here, no password.",
     fr: "L'admin de ton crew ajoute d'abord ton email. Ensuite tu reçois ici un code à 6 chiffres, sans mot de passe.",

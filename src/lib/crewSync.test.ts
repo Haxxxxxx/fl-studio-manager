@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CrewSongRow, ProjectInfo, Workspace } from "../types";
 import {
-  localStageMoves,
   orphanedShares,
-  remoteStageMoves,
   shareElsewhere,
   sharedCredits,
   sharedHere,
@@ -11,6 +9,7 @@ import {
   sharedTags,
   sharedTitle,
   staleShareIds,
+  stageSync,
 } from "./crewSync";
 
 // Regression tests for the crew-sync review (data loss and rewound moves).
@@ -82,20 +81,65 @@ describe("stage moves", () => {
     expect(p).not.toHaveProperty("stage_updated_at");
   });
 
-  it("a crewmate's newer move is applied locally", () => {
-    const local = ws({ "/a.flp": { shared: true, shareId: "s1", status: "production", stageUpdatedAtMs: Date.parse("2026-10-01T00:00:00Z") } });
-    const moves = remoteStageMoves([row("s1", { stage: "prep", stage_updated_at: "2026-10-12T00:00:00Z" })], local, ME);
-    expect(moves).toEqual([{ path: "/a.flp", stage: "prep", atMs: Date.parse("2026-10-12T00:00:00Z") }]);
+  const V1 = "2026-10-10T00:00:00Z";
+  const V2 = "2026-10-12T09:30:00.123456+00:00";
+  const shared = (meta: Workspace["songs"][string]) => ws({ "/a.flp": { shared: true, shareId: "s1", ...meta } });
+
+  it("a crewmate's move is taken when I have nothing waiting", () => {
+    const local = shared({ status: "production", stageBaseAt: V1 });
+    expect(stageSync([row("s1", { stage: "prep", stage_updated_at: V2 })], local, scope)).toEqual([{ kind: "adopt", path: "/a.flp", stage: "prep", at: V2 }]);
   });
 
-  it("an older local stage doesn't rewind a crewmate's move", () => {
-    const local = ws({ "/a.flp": { shared: true, shareId: "s1", status: "production", stageUpdatedAtMs: Date.parse("2026-10-01T00:00:00Z") } });
-    expect(localStageMoves([row("s1", { stage: "prep", stage_updated_at: "2026-10-12T00:00:00Z" })], local, scope)).toEqual([]);
+  it("my waiting move is sent with the version it was made on", () => {
+    const local = shared({ status: "release", stageBaseAt: V1, stagePending: true });
+    expect(stageSync([row("s1", { stage: "production", stage_updated_at: V1 })], local, scope)).toEqual([
+      { kind: "push", path: "/a.flp", id: "s1", stage: "release", base: V1 },
+    ]);
   });
 
-  it("my newer local move is sent", () => {
-    const local = ws({ "/a.flp": { shared: true, shareId: "s1", status: "release", stageUpdatedAtMs: Date.parse("2026-10-13T00:00:00Z") } });
-    expect(localStageMoves([row("s1", { stage: "prep" })], local, scope)).toEqual([{ id: "s1", stage: "release" }]);
+  it("a wrong clock can't overwrite a crewmate's move: it's a conflict", () => {
+    // Ben's PC is 15 minutes fast: his move is stamped later than Ana's, but
+    // it was made on the version before hers.
+    const local = shared({ status: "production", stageBaseAt: V1, stagePending: true, stageUpdatedAtMs: Date.parse(V2) + 15 * 60e3 });
+    const ana = row("s1", { stage: "prep", stage_updated_at: V2, stage_updated_by: "user-ana" });
+    expect(stageSync([ana], local, scope)).toEqual([
+      { kind: "conflict", path: "/a.flp", conflict: { mine: "production", theirs: "prep", by: "user-ana", at: V2 } },
+    ]);
+  });
+
+  it("a slow clock can't lose my move either: it's sent", () => {
+    const local = shared({ status: "release", stageBaseAt: V1, stagePending: true, stageUpdatedAtMs: Date.parse(V1) - 3600e3 });
+    expect(stageSync([row("s1", { stage: "production", stage_updated_at: V1 })], local, scope)[0].kind).toBe("push");
+  });
+
+  it("the same move on both sides just settles", () => {
+    const local = shared({ status: "prep", stageBaseAt: V1, stagePending: true });
+    expect(stageSync([row("s1", { stage: "prep", stage_updated_at: V2 })], local, scope)).toEqual([{ kind: "settle", path: "/a.flp", at: V2 }]);
+    const done = shared({ status: "prep", stageBaseAt: V2 });
+    expect(stageSync([row("s1", { stage: "prep", stage_updated_at: "2026-10-12T09:30:00.123Z" })], done, scope)).toEqual([]);
+  });
+
+  it("a waiting conflict follows the crew's latest move, and is never pushed", () => {
+    const conflict = { mine: "production" as const, theirs: "prep" as const, by: "user-ana", at: V2 };
+    const local = shared({ status: "production", stageBaseAt: V1, stagePending: true, stageConflict: conflict });
+    expect(stageSync([row("s1", { stage: "prep", stage_updated_at: V2 })], local, scope)).toEqual([]);
+    const later = "2026-10-12T10:00:00Z";
+    expect(stageSync([row("s1", { stage: "release", stage_updated_at: later, stage_updated_by: "user-cleo" })], local, scope)).toEqual([
+      { kind: "conflict", path: "/a.flp", conflict: { mine: "production", theirs: "release", by: "user-cleo", at: later } },
+    ]);
+  });
+
+  it("songs shared before versions: the old timestamp rule, once", () => {
+    const newer = shared({ status: "release", stageUpdatedAtMs: Date.parse("2026-10-13T00:00:00Z") });
+    expect(stageSync([row("s1", { stage: "prep", stage_updated_at: V1 })], newer, scope)[0]).toMatchObject({ kind: "push", base: V1 });
+    const older = shared({ status: "production", stageUpdatedAtMs: Date.parse("2026-10-01T00:00:00Z") });
+    expect(stageSync([row("s1", { stage: "prep", stage_updated_at: V2 })], older, scope)[0]).toMatchObject({ kind: "adopt", stage: "prep" });
+  });
+
+  it("only my songs in this crew", () => {
+    const local = shared({ status: "release", stageBaseAt: V1, stagePending: true });
+    expect(stageSync([row("s1", { owner_id: "someone-else" })], local, scope)).toEqual([]);
+    expect(stageSync([row("s1", { crew_id: "crew-b" })], local, scope)).toEqual([]);
   });
 });
 

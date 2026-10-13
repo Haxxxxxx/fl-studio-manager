@@ -1,4 +1,4 @@
-import type { CrewCredit, CrewSongRow, ProjectInfo, SongMeta, SongStatus, Workspace } from "../types";
+import type { CrewCredit, CrewSongRow, ProjectInfo, SongMeta, SongStatus, StageConflict, Workspace } from "../types";
 import { cleanTitle } from "./launchKit";
 
 // Sync between the local workspace and the crew database (docs/ARCHITECTURE.md).
@@ -14,7 +14,8 @@ import { cleanTitle } from "./launchKit";
 //   another computer's workspace, or from an empty workspace is never deleted.
 // - The stage is never sent in the regular upsert (that could rewind a move
 //   a crewmate made on the board). New rows carry it; later local moves go
-//   through set_song_stage, only when the local move is newer.
+//   through move_song_stage with the version they were made on, so a move
+//   made on an outdated version becomes a conflict, never an overwrite.
 
 export interface ShareScope {
   crewId: string;
@@ -163,45 +164,57 @@ export function pathsByShareId(ws: Workspace): Map<string, string> {
   return out;
 }
 
-export interface RemoteStageMove {
-  path: string;
-  stage: SongStatus | undefined;
-  atMs: number;
-}
+/** What to do about one of my shared songs' stage. */
+export type StageSync =
+  /** The crew moved it (on the board, or my other computer): take that. */
+  | { kind: "adopt"; path: string; stage: SongStatus | undefined; at: string }
+  /** Both sides agree: just remember the row's version. */
+  | { kind: "settle"; path: string; at: string }
+  /** My move, made on version `base`: send it (the server refuses it if
+   * someone moved the song since). */
+  | { kind: "push"; path: string; id: string; stage: SongStatus | null; base: string }
+  /** Someone moved it while my move was waiting: the owner picks. */
+  | { kind: "conflict"; path: string; conflict: StageConflict };
 
-/** Stage moves made on the crew board for *my* songs that are newer than my
- * last local change: these get applied to the local workspace. */
-export function remoteStageMoves(rows: CrewSongRow[], ws: Workspace, myUserId: string): RemoteStageMove[] {
+/** Stage sync for my songs shared with this crew, by version, never by
+ * comparing clocks (a computer with a wrong clock can't win or lose a move
+ * it shouldn't). Songs shared before versions existed fall back to the old
+ * timestamp comparison once, then carry a version. */
+export function stageSync(rows: CrewSongRow[], ws: Workspace, scope: ShareScope): StageSync[] {
   const byId = pathsByShareId(ws);
-  const out: RemoteStageMove[] = [];
-  for (const row of rows) {
-    if (row.owner_id !== myUserId) continue;
-    const path = byId.get(row.id);
-    if (!path) continue;
-    const meta = ws.songs[path] ?? {};
-    const remote = row.stage ?? undefined;
-    const atMs = Date.parse(row.stage_updated_at);
-    if (remote !== meta.status && Number.isFinite(atMs) && atMs > (meta.stageUpdatedAtMs ?? 0)) {
-      out.push({ path, stage: remote, atMs });
-    }
-  }
-  return out;
-}
-
-/** Local stage moves on my shared songs that the crew hasn't seen yet (local
- * move newer than the row's). Run after applying remote moves. */
-export function localStageMoves(rows: CrewSongRow[], ws: Workspace, scope: ShareScope): { id: string; stage: SongStatus | null }[] {
-  const byId = pathsByShareId(ws);
-  const out: { id: string; stage: SongStatus | null }[] = [];
+  const out: StageSync[] = [];
   for (const row of rows) {
     if (row.owner_id !== scope.userId || row.crew_id !== scope.crewId) continue;
     const path = byId.get(row.id);
     const meta = path ? ws.songs[path] : undefined;
-    if (!meta || !sharedHere(meta, scope)) continue;
+    if (!path || !meta || !sharedHere(meta, scope)) continue;
     const local = meta.status ?? null;
-    if (local !== (row.stage ?? null) && (meta.stageUpdatedAtMs ?? 0) > (Date.parse(row.stage_updated_at) || 0)) {
-      out.push({ id: row.id, stage: local });
+    const remote = row.stage ?? null;
+    const at = row.stage_updated_at;
+    const sameVersion = meta.stageBaseAt !== undefined && Date.parse(meta.stageBaseAt) === Date.parse(at);
+    if (remote === local) {
+      if (!sameVersion || meta.stagePending || meta.stageConflict) out.push({ kind: "settle", path, at });
+      continue;
     }
+    if (meta.stageConflict) {
+      // Already waiting for the owner; follow the crew's latest move.
+      if (Date.parse(meta.stageConflict.at) !== Date.parse(at)) {
+        out.push({ kind: "conflict", path, conflict: { ...meta.stageConflict, theirs: remote, by: row.stage_updated_by ?? null, at } });
+      }
+      continue;
+    }
+    if (meta.stageBaseAt === undefined) {
+      // Shared before stage versions: one last time, the newer stamp wins.
+      if ((meta.stageUpdatedAtMs ?? 0) > (Date.parse(at) || 0)) out.push({ kind: "push", path, id: row.id, stage: local, base: at });
+      else out.push({ kind: "adopt", path, stage: remote ?? undefined, at });
+      continue;
+    }
+    if (meta.stagePending) {
+      if (sameVersion) out.push({ kind: "push", path, id: row.id, stage: local, base: meta.stageBaseAt });
+      else out.push({ kind: "conflict", path, conflict: { mine: local, theirs: remote, by: row.stage_updated_by ?? null, at } });
+      continue;
+    }
+    if (!sameVersion) out.push({ kind: "adopt", path, stage: remote ?? undefined, at });
   }
   return out;
 }

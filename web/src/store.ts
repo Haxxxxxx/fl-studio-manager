@@ -1,3 +1,4 @@
+import { statusInfo } from "@shared/lib/songs";
 import { crewText } from "@shared/lib/crewMessages";
 import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -224,11 +225,22 @@ export const useWeb = create<WebState>((set, get) => {
     moveSong: async (songId, stage) => {
       if (!supabase) return;
       const before = get().songs;
-      set({ songs: before.map((s) => (s.id === songId ? { ...s, stage, stage_updated_at: new Date().toISOString(), stage_updated_by: get().userId } : s)) });
-      const { error } = await supabase.rpc("set_song_stage", { p_song: songId, p_stage: stage });
+      const row = before.find((s) => s.id === songId);
+      // Optimistic stage only: the move carries the version it was made on.
+      set({ songs: before.map((s) => (s.id === songId ? { ...s, stage } : s)) });
+      const { data, error } = await supabase.rpc("move_song_stage", { p_song: songId, p_stage: stage, p_expected_at: row?.stage_updated_at ?? null });
       if (error) {
         set({ songs: before, error: errorMessage(error) });
         throw new Error(errorMessage(error));
+      }
+      const r = (Array.isArray(data) ? data[0] : data) as { applied: boolean; stage: SongStatus | null; stage_updated_at: string; stage_updated_by: string | null };
+      set({ songs: get().songs.map((s) => (s.id === songId ? { ...s, stage: r.stage, stage_updated_at: r.stage_updated_at, stage_updated_by: r.stage_updated_by } : s)) });
+      if (!r.applied) {
+        // A crewmate moved it just before: theirs stands, and we say so.
+        const who = get().members.find((m) => m.user_id === r.stage_updated_by)?.display_name ?? crewText("someone");
+        const message = crewText("movedMeanwhile", undefined, { who, stage: statusInfo(r.stage ?? undefined).label });
+        set({ error: message });
+        throw new Error(message);
       }
       set({ error: null });
     },

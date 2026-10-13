@@ -732,9 +732,11 @@ export const useAppStore = create<AppState>((set, get) => {
 
     updateSong: (path, patch) =>
       mutateWorkspace((ws) => {
-        // A local stage change is stamped so crew sync can order it against
-        // moves made on the crew board (which bring their own stamp).
-        const stamped = "status" in patch && patch.stageUpdatedAtMs === undefined ? { ...patch, stageUpdatedAtMs: Date.now() } : patch;
+        // A local stage change waits to be sent to the crew (crew sync
+        // sends it with the version it was made on). Crew moves applied here
+        // carry their own sync fields.
+        const stamped =
+          "status" in patch && patch.stagePending === undefined ? { ...patch, stageUpdatedAtMs: Date.now(), stagePending: true } : patch;
         return { ...ws, songs: { ...ws.songs, [path]: { ...ws.songs[path], ...stamped } } };
       }),
 
@@ -742,7 +744,7 @@ export const useAppStore = create<AppState>((set, get) => {
       mutateWorkspace((ws) => {
         const songs = { ...ws.songs };
         const now = Date.now();
-        for (const p of paths) songs[p] = { ...songs[p], status, stageUpdatedAtMs: now };
+        for (const p of paths) songs[p] = { ...songs[p], status, stageUpdatedAtMs: now, stagePending: true };
         return { ...ws, songs };
       }),
 

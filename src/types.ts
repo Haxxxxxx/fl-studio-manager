@@ -122,12 +122,29 @@ export interface RenderEvent {
 /** The song lifecycle (docs/ROADMAP.md): one stage at a time. */
 export type SongStatus = "creation" | "production" | "prep" | "release" | "promotion";
 
+/** "Ana moved it to Prep meanwhile": the two moves, until the owner picks one. */
+export interface StageConflict {
+  mine: SongStatus | null;
+  theirs: SongStatus | null;
+  /** Who made the crew's move (user id), when known. */
+  by: string | null;
+  /** The crew row's version carrying their move. */
+  at: string;
+}
+
 export interface SongMeta {
   status?: SongStatus;
   /** The stage before the lifecycle migration (idea/wip/mixing/mastering/done). */
   legacyStatus?: string;
-  /** When the stage last changed (here or on the crew board), for sync. */
+  /** When the stage last changed (here or on the crew board). Display and
+   * a one-time tiebreak for songs shared before stage versions. */
   stageUpdatedAtMs?: number;
+  /** The crew row's version (stage_updated_at) this stage is based on. */
+  stageBaseAt?: string;
+  /** A local stage move the crew hasn't received yet. */
+  stagePending?: boolean;
+  /** A crewmate moved the song while this computer's move was waiting. */
+  stageConflict?: StageConflict;
   /** Shared with the crew (opt-in per song). */
   shared?: boolean;
   /** Stable id of this song in the crew database, set on first share. Kept
