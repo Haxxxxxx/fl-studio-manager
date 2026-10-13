@@ -1,3 +1,4 @@
+import { crewText } from "../lib/crewMessages";
 import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { crewErrorMessage, supabase } from "../lib/supabase";
@@ -453,7 +454,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
       if (!supabase) return;
       const { data, error } = await supabase.rpc("join_crew", { p_code: code.trim(), p_display_name: displayName.trim() });
       if (error) throw new Error(crewErrorMessage(error));
-      if (!data) throw new Error("That invite code didn't work: it's wrong, expired, used up or revoked (or you're already in 10 crews). Ask for a new one.");
+      if (!data) throw new Error(crewText("invalidInvite"));
       writeActiveCrew(data as string);
       await get().loadCrews();
     },
