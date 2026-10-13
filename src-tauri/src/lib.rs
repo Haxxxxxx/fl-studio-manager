@@ -8,6 +8,7 @@ mod render;
 mod resolve;
 mod scanner;
 mod settings;
+mod shorts;
 mod workspace;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -36,6 +37,8 @@ pub fn run() {
             ai::ai_status,
             ai::set_ai_key,
             ai::ai_generate_json,
+            shorts::shorts_status,
+            shorts::render_shorts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

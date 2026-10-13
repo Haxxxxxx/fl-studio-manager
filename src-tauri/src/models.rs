@@ -97,6 +97,9 @@ pub struct Settings {
     /// Language for AI-written captions and briefs ("English", "French"…).
     #[serde(default)]
     pub ai_language: Option<String>,
+    /// ffmpeg for shorts; None = found automatically.
+    #[serde(default)]
+    pub ffmpeg_path: Option<String>,
 }
 
 impl Default for Settings {
@@ -109,6 +112,7 @@ impl Default for Settings {
             favorites: Vec::new(),
             ai_model: None,
             ai_language: None,
+            ffmpeg_path: None,
         }
     }
 }

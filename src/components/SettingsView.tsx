@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
@@ -136,6 +136,8 @@ export function SettingsView() {
 
         <AiSettings />
 
+        <ShortsSettings />
+
         <section>
           <h2 className="text-sm font-semibold text-white/90">FL Studio executable</h2>
           <p className="mt-1 text-xs text-white/40">
@@ -241,6 +243,61 @@ export function SettingsView() {
         </section>
       </div>
     </div>
+  );
+}
+
+/** ffmpeg for the Launch Kit's 9:16 shorts: found automatically, or set here. */
+function ShortsSettings() {
+  const settings = useAppStore((s) => s.settings);
+  const updateSettings = useAppStore((s) => s.updateSettings);
+  const [status, setStatus] = useState<api.ShortsStatus | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api.shortsStatus(settings.ffmpegPath).then((s) => live && setStatus(s)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [settings.ffmpegPath]);
+
+  async function browse() {
+    const path = await api.pickExecutable();
+    if (path) await updateSettings({ ffmpegPath: path });
+  }
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-white/90">Shorts (ffmpeg)</h2>
+      <p className="mt-1 text-xs text-white/40">
+        The Launch Kit renders 9:16 shorts with ffmpeg, free and on this computer. Install it once:{" "}
+        <code className="rounded bg-white/10 px-1">brew install ffmpeg</code> (Mac) or{" "}
+        <code className="rounded bg-white/10 px-1">winget install Gyan.FFmpeg</code> (Windows).
+      </p>
+      <div className={`mt-3 text-xs ${status?.encoder ? "text-emerald-300" : "text-white/50"}`}>
+        {!status
+          ? "Looking for ffmpeg…"
+          : status.encoder
+            ? `Found: ${status.path} (${status.encoder})`
+            : status.error ?? "Not found. Install it, then restart the app, or pick it below."}
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          defaultValue={settings.ffmpegPath ?? ""}
+          key={settings.ffmpegPath ?? ""}
+          onBlur={(e) => updateSettings({ ffmpegPath: e.target.value.trim() || null })}
+          placeholder="Found automatically"
+          className={field}
+        />
+        <button onClick={browse} className="shrink-0 rounded-md border border-white/15 px-3 py-2 text-sm text-white/70 hover:bg-white/5">
+          Browse
+        </button>
+        {settings.ffmpegPath && (
+          <button onClick={() => updateSettings({ ffmpegPath: null })} className="shrink-0 rounded-md border border-white/15 px-3 py-2 text-sm text-white/70 hover:bg-white/5">
+            Auto
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 

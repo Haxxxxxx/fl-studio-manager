@@ -21,6 +21,7 @@ import { formatRelative } from "../lib/format";
 import type { AiFieldReview, AudioAnalysis, ProjectInfo, Snippet } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { SongPicker } from "./SongPicker";
+import { ShortsPanel } from "./ShortsPanel";
 import { btn, btnPrimary, input } from "./ui";
 
 // Snippet colors: the dark categorical slots, in fixed order (as elsewhere).
@@ -201,7 +202,7 @@ export function LaunchKitView() {
           </div>
 
           <div className="flex flex-col gap-5">
-            <AiPanel key={project.path} path={project.path} input={kitInput} fields={fields} />
+            <AiPanel key={`ai:${project.path}`} path={project.path} input={kitInput} fields={fields} />
             <Card title="Snippets for reels and stories">
               <Snippets
                 project={project}
@@ -213,6 +214,7 @@ export function LaunchKitView() {
                 onMove={(label, start) => setSnippetStart(project.path, label, start)}
               />
             </Card>
+            <ShortsPanel key={`shorts:${project.path}`} project={project} fields={fields} snippets={snippets} />
             <Card title="Cover art brief">
               <FieldRow field={byId("coverBrief")} onChange={(v) => setKitEdit(project.path, "coverBrief", v)} bare />
             </Card>
