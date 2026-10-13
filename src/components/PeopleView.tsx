@@ -55,7 +55,7 @@ function PeopleList() {
       <div className="mx-auto max-w-4xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-white">People</h1>
+            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">People</h1>
           </div>
           {draft === null && (
             <button onClick={() => setDraft("")} className={btnPrimary}>
@@ -85,8 +85,8 @@ function PeopleList() {
         )}
 
         {suggestions.length > 0 && (
-          <div className="mt-6 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-            <div className="flex items-center gap-1.5 text-xs text-white/60">
+          <div className="mt-6 rounded-lg border border-rule bg-panel p-4">
+            <div className="flex items-center gap-1.5 text-xs text-body">
               <Sparkles size={13} className="text-orange-300" /> Found in your session track names — add who's a real person
             </div>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -94,44 +94,44 @@ function PeopleList() {
                 <button
                   key={s.name}
                   onClick={() => createPerson(s.name)}
-                  className="rounded-full border border-dashed border-white/20 px-2.5 py-1 text-xs text-white/70 hover:border-orange-400/50 hover:text-white"
+                  className="rounded-full border border-dashed border-rule-strong px-2.5 py-1 text-xs text-body hover:border-orange-400/50 hover:text-cream"
                 >
-                  + {s.name} <span className="text-white/55">· {s.songs} song{s.songs === 1 ? "" : "s"}</span>
+                  + {s.name} <span className="text-engrave">· {s.songs} song{s.songs === 1 ? "" : "s"}</span>
                 </button>
               ))}
             </div>
-            <div className="mt-2 text-[11px] text-white/50">
+            <div className="mt-2 text-[11px] text-engrave">
               Same person under several spellings (NV, Novah…)? Add one, then add the others as aliases on their page.
             </div>
           </div>
         )}
 
         {rows.length === 0 ? (
-          <div className="mt-16 flex flex-col items-center gap-2 text-center text-white/55">
+          <div className="mt-16 flex flex-col items-center gap-2 text-center text-engrave">
             <Users size={32} />
             <div className="text-sm">No people yet.</div>
           </div>
         ) : (
-          <div className="mt-6 overflow-hidden rounded-lg border border-white/10">
+          <div className="mt-6 overflow-hidden rounded-lg border border-rule">
             {rows.map(({ person, songs: n, pitches }) => {
               const wins = pitches.filter((x) => x.pitch.outcome === "placed" || x.pitch.outcome === "sold").length;
               return (
                 <button
                   key={person.id}
                   onClick={() => openPerson(person.id)}
-                  className="flex w-full items-center gap-4 border-b border-white/5 px-4 py-3 text-left last:border-0 hover:bg-white/[0.03]"
+                  className="flex w-full items-center gap-4 border-b border-rule px-4 py-3 text-left last:border-0 hover:bg-panel"
                 >
                   <Avatar name={person.name} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-white/90">{person.name}</div>
-                    <div className="truncate text-[11px] text-white/58">
+                    <div className="truncate text-sm font-medium text-cream">{person.name}</div>
+                    <div className="truncate text-[11px] text-engrave">
                       {[person.aliases.length ? `aka ${person.aliases.join(", ")}` : "", person.contact].filter(Boolean).join(" · ") || "—"}
                     </div>
                   </div>
-                  <div className="w-20 text-right text-xs text-white/60">
+                  <div className="w-20 text-right text-xs text-body">
                     {n} song{n === 1 ? "" : "s"}
                   </div>
-                  <div className="w-28 text-right text-xs text-white/60">
+                  <div className="w-28 text-right text-xs text-body">
                     {pitches.length ? `${pitches.length} sent${wins ? ` · ${wins} won` : ""}` : "—"}
                   </div>
                 </button>
@@ -157,7 +157,7 @@ function PersonDetail({ person }: { person: Person }) {
   return (
     <div className="min-w-0 flex-1 overflow-auto px-8 py-6">
       <div className="mx-auto max-w-3xl">
-        <button onClick={() => openPerson(null)} className="flex items-center gap-1 text-xs text-white/58 hover:text-white/80">
+        <button onClick={() => openPerson(null)} className="flex items-center gap-1 text-xs text-engrave hover:text-cream">
           <ArrowLeft size={13} /> All people
         </button>
 
@@ -166,7 +166,7 @@ function PersonDetail({ person }: { person: Person }) {
           <input
             value={person.name}
             onChange={(e) => updatePerson(person.id, { name: e.target.value })}
-            className="min-w-0 flex-1 bg-transparent text-2xl font-semibold text-white focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-2xl font-semibold text-cream focus:outline-none"
           />
         </div>
 
@@ -174,7 +174,7 @@ function PersonDetail({ person }: { person: Person }) {
           <div>
             <div className={`${sectionLabel} mb-2`}>Also appears as</div>
             <TagEditor tags={person.aliases} suggestions={[]} onChange={(aliases) => updatePerson(person.id, { aliases })} />
-            <div className="mt-1 text-[11px] text-white/50">Spellings used in track names (NV, Novah…). Case doesn't matter.</div>
+            <div className="mt-1 text-[11px] text-engrave">Spellings used in track names (NV, Novah…). Case doesn't matter.</div>
           </div>
           <div>
             <div className={`${sectionLabel} mb-2`}>Contact</div>
@@ -197,9 +197,9 @@ function PersonDetail({ person }: { person: Person }) {
         />
 
         <div className={`${sectionLabel} mt-8 mb-2`}>Songs · {theirSongs.length}</div>
-        <div className="overflow-hidden rounded-lg border border-white/10">
+        <div className="overflow-hidden rounded-lg border border-rule">
           {theirSongs.length === 0 && (
-            <div className="px-4 py-6 text-center text-xs text-white/55">
+            <div className="px-4 py-6 text-center text-xs text-engrave">
               Not on any song yet. Credit them from a song's panel, or add the spelling used in your track names as an alias.
             </div>
           )}
@@ -209,16 +209,16 @@ function PersonDetail({ person }: { person: Person }) {
               <button
                 key={song.path}
                 onClick={() => openDetail(song.path)}
-                className="flex w-full items-center gap-3 border-b border-white/5 px-4 py-2 text-left text-sm last:border-0 hover:bg-white/[0.03]"
+                className="flex w-full items-center gap-3 border-b border-rule px-4 py-2 text-left text-sm last:border-0 hover:bg-panel"
               >
-                <span className="min-w-0 flex-1 truncate text-white/85">{song.name}</span>
-                <span className="text-xs text-white/50">
+                <span className="min-w-0 flex-1 truncate text-cream">{song.name}</span>
+                <span className="text-xs text-engrave">
                   {credit ? `${credit.role}${credit.split != null ? ` · ${credit.split}%` : ""}` : detected ? "in track names" : ""}
                 </span>
-                <span className="flex w-28 items-center gap-1.5 text-xs text-white/62">
+                <span className="flex w-28 items-center gap-1.5 text-xs text-body">
                   <StatusDot color={s.color} size={6} /> {s.label}
                 </span>
-                <span className="w-24 text-right text-xs text-white/55">{formatRelative(song.modifiedAtMs)}</span>
+                <span className="w-24 text-right text-xs text-engrave">{formatRelative(song.modifiedAtMs)}</span>
               </button>
             );
           })}
@@ -226,16 +226,16 @@ function PersonDetail({ person }: { person: Person }) {
 
         <div className={`${sectionLabel} mt-8 mb-2`}>Sent to them · {pitches.length}</div>
         {pitches.length === 0 ? (
-          <div className="text-xs text-white/55">Log a send from any song's panel ("Sent to").</div>
+          <div className="text-xs text-engrave">Log a send from any song's panel ("Sent to").</div>
         ) : (
           <div className="flex flex-col gap-1">
             {pitches.map(({ song, path, pitch }) => {
               const o = OUTCOMES.find((x) => x.id === pitch.outcome);
               return (
-                <button key={pitch.id} onClick={() => openDetail(path)} className="flex items-center gap-3 rounded px-2 py-1.5 text-left text-xs hover:bg-white/[0.03]">
-                  <Send size={11} className="text-white/50" />
-                  <span className="w-24 text-white/62">{pitch.date}</span>
-                  <span className="min-w-0 flex-1 truncate text-white/85">{song?.name ?? path.split(/[/\\]/).pop()}</span>
+                <button key={pitch.id} onClick={() => openDetail(path)} className="flex items-center gap-3 rounded px-2 py-1.5 text-left text-xs hover:bg-panel">
+                  <Send size={11} className="text-engrave" />
+                  <span className="w-24 text-body">{pitch.date}</span>
+                  <span className="min-w-0 flex-1 truncate text-cream">{song?.name ?? path.split(/[/\\]/).pop()}</span>
                   <span className={`w-20 text-right ${o?.tone ?? ""}`}>{o?.label}</span>
                 </button>
               );
@@ -243,7 +243,7 @@ function PersonDetail({ person }: { person: Person }) {
           </div>
         )}
 
-        <div className="mt-10 border-t border-white/5 pt-4">
+        <div className="mt-10 border-t border-rule pt-4">
           <ConfirmButton
             label={
               <>

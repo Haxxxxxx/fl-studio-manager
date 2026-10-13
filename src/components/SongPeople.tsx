@@ -8,16 +8,16 @@ import { btn, input } from "./ui";
 export const ROLES = ["Producer", "Co-producer", "Vocals", "Feature", "Writer", "Mix", "Master", "Engineer", "Other"];
 
 export const OUTCOMES: { id: PitchOutcome; label: string; tone: string }[] = [
-  { id: "sent", label: "Sent", tone: "text-white/60" },
-  { id: "listened", label: "Listened", tone: "text-white/70" },
+  { id: "sent", label: "Sent", tone: "text-body" },
+  { id: "listened", label: "Listened", tone: "text-body" },
   { id: "interested", label: "Interested", tone: "text-sky-300" },
   { id: "placed", label: "Placed", tone: "text-emerald-300" },
   { id: "sold", label: "Sold", tone: "text-emerald-300" },
-  { id: "passed", label: "Passed", tone: "text-white/55" },
+  { id: "passed", label: "Passed", tone: "text-engrave" },
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
-const small = "rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[11px] text-white/75";
+const small = "rounded border border-rule bg-panel px-1.5 py-0.5 text-[11px] text-body";
 
 /** Pick an existing person or type a new name (created on submit). */
 function PersonPicker({ onPick, label }: { onPick: (personId: string) => void; label: string }) {
@@ -43,7 +43,7 @@ function PersonPicker({ onPick, label }: { onPick: (personId: string) => void; l
           {label}
         </button>
         {people.length > 0 && (
-          <button type="button" onClick={() => setNaming(false)} className="text-white/58 hover:text-white">
+          <button type="button" onClick={() => setNaming(false)} className="text-engrave hover:text-cream">
             <X size={13} />
           </button>
         )}
@@ -90,7 +90,7 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
       <div className="flex flex-col gap-1.5">
         {credits.map((c, i) => (
           <div key={c.personId} className="flex items-center gap-2 text-xs">
-            <button onClick={() => openPerson(c.personId)} className="min-w-0 flex-1 truncate text-left text-white/85 hover:underline">
+            <button onClick={() => openPerson(c.personId)} className="min-w-0 flex-1 truncate text-left text-cream hover:underline">
               {byId.get(c.personId)?.name ?? "Unknown"}
             </button>
             <select
@@ -99,12 +99,12 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
               className={small}
             >
               {ROLES.map((r) => (
-                <option key={r} value={r} className="bg-[#18181d]">
+                <option key={r} value={r} className="bg-raised">
                   {r}
                 </option>
               ))}
             </select>
-            <label className="flex items-center gap-0.5 text-white/58" title="Agreed split (%)">
+            <label className="flex items-center gap-0.5 text-engrave" title="Agreed split (%)">
               <input
                 type="number"
                 min={0}
@@ -122,7 +122,7 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
               />
               %
             </label>
-            <button onClick={() => setCredits(credits.filter((_, j) => j !== i))} className="text-white/50 hover:text-white">
+            <button onClick={() => setCredits(credits.filter((_, j) => j !== i))} className="text-engrave hover:text-cream">
               <X size={12} />
             </button>
           </div>
@@ -132,13 +132,13 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
 
       {suggested.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1">
-          <span className="text-[11px] text-white/55">In this session:</span>
+          <span className="text-[11px] text-engrave">In this session:</span>
           {suggested.map((p) => (
             <button
               key={p.id}
               onClick={() => add(p.id)}
               title="Found in the song's mixer/recording track names — click to credit"
-              className="rounded-full border border-dashed border-white/20 px-2 py-0.5 text-[11px] text-white/60 hover:border-white/40 hover:text-white"
+              className="rounded-full border border-dashed border-rule-strong px-2 py-0.5 text-[11px] text-body hover:border-engrave hover:text-cream"
             >
               + {p.name}
             </button>
@@ -164,15 +164,15 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
 
   return (
     <div>
-      {sorted.length === 0 && <div className="mb-2 text-xs text-white/55">Not sent to anyone yet.</div>}
+      {sorted.length === 0 && <div className="mb-2 text-xs text-engrave">Not sent to anyone yet.</div>}
       <div className="flex flex-col gap-1.5">
         {sorted.map((p) => {
           const outcome = OUTCOMES.find((o) => o.id === p.outcome);
           return (
             <div key={p.id} className="group text-xs">
               <div className="flex items-center gap-2">
-                <Send size={11} className="shrink-0 text-white/50" />
-                <button onClick={() => openPerson(p.personId)} className="min-w-0 flex-1 truncate text-left text-white/85 hover:underline">
+                <Send size={11} className="shrink-0 text-engrave" />
+                <button onClick={() => openPerson(p.personId)} className="min-w-0 flex-1 truncate text-left text-cream hover:underline">
                   {byId.get(p.personId)?.name ?? "Unknown"}
                 </button>
                 <input
@@ -187,12 +187,12 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
                   className={`${small} ${outcome?.tone ?? ""}`}
                 >
                   {OUTCOMES.map((o) => (
-                    <option key={o.id} value={o.id} className="bg-[#18181d] text-white">
+                    <option key={o.id} value={o.id} className="bg-raised text-cream">
                       {o.label}
                     </option>
                   ))}
                 </select>
-                <button onClick={() => removePitch(project.path, p.id)} className="text-white/50 opacity-0 hover:text-white group-hover:opacity-100">
+                <button onClick={() => removePitch(project.path, p.id)} className="text-engrave opacity-0 hover:text-cream group-hover:opacity-100">
                   <X size={12} />
                 </button>
               </div>
@@ -200,7 +200,7 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
                 value={p.note ?? ""}
                 onChange={(e) => updatePitch(project.path, p.id, { note: e.target.value })}
                 placeholder="Note (feedback, price, link…)"
-                className="ml-5 mt-0.5 w-[calc(100%-1.25rem)] bg-transparent text-[11px] text-white/50 placeholder:text-white/50 focus:outline-none"
+                className="ml-5 mt-0.5 w-[calc(100%-1.25rem)] bg-transparent text-[11px] text-engrave placeholder:text-engrave focus:outline-none"
               />
             </div>
           );

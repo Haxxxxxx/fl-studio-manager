@@ -1,10 +1,10 @@
 # FL Manager UI: conventions
 
-FL Manager is a desktop app for a rap crew's FL Studio projects: songs move through stages (Creation → Production → Prep → Release → Promotion), get mixdowns, stems and a Launch Kit for release. Dark, dense, music-first.
+FL Manager is a desktop app for a rap crew's music projects: songs move through stages (Creation → Production → Prep → Release → Promotion), get mixdowns, stems and a Launch Kit for release. The look is **System 02, "built like a rack unit"**: hardware panels, engraved labels and LED status for structure; loud condensed type and one orange for attitude. Dark, dense, music-first.
 
 ## Wrap everything in `Theme`
 
-Every component is designed for the app's near-black surface (`#0f0f12`, text `#e6e6ea`, the OS system font). Without `Theme`, text is white on white and invisible.
+Every component is designed for the app's chassis (`#0D0D0C`, body text `#C9C5BB`, IBM Plex Sans 14px). Without `Theme`, text is light on white and invisible.
 
 ```jsx
 <Theme padded>
@@ -14,30 +14,40 @@ Every component is designed for the app's near-black surface (`#0f0f12`, text `#
 </Theme>
 ```
 
-## Styling idiom: Tailwind utility classes (compiled)
+## Principles
+
+1. **Engraved, not tinted.** Labels are small mono caps (`engrave`). No pastel `/15` pills: status is a lit LED (`StatusDot`) next to a word.
+2. **One loud voice.** Orange (`hot`) only for the main action, "needs you" and active LEDs. Selection is cream on black, never orange.
+3. **Solid surfaces.** Warm greys, not white-alpha layers. 4px corners, hard 1px rules, heavy 3px section rules.
+4. **Provenance by shape.** Detected, Suggested, AI draft, Edited, Needs you differ by fill and border style, not just hue (`SourceBadge`). AI has no special colour.
+
+## Styling idiom: Tailwind utility classes with theme tokens
 
 Components are styled with Tailwind classes. `styles.css` holds the classes the app already uses, and only those exist; reuse this vocabulary for layout glue instead of inventing classes:
 
 | Role | Classes |
 |---|---|
-| Panel surface | `rounded-lg border border-white/10 bg-white/[0.03] p-4` |
-| Text tiers | `text-white` (values), `text-white/75` (body), `text-white/55` (secondary), `text-white/40`, `text-white/35` (labels) |
-| Small label | `text-[11px] uppercase tracking-wide text-white/40` |
-| Accent (one main action) | `bg-orange-500`, selected `bg-orange-500/15 text-orange-300` |
-| Status tints | `bg-emerald-500/15 text-emerald-300` ok, `bg-amber-500/15 text-amber-300` warn, `bg-red-500/15 text-red-300` missing, `bg-sky-500/15` suggested, `bg-violet-500/15` AI |
-| Shape, spacing | `rounded-md`, `rounded-lg`, `rounded-full`; `gap-3`, `gap-5`, `p-4`; `divide-white/5` between rows; `hover:bg-white/5` |
-| Numbers | `text-2xl` for big figures, `tabular-nums` for columns |
+| Surfaces | `bg-chassis` (#0D0D0C app), `bg-panel` (#161614 cards), `bg-raised` (#1F1F1C hover, modal) |
+| Panel | `rounded border border-rule bg-panel p-5 shadow-panel` |
+| Rules | `border-rule` (#2C2B27), `border-rule-strong` (#3D3C37), `divide-rule` |
+| Ink | `text-cream` (#F2EFE8 values, selected), `text-body` (#C9C5BB prose), `text-engrave` (#8D897F labels) |
+| Engraved label | `engrave` export = `font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave` |
+| Signal | `bg-hot`/`text-hot` (#FF5A1F), `ok` (#3DDC84), `warn` (#FFC233), `missing` (#FF4040) |
+| Type | `font-display` (Barlow Condensed: titles in caps, buttons, big figures), `font-sans` (IBM Plex Sans), `font-mono` (IBM Plex Mono: labels, data, BPM, dates) |
+| Selected | `bg-cream text-chassis` |
+| Numbers | `font-display text-4xl font-semibold tabular-nums text-cream` for figures, `font-mono tabular-nums` in columns |
 
-Class-string exports for native elements: `btn` (secondary button), `btnPrimary`, `input`, `sectionLabel`. Prefer the components `Button` (`variant="primary"` for the one main action per screen) and `Input`.
+Class-string exports for native elements: `btn` (secondary), `btnPrimary`, `btnQuiet` (Cancel), `input` (recessed field), `engrave`, `sectionLabel`. Prefer the components `Button` (`variant="primary"` for the one main action per screen, `"quiet"` for Cancel) and `Input`.
 
-Song stage colors (use with `StatusDot`, never color alone, always with the stage name): Unsorted `#6F6F78`, Creation `#F5A524`, Production `#D6409F`, Prep `#8E4EC6`, Release `#30A46C`, Promotion `#00A2C7`.
+Song stage colors are one blue ramp, dark → light (use with `StatusDot`, never color alone, always with the stage name): Unsorted `#5B5B63`, Creation `#1C5CAB`, Production `#2A78D6`, Prep `#5598E7`, Release `#86B6EF`, Promotion `#B7D3F6`. Blue means "stage" only: charts stay neutral (cream → grey).
 
 ## Building blocks
 
-- Layout and numbers: `Card` (title + optional `action`), `StatTile`, `HeroStat`, `Stat`, `Meter`, `Section`, `Fact` (inside a `<dl>`).
-- Controls: `Button`, `Input`, `Chip` (filter pills), `Toggle`, `StatusSelect` (stage picker), `TagEditor`, `ConfirmButton` (two-click destructive), `Modal`.
-- Music: `StatusDot`, `MixdownBadge`, `SongLines` (clickable song list), `FileRow`, `Avatar`.
-- Launch Kit: `FieldRow` (one release field with source badge, note, editor, checks, AI review), `KitStatus`, `CheckLine`, `AiLine`.
+- Brand: `LogoMark` (the FL rack key, orange with one LED).
+- Layout and numbers: `Card` (engraved title + optional `action`), `StatTile`, `HeroStat`, `Stat`, `Meter` (segmented LED bar), `Section`, `Fact` (inside a `<dl>`).
+- Controls: `Button`, `Input`, `Chip` (filter, cream when selected), `Toggle` (LED switch), `StatusSelect` (stage picker), `TagEditor`, `ConfirmButton` (two-click destructive, arms red), `Modal`.
+- Music: `StatusDot` (LED), `MixdownBadge` (LED + Mix current / Mix outdated / No mixdown), `SongLines`, `FileRow`, `Avatar` (initials key).
+- Launch Kit: `FieldRow` (one release field with source badge, note, editor, checks, AI review), `SourceBadge`, `KitStatus`, `CheckLine`, `AiLine` (dashed panel).
 
 ## Where the truth lives
 

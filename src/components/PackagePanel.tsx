@@ -14,9 +14,9 @@ export function PackagePanel() {
   const firstZip = results.find((r) => r.zipPath)?.zipPath;
 
   return (
-    <div className="absolute bottom-4 left-60 z-30 w-96 rounded-lg border border-white/10 bg-[#18181d] shadow-2xl">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-white/90">
+    <div className="absolute bottom-4 left-60 z-30 w-96 rounded-lg border border-rule bg-raised shadow-2xl">
+      <div className="flex items-center justify-between border-b border-rule px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-cream">
           {packaging && <Loader2 size={14} className="animate-spin text-orange-400" />}
           {packaging ? `Packaging… ${results.length} done` : "Packages ready"}
         </div>
@@ -24,13 +24,13 @@ export function PackagePanel() {
           {firstZip && (
             <button
               onClick={() => revealInFileManager(firstZip)}
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-body hover:bg-rule hover:text-cream"
             >
               <FolderOpen size={13} /> Show
             </button>
           )}
           {!packaging && (
-            <button onClick={dismiss} className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
+            <button onClick={dismiss} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
               <X size={14} />
             </button>
           )}
@@ -47,9 +47,9 @@ export function PackagePanel() {
               ) : (
                 <CheckCircle2 size={13} className="shrink-0 text-emerald-400" />
               )}
-              <span className="min-w-0 flex-1 truncate text-white/80">{name(r.projectPath)}</span>
+              <span className="min-w-0 flex-1 truncate text-cream">{name(r.projectPath)}</span>
               {!r.error && (
-                <span className="text-white/58">
+                <span className="text-engrave">
                   {r.included} samples · {formatBytes(r.bytes)}
                 </span>
               )}
@@ -63,7 +63,7 @@ export function PackagePanel() {
           </div>
         ))}
       </div>
-      <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/55">
+      <div className="border-t border-rule px-4 py-2 text-[11px] text-engrave">
         Open a package directly from FL (File → Open) — samples relink automatically.
       </div>
     </div>

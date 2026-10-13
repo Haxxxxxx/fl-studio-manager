@@ -1,12 +1,12 @@
 import { StatusDot } from "fl-manager-ui";
 
 const STAGES: [string, string][] = [
-  ["Unsorted", "#6F6F78"],
-  ["Creation", "#F5A524"],
-  ["Production", "#D6409F"],
-  ["Prep", "#8E4EC6"],
-  ["Release", "#30A46C"],
-  ["Promotion", "#00A2C7"],
+  ["Unsorted", "#5B5B63"],
+  ["Creation", "#1C5CAB"],
+  ["Production", "#2A78D6"],
+  ["Prep", "#5598E7"],
+  ["Release", "#86B6EF"],
+  ["Promotion", "#B7D3F6"],
 ];
 
 export const Stages = () => (
@@ -21,8 +21,8 @@ export const Stages = () => (
 
 export const Sizes = () => (
   <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-    <StatusDot color="#D6409F" size={6} />
-    <StatusDot color="#D6409F" />
-    <StatusDot color="#D6409F" size={12} />
+    <StatusDot color="#2A78D6" size={6} />
+    <StatusDot color="#2A78D6" />
+    <StatusDot color="#2A78D6" size={12} />
   </div>
 );

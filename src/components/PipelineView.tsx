@@ -46,20 +46,20 @@ export function PipelineView() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-3">
+      <div className="flex items-center justify-between border-b border-rule px-6 py-3">
         <div>
-          <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-white">Pipeline</h1>
-          {shownBoard === "crew" && <p className="mt-1 text-xs text-white/58">{crewName} · anyone in the crew can move a card</p>}
+          <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">Pipeline</h1>
+          {shownBoard === "crew" && <p className="mt-1 text-xs text-engrave">{crewName} · anyone in the crew can move a card</p>}
         </div>
         {canShare && (
-          <div className="flex rounded-md border border-white/10 p-0.5 text-xs" role="tablist" aria-label="Board">
+          <div className="flex rounded-md border border-rule p-0.5 text-xs" role="tablist" aria-label="Board">
             {(["mine", "crew"] as const).map((b) => (
               <button
                 key={b}
                 role="tab"
                 aria-selected={shownBoard === b}
                 onClick={() => setBoard(b)}
-                className={`rounded px-3 py-1 ${shownBoard === b ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"}`}
+                className={`rounded px-3 py-1 ${shownBoard === b ? "bg-rule-strong text-cream" : "text-engrave hover:text-cream"}`}
               >
                 {b === "mine" ? "My songs" : `Crew · ${crewSongCount}`}
               </button>
@@ -90,23 +90,23 @@ export function PipelineView() {
                 if (songs.some((p) => p.path === path)) setStatus([path], col.id);
               }}
               className={`flex min-w-[190px] flex-1 basis-0 flex-col rounded-lg border ${
-                dragOver === key ? "border-orange-400/50 bg-orange-500/[0.05]" : "border-white/5 bg-white/[0.02]"
+                dragOver === key ? "border-orange-400/50 bg-orange-500/[0.05]" : "border-rule bg-panel"
               }`}
             >
               <div className="flex flex-wrap items-center gap-x-2 px-3 pb-2 pt-2.5">
                 <StatusDot color={col.color} />
-                <span className="text-xs font-medium text-white/80">{col.label}</span>
-                <span className="text-xs text-white/50">{items.length}</span>
+                <span className="text-xs font-medium text-cream">{col.label}</span>
+                <span className="text-xs text-engrave">{items.length}</span>
                 {col.id === "creation" && (
                   <button
                     onClick={() => openNewProject({ status: "creation" })}
                     title="New song"
-                    className="ml-auto rounded p-0.5 text-white/55 hover:bg-white/10 hover:text-white"
+                    className="ml-auto rounded p-0.5 text-engrave hover:bg-rule hover:text-cream"
                   >
                     <Plus size={14} />
                   </button>
                 )}
-                <span className="basis-full pt-0.5 text-[10px] leading-snug text-white/50">{col.hint}</span>
+                <span className="basis-full pt-0.5 text-[10px] leading-snug text-engrave">{col.hint}</span>
               </div>
               <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto px-2 pb-2">
                 {items.map((p) => {
@@ -120,12 +120,12 @@ export function PipelineView() {
                       onClick={() => openDetail(detailPath === p.path ? null : p.path)}
                       className={`cursor-grab rounded-md border px-3 py-2 active:cursor-grabbing ${
                         detailPath === p.path
-                          ? "border-orange-400/40 bg-white/[0.08]"
-                          : "border-white/5 bg-[#18181d] hover:border-white/15"
+                          ? "border-orange-400/40 bg-raised"
+                          : "border-rule bg-raised hover:border-rule-strong"
                       }`}
                     >
-                      <div className="truncate text-sm font-medium text-white/90">{p.name}</div>
-                      <div className="mt-1 flex items-center gap-2 text-[11px] text-white/58">
+                      <div className="truncate text-sm font-medium text-cream">{p.name}</div>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-engrave">
                         <span>{formatRelative(p.modifiedAtMs)}</span>
                         {p.tempoBpm && <span>· {formatBpm(p.tempoBpm)} BPM</span>}
                       </div>
@@ -134,10 +134,10 @@ export function PipelineView() {
                           {albums.map((a) => (
                             <span key={a.id} title={a.title} className="h-2.5 w-2.5 rounded-sm" style={{ background: a.color }} />
                           ))}
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-white/50">
+                          <span className="min-w-0 flex-1 truncate text-[11px] text-engrave">
                             {tags.map((t) => `#${t}`).join(" ")}
                           </span>
-                          {p.renders.length > 0 && <MixdownBadge project={p} />}
+                          {p.renders.length > 0 && <MixdownBadge project={p} compact />}
                         </div>
                       )}
                     </div>

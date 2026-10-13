@@ -36,15 +36,15 @@ import { ProgressBar } from "./AlbumsView";
 import { StatusDot, btn, btnPrimary } from "./ui";
 import { Card, HeroStat, SongLines, StatTile } from "../ui";
 
-// Storage is part-to-whole over four categories: dark categorical slots
-// 1–4 in fixed order (validated adjacent-pair against #16161b; the 8.4 CVD
-// pair is backed by direct labels in the legend).
-const STORAGE_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500"];
-const SERIES_1 = "#3987e5";
-const AXIS_COLOR = "rgba(255,255,255,0.35)";
-const GRID_COLOR = "rgba(255,255,255,0.08)";
+// Charts stay neutral (cream → grey, plus one amber) so blue keeps meaning
+// "stage" and orange "needs you". Storage is part-to-whole over four
+// categories in fixed order, backed by direct labels in the legend.
+const STORAGE_COLORS = ["#f2efe8", "#8d897f", "#5a5850", "#c98500"];
+const SERIES_1 = "#c9c5bb";
+const AXIS_COLOR = "#8d897f";
+const GRID_COLOR = "#2c2b27";
 // Activity heatmap: one hue (the app accent), stepped by opacity over the surface.
-const HEAT = ["rgba(255,255,255,0.05)", "rgba(217,89,38,0.35)", "rgba(217,89,38,0.55)", "rgba(217,89,38,0.78)", "#e0703f"];
+const HEAT = ["#1f1f1c", "rgba(255,90,31,0.32)", "rgba(255,90,31,0.55)", "rgba(255,90,31,0.8)", "#ff5a1f"];
 
 const DAY = 24 * 60 * 60 * 1000;
 const HEATMAP_WEEKS = 53;
@@ -123,13 +123,13 @@ function MyDashboard() {
     if (!demoMode && watchedFolders.length === 0) return <EmptyLibrary />;
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/50">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-raised text-engrave">
           <FolderSearch size={28} />
         </div>
-        <div className="text-base font-medium text-white/80">{scanning ? "Scanning your projects…" : "No songs found yet"}</div>
+        <div className="text-base font-medium text-cream">{scanning ? "Scanning your projects…" : "No songs found yet"}</div>
         {!scanning && (
           <>
-            <div className="max-w-sm text-sm text-white/58">
+            <div className="max-w-sm text-sm text-engrave">
               No projects in your linked folders. Check the folders in Settings, or load sample data to look around.
             </div>
             <div className="mt-2 flex gap-2">
@@ -173,13 +173,13 @@ function MyDashboard() {
                 <div
                   key={p.path}
                   onClick={() => openDetail(p.path)}
-                  className="group cursor-pointer rounded-lg border border-white/5 bg-[#18181d] p-3 hover:border-white/15"
+                  className="group cursor-pointer rounded-lg border border-rule bg-raised p-3 hover:border-rule-strong"
                 >
-                  <div className="truncate text-sm font-medium text-white/90">{p.name}</div>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/62">
+                  <div className="truncate text-sm font-medium text-cream">{p.name}</div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-body">
                     <StatusDot color={s.color} size={6} /> {s.label}
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-white/55">
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-engrave">
                     <span>{formatRelative(p.modifiedAtMs)}</span>
                     {!demoMode && (
                       <button
@@ -187,7 +187,7 @@ function MyDashboard() {
                           e.stopPropagation();
                           openInFlStudio(p.path).catch((err) => console.error("couldn't open the project", err));
                         }}
-                        className="flex items-center gap-1 text-white/58 opacity-0 hover:text-orange-300 group-hover:opacity-100"
+                        className="flex items-center gap-1 text-engrave opacity-0 hover:text-orange-300 group-hover:opacity-100"
                       >
                         <PlayCircle size={13} /> Open
                       </button>
@@ -217,9 +217,9 @@ function MyDashboard() {
                       setStatusFilter(s.id ?? "unsorted");
                       setView("library");
                     }}
-                    className="group flex items-center gap-3 rounded px-1 py-0.5 text-left hover:bg-white/[0.03]"
+                    className="group flex items-center gap-3 rounded px-1 py-0.5 text-left hover:bg-panel"
                   >
-                    <span className="flex w-24 shrink-0 items-center gap-1.5 text-xs text-white/65">
+                    <span className="flex w-24 shrink-0 items-center gap-1.5 text-xs text-body">
                       <StatusDot color={s.color} /> {s.label}
                     </span>
                     <span className="flex h-4 flex-1 items-center">
@@ -228,13 +228,13 @@ function MyDashboard() {
                         style={{ width: `${(s.count / max) * 100}%`, minWidth: s.count ? 3 : 0, background: s.color }}
                       />
                     </span>
-                    <span className="w-8 text-right text-xs tabular-nums text-white/70">{s.count}</span>
+                    <span className="w-8 text-right text-xs tabular-nums text-body">{s.count}</span>
                   </button>
                 );
               })}
             </div>
             {pipeline[0].count === songs.length && (
-              <div className="mt-3 text-xs text-white/58">
+              <div className="mt-3 text-xs text-engrave">
                 Nothing triaged yet — open the Pipeline board and drag songs into stages.
               </div>
             )}
@@ -252,7 +252,7 @@ function MyDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="py-10 text-center text-xs text-white/55">No tempo data</div>
+              <div className="py-10 text-center text-xs text-engrave">No tempo data</div>
             )}
           </Card>
         </div>
@@ -284,8 +284,8 @@ function MyDashboard() {
               {storage.map((s, i) => (
                 <div key={s.label} className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: STORAGE_COLORS[i] }} />
-                  <span className="flex-1 text-white/60">{s.label}</span>
-                  <span className="tabular-nums text-white/80">{formatBytes(s.bytes)}</span>
+                  <span className="flex-1 text-body">{s.label}</span>
+                  <span className="tabular-nums text-cream">{formatBytes(s.bytes)}</span>
                 </div>
               ))}
             </div>
@@ -299,12 +299,12 @@ function MyDashboard() {
               items={outdated}
             />
             <AttentionList
-              icon={<Disc3 size={13} className="text-white/58" />}
+              icon={<Disc3 size={13} className="text-engrave" />}
               title={`${doneNoMix.length} finished song${doneNoMix.length === 1 ? "" : "s"} without a mixdown`}
               items={doneNoMix}
             />
             {outdated.length === 0 && doneNoMix.length === 0 && (
-              <div className="text-xs text-white/55">All mixdowns are current.</div>
+              <div className="text-xs text-engrave">All mixdowns are current.</div>
             )}
           </Card>
         </div>
@@ -320,8 +320,8 @@ function MyDashboard() {
                   <button key={a.id} onClick={() => openAlbum(a.id)} className="flex items-center gap-3 text-left">
                     <span className="h-8 w-8 shrink-0 rounded" style={{ background: a.color }} />
                     <span className="w-40 shrink-0">
-                      <span className="block truncate text-sm text-white/85">{a.title}</span>
-                      <span className="block text-[11px] text-white/58">
+                      <span className="block truncate text-sm text-cream">{a.title}</span>
+                      <span className="block text-[11px] text-engrave">
                         {done}/{a.trackPaths.length} done
                         {a.releaseDate && ` · ${formatRelative(new Date(a.releaseDate).getTime())}`}
                       </span>
@@ -343,7 +343,7 @@ function MyDashboard() {
     if (!items.length) return null;
     return (
       <div className="mb-3">
-        <div className="flex items-center gap-1.5 text-xs text-white/70">
+        <div className="flex items-center gap-1.5 text-xs text-body">
           {icon} {title}
         </div>
         <div className="mt-1.5 flex flex-wrap gap-1">
@@ -352,12 +352,12 @@ function MyDashboard() {
               key={p.path}
               title={p.path}
               onClick={() => openDetail(p.path)}
-              className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
+              className="rounded bg-raised px-2 py-0.5 text-[11px] text-body hover:bg-rule hover:text-cream"
             >
               {songLabel(p, songs)}
             </button>
           ))}
-          {items.length > 8 && <span className="px-1 text-[11px] text-white/55">+{items.length - 8}</span>}
+          {items.length > 8 && <span className="px-1 text-[11px] text-engrave">+{items.length - 8}</span>}
         </div>
       </div>
     );
@@ -367,13 +367,13 @@ function MyDashboard() {
     const top = [...songs].sort((a, b) => backupsBytes(b) - backupsBytes(a)).slice(0, 3).filter((p) => p.backups.length > 5);
     if (!top.length) return null;
     return (
-      <div className="mt-4 border-t border-white/5 pt-3 text-xs">
-        <div className="text-white/62">Most backups — clean up from the song's Versions panel</div>
+      <div className="mt-4 border-t border-rule pt-3 text-xs">
+        <div className="text-body">Most backups — clean up from the song's Versions panel</div>
         {top.map((p) => (
-          <button key={p.path} onClick={() => openDetail(p.path)} className="mt-1 flex w-full items-center gap-2 text-left hover:text-white">
-            <span className="flex-1 truncate text-white/70">{p.name}</span>
-            <span className="text-white/58">{p.backups.length} files</span>
-            <span className="w-16 text-right tabular-nums text-white/70">{formatBytes(backupsBytes(p))}</span>
+          <button key={p.path} onClick={() => openDetail(p.path)} className="mt-1 flex w-full items-center gap-2 text-left hover:text-cream">
+            <span className="flex-1 truncate text-body">{p.name}</span>
+            <span className="text-engrave">{p.backups.length} files</span>
+            <span className="w-16 text-right tabular-nums text-body">{formatBytes(backupsBytes(p))}</span>
           </button>
         ))}
       </div>
@@ -449,14 +449,14 @@ function ActivityHeatmap() {
     <div className="relative">
       <div className="flex gap-4">
         <div className="flex gap-[2px] overflow-x-auto pb-1">
-          <div className="mr-1 flex flex-col gap-[2px] pt-[15px] text-[9px] leading-[11px] text-white/50">
+          <div className="mr-1 flex flex-col gap-[2px] pt-[15px] text-[9px] leading-[11px] text-engrave">
             {["Mon", "", "Wed", "", "Fri", "", ""].map((d, i) => (
               <span key={i} className="h-[11px]">{d}</span>
             ))}
           </div>
           {Array.from({ length: weeks }, (_, w) => (
             <div key={w} className="flex flex-col gap-[2px]">
-              <span className="h-[13px] w-[11px] overflow-visible whitespace-nowrap text-[9px] leading-[11px] text-white/50">
+              <span className="h-[13px] w-[11px] overflow-visible whitespace-nowrap text-[9px] leading-[11px] text-engrave">
                 {months[w]}
               </span>
               {days.slice(w * 7, w * 7 + 7).map((d, i) => (
@@ -473,7 +473,7 @@ function ActivityHeatmap() {
                     const p = songs.find((s) => s.name === name);
                     if (p) openDetail(p.path);
                   }}
-                  className={`h-[11px] w-[11px] rounded-[2px] ${d.saves ? "cursor-pointer" : ""} ${hover?.day === w * 7 + i ? "ring-1 ring-white/60" : ""}`}
+                  className={`h-[11px] w-[11px] rounded-[2px] ${d.saves ? "cursor-pointer" : ""} ${hover?.day === w * 7 + i ? "ring-1 ring-cream" : ""}`}
                   style={{ background: HEAT[level(d.saves)] }}
                 />
               ))}
@@ -489,13 +489,13 @@ function ActivityHeatmap() {
           )}
           {longest > 1 && <HeroStat label="Longest streak" value={`${longest} days`} />}
           {busiest.saves > 0 && (
-            <div className="text-[11px] text-white/58">
+            <div className="text-[11px] text-engrave">
               Busiest: {busiest.date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {busiest.saves} saves
             </div>
           )}
         </div>
       </div>
-      <div className="mt-2 flex items-center gap-1 text-[10px] text-white/55">
+      <div className="mt-2 flex items-center gap-1 text-[10px] text-engrave">
         Less
         {HEAT.map((c) => (
           <span key={c} className="h-[10px] w-[10px] rounded-[2px]" style={{ background: c }} />
@@ -504,17 +504,17 @@ function ActivityHeatmap() {
       </div>
       {hover && hovered && (
         <div
-          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-white/10 bg-[#0f0f12] px-2.5 py-1.5 text-[11px] shadow-xl"
+          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-rule bg-chassis px-2.5 py-1.5 text-[11px] shadow-xl"
           style={{ left: hover.x, top: hover.y - 6 }}
         >
-          <div className="text-white/50">
+          <div className="text-engrave">
             {hovered.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
           </div>
-          <div className="font-medium text-white">
+          <div className="font-medium text-cream">
             {hovered.saves} save{hovered.saves === 1 ? "" : "s"}
           </div>
           {hovered.songs.size > 0 && (
-            <div className="max-w-[200px] truncate text-white/60">{[...hovered.songs].join(", ")}</div>
+            <div className="max-w-[200px] truncate text-body">{[...hovered.songs].join(", ")}</div>
           )}
         </div>
       )}
@@ -522,7 +522,7 @@ function ActivityHeatmap() {
   );
 }
 
-const CRITICAL = "#d03b3b";
+const CRITICAL = "#ff4040";
 const FOLLOW_UP_DAYS = 14;
 
 /** Beats sent with no answer for two weeks, and recent wins. */
@@ -557,24 +557,24 @@ function PitchesCard() {
 
   if (total === 0) return null;
   const Row = ({ x, right }: { x: (typeof followUps)[number]; right: string }) => (
-    <button onClick={() => openDetail(x.path)} className="flex w-full items-center gap-2 rounded px-1 py-1 text-left text-xs hover:bg-white/[0.03]">
-      <span className="min-w-0 flex-1 truncate text-white/85">{x.song}</span>
-      <span className="w-32 truncate text-white/50">→ {x.who}</span>
-      <span className="w-24 text-right text-white/58">{right}</span>
+    <button onClick={() => openDetail(x.path)} className="flex w-full items-center gap-2 rounded px-1 py-1 text-left text-xs hover:bg-panel">
+      <span className="min-w-0 flex-1 truncate text-cream">{x.song}</span>
+      <span className="w-32 truncate text-engrave">→ {x.who}</span>
+      <span className="w-24 text-right text-engrave">{right}</span>
     </button>
   );
   return (
     <div className="grid grid-cols-2 gap-4">
       <Card title={`Follow up — no answer after ${FOLLOW_UP_DAYS} days`}>
         {followUps.length === 0 ? (
-          <div className="text-xs text-white/55">Nothing waiting.</div>
+          <div className="text-xs text-engrave">Nothing waiting.</div>
         ) : (
           followUps.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={formatRelative(new Date(x.pitch.date).getTime())} />)
         )}
       </Card>
       <Card title={`Wins — placed or sold · ${wins.length}`}>
         {wins.length === 0 ? (
-          <div className="text-xs text-white/55">None logged yet. {total} send{total === 1 ? "" : "s"} tracked.</div>
+          <div className="text-xs text-engrave">None logged yet. {total} send{total === 1 ? "" : "s"} tracked.</div>
         ) : (
           wins.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={x.pitch.outcome === "sold" ? "Sold" : "Placed"} />)
         )}
@@ -621,7 +621,7 @@ function PluginToolkit() {
   const [thirdPartyOnly, setThirdPartyOnly] = useState(true);
   const list = stats.filter((s) => !thirdPartyOnly || s.thirdParty).slice(0, 10);
   const max = Math.max(1, ...list.map((s) => s.count));
-  if (!stats.length) return <div className="py-6 text-center text-xs text-white/55">No plugin data</div>;
+  if (!stats.length) return <div className="py-6 text-center text-xs text-engrave">No plugin data</div>;
   return (
     <div>
       <div className="mb-2 flex gap-1 text-[11px]">
@@ -632,7 +632,7 @@ function PluginToolkit() {
           <button
             key={String(value)}
             onClick={() => setThirdPartyOnly(value as boolean)}
-            className={`rounded-full px-2 py-0.5 ${thirdPartyOnly === value ? "bg-white/15 text-white" : "text-white/62 hover:bg-white/5"}`}
+            className={`rounded-full px-2 py-0.5 ${thirdPartyOnly === value ? "bg-rule-strong text-cream" : "text-body hover:bg-raised"}`}
           >
             {label as string}
           </button>
@@ -644,9 +644,9 @@ function PluginToolkit() {
             key={s.name}
             onClick={() => showSongs(s.name)}
             title={`Show the ${s.count} songs using ${s.name}`}
-            className="group flex items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-white/[0.03]"
+            className="group flex items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-panel"
           >
-            <span className={`flex w-36 shrink-0 items-center gap-1 truncate text-xs ${s.missing ? "text-red-300" : "text-white/70"}`}>
+            <span className={`flex w-36 shrink-0 items-center gap-1 truncate text-xs ${s.missing ? "text-red-300" : "text-body"}`}>
               {s.missing && <AlertTriangle size={11} className="shrink-0" />}
               <span className="truncate">{s.name}</span>
             </span>
@@ -656,12 +656,12 @@ function PluginToolkit() {
                 style={{ width: `${(s.count / max) * 100}%`, minWidth: 3, background: s.missing ? CRITICAL : SERIES_1 }}
               />
             </span>
-            <span className="w-6 text-right text-xs tabular-nums text-white/70">{s.count}</span>
+            <span className="w-6 text-right text-xs tabular-nums text-body">{s.count}</span>
           </button>
         ))}
       </div>
       {list.some((s) => s.missing) && (
-        <div className="mt-2 flex items-center gap-1 text-[10px] text-white/58">
+        <div className="mt-2 flex items-center gap-1 text-[10px] text-engrave">
           <AlertTriangle size={10} className="text-red-300" /> Not installed on this computer
         </div>
       )}
@@ -698,7 +698,7 @@ function HealthCard() {
       <div className="flex flex-col gap-2 py-2">
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-semibold text-emerald-300">100%</span>
-          <span className="text-xs text-white/50">of {songs.length} songs open cleanly on this computer</span>
+          <span className="text-xs text-engrave">of {songs.length} songs open cleanly on this computer</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-emerald-300">
           <CheckCircle2 size={16} /> Every song has its plugins and samples.
@@ -709,8 +709,8 @@ function HealthCard() {
   return (
     <div className="flex flex-col gap-3 text-xs">
       <div className="flex items-baseline gap-2">
-        <span className={`text-3xl font-semibold ${affected ? "text-white" : "text-emerald-300"}`}>{pct}%</span>
-        <span className="text-white/50">
+        <span className={`text-3xl font-semibold ${affected ? "text-cream" : "text-emerald-300"}`}>{pct}%</span>
+        <span className="text-engrave">
           of {songs.length} songs open cleanly on this computer
         </span>
         {affected > 0 && (
@@ -719,7 +719,7 @@ function HealthCard() {
               setProblemsOnly(true);
               setView("library");
             }}
-            className="ml-auto text-white/62 hover:text-white"
+            className="ml-auto text-body hover:text-cream"
           >
             Show {affected} →
           </button>
@@ -731,7 +731,7 @@ function HealthCard() {
       </div>
       {missingPlugins.length > 0 && (
         <div>
-          <div className="mb-1 flex items-center gap-1.5 text-white/70">
+          <div className="mb-1 flex items-center gap-1.5 text-body">
             <AlertTriangle size={12} className="text-red-400" /> Plugins not installed
           </div>
           <div className="flex flex-wrap gap-1">
@@ -748,14 +748,14 @@ function HealthCard() {
         </div>
       )}
       {samples.missing > 0 && (
-        <div className="flex items-center gap-1.5 text-white/70">
+        <div className="flex items-center gap-1.5 text-body">
           <AlertTriangle size={12} className="text-red-400" />
           {samples.missing} sample{samples.missing === 1 ? "" : "s"} missing across {samples.songsMissing} song
           {samples.songsMissing === 1 ? "" : "s"}
         </div>
       )}
       {samples.relocated > 0 && (
-        <div className="flex items-start gap-1.5 text-white/50">
+        <div className="flex items-start gap-1.5 text-engrave">
           <FolderInput size={12} className="mt-px shrink-0 text-sky-400" />
           <span>
             {samples.relocated} samples aren't at their saved path but were found in the song's folder — the project
@@ -770,9 +770,9 @@ function HealthCard() {
 function TempoTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-md border border-white/10 bg-[#0f0f12] px-3 py-2 text-xs shadow-xl">
-      <div className="text-white/50">{label} BPM</div>
-      <div className="mt-0.5 font-medium text-white">
+    <div className="rounded-md border border-rule bg-chassis px-3 py-2 text-xs shadow-xl">
+      <div className="text-engrave">{label} BPM</div>
+      <div className="mt-0.5 font-medium text-cream">
         {payload[0].value} song{payload[0].value === 1 ? "" : "s"}
       </div>
     </div>
@@ -794,15 +794,15 @@ export function Dashboard() {
   if (!inCrew) return <MyDashboard />;
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex justify-center border-b border-white/5 px-8 pb-2 pt-4">
-        <div role="tablist" aria-label="Dashboard scope" className="flex rounded-md border border-white/10 p-0.5 text-xs">
+      <div className="flex justify-center border-b border-rule px-8 pb-2 pt-4">
+        <div role="tablist" aria-label="Dashboard scope" className="flex rounded-md border border-rule p-0.5 text-xs">
           {(["me", "crew"] as const).map((s) => (
             <button
               key={s}
               role="tab"
               aria-selected={scope === s}
               onClick={() => setPicked(s)}
-              className={`rounded px-3 py-1 ${scope === s ? "bg-white/10 text-white" : "text-white/50 hover:text-white"}`}
+              className={`rounded px-3 py-1 ${scope === s ? "bg-rule text-cream" : "text-engrave hover:text-cream"}`}
             >
               {s === "me" ? "Me" : crewName}
             </button>
@@ -837,7 +837,7 @@ function CrewDashboard() {
 
   if (songs.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-white/62">
+      <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-body">
         No crew stats yet: nothing is shared. Share songs from their panel or the Library, and ask the crew to do the same.
       </div>
     );
@@ -861,13 +861,13 @@ function CrewDashboard() {
                 const info = statusInfo(s.id ?? undefined);
                 return (
                   <div key={s.id ?? "none"} className="flex items-center gap-3 text-xs">
-                    <span className="flex w-24 items-center gap-2 text-white/65">
+                    <span className="flex w-24 items-center gap-2 text-body">
                       <StatusDot color={info.color} /> {info.label}
                     </span>
-                    <div className="h-2 flex-1 rounded bg-white/5">
+                    <div className="h-2 flex-1 rounded bg-raised">
                       <div className="h-2 rounded" style={{ width: `${(s.count / max) * 100}%`, background: info.color }} />
                     </div>
-                    <span className="w-6 text-right tabular-nums text-white/70">{s.count}</span>
+                    <span className="w-6 text-right tabular-nums text-body">{s.count}</span>
                   </div>
                 );
               })}
@@ -878,14 +878,14 @@ function CrewDashboard() {
             <div className="flex flex-col gap-2 text-xs">
               {stats.members.map((m) => (
                 <div key={m.userId} className="flex items-center gap-3">
-                  <span className="min-w-0 flex-1 truncate text-white/80">{who(m.userId, m.name)}</span>
-                  <span className="tabular-nums text-white/55" title="Shared songs · finished (Prep or later)">
+                  <span className="min-w-0 flex-1 truncate text-cream">{who(m.userId, m.name)}</span>
+                  <span className="tabular-nums text-engrave" title="Shared songs · finished (Prep or later)">
                     {m.songs} song{m.songs === 1 ? "" : "s"} · {m.finished} done
                   </span>
-                  <span className="w-20 text-right tabular-nums text-white/62" title={`Songs they last moved in the past ${RECENT_DAYS} days`}>
+                  <span className="w-20 text-right tabular-nums text-body" title={`Songs they last moved in the past ${RECENT_DAYS} days`}>
                     {m.recentMoves ? `${m.recentMoves} moved` : "—"}
                   </span>
-                  <span className="w-24 text-right text-white/58">{m.lastActivityMs ? formatRelative(m.lastActivityMs) : "nothing shared"}</span>
+                  <span className="w-24 text-right text-engrave">{m.lastActivityMs ? formatRelative(m.lastActivityMs) : "nothing shared"}</span>
                 </div>
               ))}
             </div>
@@ -895,14 +895,14 @@ function CrewDashboard() {
         <div className="grid grid-cols-2 gap-5">
           <Card title={`Ready to ship · ${stats.readyToShip.length}`}>
             {stats.readyToShip.length === 0 ? (
-              <p className="text-xs text-white/62">Nothing in Prep with a mixdown and an accepted Launch Kit yet.</p>
+              <p className="text-xs text-body">Nothing in Prep with a mixdown and an accepted Launch Kit yet.</p>
             ) : (
               <SongLines items={stats.readyToShip.map((s) => ({ id: s.id, title: s.title, right: s.release_date ?? "no date" }))} onOpen={open} />
             )}
           </Card>
           <Card title="Coming out">
             {stats.upcoming.length === 0 ? (
-              <p className="text-xs text-white/62">No release dates on shared songs. Set them in the Launch Kit.</p>
+              <p className="text-xs text-body">No release dates on shared songs. Set them in the Launch Kit.</p>
             ) : (
               <SongLines
                 items={stats.upcoming.slice(0, 6).map((u) => ({ id: u.song.id, title: u.song.title, sub: who(u.song.owner_id, u.owner), right: u.date }))}
@@ -914,7 +914,7 @@ function CrewDashboard() {
 
         <Card title={`Stalled — no save or move in ${STALLED_DAYS}+ days`}>
           {stats.stalled.length === 0 ? (
-            <p className="flex items-center gap-2 text-xs text-white/55">
+            <p className="flex items-center gap-2 text-xs text-engrave">
               <CheckCircle2 size={13} className="text-emerald-400" /> Everything in Creation or Production moved recently.
             </p>
           ) : (

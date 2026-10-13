@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ArrowRight, Music2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { LogoLockup, LogoMark } from "./LogoMark";
 import { STATUSES } from "@shared/lib/songs";
 
 // The signed-out front door, "studio wall" style: loud condensed type, mono
@@ -13,13 +14,13 @@ const STAGE_LINES: Record<string, string> = {
   promotion: "Clips, reels, keep it moving",
 };
 
-const primary = "inline-flex items-center gap-2 rounded-lg bg-orange-500 px-5 py-3 text-sm font-bold text-[#0f0f12] hover:bg-orange-400";
-const ghost = "inline-flex items-center gap-2 rounded-lg border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/5";
-const kicker = "font-mono text-xs tracking-wider text-orange-400";
+const primary = "inline-flex items-center gap-2 rounded bg-hot px-5 py-2.5 font-display uppercase tracking-[0.06em] text-base font-bold text-chassis hover:bg-hot-hover";
+const ghost = "inline-flex items-center gap-2 rounded border border-rule-strong px-5 py-2.5 font-display uppercase tracking-[0.06em] text-base font-semibold text-cream hover:bg-raised";
+const kicker = "font-mono text-[11px] uppercase tracking-[0.14em] text-hot";
 
 export function Landing({ signIn }: { signIn: ReactNode }) {
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-[#0f0f12] text-[#e6e6ea]">
+    <div className="min-h-dvh overflow-x-hidden bg-chassis text-body">
       <Nav />
       <Hero />
       <Stages />
@@ -54,20 +55,20 @@ export function Landing({ signIn }: { signIn: ReactNode }) {
         alt="The song panel: stage, key, release, tags, notes and project facts"
       />
       <Privacy />
-      <section id="signin" className="scroll-mt-20 border-t border-white/10 px-6 py-24">
+      <section id="signin" className="scroll-mt-20 border-t border-rule px-6 py-24">
         <div className="mx-auto grid max-w-5xl gap-12 md:grid-cols-[1.1fr_1fr] md:items-center">
           <div>
-            <h2 className="font-display text-5xl uppercase leading-[0.95] text-white md:text-6xl">Crew only.</h2>
-            <p className="mt-5 max-w-md text-base leading-relaxed text-white/70">Got an invite? Drop your email and we'll send a code. No password.</p>
-            <p className="mt-3 max-w-md text-sm text-white/60">The desktop app is crew-only for now: ask your crew lead to set you up.</p>
+            <h2 className="font-display text-5xl uppercase leading-[0.95] text-cream md:text-6xl">Crew only.</h2>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-body">Got an invite? Drop your email and we'll send a code. No password.</p>
+            <p className="mt-3 max-w-md text-sm text-body">The desktop app is crew-only for now: ask your crew lead to set you up.</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">{signIn}</div>
+          <div className="rounded-2xl border border-rule bg-panel p-6">{signIn}</div>
         </div>
       </section>
-      <footer className="border-t border-white/10 px-6 py-10 text-xs text-white/60">
+      <footer className="border-t border-rule px-6 py-10 text-xs text-body">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <span className="flex items-center gap-2">
-            <Mark size={20} /> FL Manager · made with and for the crew
+            <LogoMark size={20} /> FL Manager · made with and for the crew
           </span>
           <span className="font-mono">crew data: EU (Ireland) · audio: never leaves your machine</span>
         </div>
@@ -76,30 +77,22 @@ export function Landing({ signIn }: { signIn: ReactNode }) {
   );
 }
 
-function Mark({ size = 32 }: { size?: number }) {
-  return (
-    <span className="flex items-center justify-center rounded-lg bg-orange-500 text-[#0f0f12]" style={{ width: size, height: size }}>
-      <Music2 size={size * 0.55} strokeWidth={2.5} />
-    </span>
-  );
-}
-
 function Nav() {
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0f0f12]/90 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-rule bg-chassis/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-8 px-6 py-4">
-        <a href="#top" className="flex items-center gap-2.5 font-semibold text-white">
-          <Mark /> FL Manager
+        <a href="#top" aria-label="FL Manager">
+          <LogoLockup size={32} />
         </a>
-        <nav className="hidden gap-6 text-sm text-white/70 md:flex">
-          <a href="#board" className="hover:text-white">
+        <nav className="hidden gap-6 text-sm text-body md:flex">
+          <a href="#board" className="hover:text-cream">
             How it works
           </a>
-          <a href="#privacy" className="hover:text-white">
+          <a href="#privacy" className="hover:text-cream">
             Privacy
           </a>
         </nav>
-        <a href="#signin" className="ml-auto rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:bg-white/5">
+        <a href="#signin" className="ml-auto rounded-lg border border-rule-strong px-4 py-2 text-sm font-semibold text-cream hover:bg-raised">
           Sign in
         </a>
       </div>
@@ -111,14 +104,14 @@ function Hero() {
   return (
     <section id="top" className="scroll-mt-20 px-6 pt-16 md:pt-24">
       <div className="mx-auto max-w-6xl">
-        <h1 className="font-display text-[3.4rem] uppercase leading-[0.92] text-white sm:text-7xl md:text-[7.5rem]">
+        <h1 className="font-display text-[3.4rem] uppercase leading-[0.92] text-cream sm:text-7xl md:text-[7.5rem]">
           Who's got the hook?
           <br />
-          <span className="text-white/60">Where's the mixdown?</span>
+          <span className="text-body">Where's the mixdown?</span>
           <br />
           <span className="text-orange-500">When does it drop?</span>
         </h1>
-        <p className="mt-8 max-w-xl text-lg leading-relaxed text-white/75">
+        <p className="mt-8 max-w-xl text-lg leading-relaxed text-body">
           One board for the crew's projects. It answers all three: every song's stage, where its files live, and a release kit ready for your
           distributor.
         </p>
@@ -130,7 +123,7 @@ function Hero() {
             How it works
           </a>
         </div>
-        <p className="mt-5 font-mono text-xs text-white/60">your beats never leave your laptop</p>
+        <p className="mt-5 font-mono text-xs text-body">your beats never leave your laptop</p>
       </div>
       <div className="mx-auto mt-16 max-w-6xl">
         <Shot
@@ -147,10 +140,10 @@ function Hero() {
 function Shot({ src, alt, caption, eager = false }: { src: string; alt: string; caption: string; eager?: boolean }) {
   return (
     <figure>
-      <div className="overflow-hidden rounded-md border border-white/15 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.85)]">
+      <div className="overflow-hidden rounded-md border border-rule-strong shadow-[0_30px_80px_-20px_rgba(0,0,0,0.85)]">
         <img src={src} alt={alt} loading={eager ? "eager" : "lazy"} width={2880} height={1800} className="block h-auto w-full" />
       </div>
-      <figcaption className="mt-3 font-mono text-[11px] text-white/55">{caption}</figcaption>
+      <figcaption className="mt-3 font-mono text-[11px] text-engrave">{caption}</figcaption>
     </figure>
   );
 }
@@ -159,18 +152,18 @@ function Stages() {
   return (
     <section className="px-6 py-24">
       <div className="mx-auto max-w-6xl">
-        <h2 className="font-display text-4xl uppercase leading-[0.95] text-white md:text-6xl">Every song has a stage.</h2>
-        <p className="mt-4 text-base text-white/70">The whole crew sees it. Nobody has to ask.</p>
-        <ol className="mt-10 grid gap-x-8 border-t border-white/15 sm:grid-cols-5">
+        <h2 className="font-display text-4xl uppercase leading-[0.95] text-cream md:text-6xl">Every song has a stage.</h2>
+        <p className="mt-4 text-base text-body">The whole crew sees it. Nobody has to ask.</p>
+        <ol className="mt-10 grid gap-x-8 border-t border-rule-strong sm:grid-cols-5">
           {STATUSES.map((s, i) => (
-            <li key={s.id} className="flex items-baseline gap-3 border-b border-white/10 py-4 sm:block sm:border-b-0 sm:py-6">
-              <span className="font-mono text-xs text-white/60">0{i + 1}</span>
+            <li key={s.id} className="flex items-baseline gap-3 border-b border-rule py-4 sm:block sm:border-b-0 sm:py-6">
+              <span className="font-mono text-xs text-body">0{i + 1}</span>
               <div className="sm:mt-3">
-                <div className="flex items-center gap-2 font-display text-2xl uppercase text-white">
+                <div className="flex items-center gap-2 font-display text-2xl uppercase text-cream">
                   <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
                   {s.label}
                 </div>
-                <div className="mt-1 text-sm text-white/65">{STAGE_LINES[s.id]}</div>
+                <div className="mt-1 text-sm text-body">{STAGE_LINES[s.id]}</div>
               </div>
             </li>
           ))}
@@ -210,12 +203,12 @@ function Feature({
           <p className={kicker}>
             {n} / {name}
           </p>
-          <h2 className="mt-4 font-display text-4xl uppercase leading-[0.95] text-white md:text-5xl">{title}</h2>
-          <p className="mt-5 text-base leading-relaxed text-white/72">{body}</p>
+          <h2 className="mt-4 font-display text-4xl uppercase leading-[0.95] text-cream md:text-5xl">{title}</h2>
+          <p className="mt-5 text-base leading-relaxed text-body">{body}</p>
           {points && (
             <ul className="mt-6 flex flex-col gap-2.5">
               {points.map((p) => (
-                <li key={p} className="flex gap-3 text-sm text-white/80">
+                <li key={p} className="flex gap-3 text-sm text-cream">
                   <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" /> {p}
                 </li>
               ))}
@@ -231,12 +224,12 @@ function Feature({
 function Privacy() {
   return (
     <section id="privacy" className="scroll-mt-20 px-6 py-24">
-      <div className="mx-auto max-w-6xl rounded-2xl bg-[#f2efe8] p-8 text-[#0f0f12] md:p-14">
+      <div className="mx-auto max-w-6xl rounded-2xl bg-[#f2efe8] p-8 text-chassis md:p-14">
         <h2 className="font-display text-5xl uppercase leading-[0.95] md:text-7xl">Share titles, not tracks.</h2>
         <p className="mt-5 max-w-2xl text-lg">Your beats don't leave your laptop. The crew sees the facts you choose to share. That's it.</p>
         <div className="mt-10 grid gap-8 font-mono text-sm md:grid-cols-2">
           <div>
-            <div className="text-xs font-bold tracking-wider text-[#0f0f12]/70">WHAT TRAVELS</div>
+            <div className="text-xs font-bold tracking-wider text-chassis/70">WHAT TRAVELS</div>
             <ul className="mt-3 flex flex-col gap-1.5">
               {["title", "stage", "bpm · key · tags", "credits · splits", "release date", "mixdown: yes / no"].map((x) => (
                 <li key={x} className="flex items-center gap-2">
@@ -246,10 +239,10 @@ function Privacy() {
             </ul>
           </div>
           <div>
-            <div className="text-xs font-bold tracking-wider text-[#0f0f12]/70">WHAT STAYS ON YOUR MACHINE</div>
-            <ul className="mt-3 flex flex-col gap-1.5 text-[#0f0f12]/70">
+            <div className="text-xs font-bold tracking-wider text-chassis/70">WHAT STAYS ON YOUR MACHINE</div>
+            <ul className="mt-3 flex flex-col gap-1.5 text-chassis/70">
               {["audio", "project files", "samples", "notes", "track names"].map((x) => (
-                <li key={x} className="line-through decoration-[#0f0f12]/40">
+                <li key={x} className="line-through decoration-chassis/40">
                   {x}
                 </li>
               ))}
