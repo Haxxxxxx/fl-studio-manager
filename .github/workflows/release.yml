@@ -1,15 +1,20 @@
-# Builds the desktop installers in the cloud and attaches them to a draft
-# GitHub Release: Windows (.exe installer + .msi) and macOS (universal .dmg,
-# Apple Silicon + Intel).
+# Builds the desktop installers and attaches them to a draft GitHub Release:
+# macOS (universal .dmg, Apple Silicon + Intel) and Windows (.exe installer,
+# cross-compiled with cargo-xwin + NSIS).
+#
+# Runs on a self-hosted runner: the crew admin's Mac, registered for this
+# repo with the label `hivo` (setup: SETUP.md → "Release builds"). It uses no
+# GitHub-hosted minutes, so it's free; the Mac must be on and the runner
+# service running. To go back to GitHub's machines later, restore the
+# windows-latest / macos-latest matrix from git history.
 #
 # Run it: push a version tag (git tag v0.2.0 && git push origin v0.2.0), or
 # Actions → "Release builds" → Run workflow. Then open Releases, check the
 # draft, and Publish.
 #
 # The crew server settings (public URL + public anon key) come from the
-# repository variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
-# (Settings → Secrets and variables → Actions → Variables). They're public by
-# design: row-level security in the database is what protects the data.
+# repository variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. They're
+# public by design: row-level security in the database protects the data.
 name: Release builds
 
 on:
@@ -26,50 +31,62 @@ concurrency:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-            args: ""
-          - platform: macos-latest
-            args: "--target universal-apple-darwin"
-    runs-on: ${{ matrix.platform }}
+    runs-on: [self-hosted, macOS, hivo]
+    timeout-minutes: 60
     env:
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          # The write token isn't left in .git/config while dependency
+          # install scripts run.
+          persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - name: Toolchain
+        run: |
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          echo "/opt/homebrew/opt/llvm/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
+      - name: Check tools
+        run: |
+          node -v && cargo -V && cargo xwin --version && makensis -VERSION
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin x86_64-pc-windows-msvc
 
       - run: npm ci
 
       - run: npm test
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: macOS installer (universal)
+        run: npm run tauri build -- --target universal-apple-darwin
+
+      - name: Windows installer (cross-compiled)
+        run: npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+
+      - name: Draft release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
-          releaseName: "Hivo ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"
-          releaseBody: |
-            Desktop builds of Hivo.
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          tag=$([ "$REF_TYPE" = "tag" ] && echo "$REF_NAME" || echo "v$version")
+          dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          exe=$(ls src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe)
+          cat > release-notes.md <<'EOF'
+          Desktop builds of Hivo.
 
-            **Windows:** download the `_x64-setup.exe` and run it. If Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
+          **Windows:** download the `_x64-setup.exe` and run it. If Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
 
-            **macOS:** download the `.dmg`, drag Hivo to Applications. The app isn't notarized yet: the first time, right-click it → **Open** → **Open**. If macOS says it's "damaged", run `xattr -cr "/Applications/Hivo.app"` in Terminal once.
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+          **macOS:** download the `.dmg`, drag Hivo to Applications. The app isn't notarized yet: the first time, right-click it → **Open** → **Open**. If macOS says it's "damaged", run `xattr -cr "/Applications/Hivo.app"` in Terminal once.
+          EOF
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$dmg" "$exe" --clobber
+          else
+            gh release create "$tag" "$dmg" "$exe" --draft --title "Hivo $tag" --notes-file release-notes.md --target "$GITHUB_SHA"
+          fi
+          echo "Draft release $tag: $(basename "$dmg"), $(basename "$exe")"
