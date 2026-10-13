@@ -121,6 +121,20 @@ export interface LaunchKitMeta {
   /** Set by "Accept all"; cleared by any later edit. */
   acceptedAtMs?: number;
   ai?: KitAiMeta;
+  /** The picked cover concept: small metadata only, never image bytes
+   * (the image itself is cover-concept.jpg in the kit folder). */
+  cover?: KitCoverMeta;
+}
+
+export interface KitCoverMeta {
+  /** FLUX seed and prompt that made it, so "more like this" can follow up. */
+  seed: number;
+  prompt: string;
+  /** Index into COVER_VARIANTS (src/lib/cover.ts). */
+  variant: number;
+  /** Where "Save to kit" wrote it, if it did. */
+  savedPath?: string;
+  savedAtMs?: number;
 }
 
 export interface AiFieldReview {
@@ -150,6 +164,24 @@ export interface AiStatus {
   configured: boolean;
   source: "env" | "settings" | null;
   defaultModel: string;
+}
+
+/** Whether Cloudflare Workers AI credentials are set (never the values). */
+export interface CoverStatus {
+  configured: boolean;
+  source: "env" | "settings" | null;
+  model: string;
+}
+
+/** One FLUX concept, as returned by `generate_cover`. */
+export interface CoverImage {
+  /** Base64 JPEG. Kept in memory only, never in the workspace. */
+  imageB64: string;
+  seed: number;
+  /** False if Cloudflare refused the seed (the image is unseeded). */
+  seedApplied: boolean;
+  width: number | null;
+  height: number | null;
 }
 
 export interface Snippet {
