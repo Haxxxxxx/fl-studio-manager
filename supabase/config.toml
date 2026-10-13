@@ -247,11 +247,11 @@ otp_expiry = 600
 # Sign-in emails carry the 6-digit code ({{ .Token }}): the desktop app
 # can't follow magic links, so both apps ask for the code instead.
 [auth.email.template.magic_link]
-subject = "Your FL Manager sign-in code"
+subject = "Your Hivo sign-in code"
 content_path = "./supabase/templates/sign-in-code.html"
 
 [auth.email.template.confirmation]
-subject = "Your FL Manager sign-in code"
+subject = "Your Hivo sign-in code"
 content_path = "./supabase/templates/sign-in-code.html"
 
 # Uncomment to customize notification email template

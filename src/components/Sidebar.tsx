@@ -1,6 +1,6 @@
 import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, Plus, Rocket, Settings as SettingsIcon, Users } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
-import { btnPrimary, engrave, LogoMark } from "../ui";
+import { btnPrimary, engrave, Wordmark } from "../ui";
 
 export function Sidebar() {
   const view = useAppStore((s) => s.view);
@@ -27,12 +27,9 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-rule bg-panel">
-      <div className="flex items-center gap-2.5 px-4 py-4">
-        <LogoMark size={32} />
-        <div>
-          <div className="font-display text-xl font-bold uppercase leading-none text-cream">Manager</div>
-          <div className={`mt-1 ${engrave} text-[9.5px]`}>{demoMode ? "Sample data" : "Session → release"}</div>
-        </div>
+      <div className="flex flex-col gap-1.5 px-4 py-4">
+        <Wordmark size={30} />
+        <div className={`${engrave} text-[9.5px]`}>{demoMode ? "Sample data" : "Session → release"}</div>
       </div>
 
       <div className="px-3 pb-2">
