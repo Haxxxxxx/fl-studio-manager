@@ -1,17 +1,17 @@
 import type { Album, ProjectInfo, RenderFreshness, SongStatus, Workspace } from "../types";
 
 // The song lifecycle from docs/ROADMAP.md: every track is in exactly one
-// stage. Stages are ordinal, so they share one hue stepped dark → light
-// (validated with validate_palette.js --ordinal against the #16161b surface).
+// stage. Stages are ordinal, so they share one blue stepped dark → light
+// (System 02's stage ramp, lit as LEDs on the #161614 panel).
 // Songs nobody has triaged yet sit in neutral gray, outside the ramp.
 export const STATUSES: { id: SongStatus; label: string; color: string; hint: string }[] = [
-  { id: "creation", label: "Creation", color: "#F5A524", hint: "Beat and lyrics exist, still rough" },
-  { id: "production", label: "Production", color: "#D6409F", hint: "Recording, mixing, mastering until final" },
-  { id: "prep", label: "Prep", color: "#8E4EC6", hint: "Cover, metadata, release date, distributor" },
-  { id: "release", label: "Release", color: "#30A46C", hint: "Release day" },
-  { id: "promotion", label: "Promotion", color: "#00A2C7", hint: "Posts, reels, stories, follow-up" },
+  { id: "creation", label: "Creation", color: "#1C5CAB", hint: "Beat and lyrics exist, still rough" },
+  { id: "production", label: "Production", color: "#2A78D6", hint: "Recording, mixing, mastering until final" },
+  { id: "prep", label: "Prep", color: "#5598E7", hint: "Cover, metadata, release date, distributor" },
+  { id: "release", label: "Release", color: "#86B6EF", hint: "Release day" },
+  { id: "promotion", label: "Promotion", color: "#B7D3F6", hint: "Posts, reels, stories, follow-up" },
 ];
-export const UNSORTED = { label: "Unsorted", color: "#6F6F78", hint: "Not placed in a stage yet" };
+export const UNSORTED = { label: "Unsorted", color: "#5B5B63", hint: "Not placed in a stage yet" };
 
 export function statusInfo(status: SongStatus | undefined) {
   return STATUSES.find((s) => s.id === status) ?? { id: undefined, ...UNSORTED };
@@ -51,7 +51,8 @@ export function migrateWorkspace(stored: Workspace | { version?: number }): { wo
 }
 
 // Album cover colors — the dark categorical slots, in fixed order.
-export const ALBUM_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#9085e9", "#e66767"];
+// Release swatches avoid blue (the stage ramp) and the hot orange (actions).
+export const ALBUM_COLORS = ["#c98500", "#199e70", "#d55181", "#9085e9", "#e66767", "#8a9a5b", "#b8742a"];
 
 export const EMPTY_WORKSPACE: Workspace = { version: 2, songs: {}, albums: [], people: [] };
 

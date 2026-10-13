@@ -32,7 +32,7 @@ function MixdownState({ song }: { song: ProjectInfo }) {
       </span>
     );
   }
-  return <span className="text-white/55">No mixdown</span>;
+  return <span className="text-engrave">No mixdown</span>;
 }
 
 function KitState({ song, workspace }: { song: ProjectInfo; workspace: Workspace }) {
@@ -46,12 +46,12 @@ function KitState({ song, workspace }: { song: ProjectInfo; workspace: Workspace
   }
   if (kit?.ai?.review || kit?.ai?.drafts) {
     return (
-      <span className="flex items-center gap-1 text-violet-300/90">
+      <span className="flex items-center gap-1 text-body">
         <Sparkles size={11} /> Kit in progress
       </span>
     );
   }
-  if (kit?.edits && Object.keys(kit.edits).length) return <span className="text-white/50">Kit in progress</span>;
+  if (kit?.edits && Object.keys(kit.edits).length) return <span className="text-engrave">Kit in progress</span>;
   return null;
 }
 
@@ -136,11 +136,11 @@ export function SongPicker({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="group flex min-w-0 max-w-[34rem] items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-left hover:border-white/20 hover:bg-white/[0.07]"
+        className="group flex min-w-0 max-w-[34rem] items-center gap-3 rounded-lg border border-rule bg-panel px-3.5 py-2 text-left hover:border-rule-strong hover:bg-raised"
       >
         <div className="min-w-0 flex-1">
-          <div className="truncate text-base font-semibold text-white">{songLabel(current, songs)}</div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-white/50">
+          <div className="truncate text-base font-semibold text-cream">{songLabel(current, songs)}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-engrave">
             <span className="flex items-center gap-1.5">
               <StatusDot color={status.color} size={7} /> {status.label}
             </span>
@@ -149,15 +149,15 @@ export function SongPicker({
             <MixdownState song={current} />
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1 text-[11px] text-white/58 group-hover:text-white/70">
+        <span className="flex shrink-0 items-center gap-1 text-[11px] text-engrave group-hover:text-body">
           Change song <ChevronDown size={14} className={open ? "rotate-180" : ""} />
         </span>
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-2 flex max-h-[70vh] w-[30rem] flex-col overflow-hidden rounded-xl border border-white/10 bg-[#17171c] shadow-2xl">
-          <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2.5">
-            <Search size={14} className="text-white/55" />
+        <div className="absolute left-0 top-full z-30 mt-2 flex max-h-[70vh] w-[30rem] flex-col overflow-hidden rounded-xl border border-rule bg-panel shadow-2xl">
+          <div className="flex items-center gap-2 border-b border-rule px-3 py-2.5">
+            <Search size={14} className="text-engrave" />
             <input
               ref={searchRef}
               value={query}
@@ -170,17 +170,17 @@ export function SongPicker({
               aria-label="Search songs"
               aria-controls="launch-song-list"
               aria-activedescendant={flat[active] ? `song-opt-${active}` : undefined}
-              className="flex-1 bg-transparent text-sm text-white placeholder:text-white/50 focus:outline-none"
+              className="flex-1 bg-transparent text-sm text-cream placeholder:text-engrave focus:outline-none"
             />
-            <kbd className="rounded border border-white/10 px-1 text-[10px] text-white/50">esc</kbd>
+            <kbd className="rounded border border-rule px-1 text-[10px] text-engrave">esc</kbd>
           </div>
           <div ref={listRef} id="launch-song-list" role="listbox" aria-label="Songs" className="overflow-y-auto py-1">
-            {groups.length === 0 && <div className="px-4 py-6 text-center text-xs text-white/58">No song matches “{query}”.</div>}
+            {groups.length === 0 && <div className="px-4 py-6 text-center text-xs text-engrave">No song matches “{query}”.</div>}
             {groups.map((g) => (
               <div key={g.id} role="group" aria-label={g.label}>
-                <div className="sticky top-0 flex items-baseline gap-2 bg-[#17171c] px-4 pb-1 pt-2.5">
-                  <span className="text-[12px] font-semibold text-white/50">{g.label}</span>
-                  <span className="text-[10px] text-white/62">
+                <div className="sticky top-0 flex items-baseline gap-2 bg-panel px-4 pb-1 pt-2.5">
+                  <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">{g.label}</span>
+                  <span className="text-[10px] text-body">
                     {g.songs.length} · {g.hint}
                   </span>
                 </div>
@@ -198,13 +198,13 @@ export function SongPicker({
                       aria-selected={selected}
                       onMouseEnter={() => setActive(i)}
                       onClick={() => choose(s)}
-                      className={`mx-1.5 cursor-pointer rounded-lg px-3 py-2 ${i === active ? "bg-white/[0.07]" : ""} ${selected ? "ring-1 ring-orange-400/40" : ""}`}
+                      className={`mx-1.5 cursor-pointer rounded-lg px-3 py-2 ${i === active ? "bg-raised" : ""} ${selected ? "ring-1 ring-orange-400/40" : ""}`}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/90">{songLabel(s, songs)}</span>
-                        <span className="shrink-0 text-[11px] text-white/55">saved {formatRelative(s.modifiedAtMs)}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-cream">{songLabel(s, songs)}</span>
+                        <span className="shrink-0 text-[11px] text-engrave">saved {formatRelative(s.modifiedAtMs)}</span>
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-white/50">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-engrave">
                         <span className="flex items-center gap-1.5">
                           <StatusDot color={st.color} size={6} /> {st.label}
                         </span>
@@ -217,7 +217,7 @@ export function SongPicker({
               </div>
             ))}
           </div>
-          <div className="border-t border-white/10 px-4 py-2 text-[10px] text-white/50">↑ ↓ to move · Enter to open · Esc to close</div>
+          <div className="border-t border-rule px-4 py-2 text-[10px] text-engrave">↑ ↓ to move · Enter to open · Esc to close</div>
         </div>
       )}
     </div>

@@ -4,30 +4,29 @@ import { useCrewStore } from "../store/useCrewStore";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
 import { orphanedShares, shareElsewhere, sharedHere } from "../lib/crewSync";
-import { ConfirmButton } from "../ui";
+import { btn, btnPrimary, ConfirmButton, input } from "../ui";
 
-const field =
-  "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-orange-400/50 focus:outline-none";
-const primary = "shrink-0 rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-[#0f0f12] hover:bg-orange-400 disabled:opacity-40";
-const secondary = "shrink-0 rounded-md border border-white/15 px-3 py-2 text-sm text-white/70 hover:bg-white/5 disabled:opacity-40";
+const field = input;
+const primary = `${btnPrimary} shrink-0 justify-center py-2`;
+const secondary = `${btn} shrink-0 justify-center py-2`;
 
 /** Settings → Crew: sign in, create or join a crew, invite, sync. */
 export function CrewPanel() {
   const crew = useCrewStore();
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-white/90">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-cream">
         <Users size={15} /> Crew
       </h2>
-      <p className="mt-1 text-xs text-white/58">
+      <p className="mt-1 text-xs text-engrave">
         Share chosen songs with your crew: everyone sees them on the crew board, the calendar and in "who's on what". Only metadata is shared
         (title, stage, BPM, key, tags, credits, release date), never audio, file paths, samples or notes. Stored in the EU.
       </p>
       <div className="mt-3">
         {!crew.enabled ? (
-          <div className="text-xs text-white/62">Crew sharing isn't set up in this build (no crew server configured).</div>
+          <div className="text-xs text-body">Crew sharing isn't set up in this build (no crew server configured).</div>
         ) : !crew.ready ? (
-          <div className="text-xs text-white/62">Loading…</div>
+          <div className="text-xs text-body">Loading…</div>
         ) : !crew.userId ? (
           <SignIn />
         ) : crew.crews.length === 0 && crew.loadError ? (
@@ -97,8 +96,8 @@ function SignIn() {
           }}
           className="flex flex-col gap-2"
         >
-          <div className="text-xs text-white/55">
-            We sent a 6-digit code to <b className="text-white/80">{sentTo}</b>. It expires in 10 minutes.
+          <div className="text-xs text-engrave">
+            We sent a 6-digit code to <b className="text-cream">{sentTo}</b>. It expires in 10 minutes.
           </div>
           <div className="flex gap-2">
             <input
@@ -114,7 +113,7 @@ function SignIn() {
               {busy ? "Checking…" : "Sign in"}
             </button>
           </div>
-          <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="self-start text-xs text-white/58 hover:text-white">
+          <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="self-start text-xs text-engrave hover:text-cream">
             Use another email
           </button>
         </form>
@@ -146,11 +145,11 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
   return (
     <div className="flex flex-col gap-3">
       {!another && (
-        <div className="text-xs text-white/50">
+        <div className="text-xs text-engrave">
           Signed in as {email}. Join your crew with the invite code someone sent you, or create the crew and invite them.
         </div>
       )}
-      <label className="text-xs text-white/50">
+      <label className="text-xs text-engrave">
         Your name in the crew (your artist name)
         <input
           value={displayName}
@@ -166,9 +165,9 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
             e.preventDefault();
             void run(() => joinCrew(code, displayName)).then(done);
           }}
-          className="flex flex-col gap-2 rounded-md border border-white/10 p-3"
+          className="flex flex-col gap-2 rounded-md border border-rule p-3"
         >
-          <span className="text-xs font-medium text-white/70">Join a crew</span>
+          <span className="text-xs font-medium text-body">Join a crew</span>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
@@ -185,9 +184,9 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
             e.preventDefault();
             void run(() => createCrew(name, displayName)).then(done);
           }}
-          className="flex flex-col gap-2 rounded-md border border-white/10 p-3"
+          className="flex flex-col gap-2 rounded-md border border-rule p-3"
         >
-          <span className="text-xs font-medium text-white/70">Create a crew</span>
+          <span className="text-xs font-medium text-body">Create a crew</span>
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={CREW_NAME_MAX} placeholder="Crew name" aria-label="Crew name" className={field} />
           <button type="submit" disabled={busy || !name.trim() || !displayName.trim()} className={secondary}>
             Create
@@ -196,7 +195,7 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
       </div>
       {error && <div className="text-xs text-red-300">{error}</div>}
       {!another && (
-        <button onClick={() => void signOut()} className="self-start text-xs text-white/58 hover:text-white">
+        <button onClick={() => void signOut()} className="self-start text-xs text-engrave hover:text-cream">
           Sign out
         </button>
       )}
@@ -246,17 +245,17 @@ function CrewHome() {
             ))}
           </select>
         ) : (
-          <span className="text-sm font-medium text-white">{active.name}</span>
+          <span className="text-sm font-medium text-cream">{active.name}</span>
         )}
-        <span className="rounded bg-white/10 px-1.5 py-px text-[10px] text-white/55">{active.role === "owner" ? "Owner" : "Member"}</span>
-        <span className={`ml-auto text-xs ${crew.sync.kind === "error" ? "text-red-300" : "text-white/62"}`}>{syncLine}</span>
-        <button onClick={() => void run(crew.syncNow)} disabled={busy || demoMode} title="Sync now" className="rounded p-1 text-white/62 hover:bg-white/10 hover:text-white disabled:opacity-40">
+        <span className="rounded bg-rule px-1.5 py-px text-[10px] text-engrave">{active.role === "owner" ? "Owner" : "Member"}</span>
+        <span className={`ml-auto text-xs ${crew.sync.kind === "error" ? "text-red-300" : "text-body"}`}>{syncLine}</span>
+        <button onClick={() => void run(crew.syncNow)} disabled={busy || demoMode} title="Sync now" className="rounded p-1 text-body hover:bg-rule hover:text-cream disabled:opacity-40">
           <RefreshCw size={13} className={crew.sync.kind === "syncing" ? "animate-spin" : ""} />
         </button>
       </div>
       {demoMode && <div className="text-xs text-amber-300">Sample data is never shared. Link your real folder to sync.</div>}
-      <div className="text-xs text-white/55">
-        You share <b className="text-white/80">{sharedCount}</b> song{sharedCount === 1 ? "" : "s"}. Share songs from their panel, or select
+      <div className="text-xs text-engrave">
+        You share <b className="text-cream">{sharedCount}</b> song{sharedCount === 1 ? "" : "s"}. Share songs from their panel, or select
         several in the Library.
       </div>
       {orphans.length > 0 && (
@@ -265,42 +264,42 @@ function CrewHome() {
             {orphans.length} shared song{orphans.length === 1 ? " isn't" : "s aren't"} in your library right now (renamed, moved or on an
             unplugged drive), so {orphans.length === 1 ? "its" : "their"} crew card is frozen.
           </span>
-          <button onClick={() => crew.setShared(orphans, false)} className="shrink-0 underline hover:text-white">
+          <button onClick={() => crew.setShared(orphans, false)} className="shrink-0 underline hover:text-cream">
             Stop sharing {orphans.length === 1 ? "it" : "them"}
           </button>
         </div>
       )}
       <div>
-        <div className="mb-1 text-[12px] font-semibold text-white/55">Members · {crew.members.length}</div>
+        <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">Members · {crew.members.length}</div>
         <div className="flex flex-wrap gap-1.5">
           {crew.members.map((m) => (
-            <span key={m.user_id} className="flex items-center rounded-full bg-white/[0.06] px-2.5 py-1 text-xs text-white/75">
+            <span key={m.user_id} className="flex items-center rounded-full bg-raised px-2.5 py-1 text-xs text-body">
               {m.display_name}
-              {m.role === "owner" && <span className="ml-1 text-white/55">· owner</span>}
-              {m.user_id === crew.userId && <span className="ml-1 text-white/55">· you</span>}
+              {m.role === "owner" && <span className="ml-1 text-engrave">· owner</span>}
+              {m.user_id === crew.userId && <span className="ml-1 text-engrave">· you</span>}
               {isOwner && m.user_id !== crew.userId && (
                 <ConfirmButton
                   label="Remove"
                   confirmLabel={`Remove ${m.display_name}?`}
                   onConfirm={() => void run(() => crew.removeMember(m.user_id))}
                   disabled={busy}
-                  className="ml-2 rounded-full border border-transparent px-1.5 text-[11px] text-white/45 hover:text-white disabled:opacity-40"
+                  className="ml-2 rounded-full border border-transparent px-1.5 text-[11px] text-engrave hover:text-cream disabled:opacity-40"
                 />
               )}
             </span>
           ))}
         </div>
         {isOwner && crew.members.length > 1 && (
-          <div className="mt-1 text-[11px] text-white/45">Removing someone takes their shared songs off the crew board.</div>
+          <div className="mt-1 text-[11px] text-engrave">Removing someone takes their shared songs off the crew board.</div>
         )}
       </div>
       {isOwner && crew.invites.length > 0 && (
         <div>
-          <div className="mb-1 text-[12px] font-semibold text-white/55">Open invite codes · {crew.invites.length}</div>
+          <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">Open invite codes · {crew.invites.length}</div>
           <div className="flex flex-col gap-1">
             {crew.invites.map((i) => (
-              <div key={i.code} className="flex items-center gap-3 text-xs text-white/62">
-                <code className="font-mono tracking-widest text-white/85">{i.code}</code>
+              <div key={i.code} className="flex items-center gap-3 text-xs text-body">
+                <code className="font-mono tracking-widest text-cream">{i.code}</code>
                 <span>
                   {i.uses}/{i.max_uses} used
                 </span>
@@ -310,7 +309,7 @@ function CrewHome() {
                   confirmLabel="Revoke code?"
                   onConfirm={() => void run(() => crew.revokeInvite(i.code))}
                   disabled={busy}
-                  className="ml-auto rounded border border-transparent px-1.5 py-0.5 text-white/50 hover:text-white disabled:opacity-40"
+                  className="ml-auto rounded border border-transparent px-1.5 py-0.5 text-engrave hover:text-cream disabled:opacity-40"
                 />
               </div>
             ))}
@@ -324,24 +323,24 @@ function CrewHome() {
           </button>
           {crew.invite && (
             <>
-              <code className="rounded bg-white/10 px-2 py-1.5 font-mono text-sm tracking-widest text-white">{crew.invite}</code>
+              <code className="rounded bg-rule px-2 py-1.5 font-mono text-sm tracking-widest text-cream">{crew.invite}</code>
               <button
                 onClick={() => void navigator.clipboard?.writeText(crew.invite!).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1200)))}
-                className="flex items-center gap-1 text-xs text-white/50 hover:text-white"
+                className="flex items-center gap-1 text-xs text-engrave hover:text-cream"
               >
                 {copied ? <Check size={12} /> : <ClipboardCopy size={12} />} {copied ? "Copied" : "Copy"}
               </button>
-              <span className="text-[11px] text-white/55">Valid 7 days, up to 10 people.</span>
+              <span className="text-[11px] text-engrave">Valid 7 days, up to 10 people.</span>
             </>
           )}
         </div>
       )}
       {error && <div className="text-xs text-red-300">{error}</div>}
       {adding ? (
-        <div className="rounded-md border border-white/10 p-3">
-          <div className="mb-2 flex items-center text-xs font-medium text-white/70">
+        <div className="rounded-md border border-rule p-3">
+          <div className="mb-2 flex items-center text-xs font-medium text-body">
             Join or create another crew
-            <button onClick={() => setAdding(false)} className="ml-auto text-white/50 hover:text-white">
+            <button onClick={() => setAdding(false)} className="ml-auto text-engrave hover:text-cream">
               Cancel
             </button>
           </div>
@@ -352,12 +351,12 @@ function CrewHome() {
           onClick={() => setAdding(true)}
           disabled={crew.crews.length >= MAX_CREWS}
           title={crew.crews.length >= MAX_CREWS ? "You're in 10 crews, the most allowed. Leave one first." : undefined}
-          className="self-start text-xs text-white/58 hover:text-white disabled:opacity-40"
+          className="self-start text-xs text-engrave hover:text-cream disabled:opacity-40"
         >
           + Join or create another crew
         </button>
       )}
-      <div className="flex gap-3 text-xs text-white/58">
+      <div className="flex gap-3 text-xs text-engrave">
         <span>{crew.email}</span>
         <button
           onClick={() => {
@@ -370,11 +369,11 @@ function CrewHome() {
                   : "";
             if (window.confirm(`Leave ${active.name}? Your shared songs leave the crew board with you.${note}`)) void run(crew.leaveCrew);
           }}
-          className="hover:text-white"
+          className="hover:text-cream"
         >
           Leave crew
         </button>
-        <button onClick={() => void crew.signOut()} className="flex items-center gap-1 hover:text-white">
+        <button onClick={() => void crew.signOut()} className="flex items-center gap-1 hover:text-cream">
           <LogOut size={11} /> Sign out
         </button>
       </div>
@@ -412,16 +411,16 @@ export function ShareToggle({ path }: { path: string }) {
   if (elsewhere && (elsewhere.shared || !elsewhere.mine)) {
     const other = crews.find((c) => c.id === elsewhere.crewId)?.name;
     return (
-      <div className="mt-3 flex flex-col gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-xs">
+      <div className="mt-3 flex flex-col gap-1.5 rounded-md border border-rule bg-panel px-3 py-2 text-xs">
         <div className="flex items-center gap-2">
-          <Users size={13} className="text-white/62" />
-          <span className="flex-1 text-white/75">
+          <Users size={13} className="text-body" />
+          <span className="flex-1 text-body">
             {!elsewhere.mine ? (
               "Shared from another account on this computer. Sign in with it to change this."
             ) : (
               <>
-                Shared with <b className="font-medium text-white/90">{other ?? "a crew you're no longer in"}</b>. Move it to{" "}
-                <b className="font-medium text-white/90">{crewName}</b>?
+                Shared with <b className="font-medium text-cream">{other ?? "a crew you're no longer in"}</b>. Move it to{" "}
+                <b className="font-medium text-cream">{crewName}</b>?
               </>
             )}
           </span>
@@ -431,7 +430,7 @@ export function ShareToggle({ path }: { path: string }) {
               confirmLabel={other ? `Take it off ${other}?` : "Move it?"}
               onConfirm={() => void run(() => moveShares([path]))}
               disabled={busy}
-              className="shrink-0 rounded border border-white/15 px-2 py-1 text-white/70 hover:bg-white/5 disabled:opacity-40"
+              className="shrink-0 rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised disabled:opacity-40"
             />
           )}
         </div>
@@ -440,7 +439,7 @@ export function ShareToggle({ path }: { path: string }) {
     );
   }
   return (
-    <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-xs">
+    <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-rule bg-panel px-3 py-2 text-xs">
       <input
         type="checkbox"
         checked={shared}
@@ -449,13 +448,13 @@ export function ShareToggle({ path }: { path: string }) {
           // Still waiting to be removed from another crew: finish that removal now, then share here.
           e.target.checked && elsewhere ? void run(() => moveShares([path])) : setShared([path], e.target.checked)
         }
-        className="accent-orange-500"
+        className="accent-[#ff5a1f]"
       />
-      <Users size={13} className="text-white/62" />
-      <span className="flex-1 text-white/75">
-        Share with <b className="font-medium text-white/90">{crewName}</b>
+      <Users size={13} className="text-body" />
+      <span className="flex-1 text-body">
+        Share with <b className="font-medium text-cream">{crewName}</b>
       </span>
-      <span className={error ? "text-red-300" : "text-white/55"}>{error ?? (shared ? "On the crew board" : "Only you see it")}</span>
+      <span className={error ? "text-red-300" : "text-engrave"}>{error ?? (shared ? "On the crew board" : "Only you see it")}</span>
     </label>
   );
 }

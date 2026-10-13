@@ -1,0 +1,57 @@
+/* Shared by the desktop app (src/index.css) and the web dashboard
+   (web/src/index.css). Tokens only: no package imports. */
+
+/* System 02, "built like a rack unit" (Claude Design project fl-Manager,
+   templates/redesign): solid warm greys, engraved mono labels, LED status,
+   one hot orange. Condensed caps for titles and buttons, Plex for the rest. */
+@theme {
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Surfaces and ink */
+  --color-chassis: #0d0d0c;
+  --color-panel: #161614;
+  --color-raised: #1f1f1c;
+  --color-rule: #2c2b27;
+  --color-rule-strong: #3d3c37;
+  --color-cream: #f2efe8;
+  --color-body: #c9c5bb;
+  --color-engrave: #8d897f;
+
+  /* Signal: the accent and the LEDs */
+  --color-hot: #ff5a1f;
+  --color-hot-hover: #ff7a47;
+  --color-ok: #3ddc84;
+  --color-warn: #ffc233;
+  --color-missing: #ff4040;
+
+  /* Existing accent classes follow the signal colors. */
+  --color-orange-200: #ffc2a8;
+  --color-orange-300: #ff9b73;
+  --color-orange-400: #ff7a47;
+  --color-orange-500: #ff5a1f;
+  --color-emerald-200: #b4f2cf;
+  --color-emerald-300: #74e6a6;
+  --color-emerald-400: #3ddc84;
+  --color-emerald-500: #3ddc84;
+  --color-amber-200: #ffe199;
+  --color-amber-300: #ffd166;
+  --color-amber-400: #ffc233;
+  --color-amber-500: #ffc233;
+  --color-red-200: #ffb3b3;
+  --color-red-300: #ff8080;
+  --color-red-400: #ff5c5c;
+  --color-red-500: #ff4040;
+  --color-sky-300: #86b6ef;
+  --color-sky-400: #5598e7;
+  --color-sky-500: #5598e7;
+
+  /* 4px corners everywhere (pills and dots stay round). */
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+
+  --shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}

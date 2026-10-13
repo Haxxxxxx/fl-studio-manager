@@ -42,7 +42,7 @@ function AlbumGrid() {
       <div className="mx-auto max-w-5xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-white">Albums & releases</h1>
+            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">Albums & releases</h1>
           </div>
           {draft === null && (
             <button onClick={() => setDraft("")} className={btnPrimary}>
@@ -72,7 +72,7 @@ function AlbumGrid() {
         )}
 
         {workspace.albums.length === 0 && draft === null ? (
-          <div className="mt-16 flex flex-col items-center gap-2 text-center text-white/55">
+          <div className="mt-16 flex flex-col items-center gap-2 text-center text-engrave">
             <Disc3 size={32} />
             <div className="text-sm">No releases yet. Create one and add songs from your library.</div>
           </div>
@@ -102,13 +102,13 @@ function AlbumCard({
   const tracks = tracksOf(album, projects);
   const done = album.trackPaths.filter((p) => isFinished(workspace.songs[p]?.status)).length;
   return (
-    <button onClick={onOpen} className="group rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left hover:border-white/20">
+    <button onClick={onOpen} className="group rounded-xl border border-rule bg-panel p-3 text-left hover:border-rule-strong">
       <Cover album={album} />
       <div className="mt-3 flex items-baseline justify-between gap-2">
-        <div className="truncate font-medium text-white/90">{album.title}</div>
-        <div className="shrink-0 text-[11px]  text-white/55">{kindLabel(album.kind)}</div>
+        <div className="truncate font-medium text-cream">{album.title}</div>
+        <div className="shrink-0 text-[11px]  text-engrave">{kindLabel(album.kind)}</div>
       </div>
-      <div className="mt-0.5 text-xs text-white/58">
+      <div className="mt-0.5 text-xs text-engrave">
         {tracks.length} track{tracks.length === 1 ? "" : "s"} · {done} done
         {album.releaseDate && ` · ${formatRelative(new Date(album.releaseDate).getTime())}`}
       </div>
@@ -128,9 +128,9 @@ function Cover({ album, size = "w-full" }: { album: Album; size?: string }) {
   return (
     <div
       className={`${size} flex aspect-square items-end rounded-lg p-3`}
-      style={{ background: `linear-gradient(135deg, ${album.color} 0%, ${album.color}55 55%, #16161b 100%)` }}
+      style={{ background: `linear-gradient(135deg, ${album.color} 0%, ${album.color}55 55%, #161614 100%)` }}
     >
-      <span className="text-3xl font-bold tracking-tight text-white/90">{initials}</span>
+      <span className="text-3xl font-bold tracking-tight text-cream">{initials}</span>
     </div>
   );
 }
@@ -140,7 +140,7 @@ export function ProgressBar({ trackPaths, workspace, height = 10 }: { trackPaths
   const segments = [{ id: undefined, ...UNSORTED }, ...STATUSES]
     .map((s) => ({ ...s, count: trackPaths.filter((p) => workspace.songs[p]?.status === s.id).length }))
     .filter((s) => s.count > 0);
-  if (trackPaths.length === 0) return <div className="rounded-full bg-white/5" style={{ height }} />;
+  if (trackPaths.length === 0) return <div className="rounded-full bg-raised" style={{ height }} />;
   return (
     <div className="flex gap-[2px]" style={{ height }}>
       {segments.map((s, i) => (
@@ -199,7 +199,7 @@ function AlbumDetail({ album }: { album: Album }) {
   return (
     <div className="min-w-0 flex-1 overflow-auto px-8 py-6">
       <div className="mx-auto max-w-4xl">
-        <button onClick={() => openAlbum(null)} className="flex items-center gap-1 text-xs text-white/58 hover:text-white/80">
+        <button onClick={() => openAlbum(null)} className="flex items-center gap-1 text-xs text-engrave hover:text-cream">
           <ArrowLeft size={13} /> All releases
         </button>
 
@@ -211,7 +211,7 @@ function AlbumDetail({ album }: { album: Album }) {
                 <button
                   key={c}
                   onClick={() => updateAlbum(album.id, { color: c })}
-                  className={`h-5 w-5 rounded-full ${album.color === c ? "ring-2 ring-white/70 ring-offset-2 ring-offset-[#0f0f12]" : ""}`}
+                  className={`h-5 w-5 rounded-full ${album.color === c ? "ring-2 ring-cream ring-offset-2 ring-offset-chassis" : ""}`}
                   style={{ background: c }}
                   aria-label={`Cover color ${c}`}
                 />
@@ -224,10 +224,10 @@ function AlbumDetail({ album }: { album: Album }) {
               <select
                 value={album.kind}
                 onChange={(e) => updateAlbum(album.id, { kind: e.target.value as AlbumKind })}
-                className="rounded border border-white/10 bg-transparent px-1.5 py-0.5 text-[12px] font-semibold text-white/50"
+                className="rounded border border-rule bg-transparent px-1.5 py-0.5 text-[12px] font-semibold text-engrave"
               >
                 {KINDS.map((k) => (
-                  <option key={k.id} value={k.id} className="bg-[#18181d]">
+                  <option key={k.id} value={k.id} className="bg-raised">
                     {k.label}
                   </option>
                 ))}
@@ -236,20 +236,20 @@ function AlbumDetail({ album }: { album: Album }) {
             <input
               value={album.title}
               onChange={(e) => updateAlbum(album.id, { title: e.target.value })}
-              className="mt-1 w-full bg-transparent text-2xl font-semibold text-white focus:outline-none"
+              className="mt-1 w-full bg-transparent text-2xl font-semibold text-cream focus:outline-none"
             />
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/50">
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-engrave">
               <label className="flex items-center gap-1.5">
-                <span className="text-white/58">Release date</span>
+                <span className="text-engrave">Release date</span>
                 <input
                   type="date"
                   value={album.releaseDate ?? ""}
                   onChange={(e) => updateAlbum(album.id, { releaseDate: e.target.value || null })}
-                  className="bg-transparent text-white/70 focus:outline-none"
+                  className="bg-transparent text-body focus:outline-none"
                 />
               </label>
               {releaseMs && (
-                <span className={releaseMs < Date.now() ? "text-white/58" : "text-orange-300"}>
+                <span className={releaseMs < Date.now() ? "text-engrave" : "text-orange-300"}>
                   {releaseMs < Date.now() ? "released" : "release"} {formatRelative(releaseMs)}
                 </span>
               )}
@@ -267,7 +267,7 @@ function AlbumDetail({ album }: { album: Album }) {
 
             <div className="mt-4">
               <ProgressBar trackPaths={album.trackPaths} workspace={workspace} />
-              <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-white/62">
+              <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-body">
                 {[{ id: undefined, ...UNSORTED }, ...STATUSES].map((s) => {
                   const n = album.trackPaths.filter((p) => workspace.songs[p]?.status === s.id).length;
                   return n ? (
@@ -316,45 +316,45 @@ function AlbumDetail({ album }: { album: Album }) {
           <div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>
         )}
 
-        <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
+        <div className="mt-3 overflow-hidden rounded-lg border border-rule">
           {tracks.length === 0 && (
-            <div className="px-4 py-8 text-center text-sm text-white/55">No tracks yet — add songs from your library.</div>
+            <div className="px-4 py-8 text-center text-sm text-engrave">No tracks yet — add songs from your library.</div>
           )}
           {tracks.map((t, i) => {
             const path = album.trackPaths[i];
             return (
-              <div key={path} className="group flex items-center gap-3 border-b border-white/5 px-3 py-2 text-sm last:border-0 hover:bg-white/[0.03]">
-                <span className="w-6 text-right tabular-nums text-white/50">{i + 1}</span>
+              <div key={path} className="group flex items-center gap-3 border-b border-rule px-3 py-2 text-sm last:border-0 hover:bg-panel">
+                <span className="w-6 text-right tabular-nums text-engrave">{i + 1}</span>
                 <div className="flex flex-col opacity-0 group-hover:opacity-100">
-                  <button onClick={() => moveTrack(album.id, i, i - 1)} disabled={i === 0} className="text-white/58 hover:text-white disabled:opacity-20">
+                  <button onClick={() => moveTrack(album.id, i, i - 1)} disabled={i === 0} className="text-engrave hover:text-cream disabled:opacity-20">
                     <ArrowUp size={11} />
                   </button>
                   <button
                     onClick={() => moveTrack(album.id, i, i + 1)}
                     disabled={i === tracks.length - 1}
-                    className="text-white/58 hover:text-white disabled:opacity-20"
+                    className="text-engrave hover:text-cream disabled:opacity-20"
                   >
                     <ArrowDown size={11} />
                   </button>
                 </div>
                 {t ? (
                   <>
-                    <button onClick={() => openDetail(t.path)} className="min-w-0 flex-1 truncate text-left font-medium text-white/90 hover:underline">
+                    <button onClick={() => openDetail(t.path)} className="min-w-0 flex-1 truncate text-left font-medium text-cream hover:underline">
                       {t.name}
                     </button>
                     <StatusSelect compact value={workspace.songs[t.path]?.status} onChange={(status) => updateSong(t.path, { status })} />
-                    <span className="w-10 text-right text-xs text-white/55">{workspace.songs[t.path]?.key ?? "—"}</span>
-                    <span className="w-14 text-right tabular-nums text-xs text-white/62">{formatBpm(t.tempoBpm)}</span>
+                    <span className="w-10 text-right text-xs text-engrave">{workspace.songs[t.path]?.key ?? "—"}</span>
+                    <span className="w-14 text-right tabular-nums text-xs text-body">{formatBpm(t.tempoBpm)}</span>
                     <span className="w-20">
                       <MixdownBadge project={t} />
                     </span>
                   </>
                 ) : (
-                  <span className="flex-1 truncate text-white/55" title={path}>
+                  <span className="flex-1 truncate text-engrave" title={path}>
                     Missing: {path.split(/[/\\]/).pop()} (moved or renamed?)
                   </span>
                 )}
-                <button onClick={() => removeTrack(album.id, path)} title="Remove from release" className="text-white/62 opacity-0 hover:text-white group-hover:opacity-100">
+                <button onClick={() => removeTrack(album.id, path)} title="Remove from release" className="text-body opacity-0 hover:text-cream group-hover:opacity-100">
                   <X size={14} />
                 </button>
               </div>
@@ -371,7 +371,7 @@ function AlbumDetail({ album }: { album: Album }) {
           className={`${input} mt-2 resize-y text-sm`}
         />
 
-        <div className="mt-8 border-t border-white/5 pt-4">
+        <div className="mt-8 border-t border-rule pt-4">
           <ConfirmButton
             label={
               <>
@@ -407,7 +407,7 @@ function TrackPicker({ album, onClose }: { album: Album; onClose: () => void }) 
   return (
     <Modal title={`Add songs to ${album.title}`} onClose={onClose}>
       <div className="relative">
-        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
+        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-engrave" />
         <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search songs" className={`${input} pl-8`} />
       </div>
       <div className="mt-3 max-h-80 overflow-auto">
@@ -415,21 +415,21 @@ function TrackPicker({ album, onClose }: { album: Album; onClose: () => void }) 
           const on = picked.includes(p.path);
           const status = statusInfo(workspace.songs[p.path]?.status);
           return (
-            <label key={p.path} className={`flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-sm ${on ? "bg-orange-500/10" : "hover:bg-white/5"}`}>
+            <label key={p.path} className={`flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-sm ${on ? "bg-orange-500/10" : "hover:bg-raised"}`}>
               <input
                 type="checkbox"
                 checked={on}
                 onChange={() => setPicked(on ? picked.filter((x) => x !== p.path) : [...picked, p.path])}
                 className="accent-orange-500"
               />
-              <span className="flex-1 truncate text-white/85">{p.name}</span>
-              <span className="flex items-center gap-1 text-[11px] text-white/58">
+              <span className="flex-1 truncate text-cream">{p.name}</span>
+              <span className="flex items-center gap-1 text-[11px] text-engrave">
                 <StatusDot color={status.color} size={6} /> {status.label}
               </span>
             </label>
           );
         })}
-        {candidates.length === 0 && <div className="py-6 text-center text-sm text-white/55">Nothing to add</div>}
+        {candidates.length === 0 && <div className="py-6 text-center text-sm text-engrave">Nothing to add</div>}
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button onClick={onClose} className={btn}>

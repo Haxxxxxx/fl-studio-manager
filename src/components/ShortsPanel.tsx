@@ -95,16 +95,16 @@ export function ShortsPanel({
   }
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold text-white/58">
+    <div className="rounded-lg border border-rule bg-panel p-4">
+      <div className="mb-3 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">
         <Clapperboard size={13} /> Shorts for Reels, TikTok and YouTube Shorts
       </div>
       <div className="flex gap-4">
         <div className="shrink-0">
-          <img src={preview} alt="9:16 layout preview" className="h-[284px] w-[160px] rounded-md border border-white/10 object-cover" />
-          <div className="mt-1 text-center text-[10px] text-white/55">The waveform animates in the dark band</div>
+          <img src={preview} alt="9:16 layout preview" className="h-[284px] w-[160px] rounded-md border border-rule object-cover" />
+          <div className="mt-1 text-center text-[10px] text-engrave">The waveform animates in the dark band</div>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5 text-xs text-white/60">
+        <div className="flex min-w-0 flex-1 flex-col gap-2.5 text-xs text-body">
           <p>
             One 1080×1920 MP4 per snippet ({snippets.map((s) => s.label).join(", ") || "none yet"}) with your real audio, made on this computer.
             Free, no upload.
@@ -116,7 +116,7 @@ export function ShortsPanel({
               <div className="flex items-center gap-1.5 font-medium">
                 <AlertTriangle size={12} /> {status.error ?? "ffmpeg not found"}
               </div>
-              <div className="mt-1 text-white/55">
+              <div className="mt-1 text-engrave">
                 Install it once (free): <code className="rounded bg-black/30 px-1">brew install ffmpeg</code> on Mac,{" "}
                 <code className="rounded bg-black/30 px-1">winget install Gyan.FFmpeg</code> on Windows. Then restart the app, or{" "}
                 <button onClick={() => setView("settings")} className="underline">
@@ -126,7 +126,7 @@ export function ShortsPanel({
               </div>
             </div>
           ) : (
-            <div className="text-white/58">Looking for ffmpeg…</div>
+            <div className="text-engrave">Looking for ffmpeg…</div>
           )}
           <div>
             <button onClick={render} disabled={!!blocker || state.kind === "running"} title={blocker?.message} className={btnPrimary}>
@@ -148,12 +148,12 @@ export function ShortsPanel({
         </div>
       </div>
       {state.kind === "done" && (
-        <div className="mt-4 flex flex-wrap gap-3 border-t border-white/5 pt-3">
+        <div className="mt-4 flex flex-wrap gap-3 border-t border-rule pt-3">
           {state.results.map((r) =>
             r.path ? (
               <div key={r.label} className="flex flex-col items-center gap-1">
                 <video src={api.audioSrc(r.path)} controls preload="metadata" className="h-[256px] w-[144px] rounded-md bg-black" />
-                <span className="text-[11px] text-white/60">{r.label}</span>
+                <span className="text-[11px] text-body">{r.label}</span>
               </div>
             ) : (
               <div key={r.label} className="max-w-[200px] text-[11px] text-red-300">
