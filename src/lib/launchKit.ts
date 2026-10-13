@@ -593,7 +593,7 @@ export function kitSnippets(analysis: AudioAnalysis | null, meta: SongMeta): Sni
 const csvCell = (s: string) => `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
 
 /** The text files of an exported kit. */
-export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]): { name: string; content: string }[] {
+export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[], lang: KitLang = "en", masterExt: string | null = "wav"): { name: string; content: string }[] {
   const get = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
   const meta = METADATA_FIELDS.concat("releaseDate", DISTRIBUTION_FIELDS);
   const aiFlags: Check[] = fields.flatMap((f) =>
@@ -608,7 +608,13 @@ export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]
     openChecks: open.map((c) => `${c.level}: ${c.message}`),
     generatedAt: new Date().toISOString(),
   };
+  const guide = kitGuide(lang, {
+    title: get("title"),
+    master: masterExt ? `${masterBaseName(fields, get("title"))}.${masterExt}` : null,
+    snippets: snippets.map((s) => s.label),
+  });
   return [
+    { name: "README.md", content: kitReadme(guide, lang) },
     { name: "metadata.json", content: JSON.stringify(json, null, 2) },
     {
       name: "metadata.csv",
@@ -708,4 +714,123 @@ export function demoAnalysis(project: ProjectInfo): AudioAnalysis {
       { label: "Alt 15s", startSec: loudest(15, [hook / windowSec, (hook + 15) / windowSec]), lengthSec: 15 },
     ],
   };
+}
+
+// ---- What's in an exported kit (README.md + the popup after export) ----
+
+export type KitLang = "en" | "fr";
+
+export interface KitGuideItem {
+  /** File or folder in the kit. */
+  file: string;
+  /** What it is. */
+  what: string;
+  /** What to do with it. */
+  todo: string;
+}
+
+export interface KitGuide {
+  title: string;
+  intro: string;
+  items: KitGuideItem[];
+  /** The order to do things in. */
+  steps: string[];
+}
+
+/** One text for the README and the popup, in the kit's language. Shorts and
+ * the cover concept are listed too: they land in the same folder when made. */
+export function kitGuide(lang: KitLang, { title, master, snippets }: { title: string; master: string | null; snippets: string[] }): KitGuide {
+  const fr = lang === "fr";
+  const clips = snippets.length ? snippets.join(", ") : fr ? "aucun extrait" : "no snippets";
+  const items: KitGuideItem[] = [
+    {
+      file: "distributor-sheet.md",
+      what: fr ? "Toutes les infos de la sortie, dans l'ordre du formulaire du distributeur." : "Every release detail, in the order distributors ask for them.",
+      todo: fr
+        ? "Copie chaque ligne dans DistroKid, TuneCore, Amuse… pendant l'upload."
+        : "Copy each line into DistroKid, TuneCore, Amuse… while you upload.",
+    },
+    ...(master
+      ? [
+          {
+            file: master,
+            what: fr ? "Le mixdown final à envoyer." : "The final mixdown to upload.",
+            todo: fr ? "C'est le fichier audio à donner au distributeur." : "This is the audio file you give the distributor.",
+          },
+        ]
+      : []),
+    {
+      file: "snippets/",
+      what: fr ? `Extraits pour les réseaux (${clips}).` : `Clips for socials (${clips}).`,
+      todo: fr
+        ? "Poste-les en reels, stories et TikTok avant la sortie (le teaser d'abord, le hook ensuite)."
+        : "Post them as reels, stories and TikToks before release (the teaser first, then the hook).",
+    },
+    {
+      file: "shorts/",
+      what: fr ? "Vidéos 9:16 prêtes à poster, si tu les as rendues." : "Ready-to-post 9:16 videos, if you rendered them.",
+      todo: fr ? "Publie-les telles quelles sur Reels, Shorts et TikTok." : "Post them as they are on Reels, Shorts and TikTok.",
+    },
+    {
+      file: "captions.md",
+      what: fr ? "Les textes des posts : annonce, teaser, jour de sortie." : "Post texts: announcement, teaser, release day.",
+      todo: fr ? "Colle chaque texte sous le post qui va avec, au bon moment." : "Paste each one under the matching post, at the right time.",
+    },
+    {
+      file: "cover-brief.md",
+      what: fr ? "La direction artistique de la cover." : "Art direction for the cover.",
+      todo: fr ? "Donne-la au graphiste (avec cover-concept.jpg si tu en as choisi un)." : "Give it to the designer (with cover-concept.jpg if you picked one).",
+    },
+    {
+      file: "checklist.md",
+      what: fr ? "Ce qui reste à vérifier avant l'upload." : "What's still open before you upload.",
+      todo: fr ? "Coche tout avant d'envoyer la sortie." : "Tick everything off before you send the release.",
+    },
+    {
+      file: "metadata.json / metadata.csv",
+      what: fr ? "Les mêmes infos pour un tableur ou un autre outil." : "The same details for a spreadsheet or another tool.",
+      todo: fr ? "Optionnel : importe-les si ton outil le permet." : "Optional: import them if your tool can.",
+    },
+  ];
+  return {
+    title: fr ? `Kit de sortie : ${title}` : `Launch kit: ${title}`,
+    intro: fr ? "Tout ce qu'il faut pour sortir ce son. Voici ce que contient le dossier et quoi en faire." : "Everything you need to release this song. Here's what's in the folder and what to do with it.",
+    items,
+    steps: fr
+      ? [
+          "Vérifie checklist.md.",
+          "Upload le mixdown chez ton distributeur avec distributor-sheet.md (vise 3 à 4 semaines avant la sortie pour les playlists).",
+          "Fais la cover à partir de cover-brief.md.",
+          "Avant la sortie : poste le teaser et les extraits avec les textes de captions.md.",
+          "Le jour J : poste le texte « jour de sortie ».",
+        ]
+      : [
+          "Check checklist.md.",
+          "Upload the mixdown to your distributor using distributor-sheet.md (aim for 3-4 weeks before release, for playlist pitching).",
+          "Get the cover made from cover-brief.md.",
+          "Before release: post the teaser and snippets with the texts from captions.md.",
+          "On release day: post the release-day text.",
+        ],
+  };
+}
+
+/** README.md for the kit folder. */
+export function kitReadme(guide: KitGuide, lang: KitLang): string {
+  const fr = lang === "fr";
+  return [
+    `# ${guide.title}`,
+    "",
+    guide.intro,
+    "",
+    fr ? "## Dans ce dossier" : "## In this folder",
+    "",
+    ...guide.items.map((i) => `- **${i.file}**: ${i.what} ${i.todo}`),
+    "",
+    fr ? "## Dans l'ordre" : "## In order",
+    "",
+    ...guide.steps.map((s, n) => `${n + 1}. ${s}`),
+    "",
+    fr ? "_Généré par Hivo._" : "_Made with Hivo._",
+    "",
+  ].join("\n");
 }
