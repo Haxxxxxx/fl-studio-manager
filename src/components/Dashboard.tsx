@@ -8,7 +8,6 @@ import {
   FolderSearch,
   Music2,
   PlayCircle,
-  Plus,
   Sparkles,
   Trophy,
 } from "lucide-react";
@@ -59,7 +58,6 @@ function MyDashboard() {
   const setView = useAppStore((s) => s.setView);
   const openDetail = useAppStore((s) => s.openDetail);
   const openAlbum = useAppStore((s) => s.openAlbum);
-  const openNewProject = useAppStore((s) => s.openNewProject);
   const setStatusFilter = useAppStore((s) => s.setStatusFilter);
   const watchedFolders = useAppStore((s) => s.settings.watchedFolders);
   const scanning = useAppStore((s) => s.scanning);
@@ -125,13 +123,13 @@ function MyDashboard() {
     if (!demoMode && watchedFolders.length === 0) return <EmptyLibrary />;
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/30">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/50">
           <FolderSearch size={28} />
         </div>
         <div className="text-base font-medium text-white/80">{scanning ? "Scanning your projects…" : "No songs found yet"}</div>
         {!scanning && (
           <>
-            <div className="max-w-sm text-sm text-white/40">
+            <div className="max-w-sm text-sm text-white/58">
               No projects in your linked folders. Check the folders in Settings, or load sample data to look around.
             </div>
             <div className="mt-2 flex gap-2">
@@ -167,14 +165,7 @@ function MyDashboard() {
           <StatTile icon={<Disc3 size={15} />} label="Releases" value={workspace.albums.length} />
         </div>
 
-        <Card
-          title="Pick up where you left off"
-          action={
-            <button onClick={() => openNewProject()} className="flex items-center gap-1 text-xs text-white/50 hover:text-white">
-              <Plus size={13} /> New song
-            </button>
-          }
-        >
+        <Card title="Pick up where you left off">
           <div className="grid grid-cols-4 gap-2">
             {continueWith.map((p) => {
               const s = statusInfo(statusOf(p.path));
@@ -185,10 +176,10 @@ function MyDashboard() {
                   className="group cursor-pointer rounded-lg border border-white/5 bg-[#18181d] p-3 hover:border-white/15"
                 >
                   <div className="truncate text-sm font-medium text-white/90">{p.name}</div>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/45">
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/62">
                     <StatusDot color={s.color} size={6} /> {s.label}
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-white/35">
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-white/55">
                     <span>{formatRelative(p.modifiedAtMs)}</span>
                     {!demoMode && (
                       <button
@@ -196,7 +187,7 @@ function MyDashboard() {
                           e.stopPropagation();
                           openInFlStudio(p.path).catch((err) => console.error("couldn't open the project", err));
                         }}
-                        className="flex items-center gap-1 text-white/40 opacity-0 hover:text-orange-300 group-hover:opacity-100"
+                        className="flex items-center gap-1 text-white/58 opacity-0 hover:text-orange-300 group-hover:opacity-100"
                       >
                         <PlayCircle size={13} /> Open
                       </button>
@@ -243,7 +234,7 @@ function MyDashboard() {
               })}
             </div>
             {pipeline[0].count === songs.length && (
-              <div className="mt-3 text-xs text-white/40">
+              <div className="mt-3 text-xs text-white/58">
                 Nothing triaged yet — open the Pipeline board and drag songs into stages.
               </div>
             )}
@@ -261,7 +252,7 @@ function MyDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="py-10 text-center text-xs text-white/35">No tempo data</div>
+              <div className="py-10 text-center text-xs text-white/55">No tempo data</div>
             )}
           </Card>
         </div>
@@ -308,12 +299,12 @@ function MyDashboard() {
               items={outdated}
             />
             <AttentionList
-              icon={<Disc3 size={13} className="text-white/40" />}
+              icon={<Disc3 size={13} className="text-white/58" />}
               title={`${doneNoMix.length} finished song${doneNoMix.length === 1 ? "" : "s"} without a mixdown`}
               items={doneNoMix}
             />
             {outdated.length === 0 && doneNoMix.length === 0 && (
-              <div className="text-xs text-white/35">All mixdowns are current.</div>
+              <div className="text-xs text-white/55">All mixdowns are current.</div>
             )}
           </Card>
         </div>
@@ -330,7 +321,7 @@ function MyDashboard() {
                     <span className="h-8 w-8 shrink-0 rounded" style={{ background: a.color }} />
                     <span className="w-40 shrink-0">
                       <span className="block truncate text-sm text-white/85">{a.title}</span>
-                      <span className="block text-[11px] text-white/40">
+                      <span className="block text-[11px] text-white/58">
                         {done}/{a.trackPaths.length} done
                         {a.releaseDate && ` · ${formatRelative(new Date(a.releaseDate).getTime())}`}
                       </span>
@@ -366,7 +357,7 @@ function MyDashboard() {
               {songLabel(p, songs)}
             </button>
           ))}
-          {items.length > 8 && <span className="px-1 text-[11px] text-white/35">+{items.length - 8}</span>}
+          {items.length > 8 && <span className="px-1 text-[11px] text-white/55">+{items.length - 8}</span>}
         </div>
       </div>
     );
@@ -377,11 +368,11 @@ function MyDashboard() {
     if (!top.length) return null;
     return (
       <div className="mt-4 border-t border-white/5 pt-3 text-xs">
-        <div className="text-white/45">Most backups — clean up from the song's Versions panel</div>
+        <div className="text-white/62">Most backups — clean up from the song's Versions panel</div>
         {top.map((p) => (
           <button key={p.path} onClick={() => openDetail(p.path)} className="mt-1 flex w-full items-center gap-2 text-left hover:text-white">
             <span className="flex-1 truncate text-white/70">{p.name}</span>
-            <span className="text-white/40">{p.backups.length} files</span>
+            <span className="text-white/58">{p.backups.length} files</span>
             <span className="w-16 text-right tabular-nums text-white/70">{formatBytes(backupsBytes(p))}</span>
           </button>
         ))}
@@ -458,14 +449,14 @@ function ActivityHeatmap() {
     <div className="relative">
       <div className="flex gap-4">
         <div className="flex gap-[2px] overflow-x-auto pb-1">
-          <div className="mr-1 flex flex-col gap-[2px] pt-[15px] text-[9px] leading-[11px] text-white/30">
+          <div className="mr-1 flex flex-col gap-[2px] pt-[15px] text-[9px] leading-[11px] text-white/50">
             {["Mon", "", "Wed", "", "Fri", "", ""].map((d, i) => (
               <span key={i} className="h-[11px]">{d}</span>
             ))}
           </div>
           {Array.from({ length: weeks }, (_, w) => (
             <div key={w} className="flex flex-col gap-[2px]">
-              <span className="h-[13px] w-[11px] overflow-visible whitespace-nowrap text-[9px] leading-[11px] text-white/30">
+              <span className="h-[13px] w-[11px] overflow-visible whitespace-nowrap text-[9px] leading-[11px] text-white/50">
                 {months[w]}
               </span>
               {days.slice(w * 7, w * 7 + 7).map((d, i) => (
@@ -498,13 +489,13 @@ function ActivityHeatmap() {
           )}
           {longest > 1 && <HeroStat label="Longest streak" value={`${longest} days`} />}
           {busiest.saves > 0 && (
-            <div className="text-[11px] text-white/40">
+            <div className="text-[11px] text-white/58">
               Busiest: {busiest.date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {busiest.saves} saves
             </div>
           )}
         </div>
       </div>
-      <div className="mt-2 flex items-center gap-1 text-[10px] text-white/35">
+      <div className="mt-2 flex items-center gap-1 text-[10px] text-white/55">
         Less
         {HEAT.map((c) => (
           <span key={c} className="h-[10px] w-[10px] rounded-[2px]" style={{ background: c }} />
@@ -569,21 +560,21 @@ function PitchesCard() {
     <button onClick={() => openDetail(x.path)} className="flex w-full items-center gap-2 rounded px-1 py-1 text-left text-xs hover:bg-white/[0.03]">
       <span className="min-w-0 flex-1 truncate text-white/85">{x.song}</span>
       <span className="w-32 truncate text-white/50">→ {x.who}</span>
-      <span className="w-24 text-right text-white/40">{right}</span>
+      <span className="w-24 text-right text-white/58">{right}</span>
     </button>
   );
   return (
     <div className="grid grid-cols-2 gap-4">
       <Card title={`Follow up — no answer after ${FOLLOW_UP_DAYS} days`}>
         {followUps.length === 0 ? (
-          <div className="text-xs text-white/35">Nothing waiting.</div>
+          <div className="text-xs text-white/55">Nothing waiting.</div>
         ) : (
           followUps.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={formatRelative(new Date(x.pitch.date).getTime())} />)
         )}
       </Card>
       <Card title={`Wins — placed or sold · ${wins.length}`}>
         {wins.length === 0 ? (
-          <div className="text-xs text-white/35">None logged yet. {total} send{total === 1 ? "" : "s"} tracked.</div>
+          <div className="text-xs text-white/55">None logged yet. {total} send{total === 1 ? "" : "s"} tracked.</div>
         ) : (
           wins.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={x.pitch.outcome === "sold" ? "Sold" : "Placed"} />)
         )}
@@ -630,7 +621,7 @@ function PluginToolkit() {
   const [thirdPartyOnly, setThirdPartyOnly] = useState(true);
   const list = stats.filter((s) => !thirdPartyOnly || s.thirdParty).slice(0, 10);
   const max = Math.max(1, ...list.map((s) => s.count));
-  if (!stats.length) return <div className="py-6 text-center text-xs text-white/35">No plugin data</div>;
+  if (!stats.length) return <div className="py-6 text-center text-xs text-white/55">No plugin data</div>;
   return (
     <div>
       <div className="mb-2 flex gap-1 text-[11px]">
@@ -641,7 +632,7 @@ function PluginToolkit() {
           <button
             key={String(value)}
             onClick={() => setThirdPartyOnly(value as boolean)}
-            className={`rounded-full px-2 py-0.5 ${thirdPartyOnly === value ? "bg-white/15 text-white" : "text-white/45 hover:bg-white/5"}`}
+            className={`rounded-full px-2 py-0.5 ${thirdPartyOnly === value ? "bg-white/15 text-white" : "text-white/62 hover:bg-white/5"}`}
           >
             {label as string}
           </button>
@@ -670,7 +661,7 @@ function PluginToolkit() {
         ))}
       </div>
       {list.some((s) => s.missing) && (
-        <div className="mt-2 flex items-center gap-1 text-[10px] text-white/40">
+        <div className="mt-2 flex items-center gap-1 text-[10px] text-white/58">
           <AlertTriangle size={10} className="text-red-300" /> Not installed on this computer
         </div>
       )}
@@ -728,7 +719,7 @@ function HealthCard() {
               setProblemsOnly(true);
               setView("library");
             }}
-            className="ml-auto text-white/45 hover:text-white"
+            className="ml-auto text-white/62 hover:text-white"
           >
             Show {affected} →
           </button>
@@ -842,7 +833,7 @@ function CrewDashboard() {
 
   if (songs.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-white/45">
+      <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-white/62">
         No crew stats yet: nothing is shared. Share songs from their panel or the Library, and ask the crew to do the same.
       </div>
     );
@@ -887,10 +878,10 @@ function CrewDashboard() {
                   <span className="tabular-nums text-white/55" title="Shared songs · finished (Prep or later)">
                     {m.songs} song{m.songs === 1 ? "" : "s"} · {m.finished} done
                   </span>
-                  <span className="w-20 text-right tabular-nums text-white/45" title={`Songs they last moved in the past ${RECENT_DAYS} days`}>
+                  <span className="w-20 text-right tabular-nums text-white/62" title={`Songs they last moved in the past ${RECENT_DAYS} days`}>
                     {m.recentMoves ? `${m.recentMoves} moved` : "—"}
                   </span>
-                  <span className="w-24 text-right text-white/40">{m.lastActivityMs ? formatRelative(m.lastActivityMs) : "nothing shared"}</span>
+                  <span className="w-24 text-right text-white/58">{m.lastActivityMs ? formatRelative(m.lastActivityMs) : "nothing shared"}</span>
                 </div>
               ))}
             </div>
@@ -900,14 +891,14 @@ function CrewDashboard() {
         <div className="grid grid-cols-2 gap-5">
           <Card title={`Ready to ship · ${stats.readyToShip.length}`}>
             {stats.readyToShip.length === 0 ? (
-              <p className="text-xs text-white/45">Nothing in Prep with a mixdown and an accepted Launch Kit yet.</p>
+              <p className="text-xs text-white/62">Nothing in Prep with a mixdown and an accepted Launch Kit yet.</p>
             ) : (
               <SongLines items={stats.readyToShip.map((s) => ({ id: s.id, title: s.title, right: s.release_date ?? "no date" }))} onOpen={open} />
             )}
           </Card>
           <Card title="Coming out">
             {stats.upcoming.length === 0 ? (
-              <p className="text-xs text-white/45">No release dates on shared songs. Set them in the Launch Kit.</p>
+              <p className="text-xs text-white/62">No release dates on shared songs. Set them in the Launch Kit.</p>
             ) : (
               <SongLines
                 items={stats.upcoming.slice(0, 6).map((u) => ({ id: u.song.id, title: u.song.title, sub: who(u.song.owner_id, u.owner), right: u.date }))}

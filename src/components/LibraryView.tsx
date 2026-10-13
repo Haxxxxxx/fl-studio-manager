@@ -10,7 +10,6 @@ import {
   Music2,
   Package,
   Plug,
-  Plus,
   RefreshCw,
   Search,
   Square,
@@ -112,7 +111,6 @@ export function LibraryView() {
   const addTracks = useAppStore((s) => s.addTracks);
   const detailPath = useAppStore((s) => s.detailPath);
   const openDetail = useAppStore((s) => s.openDetail);
-  const openNewProject = useAppStore((s) => s.openNewProject);
   const [error, setError] = useState<string | null>(null);
 
   const statusOf = (p: ProjectInfo) => workspace.songs[p.path]?.status;
@@ -209,12 +207,12 @@ export function LibraryView() {
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-6 py-3 [&_button]:whitespace-nowrap">
         <div className="relative min-w-[200px] max-w-sm flex-1">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search songs, tags, notes, plugins, samples…"
-            className="w-full rounded-md border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none"
+            className="w-full rounded-md border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/50 focus:border-orange-400/50 focus:outline-none"
           />
         </div>
         <button onClick={() => rescan()} disabled={scanning || demoMode} className={btn} title="Rescan folders">
@@ -238,16 +236,12 @@ export function LibraryView() {
             <LayoutTemplate size={14} /> Templates ({templateCount})
           </Toggle>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => openNewProject()} className={btn}>
-            <Plus size={14} /> New song
-          </button>
-        </div>
+
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 border-b border-white/5 px-6 py-2">
         <Chip active={statusFilter === null} onClick={() => setStatusFilter(null)}>
-          All <span className="text-white/35">{songs.length}</span>
+          All <span className="text-white/55">{songs.length}</span>
         </Chip>
         {[{ id: "unsorted" as const, ...UNSORTED }, ...STATUSES].map((s) => {
           const count = statusCounts.get(s.id) ?? 0;
@@ -258,7 +252,7 @@ export function LibraryView() {
               active={statusFilter === s.id}
               onClick={() => setStatusFilter(statusFilter === s.id ? null : (s.id as StatusFilter))}
             >
-              <StatusDot color={s.color} /> {s.label} <span className="text-white/35">{count}</span>
+              <StatusDot color={s.color} /> {s.label} <span className="text-white/55">{count}</span>
             </Chip>
           );
         })}
@@ -270,7 +264,7 @@ export function LibraryView() {
         {tags.length > 0 && <span className="mx-2 h-4 w-px bg-white/10" />}
         {tags.slice(0, 12).map(([tag, count]) => (
           <Chip key={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)}>
-            #{tag} <span className="text-white/35">{count}</span>
+            #{tag} <span className="text-white/55">{count}</span>
             {tagFilter === tag && <X size={11} />}
           </Chip>
         ))}
@@ -324,7 +318,7 @@ export function LibraryView() {
             <Download size={14} />
             {rendering ? "Rendering…" : `Export ${selected.size}`}
           </button>
-          <button onClick={clearSelection} className="rounded p-1 text-white/40 hover:text-white">
+          <button onClick={clearSelection} className="rounded p-1 text-white/58 hover:text-white">
             <X size={15} />
           </button>
         </div>
@@ -343,18 +337,18 @@ export function LibraryView() {
 
       <div className="flex-1 overflow-auto px-4 py-2">
         {filtered.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-white/30">
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-white/50">
             <Music2 size={28} />
             <div className="text-sm">{scanning ? "Scanning your project folders…" : "No songs match"}</div>
           </div>
         ) : (
           <table className="w-full border-separate border-spacing-y-0.5 text-sm">
             <thead className="sticky top-0 z-10 bg-[#0f0f12]">
-              <tr className="text-left text-[11px] uppercase tracking-wide text-white/30">
+              <tr className="text-left text-[12px] font-semibold text-white/50">
                 <th className="w-8 px-2 py-2">
                   <button
                     onClick={() => (allSelected ? clearSelection() : selectAll(filtered.map((p) => p.path)))}
-                    className="flex text-white/40 hover:text-white/70"
+                    className="flex text-white/58 hover:text-white/70"
                   >
                     {allSelected ? <CheckSquare size={15} /> : <Square size={15} />}
                   </button>
@@ -393,12 +387,16 @@ export function LibraryView() {
                     }`}
                   >
                     <td className="rounded-l-md px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => toggleSelected(project.path)} className="flex text-white/40 hover:text-white/70">
+                      <button onClick={() => toggleSelected(project.path)} className="flex text-white/58 hover:text-white/70">
                         {isSelected ? <CheckSquare size={15} className="text-orange-400" /> : <Square size={15} />}
                       </button>
                     </td>
                     <td className="px-1 py-2" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => toggleFavorite(project.path)} className="flex text-white/20 hover:text-orange-300">
+                      <button
+                        onClick={() => toggleFavorite(project.path)}
+                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        className="flex text-white/45 hover:text-orange-300"
+                      >
                         <Star size={13} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-orange-400" : ""} />
                       </button>
                     </td>
@@ -414,11 +412,11 @@ export function LibraryView() {
                         </span>
                         {hasProblems(project) && <ProblemIcon project={project} />}
                         {project.isTemplate && (
-                          <span className="rounded bg-white/10 px-1.5 text-[10px] uppercase text-white/50">template</span>
+                          <span className="rounded bg-white/10 px-1.5 text-[10px]  text-white/50">template</span>
                         )}
                       </div>
                       {meta?.tags && meta.tags.length > 0 && (
-                        <div className="mt-0.5 truncate text-[11px] text-white/35">
+                        <div className="mt-0.5 truncate text-[11px] text-white/55">
                           {meta.tags.map((t) => `#${t}`).join("  ")}
                         </div>
                       )}
@@ -426,19 +424,19 @@ export function LibraryView() {
                     <td className="px-2 py-2">
                       <StatusSelect compact value={meta?.status} onChange={(status) => updateSong(project.path, { status })} />
                     </td>
-                    <td className="px-2 py-2 tabular-nums text-white/50">{formatBpm(project.tempoBpm)}</td>
-                    <td className="px-2 py-2 text-white/60">
+                    <td className="px-2 py-2 font-mono text-[13px] tabular-nums text-white/70">{formatBpm(project.tempoBpm)}</td>
+                    <td className="px-2 py-2 font-mono text-[13px] text-white/70">
                       {meta?.key ??
                         (detectKey(project.trackNames) ? (
-                          <span className="italic text-white/35" title="Found in a mixer track name — set it in the song panel">
+                          <span className="italic text-white/55" title="Found in a mixer track name — set it in the song panel">
                             {detectKey(project.trackNames)}?
                           </span>
                         ) : (
                           <span className="text-white/20">—</span>
                         ))}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2 text-white/50">{formatDate(project.modifiedAtMs)}</td>
-                    <td className="px-2 py-2 tabular-nums text-white/40">{project.backups.length || "—"}</td>
+                    <td className="whitespace-nowrap px-2 py-2 font-mono text-[13px] text-white/60">{formatDate(project.modifiedAtMs)}</td>
+                    <td className="px-2 py-2 tabular-nums text-white/58">{project.backups.length || "—"}</td>
                     <td className="px-2 py-2">
                       <MixdownBadge project={project} />
                     </td>
@@ -521,19 +519,19 @@ export function EmptyLibrary() {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/30">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/50">
         <FolderSearch size={28} />
       </div>
       <div className="text-base font-medium text-white/80">No project folder linked yet</div>
       {suggested ? (
-        <div className="max-w-md text-sm text-white/40">
+        <div className="max-w-md text-sm text-white/58">
           Found a projects folder:
           <div className="mt-1.5 truncate rounded bg-white/5 px-2 py-1 font-mono text-xs text-white/60" title={suggested}>
             {suggested}
           </div>
         </div>
       ) : (
-        <div className="max-w-sm text-sm text-white/40">
+        <div className="max-w-sm text-sm text-white/58">
           Point FL Manager at the folder where your projects live: FL Studio, Ableton Live, REAPER, Studio One, Pro Tools,
           Cubase or Bitwig. You can link several.
         </div>

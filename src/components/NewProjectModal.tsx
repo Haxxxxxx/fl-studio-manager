@@ -122,7 +122,7 @@ export function NewProjectModal() {
             ))}
           </select>
           {factory.length === 0 && userTemplates.length === 0 && (
-            <div className="mt-1 text-xs text-white/40">
+            <div className="mt-1 text-xs text-white/58">
               {settings.flStudioPath
                 ? "No templates found. Save any project into a Templates folder inside a linked folder to start new songs from it."
                 : "Set the FL Studio path in Settings to see its templates."}
@@ -140,7 +140,7 @@ export function NewProjectModal() {
             ))}
           </select>
           {trimmed && parentFolder && (
-            <div className="mt-1 truncate text-[11px] text-white/35">
+            <div className="mt-1 truncate text-[11px] text-white/55">
               {parentFolder}
               {sep}
               {trimmed}

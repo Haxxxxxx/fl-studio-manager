@@ -96,13 +96,13 @@ export function ShortsPanel({
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-3 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-white/40">
+      <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold text-white/58">
         <Clapperboard size={13} /> Shorts for Reels, TikTok and YouTube Shorts
       </div>
       <div className="flex gap-4">
         <div className="shrink-0">
           <img src={preview} alt="9:16 layout preview" className="h-[284px] w-[160px] rounded-md border border-white/10 object-cover" />
-          <div className="mt-1 text-center text-[10px] text-white/35">The waveform animates in the dark band</div>
+          <div className="mt-1 text-center text-[10px] text-white/55">The waveform animates in the dark band</div>
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2.5 text-xs text-white/60">
           <p>
@@ -126,7 +126,7 @@ export function ShortsPanel({
               </div>
             </div>
           ) : (
-            <div className="text-white/40">Looking for ffmpeg…</div>
+            <div className="text-white/58">Looking for ffmpeg…</div>
           )}
           <div>
             <button onClick={render} disabled={!!blocker || state.kind === "running"} title={blocker?.message} className={btnPrimary}>

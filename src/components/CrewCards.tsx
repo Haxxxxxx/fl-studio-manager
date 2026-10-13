@@ -34,10 +34,10 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
               <span className="h-2.5 w-2.5 rounded-sm" style={{ background: next.color }} />
               <span className="truncate text-sm font-medium text-white/90">{next.title}</span>
             </div>
-            <div className="text-2xl font-semibold text-white">
+            <div className="font-display text-3xl leading-none text-white">
               {next.daysAway === 0 ? "Today" : next.daysAway === 1 ? "Tomorrow" : formatRelative(next.dateMs)}
             </div>
-            <div className="text-[11px] text-white/45">
+            <div className="text-[11px] text-white/62">
               {new Date(next.dateMs).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
               {next.tracks.length > 0 && ` · ${next.finished}/${next.tracks.length} finished · ${next.kitsAccepted}/${next.tracks.length} kits`}
             </div>
@@ -48,7 +48,7 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
             )}
           </button>
         ) : (
-          <div className="text-xs text-white/40">
+          <div className="text-xs text-white/58">
             Nothing dated yet.{" "}
             <button onClick={() => setView("albums")} className="underline hover:text-white">
               Plan a release
@@ -59,24 +59,24 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
 
       <Card icon={<Hourglass size={13} />} title={`Stalled · no save in ${STALLED_DAYS}+ days`}>
         {stalled.length === 0 ? (
-          <div className="text-xs text-white/40">Nothing stuck in Creation or Production.</div>
+          <div className="text-xs text-white/58">Nothing stuck in Creation or Production.</div>
         ) : (
           <div className="flex flex-col gap-1">
             {stalled.slice(0, 5).map((s) => (
               <button key={s.song.path} onClick={() => openDetail(s.song.path)} className="flex items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-white/[0.04]">
                 <StatusDot color={statusInfo(s.status).color} size={6} />
                 <span className="min-w-0 flex-1 truncate text-white/80">{s.song.name}</span>
-                <span className="shrink-0 tabular-nums text-white/40">{s.idleDays}d</span>
+                <span className="shrink-0 tabular-nums text-white/58">{s.idleDays}d</span>
               </button>
             ))}
-            {stalled.length > 5 && <div className="px-1 text-[11px] text-white/35">+{stalled.length - 5} more</div>}
+            {stalled.length > 5 && <div className="px-1 text-[11px] text-white/55">+{stalled.length - 5} more</div>}
           </div>
         )}
       </Card>
 
       <Card icon={<Users size={13} />} title="Crew · who's on what" action={{ label: "People", run: () => openPerson(null) }}>
         {crew.length === 0 ? (
-          <div className="text-xs text-white/40">
+          <div className="text-xs text-white/58">
             Add the crew in{" "}
             <button onClick={() => openPerson(null)} className="underline hover:text-white">
               People
@@ -89,7 +89,7 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
               <button key={m.person.id} onClick={() => openPerson(m.person.id)} className="flex flex-col gap-1 rounded px-1 py-0.5 text-left hover:bg-white/[0.04]">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="min-w-0 flex-1 truncate text-white/85">{m.person.name}</span>
-                  <span className="shrink-0 text-white/45">
+                  <span className="shrink-0 text-white/62">
                     {m.active} active · {m.lastSessionMs ? formatRelative(m.lastSessionMs) : "no sessions"}
                   </span>
                 </div>
@@ -120,10 +120,10 @@ function Card({
 }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-3 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">
+      <div className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-white/58">
         {icon} {title}
         {action && (
-          <button onClick={action.run} className="ml-auto normal-case tracking-normal text-white/40 hover:text-white">
+          <button onClick={action.run} className="ml-auto normal-case tracking-normal text-white/58 hover:text-white">
             {action.label} →
           </button>
         )}

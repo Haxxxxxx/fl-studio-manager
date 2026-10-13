@@ -30,7 +30,7 @@ Components are styled with Tailwind classes. `styles.css` holds the classes the 
 
 Class-string exports for native elements: `btn` (secondary button), `btnPrimary`, `input`, `sectionLabel`. Prefer the components `Button` (`variant="primary"` for the one main action per screen) and `Input`.
 
-Song stage colors (use with `StatusDot`, never color alone, always with the stage name): Unsorted `#5b5b63`, Creation `#1c5cab`, Production `#2a78d6`, Prep `#5598e7`, Release `#86b6ef`, Promotion `#b7d3f6`.
+Song stage colors (use with `StatusDot`, never color alone, always with the stage name): Unsorted `#6F6F78`, Creation `#F5A524`, Production `#D6409F`, Prep `#8E4EC6`, Release `#30A46C`, Promotion `#00A2C7`.
 
 ## Building blocks
 

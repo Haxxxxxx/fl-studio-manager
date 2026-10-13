@@ -6,8 +6,8 @@ import { formatRelative } from "../lib/format";
 import { orphanedShares, sharedHere } from "../lib/crewSync";
 
 const field =
-  "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none";
-const primary = "shrink-0 rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-400 disabled:opacity-40";
+  "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-orange-400/50 focus:outline-none";
+const primary = "shrink-0 rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-[#0f0f12] hover:bg-orange-400 disabled:opacity-40";
 const secondary = "shrink-0 rounded-md border border-white/15 px-3 py-2 text-sm text-white/70 hover:bg-white/5 disabled:opacity-40";
 
 /** Settings → Crew: sign in, create or join a crew, invite, sync. */
@@ -18,15 +18,15 @@ export function CrewPanel() {
       <h2 className="flex items-center gap-2 text-sm font-semibold text-white/90">
         <Users size={15} /> Crew
       </h2>
-      <p className="mt-1 text-xs text-white/40">
+      <p className="mt-1 text-xs text-white/58">
         Share chosen songs with your crew: everyone sees them on the crew board, the calendar and in "who's on what". Only metadata is shared
         (title, stage, BPM, key, tags, credits, release date), never audio, file paths, samples or notes. Stored in the EU.
       </p>
       <div className="mt-3">
         {!crew.enabled ? (
-          <div className="text-xs text-white/45">Crew sharing isn't set up in this build (no crew server configured).</div>
+          <div className="text-xs text-white/62">Crew sharing isn't set up in this build (no crew server configured).</div>
         ) : !crew.ready ? (
-          <div className="text-xs text-white/45">Loading…</div>
+          <div className="text-xs text-white/62">Loading…</div>
         ) : !crew.userId ? (
           <SignIn />
         ) : crew.crews.length === 0 && crew.loadError ? (
@@ -113,7 +113,7 @@ function SignIn() {
               {busy ? "Checking…" : "Sign in"}
             </button>
           </div>
-          <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="self-start text-xs text-white/40 hover:text-white">
+          <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="self-start text-xs text-white/58 hover:text-white">
             Use another email
           </button>
         </form>
@@ -177,7 +177,7 @@ function CreateOrJoin() {
         </form>
       </div>
       {error && <div className="text-xs text-red-300">{error}</div>}
-      <button onClick={() => void signOut()} className="self-start text-xs text-white/40 hover:text-white">
+      <button onClick={() => void signOut()} className="self-start text-xs text-white/58 hover:text-white">
         Sign out
       </button>
     </div>
@@ -222,8 +222,8 @@ function CrewHome() {
           <span className="text-sm font-medium text-white">{active.name}</span>
         )}
         <span className="rounded bg-white/10 px-1.5 py-px text-[10px] text-white/55">{active.role === "owner" ? "Owner" : "Member"}</span>
-        <span className={`ml-auto text-xs ${crew.sync.kind === "error" ? "text-red-300" : "text-white/45"}`}>{syncLine}</span>
-        <button onClick={() => void run(crew.syncNow)} disabled={busy || demoMode} title="Sync now" className="rounded p-1 text-white/45 hover:bg-white/10 hover:text-white disabled:opacity-40">
+        <span className={`ml-auto text-xs ${crew.sync.kind === "error" ? "text-red-300" : "text-white/62"}`}>{syncLine}</span>
+        <button onClick={() => void run(crew.syncNow)} disabled={busy || demoMode} title="Sync now" className="rounded p-1 text-white/62 hover:bg-white/10 hover:text-white disabled:opacity-40">
           <RefreshCw size={13} className={crew.sync.kind === "syncing" ? "animate-spin" : ""} />
         </button>
       </div>
@@ -244,13 +244,13 @@ function CrewHome() {
         </div>
       )}
       <div>
-        <div className="mb-1 text-[11px] uppercase tracking-wide text-white/35">Members · {crew.members.length}</div>
+        <div className="mb-1 text-[12px] font-semibold text-white/55">Members · {crew.members.length}</div>
         <div className="flex flex-wrap gap-1.5">
           {crew.members.map((m) => (
             <span key={m.user_id} className="rounded-full bg-white/[0.06] px-2.5 py-1 text-xs text-white/75">
               {m.display_name}
-              {m.role === "owner" && <span className="ml-1 text-white/35">· owner</span>}
-              {m.user_id === crew.userId && <span className="ml-1 text-white/35">· you</span>}
+              {m.role === "owner" && <span className="ml-1 text-white/55">· owner</span>}
+              {m.user_id === crew.userId && <span className="ml-1 text-white/55">· you</span>}
             </span>
           ))}
         </div>
@@ -269,13 +269,13 @@ function CrewHome() {
               >
                 {copied ? <Check size={12} /> : <ClipboardCopy size={12} />} {copied ? "Copied" : "Copy"}
               </button>
-              <span className="text-[11px] text-white/35">Valid 7 days, up to 10 people.</span>
+              <span className="text-[11px] text-white/55">Valid 7 days, up to 10 people.</span>
             </>
           )}
         </div>
       )}
       {error && <div className="text-xs text-red-300">{error}</div>}
-      <div className="flex gap-3 text-xs text-white/40">
+      <div className="flex gap-3 text-xs text-white/58">
         <span>{crew.email}</span>
         <button
           onClick={() => {
@@ -321,11 +321,11 @@ export function ShareToggle({ path }: { path: string }) {
   return (
     <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-xs">
       <input type="checkbox" checked={shared} onChange={(e) => setShared([path], e.target.checked)} className="accent-orange-500" />
-      <Users size={13} className="text-white/45" />
+      <Users size={13} className="text-white/62" />
       <span className="flex-1 text-white/75">
         Share with <b className="font-medium text-white/90">{crewName}</b>
       </span>
-      <span className="text-white/35">{shared ? "On the crew board" : "Only you see it"}</span>
+      <span className="text-white/55">{shared ? "On the crew board" : "Only you see it"}</span>
     </label>
   );
 }

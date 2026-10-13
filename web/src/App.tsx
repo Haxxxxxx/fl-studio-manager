@@ -7,8 +7,8 @@ import { useWeb } from "./store";
 import { Landing } from "./Landing";
 
 const input =
-  "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-base text-white placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none sm:text-sm";
-const primary = "rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-400 disabled:opacity-40";
+  "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-base text-white placeholder:text-white/50 focus:border-orange-400/50 focus:outline-none sm:text-sm";
+const primary = "rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-bold text-[#0f0f12] hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-70";
 const COLUMNS = [{ id: undefined as SongStatus | undefined, ...UNSORTED }, ...STATUSES];
 type Tab = "board" | "calendar" | "crew";
 
@@ -44,7 +44,7 @@ export function App() {
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-dvh items-center justify-center text-sm text-white/45">{children}</div>;
+  return <div className="flex min-h-dvh items-center justify-center text-sm text-white/62">{children}</div>;
 }
 
 function Logo() {
@@ -55,7 +55,7 @@ function Logo() {
       </div>
       <div className="leading-tight">
         <div className="text-sm font-semibold">FL Manager</div>
-        <div className="text-[11px] text-white/40">Crew</div>
+        <div className="text-[11px] text-white/58">Crew</div>
       </div>
     </div>
   );
@@ -66,7 +66,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-8 px-5 py-10">
       <Logo />
       {children}
-      <p className="mt-auto text-[11px] leading-relaxed text-white/30">
+      <p className="mt-auto text-[11px] leading-relaxed text-white/50">
         Your crew's shared songs: titles, stages, BPM, key, credits and release dates. Never audio or files. Stored in the EU.
       </p>
     </div>
@@ -118,7 +118,7 @@ function SignIn() {
           <button disabled={busy || code.length !== 6} className={primary}>
             {busy ? "Checking…" : "Sign in"}
           </button>
-          <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="text-xs text-white/40 hover:text-white">
+          <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="text-xs text-white/58 hover:text-white">
             Use another email
           </button>
         </form>
@@ -150,7 +150,7 @@ function Join() {
         Join crew
       </button>
       <details className="text-sm text-white/55">
-        <summary className="cursor-pointer text-white/45">Starting a new crew instead?</summary>
+        <summary className="cursor-pointer text-white/62">Starting a new crew instead?</summary>
         <div className="mt-3 flex flex-col gap-3">
           <input value={crewName} onChange={(e) => setCrewName(e.target.value)} placeholder="Crew name" aria-label="Crew name" className={input} />
           <button onClick={() => void run(() => createCrew(crewName, displayName))} disabled={busy || !crewName.trim() || !displayName.trim()} className="rounded-lg border border-white/15 px-4 py-2.5 text-sm text-white/80 hover:bg-white/5 disabled:opacity-40">
@@ -159,7 +159,7 @@ function Join() {
         </div>
       </details>
       {error && <p className="text-sm text-red-300">{error}</p>}
-      <button onClick={() => void signOut()} className="self-start text-xs text-white/40 hover:text-white">
+      <button onClick={() => void signOut()} className="self-start text-xs text-white/58 hover:text-white">
         Sign out
       </button>
     </div>
@@ -191,7 +191,7 @@ function Dashboard({ topError }: { topError: string | null }) {
           ) : (
             <span className="text-sm font-medium text-white/85">{active.name}</span>
           )}
-          <button onClick={() => void signOut()} aria-label="Sign out" className="rounded p-1.5 text-white/40 hover:bg-white/10 hover:text-white">
+          <button onClick={() => void signOut()} aria-label="Sign out" className="rounded p-1.5 text-white/58 hover:bg-white/10 hover:text-white">
             <LogOut size={15} />
           </button>
         </div>
@@ -206,7 +206,7 @@ function Dashboard({ topError }: { topError: string | null }) {
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm ${tab === t.id ? "border-orange-400 text-white" : "border-transparent text-white/50 hover:text-white/80"}`}
           >
             {t.icon} {t.label}
-            {t.id === "board" && <span className="text-white/35">{songs.length}</span>}
+            {t.id === "board" && <span className="text-white/55">{songs.length}</span>}
           </button>
         ))}
       </nav>
@@ -238,7 +238,7 @@ function Board() {
   }, [songs]);
 
   if (songs.length === 0) {
-    return <div className="p-8 text-center text-sm text-white/45">Nothing shared yet. Songs appear here when the crew shares them from FL Manager.</div>;
+    return <div className="p-8 text-center text-sm text-white/62">Nothing shared yet. Songs appear here when the crew shares them from FL Manager.</div>;
   }
   const card = (s: CrewSongRow) => <SongCard key={s.id} s={s} you={s.owner_id === userId} owner={names.get(s.owner_id)} mover={s.stage_updated_by ? (s.stage_updated_by === userId ? "you" : names.get(s.stage_updated_by)) : undefined} onMove={(st) => void moveSong(s.id, st).catch(() => {})} />;
   const empty = COLUMNS.filter((c) => !(byStage.get(c.id ?? "") ?? []).length);
@@ -251,13 +251,13 @@ function Board() {
             <div className="flex items-baseline gap-2">
               <span className="h-2 w-2 self-center rounded-full" style={{ background: col.color }} />
               <span className="text-sm font-medium text-white/85">{col.label}</span>
-              <span className="text-sm text-white/30">{byStage.get(col.id ?? "")!.length}</span>
-              <span className="truncate text-[11px] text-white/30">{col.hint}</span>
+              <span className="text-sm text-white/50">{byStage.get(col.id ?? "")!.length}</span>
+              <span className="truncate text-[11px] text-white/50">{col.hint}</span>
             </div>
             {byStage.get(col.id ?? "")!.map(card)}
           </section>
         ))}
-        {empty.length > 0 && <p className="text-[11px] text-white/30">Empty: {empty.map((c) => c.label).join(", ")}</p>}
+        {empty.length > 0 && <p className="text-[11px] text-white/50">Empty: {empty.map((c) => c.label).join(", ")}</p>}
       </div>
       <div className="hidden flex-1 gap-3 overflow-x-auto p-5 sm:flex">
       {COLUMNS.map((col) => {
@@ -281,9 +281,9 @@ function Board() {
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full" style={{ background: col.color }} />
                 <span className="text-sm font-medium text-white/85">{col.label}</span>
-                <span className="text-sm text-white/30">{items.length}</span>
+                <span className="text-sm text-white/50">{items.length}</span>
               </div>
-              <p className="mt-0.5 text-[11px] text-white/30">{col.hint}</p>
+              <p className="mt-0.5 text-[11px] text-white/50">{col.hint}</p>
             </div>
             <div className="flex flex-col gap-2 px-2 pb-2">{items.map(card)}</div>
           </section>
@@ -302,12 +302,12 @@ function SongCard({ s, you, owner, mover, onMove }: { s: CrewSongRow; you: boole
       className="rounded-lg border border-white/5 bg-[#18181d] px-3 py-2.5"
     >
       <div className="truncate text-sm font-medium text-white/90">{s.title}</div>
-      <div className="mt-1 text-xs text-white/45">
+      <div className="mt-1 text-xs text-white/62">
         {you ? "You" : (owner ?? "Crewmate")}
         {s.bpm != null && ` · ${Math.round(s.bpm)} BPM`}
         {s.musical_key && ` · ${s.musical_key}`}
       </div>
-      <div className="mt-1.5 flex items-center gap-2 text-[11px] text-white/35">
+      <div className="mt-1.5 flex items-center gap-2 text-[11px] text-white/55">
         {s.last_saved_at && <span>saved {formatRelative(Date.parse(s.last_saved_at))}</span>}
         {s.release_date && <span>· out {s.release_date}</span>}
         <span className="ml-auto flex items-center gap-1">
@@ -316,7 +316,7 @@ function SongCard({ s, you, owner, mover, onMove }: { s: CrewSongRow; you: boole
         </span>
       </div>
       {/* Touch screens can't drag: a stage picker on every card. */}
-      <label className="mt-2 flex items-center gap-2 text-[11px] text-white/40">
+      <label className="mt-2 flex items-center gap-2 text-[11px] text-white/58">
         Stage
         <select
           value={s.stage ?? ""}
@@ -332,7 +332,7 @@ function SongCard({ s, you, owner, mover, onMove }: { s: CrewSongRow; you: boole
           ))}
         </select>
       </label>
-      {mover && s.stage_updated_by !== s.owner_id && <div className="mt-1 text-[10px] text-white/30">moved by {mover}</div>}
+      {mover && s.stage_updated_by !== s.owner_id && <div className="mt-1 text-[10px] text-white/50">moved by {mover}</div>}
     </article>
   );
 }
@@ -353,29 +353,29 @@ function Calendar() {
   const upcoming = dated.filter((x) => x.date.getTime() >= todayMs);
   const past = dated.filter((x) => x.date.getTime() < todayMs).reverse();
 
-  if (dated.length === 0) return <div className="p-8 text-center text-sm text-white/45">No release dates yet. They come from the crew's releases and Launch Kits.</div>;
+  if (dated.length === 0) return <div className="p-8 text-center text-sm text-white/62">No release dates yet. They come from the crew's releases and Launch Kits.</div>;
   const Row = ({ s, date }: { s: CrewSongRow; date: Date }) => (
     <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
       <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-white/5 py-1">
-        <span className="text-[10px] uppercase text-white/45">{date.toLocaleDateString(undefined, { weekday: "short" })}</span>
+        <span className="text-[10px]  text-white/62">{date.toLocaleDateString(undefined, { weekday: "short" })}</span>
         <span className="text-lg font-semibold leading-tight">{date.getDate()}</span>
-        <span className="text-[10px] uppercase text-white/45">{date.toLocaleDateString(undefined, { month: "short" })}</span>
+        <span className="text-[10px]  text-white/62">{date.toLocaleDateString(undefined, { month: "short" })}</span>
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{s.title}</div>
-        <div className="text-xs text-white/45">
+        <div className="text-xs text-white/62">
           {s.owner_id === userId ? "You" : (names.get(s.owner_id) ?? "Crewmate")} · {statusInfo(s.stage ?? undefined).label}
           {s.kit_accepted ? " · kit ready" : ""}
         </div>
       </div>
-      <span className="shrink-0 text-xs text-white/45">{formatRelative(date.getTime())}</span>
+      <span className="shrink-0 text-xs text-white/62">{formatRelative(date.getTime())}</span>
     </div>
   );
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 p-4 sm:p-6">
-      <h2 className="text-xs font-medium uppercase tracking-wide text-white/40">Coming up</h2>
-      {upcoming.length ? upcoming.map((x) => <Row key={x.s.id} {...x} />) : <p className="text-sm text-white/45">Nothing planned.</p>}
-      {past.length > 0 && <h2 className="mt-4 text-xs font-medium uppercase tracking-wide text-white/40">Released</h2>}
+      <h2 className="text-xs font-medium  text-white/58">Coming up</h2>
+      {upcoming.length ? upcoming.map((x) => <Row key={x.s.id} {...x} />) : <p className="text-sm text-white/62">Nothing planned.</p>}
+      {past.length > 0 && <h2 className="mt-4 text-xs font-medium  text-white/58">Released</h2>}
       {past.slice(0, 10).map((x) => (
         <Row key={x.s.id} {...x} />
       ))}
@@ -395,10 +395,10 @@ function Crew() {
           <div key={m.user_id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="flex items-baseline gap-2">
               <span className="font-medium">{m.display_name}</span>
-              {m.role === "owner" && <span className="text-xs text-white/35">owner</span>}
-              {m.user_id === userId && <span className="text-xs text-white/35">you</span>}
+              {m.role === "owner" && <span className="text-xs text-white/55">owner</span>}
+              {m.user_id === userId && <span className="text-xs text-white/55">you</span>}
             </div>
-            <div className="mt-1 text-xs text-white/45">
+            <div className="mt-1 text-xs text-white/62">
               {theirs.length} shared · {active} being made · {last ? `last session ${formatRelative(last)}` : "no sessions yet"}
             </div>
             <div className="mt-3 flex h-1.5 gap-px overflow-hidden rounded-full bg-white/5">
