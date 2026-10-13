@@ -114,7 +114,7 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
     if (!settings.outputFolder) return setMessage({ kind: "error", text: "Set an export folder in Settings first." });
     setSaving(true);
     try {
-      const file = await api.saveCover({ outputFolder: settings.outputFolder, folderName: title, imageB64: picked.image.imageB64 });
+      const file = await api.saveCover({ folderName: title, imageB64: picked.image.imageB64 });
       setKitCover(path, { seed: picked.seed, prompt: picked.prompt, variant: picked.variant, savedPath: file, savedAtMs: Date.now() });
       setMessage({ kind: "ok", text: "Saved as cover-concept.jpg in the kit folder.", dir: file });
     } catch (e) {

@@ -1,6 +1,10 @@
 use crate::models::Settings;
+use crate::paths::is_remote_or_device;
+use crate::scope::{fl_studio_binary, is_ffmpeg};
 use std::fs;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
+use tauri_plugin_dialog::DialogExt;
 
 fn settings_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let dir = app
@@ -11,9 +15,9 @@ fn settings_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(dir.join("settings.json"))
 }
 
-#[tauri::command]
-pub fn get_settings(app: AppHandle) -> Result<Settings, String> {
-    let path = settings_path(&app)?;
+/// The saved settings (what every command's scope is built from).
+pub fn load(app: &AppHandle) -> Result<Settings, String> {
+    let path = settings_path(app)?;
     if !path.exists() {
         return Ok(Settings::default());
     }
@@ -21,12 +25,151 @@ pub fn get_settings(app: AppHandle) -> Result<Settings, String> {
     serde_json::from_str(&raw).map_err(|e| format!("could not parse settings: {e}"))
 }
 
-#[tauri::command]
-pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
-    let path = settings_path(&app)?;
-    let raw = serde_json::to_string_pretty(&settings)
-        .map_err(|e| format!("could not serialize settings: {e}"))?;
+fn store(app: &AppHandle, settings: &Settings) -> Result<(), String> {
+    let path = settings_path(app)?;
+    let raw = serde_json::to_string_pretty(settings).map_err(|e| format!("could not serialize settings: {e}"))?;
     fs::write(&path, raw).map_err(|e| format!("could not write settings: {e}"))
+}
+
+#[tauri::command]
+pub fn get_settings(app: AppHandle) -> Result<Settings, String> {
+    load(&app)
+}
+
+/// Saves the preferences the webview may set. Paths (linked folders, the
+/// export folder, FL Studio, ffmpeg) are kept as saved: they change only
+/// through the pickers and detection below, so a compromised webview can't
+/// point the app at other folders or programs.
+#[tauri::command]
+pub fn save_settings(app: AppHandle, settings: Settings) -> Result<Settings, String> {
+    let mut saved = load(&app)?;
+    apply_preferences(&mut saved, settings);
+    store(&app, &saved)?;
+    Ok(saved)
+}
+
+fn apply_preferences(saved: &mut Settings, from: Settings) {
+    if matches!(from.render_format.as_str(), "wav" | "mp3" | "ogg" | "flac") {
+        saved.render_format = from.render_format;
+    }
+    saved.favorites = from.favorites;
+    saved.ai_model = from.ai_model;
+    saved.ai_language = from.ai_language;
+    saved.ai_include_notes = from.ai_include_notes;
+}
+
+/// Runs a native picker off the main thread. None = cancelled.
+async fn pick(app: &AppHandle, folder: bool) -> Result<Option<PathBuf>, String> {
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let dialog = app.dialog().file();
+        let picked = if folder { dialog.blocking_pick_folder() } else { dialog.blocking_pick_file() };
+        picked.and_then(|p| p.into_path().ok())
+    })
+    .await
+    .map_err(|e| format!("the picker failed: {e}"))
+}
+
+fn usable_folder(path: &Path) -> Result<String, String> {
+    let s = path.to_string_lossy().to_string();
+    if is_remote_or_device(&s) || !path.is_dir() {
+        return Err(format!("not a folder on this computer: {s}"));
+    }
+    Ok(s)
+}
+
+fn add_watched(app: &AppHandle, folder: &Path) -> Result<Settings, String> {
+    let folder = usable_folder(folder)?;
+    let mut saved = load(app)?;
+    if !saved.watched_folders.contains(&folder) {
+        saved.watched_folders.push(folder);
+        store(app, &saved)?;
+    }
+    Ok(saved)
+}
+
+/// Links a projects folder the user picks.
+#[tauri::command]
+pub async fn pick_watched_folder(app: AppHandle) -> Result<Settings, String> {
+    match pick(&app, true).await? {
+        Some(folder) => add_watched(&app, &folder),
+        None => load(&app),
+    }
+}
+
+/// Links the detected default projects folder (first-run suggestion).
+#[tauri::command]
+pub fn link_detected_projects_folder(app: AppHandle) -> Result<Settings, String> {
+    let folder = detect_projects_folder(app.clone()).ok_or("No default projects folder was found.")?;
+    add_watched(&app, Path::new(&folder))
+}
+
+/// Unlinks a folder (only ever shrinks what the app may touch).
+#[tauri::command]
+pub fn remove_watched_folder(app: AppHandle, folder: String) -> Result<Settings, String> {
+    let mut saved = load(&app)?;
+    saved.watched_folders.retain(|f| f != &folder);
+    store(&app, &saved)?;
+    Ok(saved)
+}
+
+#[tauri::command]
+pub async fn pick_output_folder(app: AppHandle) -> Result<Settings, String> {
+    let Some(folder) = pick(&app, true).await? else { return load(&app) };
+    let folder = usable_folder(&folder)?;
+    let mut saved = load(&app)?;
+    saved.output_folder = Some(folder);
+    store(&app, &saved)?;
+    Ok(saved)
+}
+
+fn set_fl_studio(app: &AppHandle, path: &Path) -> Result<Settings, String> {
+    let exe = fl_studio_binary(path).ok_or_else(|| format!("That isn't FL Studio: {}", path.display()))?;
+    let mut saved = load(app)?;
+    saved.fl_studio_path = Some(exe.to_string_lossy().to_string());
+    store(app, &saved)?;
+    Ok(saved)
+}
+
+#[tauri::command]
+pub async fn pick_fl_studio(app: AppHandle) -> Result<Settings, String> {
+    match pick(&app, false).await? {
+        Some(path) => set_fl_studio(&app, &path),
+        None => load(&app),
+    }
+}
+
+/// Fills in the FL Studio path found on this machine.
+#[tauri::command]
+pub fn use_detected_fl_studio(app: AppHandle) -> Result<Settings, String> {
+    let found = detect_fl_studio().ok_or("FL Studio wasn't found. Pick it by hand.")?;
+    set_fl_studio(&app, Path::new(&found))
+}
+
+#[tauri::command]
+pub async fn pick_ffmpeg(app: AppHandle) -> Result<Settings, String> {
+    let Some(path) = pick(&app, false).await? else { return load(&app) };
+    if !is_ffmpeg(&path) {
+        return Err(format!("That isn't ffmpeg: {}", path.display()));
+    }
+    let mut saved = load(&app)?;
+    saved.ffmpeg_path = Some(path.to_string_lossy().to_string());
+    store(&app, &saved)?;
+    Ok(saved)
+}
+
+/// Clears a path setting: "flStudio", "ffmpeg" or "outputFolder".
+#[tauri::command]
+pub fn clear_path_setting(app: AppHandle, which: String) -> Result<Settings, String> {
+    let mut saved = load(&app)?;
+    match which.as_str() {
+        "flStudio" => saved.fl_studio_path = None,
+        "ffmpeg" => saved.ffmpeg_path = None,
+        "outputFolder" => saved.output_folder = None,
+        other => return Err(format!("unknown setting: {other}")),
+    }
+    store(&app, &saved)?;
+    Ok(saved)
 }
 
 /// FL's default projects folder, `<Documents>/Image-Line/FL Studio/Projects`
@@ -135,5 +278,44 @@ pub fn detect_fl_studio() -> Option<String> {
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn saving_settings_never_changes_paths() {
+        let mut saved = Settings {
+            watched_folders: vec!["/music/Projects".into()],
+            fl_studio_path: Some("/Applications/FL Studio 2025.app/Contents/MacOS/FL Studio".into()),
+            output_folder: Some("/music/Exports".into()),
+            ffmpeg_path: Some("/opt/homebrew/bin/ffmpeg".into()),
+            ..Settings::default()
+        };
+        let before = (saved.watched_folders.clone(), saved.fl_studio_path.clone(), saved.output_folder.clone(), saved.ffmpeg_path.clone());
+        let from_webview = Settings {
+            watched_folders: vec!["/".into(), "/Users/someone".into()],
+            fl_studio_path: Some("/tmp/payload".into()),
+            output_folder: Some("/Users/someone/Library/LaunchAgents".into()),
+            ffmpeg_path: Some("/tmp/payload".into()),
+            render_format: "plist".into(),
+            ai_include_notes: true,
+            ai_language: Some("French".into()),
+            ..Settings::default()
+        };
+        apply_preferences(&mut saved, from_webview);
+        assert_eq!((saved.watched_folders.clone(), saved.fl_studio_path.clone(), saved.output_folder.clone(), saved.ffmpeg_path.clone()), before);
+        assert_eq!(saved.render_format, "wav", "unknown formats are ignored");
+        assert!(saved.ai_include_notes);
+        assert_eq!(saved.ai_language.as_deref(), Some("French"));
+    }
+
+    #[test]
+    fn folders_must_be_local_directories() {
+        assert!(usable_folder(Path::new(r"\\host\share")).is_err());
+        assert!(usable_folder(Path::new("/definitely/not/here")).is_err());
+        assert!(usable_folder(&std::env::temp_dir()).is_ok());
     }
 }

@@ -100,13 +100,14 @@ fn plan_one(resolver: &mut Resolver, project: &Path) -> Result<PackagePlan, Stri
 
 /// Step 1: what each package would hold. Nothing is written.
 #[tauri::command]
-pub async fn package_preview(project_paths: Vec<String>) -> Result<Vec<PackagePlan>, String> {
+pub async fn package_preview(app: AppHandle, project_paths: Vec<String>) -> Result<Vec<PackagePlan>, String> {
+    let scope = crate::scope::Scope::load(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut resolver = Resolver::new(crate::settings::detect_fl_studio());
         project_paths
             .iter()
             .map(|p| {
-                plan_one(&mut resolver, Path::new(p)).unwrap_or_else(|error| PackagePlan {
+                scope.fl_project(p).and_then(|project| plan_one(&mut resolver, &project)).unwrap_or_else(|error| PackagePlan {
                     project_path: p.clone(),
                     files: Vec::new(),
                     refused: Vec::new(),
@@ -222,14 +223,6 @@ fn write_zip(dest: &Path, project: &Path, samples: &[PathBuf]) -> Result<(u32, V
     Ok((included, unreadable))
 }
 
-/// One folder name for an album's packages: no separators, no `..`, no
-/// leading dots. None when nothing usable is left.
-fn safe_subfolder(sub: &str) -> Option<String> {
-    let name = sub.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
-    let name = name.trim().trim_start_matches('.').trim();
-    (!name.is_empty()).then(|| name.to_string())
-}
-
 /// Step 2: packages each project into `<output>/<subfolder?>/<song>.zip`,
 /// emitting a `package-progress` event per song as it finishes. `approved`
 /// lines up with `project_paths`: the sample paths the user confirmed.
@@ -237,22 +230,23 @@ fn safe_subfolder(sub: &str) -> Option<String> {
 pub async fn package_projects(
     app: AppHandle,
     project_paths: Vec<String>,
-    output_folder: String,
     subfolder: Option<String>,
     approved: Vec<Vec<String>>,
 ) -> Result<Vec<PackageResult>, String> {
+    let scope = crate::scope::Scope::load(&app)?;
+    // <export folder>/Packages[/<album>]
+    let mut out_dir = scope.output()?.join("Packages");
+    if let Some(sub) = subfolder.as_deref().and_then(crate::scope::safe_subfolder) {
+        out_dir.push(sub);
+    }
     tauri::async_runtime::spawn_blocking(move || {
-        let mut out_dir = PathBuf::from(&output_folder);
-        if let Some(sub) = subfolder.as_deref().and_then(safe_subfolder) {
-            out_dir.push(sub);
-        }
         let mut resolver = Resolver::new(crate::settings::detect_fl_studio());
         let results: Vec<PackageResult> = project_paths
             .iter()
             .enumerate()
             .map(|(i, p)| {
                 let ok: HashSet<String> = approved.get(i).cloned().unwrap_or_default().into_iter().collect();
-                let result = package_one(&mut resolver, Path::new(p), &out_dir, &ok).unwrap_or_else(|error| PackageResult {
+                let result = scope.fl_project(p).and_then(|project| package_one(&mut resolver, &project, &out_dir, &ok)).unwrap_or_else(|error| PackageResult {
                     project_path: p.clone(),
                     zip_path: None,
                     bytes: 0,
@@ -430,12 +424,4 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    #[test]
-    fn subfolders_cannot_climb() {
-        assert_eq!(safe_subfolder("..").as_deref(), None);
-        assert_eq!(safe_subfolder("../../etc").as_deref(), Some("_.._etc"));
-        assert_eq!(safe_subfolder(" .hidden ").as_deref(), Some("hidden"));
-        assert_eq!(safe_subfolder("Night Run (EP)").as_deref(), Some("Night Run (EP)"));
-        assert_eq!(safe_subfolder("   ").as_deref(), None);
-    }
 }

@@ -44,12 +44,12 @@ fn candidate_paths() -> Vec<PathBuf> {
     out
 }
 
-/// The configured path if it exists, else FFMPEG_PATH, else the first
-/// ffmpeg found on PATH or in the usual install folders.
-pub fn find_ffmpeg(configured: Option<&str>) -> Option<PathBuf> {
-    let configured = configured.map(str::trim).filter(|p| !p.is_empty()).map(PathBuf::from);
+/// The ffmpeg from Settings (already checked to be ffmpeg), else
+/// FFMPEG_PATH, else the first ffmpeg found on PATH or in the usual install
+/// folders. Only files called ffmpeg / ffmpeg.exe are ever run.
+pub fn find_ffmpeg(configured: Option<PathBuf>) -> Option<PathBuf> {
     let env = std::env::var_os("FFMPEG_PATH").map(PathBuf::from);
-    configured.into_iter().chain(env).chain(candidate_paths()).find(|p| p.is_file())
+    configured.into_iter().chain(env).chain(candidate_paths()).find(|p| crate::scope::is_ffmpeg(p))
 }
 
 /// Best available H.264 encoder from `ffmpeg -encoders` output.
@@ -90,8 +90,10 @@ pub fn build_args(layout: &Path, master: &Path, start: f64, length: f64, encoder
     );
     let mut args: Vec<String> = [
         "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-        "-loop", "1", "-framerate", &FPS.to_string(), "-i", &layout.to_string_lossy(),
-        "-ss", &format!("{start:.3}"), "-t", &format!("{length:.3}"), "-i", &master.to_string_lossy(),
+        // Plain local files only: a mixdown that is really a playlist can't
+        // make ffmpeg open other files or URLs.
+        "-protocol_whitelist", "file", "-loop", "1", "-framerate", &FPS.to_string(), "-i", &format!("file:{}", layout.to_string_lossy()),
+        "-protocol_whitelist", "file", "-ss", &format!("{start:.3}"), "-t", &format!("{length:.3}"), "-i", &format!("file:{}", master.to_string_lossy()),
         "-filter_complex", &filter,
         "-map", "[v]", "-map", "[a]",
         "-t", &format!("{length:.3}"), "-r", &FPS.to_string(),
@@ -152,8 +154,9 @@ pub struct ShortsStatus {
 }
 
 #[tauri::command]
-pub async fn shorts_status(ffmpeg_path: Option<String>) -> ShortsStatus {
-    tauri::async_runtime::spawn_blocking(move || match find_ffmpeg(ffmpeg_path.as_deref()) {
+pub async fn shorts_status(app: tauri::AppHandle) -> ShortsStatus {
+    let configured = crate::scope::Scope::load(&app).ok().and_then(|s| s.ffmpeg());
+    tauri::async_runtime::spawn_blocking(move || match find_ffmpeg(configured) {
         None => ShortsStatus { path: None, encoder: None, error: None },
         Some(p) => match encoder_for(&p) {
             Ok(e) => ShortsStatus { path: Some(p.to_string_lossy().into()), encoder: Some(e.into()), error: None },
@@ -216,14 +219,17 @@ fn decode_base64(s: &str) -> Result<Vec<u8>, String> {
 /// Renders each clip to `<export>/Launch Kits/<song>/shorts/<label>.mp4`.
 #[tauri::command]
 pub async fn render_shorts(
-    ffmpeg_path: Option<String>,
+    app: tauri::AppHandle,
     master: String,
     clips: Vec<ShortClip>,
-    output_folder: String,
     folder_name: String,
 ) -> Result<Vec<ShortResult>, String> {
+    let scope = crate::scope::Scope::load(&app)?;
+    let configured = scope.ffmpeg();
+    let master = scope.audio(&master)?.to_string_lossy().to_string();
+    let output_folder = scope.output()?.to_string_lossy().to_string();
     tauri::async_runtime::spawn_blocking(move || {
-        let ffmpeg = find_ffmpeg(ffmpeg_path.as_deref())
+        let ffmpeg = find_ffmpeg(configured)
             .ok_or("ffmpeg isn't installed (or wasn't found). See Settings → Shorts.")?;
         let encoder = encoder_for(&ffmpeg)?;
         let master = PathBuf::from(&master);
@@ -281,7 +287,8 @@ mod tests {
     fn builds_a_nine_by_sixteen_command() {
         let args = build_args(Path::new("/tmp/l.png"), Path::new("/tmp/m.wav"), 12.5, 15.0, "libx264", Path::new("/tmp/o.mp4"));
         let joined = args.join(" ");
-        assert!(joined.contains("-ss 12.500 -t 15.000 -i /tmp/m.wav"), "{joined}");
+        assert!(joined.contains("-protocol_whitelist file -ss 12.500 -t 15.000 -i file:/tmp/m.wav"), "{joined}");
+        assert!(joined.contains("-protocol_whitelist file -loop 1"), "{joined}");
         assert!(joined.contains("scale=1080:1920"));
         // Default draw=scale makes the strokes ~6% opaque (murky on dark).
         assert!(joined.contains("draw=full"));
@@ -298,11 +305,17 @@ mod tests {
     }
 
     #[test]
-    fn finds_a_configured_ffmpeg() {
-        let fake = std::env::temp_dir().join(format!("flsm-fake-ffmpeg-{}", std::process::id()));
+    fn finds_a_configured_ffmpeg_and_runs_nothing_else() {
+        let dir = std::env::temp_dir().join(format!("flsm-fake-ffmpeg-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let fake = dir.join("ffmpeg");
         fs::write(&fake, b"").unwrap();
-        assert_eq!(find_ffmpeg(Some(fake.to_str().unwrap())), Some(fake.clone()));
-        let _ = fs::remove_file(&fake);
+        assert_eq!(find_ffmpeg(Some(fake.clone())), Some(fake.clone()));
+        // Anything not called ffmpeg is skipped, even if it's handed in.
+        let payload = dir.join("payload.sh");
+        fs::write(&payload, b"#!/bin/sh").unwrap();
+        assert_ne!(find_ffmpeg(Some(payload.clone())), Some(payload));
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// Manual check: render a layout PNG drawn by the app.

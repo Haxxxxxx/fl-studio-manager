@@ -25,6 +25,9 @@ export function SettingsView() {
   const loadDemoData = useAppStore((s) => s.loadDemoData);
   const exitDemoMode = useAppStore((s) => s.exitDemoMode);
   const startRender = useAppStore((s) => s.startRender);
+  const detectFlStudio = useAppStore((s) => s.detectFlStudio);
+  const pickFlStudio = useAppStore((s) => s.pickFlStudio);
+  const pickOutputFolder = useAppStore((s) => s.pickOutputFolder);
   const [detecting, setDetecting] = useState(false);
   const [testState, setTestState] = useState<
     { status: "idle" } | { status: "running" } | { status: "done"; path: string } | { status: "error"; message: string }
@@ -33,23 +36,20 @@ export function SettingsView() {
   async function handleDetect() {
     setDetecting(true);
     try {
-      const path = await api.detectFlStudio();
-      if (path) {
-        await updateSettings({ flStudioPath: path });
-      }
+      await detectFlStudio();
     } finally {
       setDetecting(false);
     }
   }
 
+  // Pickers run in Rust, which checks the choice (FL Studio must be FL
+  // Studio) before saving it.
   async function handleBrowseExecutable() {
-    const path = await api.pickExecutable();
-    if (path) await updateSettings({ flStudioPath: path });
+    await pickFlStudio().catch((e) => setTestState({ status: "error", message: e instanceof Error ? e.message : String(e) }));
   }
 
   async function handleBrowseOutput() {
-    const folder = await api.pickFolder();
-    if (folder) await updateSettings({ outputFolder: folder });
+    await pickOutputFolder().catch((e) => setTestState({ status: "error", message: e instanceof Error ? e.message : String(e) }));
   }
 
   async function handleTestRender() {
@@ -257,20 +257,22 @@ export function SettingsView() {
 /** ffmpeg for the Launch Kit's 9:16 shorts: found automatically, or set here. */
 function ShortsSettings() {
   const settings = useAppStore((s) => s.settings);
-  const updateSettings = useAppStore((s) => s.updateSettings);
+  const pickFfmpeg = useAppStore((s) => s.pickFfmpeg);
+  const clearPathSetting = useAppStore((s) => s.clearPathSetting);
   const [status, setStatus] = useState<api.ShortsStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
-    api.shortsStatus(settings.ffmpegPath).then((s) => live && setStatus(s)).catch(() => {});
+    api.shortsStatus().then((s) => live && setStatus(s)).catch(() => {});
     return () => {
       live = false;
     };
   }, [settings.ffmpegPath]);
 
   async function browse() {
-    const path = await api.pickExecutable();
-    if (path) await updateSettings({ ffmpegPath: path });
+    setError(null);
+    await pickFfmpeg().catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }
 
   return (
@@ -289,22 +291,17 @@ function ShortsSettings() {
             : status.error ?? "Not found. Install it, then restart the app, or pick it below."}
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <input
-          defaultValue={settings.ffmpegPath ?? ""}
-          key={settings.ffmpegPath ?? ""}
-          onBlur={(e) => updateSettings({ ffmpegPath: e.target.value.trim() || null })}
-          placeholder="Found automatically"
-          className={field}
-        />
+        <input value={settings.ffmpegPath ?? ""} readOnly placeholder="Found automatically" aria-label="ffmpeg" className={field} />
         <button onClick={browse} className="shrink-0 rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised">
           Browse
         </button>
         {settings.ffmpegPath && (
-          <button onClick={() => updateSettings({ ffmpegPath: null })} className="shrink-0 rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised">
+          <button onClick={() => void clearPathSetting("ffmpeg")} className="shrink-0 rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised">
             Auto
           </button>
         )}
       </div>
+      {error && <div className="mt-2 text-xs text-red-300">{error}</div>}
     </section>
   );
 }

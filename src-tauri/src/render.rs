@@ -156,20 +156,31 @@ fn find_rendered_file(dir: &Path, base_name: &str, format: &str) -> Option<PathB
 /// a sync command would block the UI thread the whole time).
 /// `output_names`, when given, lines up with `project_paths` and names each
 /// file (e.g. "01 - Envy" for an album export) instead of the project name.
+/// FL Studio, the format and the export folder come from Settings; every
+/// project must be an FL Studio project in a linked folder.
 #[tauri::command]
 pub async fn render_projects(
     app: AppHandle,
     project_paths: Vec<String>,
-    output_folder: String,
-    fl_studio_path: String,
-    format: String,
+    subfolder: Option<String>,
     output_names: Option<Vec<String>>,
 ) -> Result<(), String> {
-    if fl_studio_path.trim().is_empty() {
-        return Err("FL Studio executable path is not set (see Settings)".to_string());
+    let scope = crate::scope::Scope::load(&app)?;
+    let fl_studio_path = scope.fl_studio()?.to_string_lossy().to_string();
+    let format = scope.render_format.clone();
+    if !matches!(format.as_str(), "wav" | "mp3" | "ogg" | "flac") {
+        return Err(format!("unsupported render format: {format}"));
     }
+    let mut output_folder = scope.output()?.to_path_buf();
+    if let Some(sub) = subfolder.as_deref().and_then(crate::scope::safe_subfolder) {
+        output_folder.push(sub);
+    }
+    for p in &project_paths {
+        scope.fl_project(p)?;
+    }
+    let output_names = output_names.map(|names| names.iter().map(|n| crate::audio::safe_name(n)).collect());
     tauri::async_runtime::spawn_blocking(move || {
-        render_all(&app, project_paths, PathBuf::from(output_folder), &fl_studio_path, &format, output_names)
+        render_all(&app, project_paths, output_folder, &fl_studio_path, &format, output_names)
     })
     .await
     .map_err(|e| format!("render worker failed: {e}"))

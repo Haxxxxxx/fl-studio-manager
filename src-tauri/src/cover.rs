@@ -440,7 +440,8 @@ fn write_cover(output_folder: &str, folder_name: &str, image_b64: &str) -> Resul
 
 /// Saves the picked concept as `<export folder>/Launch Kits/<song>/cover-concept.jpg`.
 #[tauri::command]
-pub async fn save_cover(output_folder: String, folder_name: String, image_b64: String) -> Result<String, String> {
+pub async fn save_cover(app: AppHandle, folder_name: String, image_b64: String) -> Result<String, String> {
+    let output_folder = crate::scope::Scope::load(&app)?.output()?.to_string_lossy().to_string();
     tauri::async_runtime::spawn_blocking(move || write_cover(&output_folder, &folder_name, &image_b64).map(|p| p.to_string_lossy().to_string()))
         .await
         .map_err(|e| format!("saving failed: {e}"))?

@@ -41,9 +41,13 @@ fn list_kit(dir: &Path) -> Vec<KitFile> {
     files
 }
 
+/// The song's kit folder under the export folder from Settings.
 #[tauri::command]
-pub fn kit_files(output_folder: String, folder_name: String) -> Vec<KitFile> {
-    list_kit(&kit_dir(&output_folder, &folder_name))
+pub fn kit_files(app: tauri::AppHandle, folder_name: String) -> Vec<KitFile> {
+    let Some(out) = crate::scope::Scope::load(&app).ok().and_then(|s| s.output_folder().map(|o| o.to_string_lossy().to_string())) else {
+        return Vec::new();
+    };
+    list_kit(&kit_dir(&out, &folder_name))
 }
 
 #[cfg(test)]
@@ -68,6 +72,6 @@ mod tests {
 
     #[test]
     fn missing_kit_is_empty() {
-        assert!(kit_files("/definitely/not/here".into(), "Song".into()).is_empty());
+        assert!(list_kit(&kit_dir("/definitely/not/here", "Song")).is_empty());
     }
 }

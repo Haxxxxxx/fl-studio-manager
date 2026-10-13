@@ -22,7 +22,7 @@ export function ShortsPanel({
   analysisError: string | null;
 }) {
   const settings = useAppStore((s) => s.settings);
-  const updateSettings = useAppStore((s) => s.updateSettings);
+  const pickOutputFolder = useAppStore((s) => s.pickOutputFolder);
   const [checkCount, setCheckCount] = useState(0);
   const recheck = () => setCheckCount((n) => n + 1);
   const demoMode = useAppStore((s) => s.demoMode);
@@ -35,7 +35,7 @@ export function ShortsPanel({
   useEffect(() => {
     let live = true;
     api
-      .shortsStatus(settings.ffmpegPath)
+      .shortsStatus()
       .then((s) => live && setStatus(s))
       .catch(() => live && setStatus({ path: null, encoder: null, error: null }));
     return () => {
@@ -55,8 +55,7 @@ export function ShortsPanel({
   const preview = useMemo(() => drawShortLayout(layoutInput), [layoutKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function chooseExportFolder() {
-    const folder = await api.pickFolder();
-    if (folder) await updateSettings({ outputFolder: folder });
+    await pickOutputFolder();
   }
 
   // What stops a render, in the order the user should fix it, each with a
@@ -82,10 +81,8 @@ export function ShortsPanel({
     setState({ kind: "running" });
     try {
       const results = await api.renderShorts({
-        ffmpegPath: settings.ffmpegPath,
         master: project.renders[0].path,
         clips: snippets.map((s) => ({ label: s.label, startSec: s.startSec, lengthSec: s.lengthSec, layoutPng: preview })),
-        outputFolder: settings.outputFolder,
         folderName: layoutInput.title,
       });
       setState({ kind: "done", results });

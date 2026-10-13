@@ -29,5 +29,6 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 ## Rules
 - Developed on Windows and macOS. Crew members use both. `.flp` files store paths with the saving OS's separators (see `native()` in `src-tauri/src/resolve.rs`).
 - No hardcoded paths, usernames, real artist names or keys in code, tests or docs. Use placeholders.
+- **The webview is untrusted.** Every root, executable and output folder a Rust command uses comes from saved settings via `src-tauri/src/scope.rs` (`Scope::load`), never from IPC arguments; paths a command does receive (a project, a mixdown, a template) are checked against it. Path settings change only through Rust-side pickers/detection in `settings.rs` (`save_settings` ignores path fields). AI calls go through `ai_kit` (typed facts, prompts built in Rust). New commands follow the same rule.
 - App data (statuses, releases, people) lives in `workspace.json` in the app config dir, keyed by `.flp` path. Never write to `.flp` files.
 - The desktop CSP (`src-tauri/tauri.conf.json` → `security.csp` / `devCsp`) and `web/vercel.json` pin the Supabase project URL. If the project ever changes, update them along with `.env.local`.
