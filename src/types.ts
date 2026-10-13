@@ -231,12 +231,26 @@ export interface Snippet {
   lengthSec: number;
 }
 
+/** The mixdown file itself, for the distributor checks. */
+export interface MasterSpec {
+  container: string;
+  sampleRate: number;
+  channels: number;
+  /** null for lossy formats (MP3/OGG). */
+  bitsPerSample: number | null;
+  /** Highest absolute sample, 0–1 (1 = 0 dBFS). */
+  peak: number;
+  clippedSamples: number;
+}
+
 export interface AudioAnalysis {
   durationSec: number;
   windowSec: number;
   /** Loudness per window, loudest = 1. */
   energy: number[];
   snippets: Snippet[];
+  /** Missing for sample data. */
+  master?: MasterSpec;
 }
 
 /** A collaborator or contact. Aliases are how they appear in track names
