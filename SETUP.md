@@ -100,6 +100,15 @@ If they see "not on your crew's list", step 1 was missed or the email has a typo
 
 Builds made for the crew already include the server address. If you run from source, copy `.env.example` to `.env.local` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the public anon key, never the service_role key). Without them the Crew section says sharing isn't set up and everything else works as before.
 
+## Release builds (admin)
+
+Installers are built on the admin's Mac, registered as this repo's GitHub Actions runner (label `hivo`). It's free: no GitHub-hosted minutes are used. The Mac builds both the macOS `.dmg` (universal) and the Windows `.exe` (cross-compiled with cargo-xwin + NSIS).
+
+- **Make a release:** `git tag v0.2.0 && git push origin v0.2.0` (or Actions → Release builds → Run workflow). The Mac must be on. When it's done, open Releases, check the draft, Publish.
+- **Needs on the Mac:** Node, Rust (`rustup`, plus `cargo install cargo-xwin`), `brew install nsis llvm`.
+- **The runner** lives in `~/actions-runner-hivo` and runs as a background service. Stop it: `cd ~/actions-runner-hivo && ./svc.sh stop`. Start it: `./svc.sh start`. Remove it: `./svc.sh uninstall`, then `./config.sh remove` (with a removal token from the repo's Settings → Actions → Runners).
+- Only use a self-hosted runner on a **private** repo: on a public one, anyone's pull request could run code on the Mac.
+
 ## Where your data lives
 
 Stages, tags, notes, releases, people and settings are Hivo's own data. FL Studio doesn't store them. They live in the app config folder:
