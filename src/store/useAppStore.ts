@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS: Settings = {
   favorites: [],
   aiModel: null,
   aiLanguage: null,
+  ffmpegPath: null,
 };
 
 export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "settings";

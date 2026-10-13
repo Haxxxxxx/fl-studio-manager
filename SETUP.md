@@ -56,6 +56,14 @@ The Launch Kit works without AI. With a free Gemini API key it also writes capti
 
 The key is stored only on that computer (`ai.json` in the app config folder, owner-only on macOS) and the UI never shows it again. Each crew member uses their own key, so free-tier limits are per person. AI calls send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. **On the free tier Google may use what you send to improve its products.**
 
+## Optional: 9:16 shorts (free, on your computer)
+
+The Launch Kit turns each snippet into a 1080×1920 MP4 (H.264 + AAC, 30 fps), the format Reels, TikTok and YouTube Shorts take. Each one is the song's art, title, artist and release date, an animated waveform, and the **real audio** from your mixdown. It runs locally with ffmpeg: no upload, no account, no cost.
+
+1. Install ffmpeg once: `brew install ffmpeg` (Mac) or `winget install Gyan.FFmpeg` (Windows), then restart the app.
+2. The app finds it automatically, including Homebrew's folder, which apps opened from Finder can't see on the PATH. If it doesn't, set the path in **Settings → Shorts**, or set `FFMPEG_PATH`.
+3. Launch Kit → **Render 3 shorts**. They're saved in `<export folder>/Launch Kits/<song>/shorts/` and play right in the app.
+
 ## Where your data lives
 
 Stages, tags, notes, releases, people and settings are FL Manager's own data. FL Studio doesn't store them. They live in the app config folder:
