@@ -1,8 +1,9 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type {
+  AiStatus,
   AudioAnalysis,
   PackageResult,
   ProjectInfo,
@@ -104,15 +105,38 @@ export async function analyzeAudio(path: string, bpm: number | null): Promise<Au
   return invoke("analyze_audio", { path, bpm });
 }
 
-/** Writes the kit folder (text files, master copy, snippet clips). */
+/** Writes `<outputFolder>/Launch Kits/<folderName>` (text files, master
+ * copy, snippet clips). The folder name is sanitized on the Rust side. */
 export async function exportLaunchKit(args: {
-  outDir: string;
+  outputFolder: string;
+  folderName: string;
   files: { name: string; content: string }[];
   master: string | null;
   masterName: string;
   clips: Snippet[];
 }): Promise<string> {
   return invoke("export_launch_kit", args);
+}
+
+/** Whether a Gemini key is set (never the key itself). */
+export async function aiStatus(): Promise<AiStatus> {
+  return invoke("ai_status");
+}
+
+/** Saves the Gemini key on this machine; null removes it. */
+export async function setAiKey(key: string | null): Promise<void> {
+  return invoke("set_ai_key", { key });
+}
+
+/** One structured Gemini call: JSON matching `schema` comes back. */
+export async function aiGenerateJson(args: {
+  model: string | null;
+  system: string;
+  prompt: string;
+  schema: object;
+  temperature: number;
+}): Promise<unknown> {
+  return invoke("ai_generate_json", args);
 }
 
 /** URL the webview can stream a local audio file from (asset protocol). */
@@ -132,6 +156,11 @@ export async function pickExecutable(): Promise<string | null> {
 
 export async function openInFlStudio(path: string): Promise<void> {
   await openPath(path);
+}
+
+/** Opens an https link in the default browser. */
+export async function openExternal(url: string): Promise<void> {
+  await openUrl(url);
 }
 
 export async function revealInFileManager(path: string): Promise<void> {

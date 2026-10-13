@@ -101,7 +101,8 @@ pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
         frames += (samples.len() / channels) as u64;
         true
     })?;
-    if n > 0 {
+    // A last window of a few samples would read as a fake spike or dip.
+    if n > 0 && n * 2 >= (rate as f64 * WINDOW_SEC) as usize {
         energy.push((acc / n as f64).sqrt() as f32);
     }
     if rate == 0 || frames == 0 {
@@ -152,22 +153,34 @@ fn snap(start: f64, length: f64, duration: f64, bpm: Option<f64>) -> f64 {
 /// doesn't overlap the hook.
 fn pick_snippets(energy: &[f32], duration: f64, bpm: Option<f64>) -> Vec<Snippet> {
     let windows = |sec: f64| (sec / WINDOW_SEC).round() as usize;
+    let snapped = |start_w: usize, len: f64| snap(start_w as f64 * WINDOW_SEC, len, duration, bpm);
+    let clip = |label: &str, start_sec: f64, length_sec: f64| Snippet { label: label.to_string(), start_sec, length_sec };
     let mut out = Vec::new();
-    let mut make = |label: &str, start_w: usize, len: f64| {
-        let start = snap(start_w as f64 * WINDOW_SEC, len, duration, bpm);
-        out.push(Snippet { label: label.to_string(), start_sec: start, length_sec: len });
-        start
-    };
-    let Some(hook_w) = loudest_run(energy, windows(15.0), |_| false) else { return out };
-    let hook = make("Hook 15s", hook_w, 15.0);
-    if let Some(w) = loudest_run(energy, windows(30.0), |_| false) {
-        make("Teaser 30s", w, 30.0);
+    // A clip is only offered when the track is really that long.
+    if duration < 15.0 {
+        return out;
     }
-    let hook_range = windows(hook)..windows(hook + 15.0);
     let len = windows(15.0);
-    let overlaps = |i: usize| i < hook_range.end && i + len > hook_range.start;
-    if let Some(w) = loudest_run(energy, len, overlaps) {
-        make("Alt 15s", w, 15.0);
+    let Some(hook_w) = loudest_run(energy, len, |_| false) else { return out };
+    let hook = snapped(hook_w, 15.0);
+    out.push(clip("Hook 15s", hook, 15.0));
+    if duration >= 30.0 {
+        if let Some(w) = loudest_run(energy, windows(30.0), |_| false) {
+            out.push(clip("Teaser 30s", snapped(w, 30.0), 30.0));
+        }
+    }
+    // Snapping moves a start by up to half a bar: keep that much clear of
+    // the hook on both sides, then check the snapped result anyway.
+    let pad = bpm
+        .filter(|b| (40.0..=300.0).contains(b))
+        .map_or(0, |b| ((120.0 / b) / WINDOW_SEC).ceil() as usize);
+    let (hook_start, hook_end) = (windows(hook), windows(hook + 15.0));
+    let blocked = |i: usize| i + len + pad > hook_start && i < hook_end + pad;
+    if let Some(w) = loudest_run(energy, len, blocked) {
+        let alt = snapped(w, 15.0);
+        if alt + 15.0 <= hook || alt >= hook + 15.0 {
+            out.push(clip("Alt 15s", alt, 15.0));
+        }
     }
     out
 }
@@ -264,14 +277,19 @@ pub struct KitFile {
 /// the kit's own files only; anything else in the folder (cover art) stays.
 #[tauri::command]
 pub async fn export_launch_kit(
-    out_dir: String,
+    output_folder: String,
+    folder_name: String,
     files: Vec<KitFile>,
     master: Option<String>,
     master_name: String,
     clips: Vec<Snippet>,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let dir = PathBuf::from(&out_dir);
+        // <export folder>/Launch Kits/<song>; the song part is sanitized here
+        // so a title like ".." can't climb out.
+        let dir = PathBuf::from(&output_folder)
+            .join(crate::scanner::LAUNCH_KITS_DIR)
+            .join(safe_name(&folder_name));
         fs::create_dir_all(&dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
         for f in &files {
             let path = dir.join(safe_name(&f.name));
@@ -281,7 +299,11 @@ pub async fn export_launch_kit(
             let src = Path::new(&master);
             let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("wav");
             let dest = dir.join(format!("{}.{ext}", safe_name(&master_name)));
-            fs::copy(src, &dest).map_err(|e| format!("could not copy the mixdown: {e}"))?;
+            // Copying a file onto itself truncates it on Unix: never do that.
+            let same = matches!((src.canonicalize(), dest.canonicalize()), (Ok(a), Ok(b)) if a == b);
+            if !same {
+                fs::copy(src, &dest).map_err(|e| format!("could not copy the mixdown: {e}"))?;
+            }
             if !clips.is_empty() {
                 export_clips(src, &clips, &dir.join("snippets"))?;
             }
@@ -339,6 +361,30 @@ mod tests {
         let s = pick_snippets(&[1.0; 120], 60.0, Some(120.0));
         assert!(s.iter().all(|c| (c.start_sec / 2.0).fract() == 0.0));
         assert!(pick_snippets(&[1.0; 20], 10.0, None).is_empty(), "too short for a 15s clip");
+        assert!(pick_snippets(&[1.0; 30], 14.9, None).is_empty(), "14.9 s isn't a 15 s clip");
+        let short = pick_snippets(&[1.0; 50], 25.0, None);
+        assert!(short.iter().all(|s| s.length_sec == 15.0), "no 30 s teaser from 25 s");
+    }
+
+    #[test]
+    fn alt_never_overlaps_hook_after_snapping() {
+        // Two loud blocks close together; at 40 BPM a bar is 6 s, so naive
+        // snapping could pull the alt into the hook.
+        for offset in 0..12 {
+            let energy: Vec<f32> = (0..240)
+                .map(|i| if (60..90).contains(&i) || (92 + offset..122 + offset).contains(&i) { 1.0 } else { 0.1 })
+                .collect();
+            let s = pick_snippets(&energy, 120.0, Some(40.0));
+            let hook = &s[0];
+            if let Some(alt) = s.iter().find(|c| c.label == "Alt 15s") {
+                assert!(
+                    alt.start_sec + 15.0 <= hook.start_sec || alt.start_sec >= hook.start_sec + 15.0,
+                    "offset {offset}: alt {} overlaps hook {}",
+                    alt.start_sec,
+                    hook.start_sec
+                );
+            }
+        }
     }
 
     #[test]

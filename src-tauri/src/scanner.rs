@@ -141,10 +141,19 @@ pub(crate) fn export_song_key(stem: &str) -> String {
 
 /// Mixdowns exported by this app land in the export folder, not next to
 /// the project; index them by song name so they count as the song's render.
+/// Where the Launch Kit exports go, inside the export folder.
+pub(crate) const LAUNCH_KITS_DIR: &str = "Launch Kits";
+
 fn index_exports(output_folder: Option<&str>) -> HashMap<String, Vec<FileEntry>> {
     let mut index: HashMap<String, Vec<FileEntry>> = HashMap::new();
     let Some(dir) = output_folder else { return index };
-    for entry in WalkDir::new(dir).max_depth(3).into_iter().filter_map(|e| e.ok()) {
+    // Launch kits hold copies of masters, not new mixdowns: indexing them
+    // would make a kit's own copy the song's "latest render".
+    let walker = WalkDir::new(dir)
+        .max_depth(3)
+        .into_iter()
+        .filter_entry(|e| !(e.depth() == 1 && e.file_type().is_dir() && e.file_name() == LAUNCH_KITS_DIR));
+    for entry in walker.filter_map(|e| e.ok()) {
         let path = entry.path();
         if entry.file_type().is_file() && has_ext(path, AUDIO_EXTS) {
             if let Some(fe) = file_entry(path) {
@@ -359,6 +368,20 @@ pub async fn scan_projects(
 mod tests {
     use super::*;
     use crate::models::SampleStatus;
+
+    #[test]
+    fn launch_kit_copies_are_not_renders() {
+        let out = std::env::temp_dir().join(format!("flsm-exports-{}", std::process::id()));
+        let kit = out.join(LAUNCH_KITS_DIR).join("Envy");
+        fs::create_dir_all(&kit).unwrap();
+        fs::write(out.join("Envy.wav"), b"x").unwrap();
+        fs::write(kit.join("Envy.wav"), b"x").unwrap();
+        let index = index_exports(out.to_str());
+        let _ = fs::remove_dir_all(&out);
+        let renders = &index[&export_song_key("Envy")];
+        assert_eq!(renders.len(), 1);
+        assert!(!renders[0].path.contains(LAUNCH_KITS_DIR));
+    }
 
     #[test]
     fn extracts_recording_labels() {

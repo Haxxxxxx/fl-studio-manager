@@ -12,6 +12,8 @@ import type {
   RenderStatus,
   Settings,
   SongMeta,
+  AiStatus,
+  KitAiMeta,
   KitFieldId,
   SongStatus,
   Workspace,
@@ -23,6 +25,8 @@ const DEFAULT_SETTINGS: Settings = {
   outputFolder: null,
   renderFormat: "wav",
   favorites: [],
+  aiModel: null,
+  aiLanguage: null,
 };
 
 export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "settings";
@@ -124,6 +128,11 @@ interface AppState {
   setKitEdit: (path: string, id: KitFieldId, value: string | undefined) => void;
   setSnippetStart: (path: string, label: string, startSec: number | undefined) => void;
   acceptKit: (path: string) => void;
+  /** Merge AI drafts/review into a song's kit. */
+  setKitAi: (path: string, patch: Partial<KitAiMeta>) => void;
+  /** null until loaded; whether a Gemini key is set. */
+  aiStatus: AiStatus | null;
+  refreshAiStatus: () => Promise<void>;
   openNewProject: (draft?: Partial<NewProjectDraft>) => void;
   closeNewProject: () => void;
 
@@ -174,6 +183,8 @@ export const useAppStore = create<AppState>((set, get) => {
     if (get().demoMode || !get().workspaceWritable) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+      // Re-check at fire time: sample data may have been loaded meanwhile.
+      if (get().demoMode || !get().workspaceWritable) return;
       api.saveWorkspace(get().workspace).catch((e) => console.error("saving workspace failed", e));
     }, 400);
   }
@@ -251,6 +262,7 @@ export const useAppStore = create<AppState>((set, get) => {
       }
       set({ settings });
       await loadWorkspace();
+      get().refreshAiStatus();
       set({ settingsLoaded: true });
 
       if (!get().unlisten) {
@@ -391,6 +403,12 @@ export const useAppStore = create<AppState>((set, get) => {
     dismissRenderPanel: () => set({ renderJobs: new Map() }),
 
     loadDemoData: () => {
+      // Flush a pending real save now, before the workspace is swapped.
+      if (saveTimer && !get().demoMode && get().workspaceWritable) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        api.saveWorkspace(get().workspace).catch((e) => console.error("saving workspace failed", e));
+      }
       const projects = generateSampleProjects();
       set({
         demoMode: true,
@@ -477,6 +495,19 @@ export const useAppStore = create<AppState>((set, get) => {
     acceptKit: (path) => {
       const kit = get().workspace.songs[path]?.launchKit ?? {};
       get().updateSong(path, { launchKit: { ...kit, acceptedAtMs: Date.now() } });
+    },
+
+    setKitAi: (path, patch) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      // New or discarded drafts change the text, so the kit needs reviewing again.
+      const acceptedAtMs = "drafts" in patch ? undefined : kit.acceptedAtMs;
+      get().updateSong(path, { launchKit: { ...kit, acceptedAtMs, ai: { ...kit.ai, ...patch } } });
+    },
+
+    aiStatus: null,
+    refreshAiStatus: async () => {
+      const aiStatus = await api.aiStatus().catch(() => null);
+      set({ aiStatus });
     },
     openNewProject: (draft) =>
       set({ newProject: { albumId: null, status: "idea", ...draft } }),
