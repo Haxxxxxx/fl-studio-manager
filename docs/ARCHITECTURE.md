@@ -35,7 +35,10 @@ Sharing is **opt-in per song** (and per release). For a shared song the crew see
 ## Accounts and crews
 
 - Sign-in uses an **email code** (6 digits) on desktop and web. It needs no password and no deep-link setup.
-- A member **creates a crew** (becoming its owner) and shares an **invite code** (8 characters, expires after 7 days, limited uses). Others **join with the code**.
+- **Sign-up is closed.** Accounts are created by the crew admin in the Supabase dashboard; an email that isn't on the list gets "ask whoever runs Hivo for your crew to add you". This keeps strangers from filling the free project.
+- A member **creates a crew** (becoming its owner; at most 3 owned crews per person) and shares an **invite code** (8 characters, expires after 7 days, limited uses). Others **join with the code**.
+- **Removing a member revokes the crew's open invite codes**, so they can't come straight back with a code they still have. The owner makes a fresh code for the next person. Leaving on your own revokes nothing.
+- Limits per person: 10 crews, 1000 shared songs per crew and 2000 in total.
 - Everyone in a crew can see the crew's shared songs and releases, and **move songs between stages**: the board is shared. Only a song's owner can change its other details or stop sharing it.
 
 ## Sync rules
