@@ -10,6 +10,18 @@ export function uiLang(languages: readonly string[] = typeof navigator === "unde
   return languages.some((l) => /^fr\b/i.test(l)) ? "fr" : "en";
 }
 
+let forced: UiLang | null = null;
+
+/** Pin the language (the website's /fr and /en pages); null = follow the system. */
+export function setUiLang(lang: UiLang | null) {
+  forced = lang;
+}
+
+/** The pinned language, else the system's. */
+export function currentUiLang(): UiLang {
+  return forced ?? uiLang();
+}
+
 const TEXT = {
   unknownEmail: {
     en: "This email isn't on your crew's list yet. Ask whoever runs Hivo for your crew to add it, then ask for a code again.",
@@ -72,12 +84,12 @@ const TEXT = {
 
 export type CrewTextKey = keyof typeof TEXT;
 
-export function crewText(key: CrewTextKey, lang: UiLang = uiLang(), vars: Record<string, string> = {}): string {
+export function crewText(key: CrewTextKey, lang: UiLang = currentUiLang(), vars: Record<string, string> = {}): string {
   return TEXT[key][lang].replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? "");
 }
 
 /** Supabase and database errors in words the crew can act on. */
-export function crewErrorMessage(e: unknown, lang: UiLang = uiLang()): string {
+export function crewErrorMessage(e: unknown, lang: UiLang = currentUiLang()): string {
   const msg = (e as { message?: string } | null)?.message ?? String(e);
   const t = (k: CrewTextKey) => crewText(k, lang);
   if (/signups? not allowed|user not found|otp_disabled/i.test(msg)) return t("unknownEmail");

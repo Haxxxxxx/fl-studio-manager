@@ -7,6 +7,8 @@ import type { CrewSongRow, SongStatus } from "@shared/types";
 import { useWeb } from "./store";
 import { Landing } from "./Landing";
 import { crewText } from "@shared/lib/crewMessages";
+import { SIGN_IN } from "./landingCopy";
+import { pageLang, type Lang } from "./lang";
 
 const input =
   "w-full rounded-lg border border-rule-strong bg-chassis px-3 py-2.5 text-base text-cream placeholder:text-engrave shadow-[inset_0_2px_3px_rgb(0_0_0/0.5)] focus:border-hot focus:outline-none sm:text-sm";
@@ -40,7 +42,10 @@ export function App() {
   }, [init]);
 
   if (!ready) return <Centered>Loading…</Centered>;
-  if (!userId) return <Landing signIn={<SignIn />} />;
+  if (!userId) {
+    const lang = pageLang();
+    return <Landing lang={lang} signIn={<SignIn lang={lang} />} />;
+  }
   if (crews.length === 0 && loadError) return <Shell><LoadFailed message={loadError} /></Shell>;
   if (crews.length === 0) return <Shell><Join /></Shell>;
   return <Dashboard topError={error} />;
@@ -71,7 +76,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SignIn() {
+function SignIn({ lang }: { lang: Lang }) {
+  const t = SIGN_IN[lang];
   const { sendCode, verifyCode } = useWeb();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -79,7 +85,7 @@ function SignIn() {
   const { busy, error, run } = useAction();
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">Sign in to your crew</h2>
+      <h2 className="text-xl font-semibold">{t.title}</h2>
       {!sentTo ? (
         <form
           className="flex flex-col gap-3"
@@ -88,11 +94,11 @@ function SignIn() {
             void run(() => sendCode(email)).then((ok) => ok && setSentTo(email.trim()));
           }}
         >
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your email" autoComplete="email" className={input} />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.email} autoComplete="email" className={input} />
           <button disabled={busy || !/^\S+@\S+\.\S+$/.test(email.trim())} className={primary}>
-            {busy ? "Sending…" : "Email me a code"}
+            {busy ? t.sending : t.send}
           </button>
-          <p className="text-xs text-engrave">{crewText("signInHint")}</p>
+          <p className="text-xs text-engrave">{crewText("signInHint", lang)}</p>
         </form>
       ) : (
         <form
@@ -103,7 +109,7 @@ function SignIn() {
           }}
         >
           <p className="text-sm text-body">
-            Enter the 6-digit code sent to <b className="text-cream">{sentTo}</b>.
+            {t.enterCode} <b className="text-cream">{sentTo}</b>.
           </p>
           <input
             value={code}
@@ -111,14 +117,14 @@ function SignIn() {
             placeholder="123456"
             inputMode="numeric"
             autoComplete="one-time-code"
-            aria-label="Sign-in code"
+            aria-label={t.code}
             className={`${input} text-center font-mono text-2xl tracking-[0.4em]`}
           />
           <button disabled={busy || code.length !== 6} className={primary}>
-            {busy ? "Checking…" : "Sign in"}
+            {busy ? t.checking : t.signIn}
           </button>
           <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="text-xs text-engrave hover:text-cream">
-            Use another email
+            {t.other}
           </button>
         </form>
       )}
