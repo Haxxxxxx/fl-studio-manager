@@ -1,4 +1,4 @@
-import type { FileEntry, ProjectInfo, SongStatus, Workspace } from "../types";
+import type { DawId, FileEntry, ProjectInfo, SongStatus, Workspace } from "../types";
 import { ALBUM_COLORS, KEYS } from "./songs";
 
 const ROOT = "C:/Users/you/Documents/Image-Line/FL Studio/Projects";
@@ -17,6 +17,27 @@ const STATUSES: (SongStatus | undefined)[] = ["creation", "creation", "productio
 const TAGS = ["dark", "chill", "club", "vocals", "808", "sample-based", "collab"];
 const DAY = 24 * 60 * 60 * 1000;
 const VOCALISTS = ["Kadence", "Milo", "Nova"];
+
+/** "2026-10-01 143005" (local time), for timestamped backup names. */
+function stamp(ms: number) {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+/** Where each DAW keeps a song's backups, named the way it does. */
+function backupPath(daw: DawId, folder: string, name: string, s: number, ms: number) {
+  switch (daw) {
+    case "ableton":
+      return `${folder}/Backup/${name} [${stamp(ms)}].als`;
+    case "reaper":
+      return `${folder}/Backups/${name}-${stamp(ms).replace(" ", "_")}.rpp-bak`;
+    case "pro-tools":
+      return `${folder}/Session File Backups/${name}.bak.${String(s + 1).padStart(3, "0")}.ptx`;
+    default:
+      return `${folder}/Backup/${name} (overwritten at ${10 + (s % 12)}h${10 + s}).flp`;
+  }
+}
 
 const PLUGINS: { name: string; vendor: string | null }[] = [
   { name: "FLEX", vendor: null },
@@ -55,15 +76,25 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
     const ageDays = Math.floor(-Math.log(1 - rand() * 0.999) * 25);
     const modifiedAtMs = now - Math.min(ageDays, 365) * DAY;
 
+    // A mixed crew: most songs in FL Studio, some in other DAWs.
+    const other = ([
+      [5, "ableton", "als", "Ableton Live 12.1.5"],
+      [7, "reaper", "rpp", "REAPER 7.22"],
+      [11, "pro-tools", "ptx", null],
+    ] as const).find(([every]) => i % every === every - 1);
+    const daw: DawId = other?.[1] ?? "fl-studio";
+    // Pro Tools sessions are closed: tempo, plugins, samples and tracks
+    // can't be read. The random draws still happen so the rest of the
+    // sample library stays the same.
+    const readable = daw !== "pro-tools";
+
     // A song gets a burst of save sessions over the weeks before its last save.
     const backups: FileEntry[] = [];
     const sessions = Math.floor(rand() * 18);
     for (let s = 0; s < sessions; s++) {
-      backups.push({
-        path: `${folder}/Backup/${name} (overwritten at ${10 + s % 12}h${10 + s}).flp`,
-        sizeBytes: Math.floor((60 + rand() * 120) * 1024),
-        modifiedAtMs: modifiedAtMs - Math.floor(rand() * 40) * DAY - Math.floor(rand() * DAY),
-      });
+      const sizeBytes = Math.floor((60 + rand() * 120) * 1024);
+      const backupMs = modifiedAtMs - Math.floor(rand() * 40) * DAY - Math.floor(rand() * DAY);
+      backups.push({ path: backupPath(daw, folder, name, s, backupMs), sizeBytes, modifiedAtMs: backupMs });
     }
     backups.sort((a, b) => b.modifiedAtMs - a.modifiedAtMs);
 
@@ -78,23 +109,18 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
           }]
         : [];
 
-    // A mixed crew: most songs in FL Studio, some in other DAWs.
-    const other = ([
-      [5, "ableton", "als", "Ableton Live 12.1.5"],
-      [7, "reaper", "rpp", "REAPER 7.22"],
-      [11, "pro-tools", "ptx", null],
-    ] as const).find(([every]) => i % every === every - 1);
-    const daw = other?.[1] ?? "fl-studio";
+    const sizeBytes = Math.floor((60 + rand() * 180) * 1024);
+    const tempoBpm = Math.round(80 + rand() * 90);
     projects.push({
       path: `${folder}/${name}.${other?.[2] ?? "flp"}`,
       name,
       folder,
-      sizeBytes: Math.floor((60 + rand() * 180) * 1024),
+      sizeBytes,
       modifiedAtMs,
       root: ROOT,
       genre: null,
       artist: null,
-      tempoBpm: Math.round(80 + rand() * 90),
+      tempoBpm: readable ? tempoBpm : null,
       timeSigNum: rand() > 0.9 ? 3 : 4,
       timeSigDenom: 4,
       flVersion: daw === "fl-studio" ? (rand() > 0.5 ? "25.1.6.4997" : "24.2.1.4526") : null,
@@ -106,20 +132,23 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
       recordingsCount: Math.floor(rand() * 20),
       recordingsBytes: Math.floor(rand() * 400 * 1024 * 1024),
       stems: null,
-      plugins: PLUGINS.filter(() => rand() > 0.55).map((p) => ({
-        ...p,
-        // One third-party plugin "not installed" on a few songs.
-        installed: p.vendor ? !(p.name === "Auto-Tune Pro" && rand() > 0.5) : null,
-      })),
+      plugins: PLUGINS.filter(() => rand() > 0.55)
+        .map((p) => ({
+          ...p,
+          // One third-party plugin "not installed" on a few songs.
+          installed: p.vendor ? !(p.name === "Auto-Tune Pro" && rand() > 0.5) : null,
+        }))
+        // FL's stock plugins (no vendor) only show up in FL projects.
+        .filter((p) => readable && (daw === "fl-studio" || p.vendor !== null)),
       samples: Array.from({ length: 3 + Math.floor(rand() * 12) }, (_, s) => ({
         path: `${folder}/Samples/sample ${s + 1}.wav`,
         status: rand() > 0.96 ? ("missing" as const) : rand() > 0.85 ? ("relocated" as const) : ("ok" as const),
-      })),
+      })).filter(() => readable),
       trackNames: [
         "Instru",
         "Bus Voices",
         ...VOCALISTS.filter(() => rand() > 0.6).map((v) => `Lead Voices - ${v}`),
-      ],
+      ].filter(() => readable),
     });
   }
 

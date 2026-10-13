@@ -32,5 +32,26 @@ export function dawOf(project: { daw?: DawId | null }): DawInfo {
   return DAWS[project.daw ?? "fl-studio"] ?? DAWS["fl-studio"];
 }
 
+const PROJECT_EXT = /\.(flp|als|rpp|song|ptx|ptf|cpr|npr|bwproject)$/i;
+
+/** "Envy.als" → "Envy", for any DAW's project file. */
+export const stripProjectExt = (fileName: string) => fileName.replace(PROJECT_EXT, "");
+
 /** Rendering and packaging from the app need FL Studio. */
 export const canRenderInApp = (project: { daw?: DawId | null }) => dawOf(project).id === "fl-studio";
+
+/** Splits a render request into FL projects (rendered in the app) and the
+ *  rest. `names`, when given, lines up with `paths` and is filtered the same
+ *  way, since the backend matches names to projects by position. */
+export function splitRenderable<P extends { daw?: DawId | null }>(
+  paths: string[],
+  byPath: Map<string, P>,
+  names?: string[],
+): { paths: string[]; names?: string[]; skipped: string[] } {
+  const keep = paths.map((p) => canRenderInApp(byPath.get(p) ?? {}));
+  return {
+    paths: paths.filter((_, i) => keep[i]),
+    names: names?.filter((_, i) => keep[i]),
+    skipped: paths.filter((_, i) => !keep[i]),
+  };
+}

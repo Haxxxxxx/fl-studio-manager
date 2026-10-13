@@ -3,7 +3,7 @@ import * as api from "../lib/tauri";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
-import { canRenderInApp, dawOf } from "../lib/daws";
+import { canRenderInApp, dawOf, splitRenderable } from "../lib/daws";
 import type {
   PackageResult,
   Person,
@@ -411,8 +411,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // Rendering from the app drives FL Studio; other DAWs' songs are
       // listed as skipped with where to export them instead.
       const byPath = new Map(get().projects.map((p) => [p.path, p]));
-      const projectPaths = requested.filter((p) => canRenderInApp(byPath.get(p) ?? {}));
-      const skipped = requested.filter((p) => !projectPaths.includes(p));
+      const { paths: projectPaths, names: outputNames, skipped } = splitRenderable(requested, byPath, options?.names);
       if (projectPaths.length === 0) {
         const daw = dawOf(byPath.get(requested[0]) ?? {});
         throw new Error(`Rendering from FL Manager works with FL Studio projects. Export this one from ${daw.label}: ${daw.exportTip}`);
@@ -439,7 +438,7 @@ export const useAppStore = create<AppState>((set, get) => {
           outputFolder,
           flStudioPath: settings.flStudioPath,
           format: settings.renderFormat,
-          outputNames: options?.names,
+          outputNames,
         });
       } finally {
         set({ rendering: false });
