@@ -132,7 +132,7 @@ function MyDashboard() {
         {!scanning && (
           <>
             <div className="max-w-sm text-sm text-white/40">
-              No .flp projects in your linked folders. Check the folders in Settings, or load sample data to look around.
+              No projects in your linked folders. Check the folders in Settings, or load sample data to look around.
             </div>
             <div className="mt-2 flex gap-2">
               <button onClick={() => setView("settings")} className={btnPrimary}>

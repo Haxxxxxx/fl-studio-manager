@@ -1,4 +1,5 @@
 use crate::flp_metadata;
+use crate::daws::{self, Daw};
 use crate::models::{FileEntry, ProjectInfo, StemsInfo};
 use crate::resolve::Resolver;
 use std::collections::{HashMap, HashSet};
@@ -39,17 +40,6 @@ fn stem_of(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// True if any folder between `root` and the file is named `name`.
-fn under_dir_named(path: &Path, root: &Path, name: &str) -> bool {
-    path.strip_prefix(root)
-        .ok()
-        .and_then(|rel| rel.parent())
-        .map(|p| {
-            p.components()
-                .any(|c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case(name))
-        })
-        .unwrap_or(false)
-}
 
 /// FL names backups `<project> (overwritten at 16h12).flp` or
 /// `<project> (autosaved at 16h43)_2.flp`; recover `<project>`.
@@ -169,7 +159,7 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
     let mut resolver = Resolver::new(crate::settings::detect_fl_studio());
     let mut seen = HashSet::new();
     let mut projects: Vec<ProjectInfo> = Vec::new();
-    let mut backups: Vec<PathBuf> = Vec::new();
+    let mut backups: Vec<(PathBuf, Daw)> = Vec::new();
 
     for root in folders {
         let root_path = Path::new(root);
@@ -178,9 +168,21 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
         }
         for entry in WalkDir::new(root_path).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
-            if !entry.file_type().is_file() || !has_ext(path, &["flp"]) {
+            if !entry.file_type().is_file() {
                 continue;
             }
+            let daw = match Daw::of_project(path) {
+                Some(d) => d,
+                None => {
+                    // Backup-only files (.rpp-bak, Cubase .bak, Studio One .autosave).
+                    if let Some(d) = Daw::of_backup_file(path) {
+                        if !entry.file_name().to_string_lossy().starts_with("._") {
+                            backups.push((path.to_path_buf(), d));
+                        }
+                    }
+                    continue;
+                }
+            };
             // macOS metadata twins (`._Envy.flp`, `__MACOSX/`) from unzipped
             // packages or exFAT drives aren't projects.
             if entry.file_name().to_string_lossy().starts_with("._")
@@ -192,15 +194,18 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
             if !seen.insert(path.to_string_lossy().to_lowercase()) {
                 continue;
             }
-            if under_dir_named(path, root_path, "Backup") {
-                backups.push(path.to_path_buf());
+            if daws::is_backup_project(path, root_path, daw) {
+                backups.push((path.to_path_buf(), daw));
                 continue;
             }
             let Ok(meta) = entry.metadata() else { continue };
 
-            // Best-effort: a corrupt or oddly-shaped .flp shouldn't fail
+            // Best-effort: a corrupt or oddly-shaped project shouldn't fail
             // the whole scan, it just shows up with no metadata.
-            let flp = flp_metadata::parse_flp_metadata(path).unwrap_or_default();
+            let flp = match daw {
+                Daw::FlStudio => flp_metadata::parse_flp_metadata(path).unwrap_or_default(),
+                other => daws::read_project(other, path),
+            };
 
             projects.push(ProjectInfo {
                 path: path.to_string_lossy().to_string(),
@@ -217,8 +222,10 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
                 tempo_bpm: flp.tempo_bpm,
                 time_sig_num: flp.time_sig_num,
                 time_sig_denom: flp.time_sig_denom,
-                fl_version: flp.fl_version,
-                is_template: under_dir_named(path, root_path, "Templates"),
+                fl_version: if daw == Daw::FlStudio { flp.fl_version.clone() } else { None },
+                daw,
+                daw_version: flp.fl_version.clone(),
+                is_template: under_template_dir(path, root_path),
                 backups: Vec::new(),
                 renders: Vec::new(),
                 recordings_count: 0,
@@ -245,23 +252,26 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
         by_folder.entry(p.folder.to_lowercase()).or_default().push(i);
     }
 
-    // A backup in `<dir>/Backup/` belongs to the project in `<dir>` with the
-    // same base name, or to the only project there if names don't match
-    // (the project was renamed after the backups were made).
-    for backup in backups {
-        let Some(project_dir) = backup.parent().and_then(|p| p.parent()) else {
-            continue;
-        };
-        let Some(candidates) = by_folder.get(&project_dir.to_string_lossy().to_lowercase()) else {
-            continue;
-        };
-        let stem = stem_of(&backup);
-        let base = backup_base_name(&stem);
-        let owner = candidates
-            .iter()
-            .copied()
-            .find(|&i| projects[i].name.eq_ignore_ascii_case(base))
-            .or_else(|| (candidates.len() == 1).then(|| candidates[0]));
+    // A backup belongs to a project of the same DAW in its folder or up to
+    // two folders up (`Backup/`, `History/`, `Session File Backups/`, or next
+    // to it for .rpp-bak / Cubase .bak), with the same base name, or to the
+    // only such project there if names don't match (renamed since).
+    for (backup, daw) in backups {
+        let file_name = backup.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let base = daws::backup_base_name(daw, &file_name);
+        let owner = backup.ancestors().skip(1).take(3).find_map(|dir| {
+            let candidates: Vec<usize> = by_folder
+                .get(&dir.to_string_lossy().to_lowercase())?
+                .iter()
+                .copied()
+                .filter(|&i| projects[i].daw == daw)
+                .collect();
+            candidates
+                .iter()
+                .copied()
+                .find(|&i| projects[i].name.eq_ignore_ascii_case(&base))
+                .or_else(|| (candidates.len() == 1).then(|| candidates[0]))
+        });
         if let (Some(i), Some(entry)) = (owner, file_entry(&backup)) {
             projects[i].backups.push(entry);
         }
@@ -293,6 +303,19 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
                 .filter(|p| !(split_are_stems && stem_of(p).to_lowercase().starts_with(&split_prefix)))
                 .filter_map(|p| file_entry(p))
                 .collect();
+            // Each DAW's own export folder (Pro Tools "Bounced Files", Studio
+            // One "Mixdown"…): files named after the song, or any audio there
+            // if it's the only project of that DAW in the folder.
+            let daw = projects[i].daw;
+            let alone = indices.iter().filter(|&&j| projects[j].daw == daw).count() == 1;
+            for sub in daw.render_dirs() {
+                renders.extend(
+                    read_files(&dir.join(sub))
+                        .iter()
+                        .filter(|p| has_ext(p, AUDIO_EXTS) && (alone || stem_of(p).to_lowercase().starts_with(&name)))
+                        .filter_map(|p| file_entry(p)),
+                );
+            }
             // A stems folder belongs to this song if it's the only song in the
             // folder, or the stems folder is named after it.
             let own_dir = stem_dirs
@@ -312,6 +335,22 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
             renders.sort_by(by_newest);
             projects[i].renders = renders;
 
+            if daw != Daw::FlStudio {
+                // The DAW's recordings folder belongs to the project when it's
+                // the only project of that DAW in the folder.
+                if alone {
+                    for sub in daw.recording_dirs() {
+                        for rec in read_files(&dir.join(sub)).iter().filter(|p| has_ext(p, AUDIO_EXTS)) {
+                            if let Ok(meta) = fs::metadata(rec) {
+                                projects[i].recordings_count += 1;
+                                projects[i].recordings_bytes += meta.len();
+                            }
+                        }
+                    }
+                }
+                projects[i].backups.sort_by(by_newest);
+                continue;
+            }
             let prefix = format!("{name}_");
             for rec in recordings.iter().filter(|p| {
                 has_ext(p, AUDIO_EXTS) && stem_of(p).to_lowercase().starts_with(&prefix)
@@ -362,6 +401,15 @@ fn merge_plugin_aliases(projects: &mut [ProjectInfo]) {
         }
         project.plugins = merged;
     }
+}
+
+/// Under a templates folder (FL "Templates", REAPER "ProjectTemplates",
+/// Pro Tools "Session Templates", Cubase "Project Templates"…).
+fn under_template_dir(path: &Path, root: &Path) -> bool {
+    let rel = path.strip_prefix(root).unwrap_or(path);
+    let mut comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect();
+    comps.pop();
+    comps.iter().any(|c| c.contains("template"))
 }
 
 fn read_dirs(dir: &Path) -> Vec<PathBuf> {
@@ -519,6 +567,79 @@ mod tests {
         assert_eq!(p.recordings_count, 1);
         assert_eq!(p.recordings_bytes, 3);
         assert!(p.stems.is_none());
+    }
+
+    #[test]
+    fn scans_projects_from_every_daw() {
+        let root = std::env::temp_dir().join(format!("flsm-multidaw-{}", std::process::id()));
+        let w = |rel: &str, bytes: &[u8]| {
+            let p = root.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, bytes).unwrap();
+        };
+        // Ableton: project folder with a Backup/ copy and recorded takes.
+        let mut als = Vec::new();
+        {
+            use std::io::Write;
+            let mut gz = flate2::write::GzEncoder::new(&mut als, flate2::Compression::default());
+            gz.write_all(br#"<Ableton Creator="Ableton Live 12.1"><LiveSet><MainTrack><DeviceChain><Mixer><Tempo><Manual Value="128" /></Tempo></Mixer></DeviceChain></MainTrack></LiveSet></Ableton>"#).unwrap();
+            gz.finish().unwrap();
+        }
+        w("Ableton/Wave Project/Wave.als", &als);
+        w("Ableton/Wave Project/Backup/Wave [2026-10-12 143005].als", &als);
+        w("Ableton/Wave Project/Samples/Recorded/take 1.wav", b"abc");
+        w("Ableton/Wave Project/Wave.wav", b"x");
+        // REAPER: .rpp + .rpp-bak next to it.
+        w("Reaper/Tide/Tide.rpp", b"<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n  TEMPO 90 4 4\n>\n");
+        w("Reaper/Tide/Tide.rpp-bak", b"x");
+        // Studio One: History/ version and a Mixdown/ export.
+        w("Studio One/Glow/Glow.song", b"not a zip");
+        w("Studio One/Glow/History/Glow (2).song", b"x");
+        w("Studio One/Glow/Mixdown/Glow.wav", b"x");
+        // Pro Tools: Session File Backups/, Bounced Files/, Audio Files/.
+        w("Pro Tools/Rush/Rush.ptx", b"\x03binary");
+        w("Pro Tools/Rush/Session File Backups/Rush.bak.001.ptx", b"x");
+        w("Pro Tools/Rush/Bounced Files/Rush mix 2.wav", b"x");
+        w("Pro Tools/Rush/Audio Files/Vox_01.wav", b"abcd");
+        // Cubase: auto-save .bak and Audio/.
+        w("Cubase/Fade/Fade.cpr", b"RIFF....NUND");
+        w("Cubase/Fade/Fade-01.bak", b"x");
+        w("Cubase/Fade/Audio/Gtr_01.wav", b"ab");
+        // Bitwig: bounce/ export and recordings/.
+        w("Bitwig/Orbit/Orbit.bwproject", b"BtWg0001");
+        w("Bitwig/Orbit/bounce/Orbit.wav", b"x");
+        w("Bitwig/Orbit/recordings/rec1.wav", b"x");
+        // A REAPER template is flagged as one.
+        w("Reaper/ProjectTemplates/Rap session.rpp", b"<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n>\n");
+
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        let get = |name: &str| projects.iter().find(|p| p.name == name).unwrap_or_else(|| panic!("{name} missing"));
+
+        assert_eq!(projects.len(), 7, "6 DAWs + 1 template, no backups listed as projects: {:?}", projects.iter().map(|p| &p.name).collect::<Vec<_>>());
+
+        let wave = get("Wave");
+        assert_eq!((wave.daw, wave.tempo_bpm, wave.daw_version.as_deref()), (Daw::Ableton, Some(128.0), Some("Ableton Live 12.1")));
+        assert_eq!((wave.backups.len(), wave.renders.len(), wave.recordings_count), (1, 1, 1));
+        assert!(wave.fl_version.is_none());
+
+        let tide = get("Tide");
+        assert_eq!((tide.daw, tide.tempo_bpm, tide.backups.len()), (Daw::Reaper, Some(90.0), 1));
+
+        let glow = get("Glow");
+        assert_eq!((glow.daw, glow.backups.len(), glow.renders.len()), (Daw::StudioOne, 1, 1));
+
+        let rush = get("Rush");
+        assert_eq!((rush.daw, rush.backups.len(), rush.renders.len(), rush.recordings_count), (Daw::ProTools, 1, 1, 1));
+        assert!(rush.tempo_bpm.is_none(), "closed format: nothing read from inside");
+
+        let fade = get("Fade");
+        assert_eq!((fade.daw, fade.backups.len(), fade.recordings_count), (Daw::Cubase, 1, 1));
+
+        let orbit = get("Orbit");
+        assert_eq!((orbit.daw, orbit.renders.len(), orbit.recordings_count), (Daw::Bitwig, 1, 1));
+
+        assert!(get("Rap session").is_template);
     }
 
     #[test]

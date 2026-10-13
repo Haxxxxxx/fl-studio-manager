@@ -64,7 +64,7 @@ export function ShortsPanel({
   const blocker: { message: string; action?: { label: string; run: () => void } } | null = demoMode
     ? { message: "Sample data has no audio. Link your real project folder to render shorts." }
     : !project.renders[0]
-      ? { message: "This song has no mixdown yet. Export a WAV or MP3 from FL Studio next to the project (or into your export folder), then come back." }
+      ? { message: "This song has no mixdown yet. Export a WAV or MP3 from your DAW next to the project (or into your export folder), then come back." }
       : analysisLoading
         ? { message: "Listening to the mixdown to find the snippets…" }
         : analysisError

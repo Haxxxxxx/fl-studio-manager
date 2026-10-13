@@ -35,10 +35,32 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
 #[tauri::command]
 pub fn detect_projects_folder(app: AppHandle) -> Option<String> {
     let docs = app.path().document_dir().ok()?;
-    let projects = docs.join("Image-Line").join("FL Studio").join("Projects");
-    projects
-        .is_dir()
-        .then(|| projects.to_string_lossy().to_string())
+    let music = app.path().audio_dir().ok();
+    default_project_folders(&docs, music.as_deref())
+        .into_iter()
+        .find(|p| p.is_dir())
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+/// Each DAW's usual projects folder, most specific first (same names on
+/// macOS and Windows, under Documents unless noted).
+fn default_project_folders(docs: &std::path::Path, music: Option<&std::path::Path>) -> Vec<std::path::PathBuf> {
+    let mut out = vec![
+        docs.join("Image-Line").join("FL Studio").join("Projects"),
+        docs.join("Studio One").join("Songs"),
+        docs.join("REAPER Media"),
+        docs.join("Ableton").join("Projects"),
+        docs.join("Cubase Projects"),
+        docs.join("Bitwig Studio").join("Projects"),
+        docs.join("Pro Tools"),
+    ];
+    // Ableton on macOS keeps its folder under ~/Music.
+    if let Some(m) = music {
+        out.push(m.join("Ableton").join("Projects"));
+        out.push(m.join("Ableton"));
+    }
+    out.push(docs.join("Ableton"));
+    out
 }
 
 /// Best-effort auto-detection of the FL Studio executable. This covers the

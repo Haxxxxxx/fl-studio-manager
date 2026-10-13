@@ -3,6 +3,7 @@ import * as api from "../lib/tauri";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
+import { canRenderInApp, dawOf } from "../lib/daws";
 import type {
   PackageResult,
   Person,
@@ -404,9 +405,18 @@ export const useAppStore = create<AppState>((set, get) => {
       if (!settings.outputFolder) {
         throw new Error("Set an export output folder in Settings first.");
       }
-      const projectPaths = paths ?? Array.from(selected);
-      if (projectPaths.length === 0) return;
+      const requested = paths ?? Array.from(selected);
+      if (requested.length === 0) return;
       if (get().rendering) throw new Error("An export is already running.");
+      // Rendering from the app drives FL Studio; other DAWs' songs are
+      // listed as skipped with where to export them instead.
+      const byPath = new Map(get().projects.map((p) => [p.path, p]));
+      const projectPaths = requested.filter((p) => canRenderInApp(byPath.get(p) ?? {}));
+      const skipped = requested.filter((p) => !projectPaths.includes(p));
+      if (projectPaths.length === 0) {
+        const daw = dawOf(byPath.get(requested[0]) ?? {});
+        throw new Error(`Rendering from FL Manager works with FL Studio projects. Export this one from ${daw.label}: ${daw.exportTip}`);
+      }
 
       const sep = settings.outputFolder.includes("\\") ? "\\" : "/";
       const outputFolder = options?.subfolder
@@ -416,6 +426,10 @@ export const useAppStore = create<AppState>((set, get) => {
       const seedJobs = new Map(get().renderJobs);
       for (const path of projectPaths) {
         seedJobs.set(path, { status: "queued", message: null, outputPath: null });
+      }
+      for (const path of skipped) {
+        const daw = dawOf(byPath.get(path) ?? {});
+        seedJobs.set(path, { status: "error", message: `Not an FL Studio project. Export it from ${daw.label}.`, outputPath: null });
       }
       set({ renderJobs: seedJobs, rendering: true });
 
@@ -488,8 +502,25 @@ export const useAppStore = create<AppState>((set, get) => {
       if (!settings.outputFolder) throw new Error("Set an export folder in Settings first — packages go in <export folder>\\Packages.");
       if (packaging) throw new Error("Already packaging.");
       if (paths.length === 0) return;
+      // Packages are FL's flat .flp + samples zips; other DAWs are reported as skipped.
+      const byPath = new Map(get().projects.map((p) => [p.path, p]));
+      const skippedResults = paths
+        .filter((p) => !canRenderInApp(byPath.get(p) ?? {}))
+        .map((p) => ({
+          projectPath: p,
+          zipPath: null,
+          bytes: 0,
+          included: 0,
+          missing: [],
+          error: `Packaging works with FL Studio projects. In ${dawOf(byPath.get(p) ?? {}).label}, use its own "collect and save" feature.`,
+        }));
+      paths = paths.filter((p) => canRenderInApp(byPath.get(p) ?? {}));
+      if (paths.length === 0) {
+        set({ packageResults: skippedResults });
+        throw new Error(skippedResults[0]?.error ?? "Nothing to package.");
+      }
       const sep = settings.outputFolder.includes("\\") ? "\\" : "/";
-      set({ packaging: true, packageResults: [] });
+      set({ packaging: true, packageResults: skippedResults });
       // Results stream in per song so the panel can show progress.
       const unlisten = await api.onPackageProgress((r) =>
         set((s) => ({ packageResults: [...(s.packageResults ?? []), r] })),

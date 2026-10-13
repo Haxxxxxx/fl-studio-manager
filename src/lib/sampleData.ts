@@ -78,8 +78,15 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
           }]
         : [];
 
+    // A mixed crew: most songs in FL Studio, some in other DAWs.
+    const other = ([
+      [5, "ableton", "als", "Ableton Live 12.1.5"],
+      [7, "reaper", "rpp", "REAPER 7.22"],
+      [11, "pro-tools", "ptx", null],
+    ] as const).find(([every]) => i % every === every - 1);
+    const daw = other?.[1] ?? "fl-studio";
     projects.push({
-      path: `${folder}/${name}.flp`,
+      path: `${folder}/${name}.${other?.[2] ?? "flp"}`,
       name,
       folder,
       sizeBytes: Math.floor((60 + rand() * 180) * 1024),
@@ -90,7 +97,9 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
       tempoBpm: Math.round(80 + rand() * 90),
       timeSigNum: rand() > 0.9 ? 3 : 4,
       timeSigDenom: 4,
-      flVersion: rand() > 0.5 ? "25.1.6.4997" : "24.2.1.4526",
+      flVersion: daw === "fl-studio" ? (rand() > 0.5 ? "25.1.6.4997" : "24.2.1.4526") : null,
+      daw,
+      dawVersion: other?.[3] ?? null,
       isTemplate: false,
       backups,
       renders,

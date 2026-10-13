@@ -40,7 +40,7 @@ export async function detectFlStudio(): Promise<string | null> {
   return invoke("detect_fl_studio");
 }
 
-/** FL's default `Documents/Image-Line/FL Studio/Projects`, if it exists. */
+/** The first DAW projects folder found (FL Studio, Studio One, REAPER, Ableton, Cubase, Bitwig, Pro Tools defaults). */
 export async function detectProjectsFolder(): Promise<string | null> {
   return invoke("detect_projects_folder");
 }

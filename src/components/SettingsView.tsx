@@ -62,7 +62,7 @@ export function SettingsView() {
     if (!sample) {
       setTestState({
         status: "error",
-        message: "Link a project folder with at least one .flp to test with.",
+        message: "Link a project folder with at least one FL Studio project (.flp) to test with.",
       });
       return;
     }
@@ -108,7 +108,7 @@ export function SettingsView() {
         <section>
           <h2 className="text-sm font-semibold text-white/90">Project folders</h2>
           <p className="mt-1 text-xs text-white/40">
-            FL Manager scans these folders (recursively) for .flp files.
+            FL Manager scans these folders (recursively) for projects from FL Studio, Ableton Live, REAPER, Studio One, Pro Tools, Cubase and Bitwig.
           </p>
           <div className="mt-3 flex flex-col gap-2">
             {settings.watchedFolders.map((folder) => (
