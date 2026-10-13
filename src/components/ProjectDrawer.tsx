@@ -133,7 +133,7 @@ export function ProjectDrawer() {
           </button>
           <button
             title="Zip the project with every sample it uses — FL opens it directly. For sharing, collabs or archiving."
-            onClick={() => run(async () => (await startPackage([project.path]), ""), () => "Packaging finished: see the panel at the bottom.")}
+            onClick={() => run(async () => (await startPackage([project.path]), ""), () => "Check the files to include in the panel at the bottom, then write the package.")}
             disabled={demoMode || packaging || !canRenderInApp(project)}
             className={btn}
           >
