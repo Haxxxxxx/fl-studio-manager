@@ -1,4 +1,4 @@
-import type { Album, AudioAnalysis, KitFieldId, Person, ProjectInfo, Snippet, SongMeta } from "../types";
+import type { AiFieldReview, Album, AudioAnalysis, KitFieldId, Person, ProjectInfo, Snippet, SongMeta } from "../types";
 import { detectKey, detectedPeople } from "./people";
 import { KEYS, renderFreshness } from "./songs";
 
@@ -8,8 +8,9 @@ import { KEYS, renderFreshness } from "./songs";
 // and anything that can't be detected is asked once instead of guessed.
 
 /** detected = read from the project; suggested = a reasonable default to
- * confirm; edited = typed by the user; missing = needs an answer. */
-export type FieldSource = "detected" | "suggested" | "edited" | "missing";
+ * confirm; ai = written by the AI layer; edited = typed by the user;
+ * missing = needs an answer. */
+export type FieldSource = "detected" | "suggested" | "ai" | "edited" | "missing";
 
 export interface Check {
   level: "warn" | "missing";
@@ -26,6 +27,8 @@ export interface KitField {
   kind: "text" | "multiline" | "date" | "choice";
   options?: string[];
   check?: Check;
+  /** The AI layer's verdict; stale when the value changed since. */
+  review?: AiFieldReview & { stale: boolean };
 }
 
 export interface KitInput {
@@ -60,12 +63,12 @@ export function formatDuration(sec: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-function isoDate(d: Date): string {
+export function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** yyyy-mm-dd → local Date, or null. */
-function parseDate(value: string): Date | null {
+export function parseDate(value: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!m) return null;
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
@@ -162,15 +165,23 @@ function generate({ project, meta, people, albums, analysis, today = new Date() 
   return g;
 }
 
+/** The factual part of a cover brief (specs, distributor rules). Kept out
+ * of the AI's hands: it's the same for every release. */
+export function briefSpecs(title: string, artists: string): string[] {
+  return [
+    `Cover art brief: "${title}"${artists ? ` by ${artists}` : ""}`,
+    "",
+    "Format: square, 3000 × 3000 px, JPG or PNG, RGB.",
+    "Distributors reject covers with URLs, social handles, prices or store logos, and any text must match the release title and artist name.",
+  ];
+}
+
 /** Templates that use the final (possibly edited) values. */
 function coverBrief(v: Record<KitFieldId, string>, meta: SongMeta): string {
   const bpm = Number(v.bpm);
   const minor = /m$/.test(v.key);
   const lines = [
-    `Cover art brief: "${v.title}"${v.artists ? ` by ${v.artists}` : ""}`,
-    "",
-    "Format: square, 3000 × 3000 px, JPG or PNG, RGB.",
-    "Distributors reject covers with URLs, social handles, prices or store logos, and any text must match the release title and artist name.",
+    ...briefSpecs(v.title, v.artists),
     "",
     "Vibe cues from the project:",
     v.bpm && !Number.isNaN(bpm) ? `- Tempo: ${v.bpm} BPM (${tempoFeel(bpm)})` : null,
@@ -221,8 +232,9 @@ export function verify(id: KitFieldId, value: string, today = new Date()): Check
       return KEYS.includes(v) ? undefined : { level: "warn", message: "Write it like Am, F# or Bb" };
     case "duration": {
       if (!v) return { level: "missing", message: "No mixdown to measure" };
-      const [m, s] = v.split(":").map(Number);
-      return m * 60 + s < 30 ? { level: "warn", message: "Under 30 s: Spotify only counts a stream after 30 seconds" } : undefined;
+      const m = /^(\d+):([0-5]\d)$/.exec(v);
+      if (!m) return { level: "warn", message: "Write it as minutes:seconds, like 2:45" };
+      return +m[1] * 60 + +m[2] < 30 ? { level: "warn", message: "Under 30 s: Spotify only counts a stream after 30 seconds" } : undefined;
     }
     case "explicit":
       return v === "Yes" || v === "No" ? undefined : { level: "missing", message: "Explicit lyrics? Yes or No" };
@@ -265,13 +277,19 @@ export function buildKit(input: KitInput): KitField[] {
   for (const id of Object.keys(g) as KitFieldId[]) values[id] = edits[id] ?? g[id].value;
   // Text pieces are generated from the final values, so editing the title
   // flows into the captions unless those were edited too.
-  const brief = coverBrief(values, input.meta);
-  const caps = captions(values);
-  values.coverBrief = edits.coverBrief ?? brief;
-  values.captions = edits.captions ?? caps;
+  const ai = input.meta.launchKit?.ai;
+  const drafts = ai?.drafts;
+  values.coverBrief = edits.coverBrief ?? drafts?.coverBrief ?? coverBrief(values, input.meta);
+  values.captions = edits.captions ?? drafts?.captions ?? captions(values);
+  // AI text bakes in the title/artist/date it was written for.
+  const basis = drafts?.basis;
+  const draftsOutdated =
+    !!basis && (basis.title !== values.title || basis.artists !== values.artists || basis.releaseDate !== values.releaseDate);
 
   const field = (id: KitFieldId, kind: KitField["kind"], gen: { source: FieldSource; note: string }, options?: string[]): KitField => {
     const edited = edits[id] !== undefined;
+    const review = ai?.review?.fields[id];
+    const outdated = draftsOutdated && !edited && (id === "captions" || id === "coverBrief");
     return {
       id,
       label: LABELS[id],
@@ -280,10 +298,15 @@ export function buildKit(input: KitInput): KitField[] {
       note: edited ? "You changed this" : gen.note,
       kind,
       options,
-      check: verify(id, values[id], input.today),
+      check: outdated
+        ? { level: "warn", message: "Written for the old title, artist or date. Rewrite with AI or edit it" }
+        : verify(id, values[id], input.today),
+      review: review && { ...review, stale: outdated || review.checkedValue !== values[id] },
     };
   };
-  const drafted = { source: "suggested" as const, note: "Drafted from the fields above" };
+  const drafted = drafts
+    ? { source: "ai" as const, note: `Written by ${drafts.model}, then checked` }
+    : { source: "suggested" as const, note: "Drafted from the fields above" };
   return [
     field("title", "text", g.title),
     field("artists", "text", g.artists),
@@ -297,6 +320,26 @@ export function buildKit(input: KitInput): KitField[] {
     field("coverBrief", "multiline", drafted),
     field("captions", "multiline", drafted),
   ];
+}
+
+/** Below this, an AI verdict is shown as low confidence. */
+export const LOW_CONFIDENCE = 0.6;
+
+/** Where the AI check stands for the whole kit. */
+export function aiSummary(fields: KitField[]): {
+  state: "unchecked" | "stale" | "checked";
+  flagged: number;
+  /** Fields the model skipped in its last answer. */
+  skipped: number;
+  verified: boolean;
+} {
+  const reviewed = fields.filter((f) => f.review);
+  if (reviewed.length === 0) return { state: "unchecked", flagged: 0, skipped: 0, verified: false };
+  const fresh = reviewed.filter((f) => !f.review!.stale);
+  const flagged = fresh.filter((f) => f.review!.verdict !== "ok" || f.review!.confidence < LOW_CONFIDENCE).length;
+  const skipped = fields.length - reviewed.length;
+  const state = fresh.length < reviewed.length ? "stale" : "checked";
+  return { state, flagged, skipped, verified: state === "checked" && skipped === 0 && flagged === 0 };
 }
 
 /** Kit-level problems that aren't one field's. */
@@ -313,13 +356,19 @@ export function kitSnippets(analysis: AudioAnalysis | null, meta: SongMeta): Sni
   return (analysis?.snippets ?? []).map((s) => ({ ...s, startSec: starts[s.label] ?? s.startSec }));
 }
 
-const csvCell = (s: string) => `"${s.replace(/"/g, '""')}"`;
+// Quoted, and a leading = + - @ is defused so spreadsheets don't run it.
+const csvCell = (s: string) => `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
 
 /** The text files of an exported kit. */
 export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]): { name: string; content: string }[] {
   const get = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
   const meta = METADATA_FIELDS.concat("releaseDate");
-  const open = [...extra, ...fields.flatMap((f) => (f.check ? [{ ...f.check, message: `${f.label}: ${f.check.message}` }] : []))];
+  const aiFlags: Check[] = fields.flatMap((f) =>
+    f.review && !f.review.stale && (f.review.verdict !== "ok" || f.review.confidence < LOW_CONFIDENCE)
+      ? [{ level: "warn" as const, message: `${f.label}: AI says ${f.review.reason || f.review.verdict}` }]
+      : [],
+  );
+  const open = [...extra, ...fields.flatMap((f) => (f.check ? [{ ...f.check, message: `${f.label}: ${f.check.message}` }] : [])), ...aiFlags];
   const json = {
     ...Object.fromEntries(meta.map((id) => [id, get(id)])),
     snippets: snippets.map((s) => ({ file: `snippets/${s.label}.wav`, startSec: s.startSec, lengthSec: s.lengthSec })),
@@ -330,7 +379,8 @@ export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]
     { name: "metadata.json", content: JSON.stringify(json, null, 2) },
     {
       name: "metadata.csv",
-      content: [meta.map((id) => csvCell(LABELS[id])).join(","), meta.map((id) => csvCell(get(id))).join(",")].join("\n") + "\n",
+      // BOM so Excel reads accented names (é, ñ) as UTF-8.
+      content: "﻿" + [meta.map((id) => csvCell(LABELS[id])).join(","), meta.map((id) => csvCell(get(id))).join(",")].join("\n") + "\n",
     },
     { name: "cover-brief.md", content: get("coverBrief") + "\n" },
     { name: "captions.md", content: get("captions") + "\n" },

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { Sidebar } from "./components/Sidebar";
 import { Dashboard } from "./components/Dashboard";
 import { LibraryView } from "./components/LibraryView";
@@ -60,6 +61,12 @@ export default function App() {
       <NewProjectModal />
       <RenderPanel />
       <PackagePanel />
+      {!isTauri() && (
+        <div className="absolute bottom-3 left-1/2 z-40 max-w-xl -translate-x-1/2 rounded-md border border-amber-400/40 bg-[#2a2112] px-4 py-2 text-xs text-amber-100 shadow-xl">
+          This is the app's UI in a browser tab, so nothing can load or save here (no folders, settings or AI key). Run{" "}
+          <code className="rounded bg-black/30 px-1">npm run tauri dev</code> and use the FL Manager window that opens.
+        </div>
+      )}
       {startupError && (
         <div className="absolute left-1/2 top-3 z-40 max-w-xl -translate-x-1/2 rounded-md border border-red-500/40 bg-[#2a1215] px-4 py-2 text-xs text-red-200 shadow-xl">
           {startupError}

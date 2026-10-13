@@ -5,7 +5,8 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 ## Where we are
 - Phase 0 (stabilize + demo-ready) is nearly done. The remaining items are the crew pitch and scrubbing git history before the repo can go public.
 - **Launch Kit** (Phase 1b) first slice is in: `src/lib/launchKit.ts` (generate, verify, export files), `src-tauri/src/audio.rs` (mixdown analysis and snippet clips), `src/components/LaunchKitView.tsx`. The kit is regenerated from the project every time; the workspace stores only user edits (`SongMeta.launchKit`).
-- Not built yet: the AI pass (it plugs into `verify()` in launchKit.ts, returning the same `Check` shape; the provider and API key are still undecided), AI-written captions and briefs (templates today), and stems. The shared crew dashboard (1a) needs a backend decision first.
+- **AI layer:** Gemini API free tier (no Firebase project exists for this app). `src-tauri/src/ai.rs` holds the key (`ai.json` in the config dir, or the `GEMINI_API_KEY` env var) and makes one generic structured call (`generateContent` + `responseSchema`). `src/lib/ai.ts` holds the prompts: `draftCopy` (captions + cover concept) and `reviewKit` (a verdict, confidence and suggestion for every field). `sanitizeReview` drops suggestions for measured fields (bpm, duration) and malformed values; never trust raw model output. The AI is optional: everything works without a key.
+- Not built yet: stems, and distributor-specific export formats. The shared crew dashboard (1a) needs a backend decision first.
 
 ## Commands
 - `npm ci && npm run tauri dev`: run the app. Setup per OS: [SETUP.md](SETUP.md).
