@@ -26,7 +26,9 @@ tauri-plugin-dialog = "2"
 walkdir = "2.5.0"
 trash = "5"
 zip = { version = "2", default-features = false, features = ["deflate"] }
-symphonia = { version = "0.5", features = ["mp3"] }
+# Only the codecs mixdowns use (wav, mp3, ogg, flac): less decoder surface
+# for files that come from crewmates.
+symphonia = { version = "0.5", default-features = false, features = ["wav", "pcm", "adpcm", "mp3", "ogg", "vorbis", "flac"] }
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls"] }
 tokio = { version = "1.53.2", features = ["time"] }
 base64 = "0.22"
@@ -43,5 +45,7 @@ winreg = "0.55"
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
+# Unwind, not abort: a panic while reading one damaged or hostile project or
+# mixdown is caught (scanner.rs, audio.rs) instead of closing the app.
+panic = "unwind"
 strip = true

@@ -28,6 +28,10 @@ pub struct StemsInfo {
 #[serde(rename_all = "camelCase")]
 pub struct ProjectInfo {
     pub path: String,
+    /// Why nothing could be read from inside the project, when that happened
+    /// (damaged, oversized or hostile file). The project is still listed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_error: Option<String>,
     pub name: String,
     pub folder: String,
     pub size_bytes: u64,
