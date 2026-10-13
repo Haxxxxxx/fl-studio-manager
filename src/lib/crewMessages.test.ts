@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crewErrorMessage, crewText, uiLang } from "./crewMessages";
+import { crewErrorMessage, crewText, currentUiLang, setUiLang, uiLang } from "./crewMessages";
 
 // One test per dead end on the way into a crew (sign-up is closed).
 
@@ -44,5 +44,14 @@ describe("onboarding messages", () => {
     expect(crewErrorMessage({ message: "you already own 3 crews" }, "fr")).toMatch(/3 crews/);
     expect(crewErrorMessage({ message: "Failed to fetch" }, "en")).toMatch(/Are you online/);
     expect(crewErrorMessage({ message: "something else" }, "en")).toBe("something else");
+  });
+
+  it("the website can pin the language (/fr, /en) over the browser's", () => {
+    setUiLang("fr");
+    expect(currentUiLang()).toBe("fr");
+    expect(crewText("badCode")).toBe("Ce code est faux ou expiré. Demande un nouveau code.");
+    setUiLang("en");
+    expect(crewText("badCode")).toBe("That code is wrong or expired. Ask for a new one.");
+    setUiLang(null);
   });
 });
