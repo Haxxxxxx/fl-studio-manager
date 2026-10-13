@@ -54,12 +54,11 @@ fn default_project_folders(docs: &std::path::Path, music: Option<&std::path::Pat
         docs.join("Bitwig Studio").join("Projects"),
         docs.join("Pro Tools"),
     ];
-    // Ableton on macOS keeps its folder under ~/Music.
+    // Ableton on macOS keeps its folder under ~/Music. Not the bare
+    // `Ableton` folder: that's the User Library and Factory Packs.
     if let Some(m) = music {
         out.push(m.join("Ableton").join("Projects"));
-        out.push(m.join("Ableton"));
     }
-    out.push(docs.join("Ableton"));
     out
 }
 

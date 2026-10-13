@@ -159,29 +159,28 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
     let mut resolver = Resolver::new(crate::settings::detect_fl_studio());
     let mut seen = HashSet::new();
     let mut projects: Vec<ProjectInfo> = Vec::new();
-    let mut backups: Vec<(PathBuf, Daw)> = Vec::new();
+    // (file, DAW, backup-only file type)
+    let mut backups: Vec<(PathBuf, Daw, bool)> = Vec::new();
 
     for root in folders {
         let root_path = Path::new(root);
         if !root_path.exists() {
             continue;
         }
-        for entry in WalkDir::new(root_path).into_iter().filter_map(|e| e.ok()) {
+        // Ableton's library folders hold presets and demo sets, not songs.
+        let walker = WalkDir::new(root_path).into_iter().filter_entry(|e| {
+            !(e.depth() > 0 && e.file_type().is_dir() && daws::LIBRARY_DIRS.contains(&e.file_name().to_string_lossy().to_lowercase().as_str()))
+        });
+        for entry in walker.filter_map(|e| e.ok()) {
             let path = entry.path();
             if !entry.file_type().is_file() {
                 continue;
             }
-            let daw = match Daw::of_project(path) {
-                Some(d) => d,
-                None => {
-                    // Backup-only files (.rpp-bak, Cubase .bak, Studio One .autosave).
-                    if let Some(d) = Daw::of_backup_file(path) {
-                        if !entry.file_name().to_string_lossy().starts_with("._") {
-                            backups.push((path.to_path_buf(), d));
-                        }
-                    }
-                    continue;
-                }
+            // Backup-only files: .rpp-bak, Cubase .bak, Studio One .autosave.
+            let (daw, backup_only) = match (Daw::of_project(path), Daw::of_backup_file(path)) {
+                (Some(d), _) => (d, false),
+                (None, Some(d)) => (d, true),
+                _ => continue,
             };
             // macOS metadata twins (`._Envy.flp`, `__MACOSX/`) from unzipped
             // packages or exFAT drives aren't projects.
@@ -190,22 +189,24 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
             {
                 continue;
             }
-            // Overlapping linked folders would otherwise list a project twice.
+            // Overlapping linked folders would otherwise list a file twice.
             if !seen.insert(path.to_string_lossy().to_lowercase()) {
                 continue;
             }
-            if daws::is_backup_project(path, root_path, daw) {
-                backups.push((path.to_path_buf(), daw));
+            if backup_only || daws::is_backup_project(path, root_path, daw) {
+                backups.push((path.to_path_buf(), daw, backup_only));
                 continue;
             }
             let Ok(meta) = entry.metadata() else { continue };
 
             // Best-effort: a corrupt or oddly-shaped project shouldn't fail
-            // the whole scan, it just shows up with no metadata.
-            let flp = match daw {
+            // the whole scan, it just shows up with no metadata. A reader
+            // bug (panic) is contained the same way, in builds that unwind.
+            let flp = std::panic::catch_unwind(|| match daw {
                 Daw::FlStudio => flp_metadata::parse_flp_metadata(path).unwrap_or_default(),
                 other => daws::read_project(other, path),
-            };
+            })
+            .unwrap_or_default();
 
             projects.push(ProjectInfo {
                 path: path.to_string_lossy().to_string(),
@@ -254,23 +255,23 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
 
     // A backup belongs to a project of the same DAW in its folder or up to
     // two folders up (`Backup/`, `History/`, `Session File Backups/`, or next
-    // to it for .rpp-bak / Cubase .bak), with the same base name, or to the
-    // only such project there if names don't match (renamed since).
-    for (backup, daw) in backups {
+    // to it for .rpp-bak / Cubase .bak) with the same base name. If names
+    // don't match (renamed since), it goes to the only such project in the
+    // folder holding its backup folder. Generic backup-only types (.bak)
+    // need the name to match.
+    for (backup, daw, backup_only) in backups {
         let file_name = backup.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         let base = daws::backup_base_name(daw, &file_name);
+        let home = daws::backup_home_dir(&backup, daw).map(|d| d.to_string_lossy().to_lowercase());
         let owner = backup.ancestors().skip(1).take(3).find_map(|dir| {
-            let candidates: Vec<usize> = by_folder
-                .get(&dir.to_string_lossy().to_lowercase())?
-                .iter()
-                .copied()
-                .filter(|&i| projects[i].daw == daw)
-                .collect();
+            let key = dir.to_string_lossy().to_lowercase();
+            let candidates: Vec<usize> = by_folder.get(&key)?.iter().copied().filter(|&i| projects[i].daw == daw).collect();
+            let fallback_here = !backup_only && home.as_deref() == Some(key.as_str());
             candidates
                 .iter()
                 .copied()
                 .find(|&i| projects[i].name.eq_ignore_ascii_case(&base))
-                .or_else(|| (candidates.len() == 1).then(|| candidates[0]))
+                .or_else(|| (fallback_here && candidates.len() == 1).then(|| candidates[0]))
         });
         if let (Some(i), Some(entry)) = (owner, file_entry(&backup)) {
             projects[i].backups.push(entry);
@@ -689,4 +690,64 @@ mod tests {
         assert_eq!(envy.stems.as_ref().map(|s| (s.count, s.bytes)), Some((1, 4)));
         assert!(other.stems.is_none(), "a stems folder named after another song isn't this one's");
     }
+
+    #[test]
+    fn backups_are_counted_once_with_overlapping_roots() {
+        let root = std::env::temp_dir().join(format!("flsm-overlap-{}", std::process::id()));
+        let tide = root.join("Reaper").join("Tide");
+        fs::create_dir_all(tide.join("__MACOSX")).unwrap();
+        fs::write(tide.join("Tide.rpp"), b"<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n>\n").unwrap();
+        fs::write(tide.join("Tide.rpp-bak"), b"x").unwrap();
+        fs::write(tide.join("._Tide.rpp-bak"), b"x").unwrap();
+        fs::write(tide.join("__MACOSX").join("Tide.rpp-bak"), b"x").unwrap();
+        let outer = root.to_string_lossy().to_string();
+        let inner = root.join("Reaper").to_string_lossy().to_string();
+        let projects = scan(&[outer, inner], None);
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].backups.len(), 1, "{:?}", projects[0].backups);
+    }
+
+    #[test]
+    fn backups_attach_only_to_their_own_project() {
+        let root = std::env::temp_dir().join(format!("flsm-owner-{}", std::process::id()));
+        let w = |rel: &str| {
+            let p = root.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, b"x").unwrap();
+        };
+        // P has no project of its own; its parent has one unrelated song.
+        w("Beats/Unrelated.flp");
+        w("Beats/P/Backup/Old idea (overwritten at 16h12).flp");
+        // Renamed since: the only project in the folder holding Backup/ still gets it.
+        w("Beats/Envy/Envy v2.flp");
+        w("Beats/Envy/Backup/Envy (overwritten at 10h00).flp");
+        // Cubase: a stray notes.bak isn't a backup of the project above it.
+        w("Cubase/Fade/Fade.cpr");
+        w("Cubase/Fade/Fade-01.bak");
+        w("Cubase/Fade/Docs/notes.bak");
+        w("Cubase/Fade/Auto Saves/Fade-02.bak");
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        let get = |name: &str| projects.iter().find(|p| p.name == name).unwrap();
+        assert!(get("Unrelated").backups.is_empty());
+        assert_eq!(get("Envy v2").backups.len(), 1);
+        let fade: Vec<_> = get("Fade").backups.iter().map(|b| Path::new(&b.path).file_name().unwrap().to_string_lossy().to_string()).collect();
+        assert_eq!(fade.len(), 2, "{fade:?}");
+        assert!(!fade.iter().any(|f| f == "notes.bak"));
+    }
+
+    #[test]
+    fn skips_ableton_library_folders() {
+        let root = std::env::temp_dir().join(format!("flsm-library-{}", std::process::id()));
+        for rel in ["User Library/Templates/Default.als", "Factory Packs/Drum Booth/Demo.als", "Songs/Wave Project/Wave.als"] {
+            let p = root.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, b"not gzip").unwrap();
+        }
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(projects.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), vec!["Wave"]);
+    }
 }
+

@@ -16,9 +16,22 @@
 
 use crate::flp_metadata::{FlpMetadata, RawPlugin};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::SystemTime;
+
+/// Upper bound on decompressed bytes read from one .als or one zip entry,
+/// so a malformed or hostile file can't exhaust memory.
+const MAX_DECOMPRESSED: u64 = 256 * 1024 * 1024;
+/// Studio One keeps one XML per device; read at most this many, this big.
+const MAX_DEVICE_FILES: usize = 64;
+const MAX_DEVICE_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Folders that belong to a DAW's install or library, never to songs.
+pub const LIBRARY_DIRS: &[&str] = &["factory packs", "user library", "core library"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -48,7 +61,9 @@ impl Daw {
         })
     }
 
-    /// Backup-only file types (never projects themselves).
+    /// Backup-only file types (never projects themselves). These extensions
+    /// are generic (`.bak`), so the scanner only attaches them to a project
+    /// whose name matches.
     pub fn of_backup_file(path: &Path) -> Option<Daw> {
         let name = path.file_name()?.to_str()?.to_ascii_lowercase();
         if name.ends_with(".rpp-bak") {
@@ -111,9 +126,47 @@ fn dirs_below(path: &Path, root: &Path) -> Vec<String> {
 /// A project-extension file that's really a backup or an older saved version.
 pub fn is_backup_project(path: &Path, root: &Path, daw: Daw) -> bool {
     let dirs = dirs_below(path, root);
-    if dirs.iter().any(|d| daw.backup_dirs().contains(&d.as_str())) {
+    dirs.iter().any(|d| daw.is_backup_dir(d)) || has_backup_stem(path, daw)
+}
+
+/// Whether the scanner could list this file as a project's backup, without
+/// knowing the linked root: a backup-only file type, or a project file with
+/// a backup name or a backup folder in the two folders above it (as far up
+/// as backups get attached).
+pub fn is_backup_file(path: &Path) -> bool {
+    if Daw::of_backup_file(path).is_some() {
         return true;
     }
+    let Some(daw) = Daw::of_project(path) else { return false };
+    let in_backup_dir = path
+        .ancestors()
+        .skip(1)
+        .take(2)
+        .filter_map(|d| d.file_name())
+        .any(|n| daw.is_backup_dir(&n.to_string_lossy().to_lowercase()));
+    in_backup_dir || has_backup_stem(path, daw)
+}
+
+/// The folder whose project a backup most likely belongs to: the one
+/// holding its backup folder (`Song/Backup/x.als` → `Song`), else the
+/// backup's own folder (`.rpp-bak` next to the project).
+pub fn backup_home_dir(path: &Path, daw: Daw) -> Option<&Path> {
+    let parent = path.parent()?;
+    parent
+        .ancestors()
+        .take(2)
+        .find(|d| d.file_name().is_some_and(|n| daw.is_backup_dir(&n.to_string_lossy().to_lowercase())))
+        .and_then(Path::parent)
+        .or(Some(parent))
+}
+
+impl Daw {
+    fn is_backup_dir(self, lower_name: &str) -> bool {
+        self.backup_dirs().contains(&lower_name)
+    }
+}
+
+fn has_backup_stem(path: &Path, daw: Daw) -> bool {
     let stem = path.file_stem().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
     match daw {
         // `<Session>.bak.001.ptx`
@@ -132,7 +185,8 @@ fn is_pro_tools_backup_stem(stem: &str) -> bool {
 /// The project a backup file belongs to, by name (`base` matched
 /// case-insensitively against project names).
 pub fn backup_base_name(daw: Daw, file_name: &str) -> String {
-    let lower = file_name.to_lowercase();
+    // ASCII lowercasing keeps byte offsets valid for `file_name`.
+    let lower = file_name.to_ascii_lowercase();
     // Drop the extension(s).
     let mut base = file_name.to_string();
     for ext in [".rpp-bak", ".song.bak", ".autosave", ".bak", ".flp", ".als", ".song", ".ptx", ".ptf", ".cpr", ".npr", ".bwproject"] {
@@ -152,7 +206,7 @@ pub fn backup_base_name(daw: Daw, file_name: &str) -> String {
         // `Night Run-2026-10-12_143005` (timestamped backups)
         Daw::Reaper => strip_timestamp_suffix(&base),
         // `Night Run.bak.001`
-        Daw::ProTools => match base.to_lowercase().rfind(".bak.") {
+        Daw::ProTools => match base.to_ascii_lowercase().rfind(".bak.") {
             Some(i) => base[..i].to_string(),
             None => base,
         },
@@ -161,35 +215,79 @@ pub fn backup_base_name(daw: Daw, file_name: &str) -> String {
             Some((b, n)) if n.len() >= 2 && n.chars().all(|c| c.is_ascii_digit()) => b.to_string(),
             _ => base,
         },
-        Daw::StudioOne | Daw::Bitwig => base,
+        // `Night Run (2)` (History/ versions, numbered backups)
+        Daw::StudioOne | Daw::Bitwig => strip_copy_number(&base),
     }
 }
 
+fn strip_copy_number(base: &str) -> String {
+    if let Some((name, n)) = base.strip_suffix(')').and_then(|h| h.rsplit_once(" (")) {
+        if !n.is_empty() && n.bytes().all(|c| c.is_ascii_digit()) && !name.trim().is_empty() {
+            return name.trim_end().to_string();
+        }
+    }
+    base.to_string()
+}
+
 fn strip_timestamp_suffix(base: &str) -> String {
-    // `<name>[-_ ]YYYY-MM-DD[_ -]HHMM(SS)`
-    let b = base.as_bytes();
+    // `<name>[-_ ]YYYY-MM-DD[_ -]HHMM(SS)`. Offsets go through `get` so a
+    // non-ASCII name can't land a slice inside a character.
+    let is_date = |d: &[u8]| d.len() == 10 && d.iter().enumerate().all(|(k, &c)| if k == 4 || k == 7 { c == b'-' } else { c.is_ascii_digit() });
     for sep in ['-', '_', ' '] {
-        if let Some(i) = base.rfind(sep) {
-            let tail = &base[i + 1..];
-            if tail.len() >= 4 && tail.chars().all(|c| c.is_ascii_digit()) && i >= 11 {
-                let date_start = i - 10;
-                let date = &base[date_start..i];
-                if date.len() == 10 && date.as_bytes()[4] == b'-' && date.as_bytes()[7] == b'-' && date_start >= 1 {
-                    let _ = b;
-                    return base[..date_start - 1].trim_end().to_string();
-                }
+        let Some(i) = base.rfind(sep) else { continue };
+        let Some(tail) = base.get(i + 1..) else { continue };
+        if tail.len() < 4 || !tail.bytes().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let Some(date_start) = i.checked_sub(10).filter(|&d| d >= 1) else { continue };
+        let Some(date) = base.as_bytes().get(date_start..i) else { continue };
+        if is_date(date) {
+            if let Some(name) = base.get(..date_start - 1) {
+                return name.trim_end().to_string();
             }
         }
     }
     base.to_string()
 }
 
+/// (size, mtime) a cached read was made at.
+type Stamp = (u64, Option<SystemTime>);
+
+/// Rescans run on every window focus; an unchanged file is read once.
+static READ_CACHE: Mutex<Option<HashMap<PathBuf, (Stamp, FlpMetadata)>>> = Mutex::new(None);
+
 /// What can be read from inside a non-FL project. Best-effort: a file that
 /// can't be parsed just yields empty metadata.
 pub fn read_project(daw: Daw, path: &Path) -> FlpMetadata {
+    if !matches!(daw, Daw::Reaper | Daw::Ableton | Daw::StudioOne) {
+        return FlpMetadata::default();
+    }
+    let stamp: Option<Stamp> = fs::metadata(path).ok().map(|m| (m.len(), m.modified().ok()));
+    if let Some(stamp) = stamp {
+        let cache = READ_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((s, meta)) = cache.as_ref().and_then(|c| c.get(path)) {
+            if *s == stamp {
+                return meta.clone();
+            }
+        }
+    }
+    let meta = read_uncached(daw, path);
+    if let Some(stamp) = stamp {
+        let mut cache = READ_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        cache.get_or_insert_with(HashMap::new).insert(path.to_path_buf(), (stamp, meta.clone()));
+    }
+    meta
+}
+
+fn read_uncached(daw: Daw, path: &Path) -> FlpMetadata {
     let read = match daw {
         Daw::Reaper => fs::read(path).map(|b| parse_rpp(&String::from_utf8_lossy(&b), project_dir(path))).map_err(|e| e.to_string()),
-        Daw::Ableton => read_gzip(path).map(|xml| parse_als(&xml, project_dir(path))),
+        Daw::Ableton => File::open(path)
+            .map(|f| {
+                let xml = flate2::read::GzDecoder::new(f).take(MAX_DECOMPRESSED);
+                parse_als_reader(BufReader::new(xml), project_dir(path))
+            })
+            .map_err(|e| e.to_string()),
         Daw::StudioOne => read_song(path),
         _ => Ok(FlpMetadata::default()),
     };
@@ -310,13 +408,6 @@ pub fn parse_rpp(text: &str, dir: &Path) -> FlpMetadata {
 
 // ------------------------------------------------------------------ Ableton
 
-fn read_gzip(path: &Path) -> Result<String, String> {
-    let file = File::open(path).map_err(|e| e.to_string())?;
-    let mut out = String::new();
-    flate2::read::GzDecoder::new(file).read_to_string(&mut out).map_err(|e| e.to_string())?;
-    Ok(out)
-}
-
 fn attr_value(e: &quick_xml::events::BytesStart, key: &str) -> Option<String> {
     e.attributes()
         .flatten()
@@ -333,6 +424,9 @@ struct AlsState {
     file_name: String,
     au_name: Option<String>,
     au_vendor: Option<String>,
+    /// The current FileRef is audio (inside a SampleRef), not a device
+    /// preset or Max device.
+    file_is_sample: bool,
 }
 
 fn als_element(name: &str, e: &quick_xml::events::BytesStart, stack: &[String], meta: &mut FlpMetadata, st: &mut AlsState) {
@@ -369,14 +463,21 @@ fn als_element(name: &str, e: &quick_xml::events::BytesStart, stack: &[String], 
             }
         }
         ("Name", "FileRef") => st.file_name = value(),
+        ("FileRef", _) => st.file_is_sample = parent == "SampleRef",
         _ => {}
     }
 }
 
+#[cfg(test)]
 pub fn parse_als(xml: &str, dir: &Path) -> FlpMetadata {
+    parse_als_reader(xml.as_bytes(), dir)
+}
+
+/// Streams the set's XML, so a big .als never sits in memory as one string.
+pub fn parse_als_reader<R: BufRead>(input: R, dir: &Path) -> FlpMetadata {
     use quick_xml::events::Event;
     let mut meta = FlpMetadata::default();
-    let mut reader = quick_xml::Reader::from_str(xml);
+    let mut reader = quick_xml::Reader::from_reader(input);
     let mut stack: Vec<String> = Vec::new();
     let mut st = AlsState::default();
     let mut buf = Vec::new();
@@ -408,9 +509,10 @@ pub fn parse_als(xml: &str, dir: &Path) -> FlpMetadata {
                         Some(r) if Path::new(&r).exists() || st.file_abs.is_empty() => r,
                         _ => st.file_abs.clone(),
                     };
-                    if Path::new(&pick).extension().is_some() {
+                    if st.file_is_sample && Path::new(&pick).extension().is_some() {
                         push_unique(&mut meta.samples, pick);
                     }
+                    st.file_is_sample = false;
                     st.file_abs.clear();
                     st.file_rel.clear();
                     st.rel_dirs.clear();
@@ -434,11 +536,11 @@ pub fn parse_als(xml: &str, dir: &Path) -> FlpMetadata {
 
 // ------------------------------------------------------------------ Studio One
 
-fn zip_text(archive: &mut zip::ZipArchive<File>, name: &str) -> Option<String> {
-    let mut f = archive.by_name(name).ok()?;
-    let mut s = String::new();
-    f.read_to_string(&mut s).ok()?;
-    Some(s)
+fn zip_text(archive: &mut zip::ZipArchive<File>, name: &str, max: u64) -> Option<String> {
+    let f = archive.by_name(name).ok()?;
+    let mut bytes = Vec::new();
+    f.take(max).read_to_end(&mut bytes).ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
 }
 
 /// `file:///Users/x/My%20Song/a.wav` → `/Users/x/My Song/a.wav`.
@@ -449,8 +551,10 @@ fn file_url_to_path(url: &str) -> Option<String> {
     let bytes = rest.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(b) = u8::from_str_radix(&rest[i + 1..i + 3], 16) {
+        if bytes[i] == b'%' {
+            // On bytes: `%` may be followed by a multi-byte character.
+            let hex = bytes.get(i + 1..i + 3).and_then(|h| std::str::from_utf8(h).ok()).and_then(|h| u8::from_str_radix(h, 16).ok());
+            if let Some(b) = hex {
                 out.push(b);
                 i += 3;
                 continue;
@@ -470,7 +574,7 @@ fn read_song(path: &Path) -> Result<FlpMetadata, String> {
     let dir: PathBuf = project_dir(path).to_path_buf();
 
     // metainfo.xml: <Attribute id="Media:Tempo" value="140"/> pairs.
-    if let Some(xml) = zip_text(&mut archive, "metainfo.xml") {
+    if let Some(xml) = zip_text(&mut archive, "metainfo.xml", MAX_DECOMPRESSED) {
         let mut reader = quick_xml::Reader::from_str(&xml);
         let mut buf = Vec::new();
         loop {
@@ -495,7 +599,7 @@ fn read_song(path: &Path) -> Result<FlpMetadata, String> {
     }
 
     // Media pool: any url="file:///..." is a referenced audio file.
-    if let Some(xml) = zip_text(&mut archive, "Song/mediapool.xml") {
+    if let Some(xml) = zip_text(&mut archive, "Song/mediapool.xml", MAX_DECOMPRESSED) {
         let mut reader = quick_xml::Reader::from_str(&xml);
         let mut buf = Vec::new();
         loop {
@@ -513,7 +617,7 @@ fn read_song(path: &Path) -> Result<FlpMetadata, String> {
     }
 
     // Tracks (best-effort): elements named *Track with a name attribute.
-    if let Some(xml) = zip_text(&mut archive, "Song/song.xml") {
+    if let Some(xml) = zip_text(&mut archive, "Song/song.xml", MAX_DECOMPRESSED) {
         let mut reader = quick_xml::Reader::from_str(&xml);
         let mut buf = Vec::new();
         loop {
@@ -533,9 +637,14 @@ fn read_song(path: &Path) -> Result<FlpMetadata, String> {
     }
 
     // Plugins (best-effort): <Attributes x:id="deviceData" name="Serum"/> in Devices/*.xml.
-    let device_files: Vec<String> = archive.file_names().filter(|n| n.starts_with("Devices/") && n.ends_with(".xml")).map(String::from).collect();
+    let device_files: Vec<String> = archive
+        .file_names()
+        .filter(|n| n.starts_with("Devices/") && n.ends_with(".xml"))
+        .take(MAX_DEVICE_FILES)
+        .map(String::from)
+        .collect();
     for name in device_files {
-        let Some(xml) = zip_text(&mut archive, &name) else { continue };
+        let Some(xml) = zip_text(&mut archive, &name, MAX_DEVICE_BYTES) else { continue };
         let mut reader = quick_xml::Reader::from_str(&xml);
         let mut buf = Vec::new();
         loop {
@@ -750,4 +859,81 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         assert!(m.tempo_bpm.is_none() && m.plugins.is_empty());
     }
+
+    #[test]
+    fn non_ascii_backup_names_never_panic() {
+        assert_eq!(backup_base_name(Daw::Reaper, "Ma très belle chanson_2024.rpp-bak"), "Ma très belle chanson_2024");
+        assert_eq!(backup_base_name(Daw::Reaper, "Été-2026-10-12_143005.rpp-bak"), "Été");
+        assert_eq!(backup_base_name(Daw::Reaper, "ééééééééééé_1234.rpp-bak"), "ééééééééééé_1234");
+        assert_eq!(backup_base_name(Daw::Reaper, "é-2026-10-12_1430.rpp-bak"), "é");
+        assert_eq!(backup_base_name(Daw::ProTools, "İstanbul.bak.002.ptx"), "İstanbul");
+        assert_eq!(backup_base_name(Daw::Cubase, "Nuit étoilée-01.bak"), "Nuit étoilée");
+        for name in ["日本語-2026", "—_1234", "x-é1234", "-2026-10-12_1430", "ÀÀÀÀÀÀÀÀÀÀ_0000"] {
+            let _ = strip_timestamp_suffix(name);
+        }
+    }
+
+    #[test]
+    fn file_urls_with_non_ascii_after_percent() {
+        assert_eq!(file_url_to_path("file:///Users/x/Caf%C3%A9/a.wav").as_deref(), Some("/Users/x/Café/a.wav"));
+        assert_eq!(file_url_to_path("file:///Users/x/%é%/a.wav").as_deref(), Some("/Users/x/%é%/a.wav"));
+        assert_eq!(file_url_to_path("file:///x/100%").as_deref(), Some("/x/100%"));
+        assert_eq!(file_url_to_path("file:///C:/Songs/a%20b.wav").as_deref(), Some("C:/Songs/a b.wav"));
+    }
+
+    #[test]
+    fn studio_one_and_bitwig_backups_drop_copy_numbers() {
+        assert_eq!(backup_base_name(Daw::StudioOne, "Night Run (2).song"), "Night Run");
+        assert_eq!(backup_base_name(Daw::StudioOne, "Night Run.autosave"), "Night Run");
+        assert_eq!(backup_base_name(Daw::Bitwig, "Night Run (14).bwproject"), "Night Run");
+        // Not a copy number: part of the name.
+        assert_eq!(backup_base_name(Daw::StudioOne, "Night Run (live).song"), "Night Run (live)");
+        assert_eq!(backup_base_name(Daw::Bitwig, "(2).bwproject"), "(2)");
+    }
+
+    #[test]
+    fn ableton_device_presets_are_not_samples() {
+        let xml = r#"<Ableton Creator="Ableton Live 12.1"><LiveSet><Tracks><AudioTrack>
+  <DeviceChain><Devices>
+    <InstrumentGroupDevice><LastPresetRef><Value><FilePresetRef><FileRef>
+      <RelativePath Value="Presets/Keys.adg" /><Path Value="/lib/Presets/Keys.adg" />
+    </FileRef></FilePresetRef></Value></LastPresetRef></InstrumentGroupDevice>
+    <MxDeviceAudioEffect><FileRef><Path Value="/lib/Max/Delay.amxd" /></FileRef></MxDeviceAudioEffect>
+  </Devices></DeviceChain>
+  <SampleRef><FileRef><Path Value="/lib/Samples/kick.wav" /></FileRef></SampleRef>
+</AudioTrack></Tracks></LiveSet></Ableton>"#;
+        let m = parse_als(xml, Path::new("/p"));
+        assert_eq!(m.samples, vec!["/lib/Samples/kick.wav"]);
+    }
+
+    #[test]
+    fn backup_files_without_a_root() {
+        assert!(is_backup_file(Path::new("/m/Wave Project/Backup/Wave [2026-10-12 143005].als")));
+        assert!(is_backup_file(Path::new("/m/Tide/Tide.rpp-bak")));
+        assert!(is_backup_file(Path::new("/m/Fade/Fade-01.bak")));
+        assert!(is_backup_file(Path::new("/m/Rush/Rush.bak.001.ptx")));
+        assert!(is_backup_file(Path::new("/m/Glow/History/Glow (2).song")));
+        assert!(is_backup_file(Path::new("/m/Envy/Backup/Envy (overwritten at 16h12).flp")));
+        assert!(!is_backup_file(Path::new("/m/Envy/Envy.flp")));
+        assert!(!is_backup_file(Path::new("/m/Wave Project/Wave.als")));
+        assert!(!is_backup_file(Path::new("/m/Tide/Tide.rpp")));
+        // A backup folder name of another DAW doesn't count.
+        assert!(!is_backup_file(Path::new("/m/Glow/Backup/Glow.song")));
+        assert!(!is_backup_file(Path::new("/m/Envy/Backup/notes.txt")));
+    }
+
+    #[test]
+    fn rereads_a_project_only_when_it_changes() {
+        let dir = std::env::temp_dir().join(format!("flsm-cache-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("Tide.rpp");
+        fs::write(&path, "<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n  TEMPO 90 4 4\n>\n").unwrap();
+        assert_eq!(read_project(Daw::Reaper, &path).tempo_bpm, Some(90.0));
+        assert_eq!(read_project(Daw::Reaper, &path).tempo_bpm, Some(90.0));
+        fs::write(&path, "<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n  TEMPO 142.5 4 4\n>\n").unwrap();
+        let m = read_project(Daw::Reaper, &path);
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(m.tempo_bpm, Some(142.5));
+    }
 }
+
