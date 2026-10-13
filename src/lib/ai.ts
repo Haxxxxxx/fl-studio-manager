@@ -1,5 +1,5 @@
 import * as api from "./tauri";
-import { artistLine, briefSpecs, isoDate, parseDate, type KitField, type KitInput } from "./launchKit";
+import { artistLine, briefSpecs, CAPTION_HEADINGS, CAPTION_LANGUAGE_NAMES, isoDate, parseDate, type KitField, type KitInput } from "./launchKit";
 import { detectKey, detectedPeople } from "./people";
 import type { AiFieldReview, KitFieldId, Settings } from "../types";
 
@@ -70,10 +70,11 @@ function fieldValues(fields: KitField[]): Record<string, string> {
  * the notes, even when they're included in checks: the cover concept it
  * writes becomes the FLUX prompt, which goes to Cloudflare. */
 export async function draftCopy(input: KitInput, fields: KitField[], settings: Settings) {
+  const lang = input.captionLanguage ?? "fr";
   const answer = await api.aiKit({
     kind: "draft",
     model: settings.aiModel,
-    language: settings.aiLanguage || "English",
+    language: CAPTION_LANGUAGE_NAMES[lang],
     context: kitContext(input),
     fields: fieldValues(fields),
   });
@@ -81,7 +82,8 @@ export async function draftCopy(input: KitInput, fields: KitField[], settings: S
   const s = (k: string) => (typeof d[k] === "string" ? (d[k] as string).trim() : "");
   if (!s("announce") || !s("concept")) throw new Error("Gemini's draft came back incomplete. Try again.");
   const value = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
-  const captions = `ANNOUNCE\n${s("announce")}\n\nTEASER (post with the Hook snippet)\n${s("teaser")}\n\nRELEASE DAY\n${s("releaseDay")}`;
+  const h = CAPTION_HEADINGS[lang];
+  const captions = `${h.announce}\n${s("announce")}\n\n${h.teaser}\n${s("teaser")}\n\n${h.releaseDay}\n${s("releaseDay")}`;
   const coverBrief = [
     ...briefSpecs(value("title"), artistLine(value("artists"), value("featuring"))),
     "",
@@ -91,7 +93,7 @@ export async function draftCopy(input: KitInput, fields: KitField[], settings: S
     `Typography: ${s("typography")}`,
     `Avoid: ${s("avoid")}`,
   ].join("\n");
-  const basis = { title: value("title"), artists: value("artists"), releaseDate: value("releaseDate") };
+  const basis = { title: value("title"), artists: value("artists"), releaseDate: value("releaseDate"), language: lang };
   return { captions, coverBrief, basis, model: answer.model };
 }
 
@@ -150,7 +152,9 @@ export function reviewPayload(input: KitInput, fields: KitField[], includeNotes:
 export async function reviewKit(input: KitInput, fields: KitField[], settings: Settings) {
   // Rust drops the notes again unless the saved setting allows them.
   const { context, values } = reviewPayload(input, fields, !!settings.aiIncludeNotes);
-  const answer = await api.aiKit({ kind: "review", model: settings.aiModel, language: settings.aiLanguage, context, fields: values });
+  // The check flags captions that aren't fully in the kit's language.
+  const language = CAPTION_LANGUAGE_NAMES[input.captionLanguage ?? "fr"];
+  const answer = await api.aiKit({ kind: "review", model: settings.aiModel, language, context, fields: values });
   const review = sanitizeReview(answer.data, fields);
   if (Object.keys(review).length === 0) throw new Error("Gemini's check came back empty. Try again.");
   return { review, model: answer.model };

@@ -11,6 +11,7 @@ import {
   kitChecks,
   kitFiles,
   kitGuide,
+  CAPTION_LANGUAGE_NAMES,
   type KitGuide,
   type KitLang,
   kitSnippets,
@@ -80,6 +81,7 @@ export function LaunchKitView() {
   const openLaunchKit = useAppStore((s) => s.openLaunchKit);
   const workspace = useAppStore((s) => s.workspace);
   const settings = useAppStore((s) => s.settings);
+  const setKitCaptionLanguage = useAppStore((s) => s.setKitCaptionLanguage);
   const demoMode = useAppStore((s) => s.demoMode);
   const setKitEdit = useAppStore((s) => s.setKitEdit);
   const setKitEdits = useAppStore((s) => s.setKitEdits);
@@ -125,7 +127,8 @@ export function LaunchKitView() {
     people: workspace.people,
     albums: workspace.albums,
     analysis,
-    language: settings.aiLanguage ?? "English",
+    captionLanguage: meta.launchKit?.captionLanguage ?? settings.captionLanguage ?? "fr",
+    language: settings.aiLanguage ?? CAPTION_LANGUAGE_NAMES[meta.launchKit?.captionLanguage ?? settings.captionLanguage ?? "fr"],
     labelName: crewName,
     busyDates,
   };
@@ -154,7 +157,7 @@ export function LaunchKitView() {
     const title = byId("title").value || project.name;
     setExportState({ status: "running" });
     try {
-      const lang = kitLang(settings.aiLanguage);
+      const lang: KitLang = kitInput.captionLanguage ?? "fr";
       const masterExt = project.renders[0]?.path.split(".").pop()?.toLowerCase() ?? null;
       const dir = await api.exportLaunchKit({
         folderName: title,
@@ -299,6 +302,11 @@ export function LaunchKitView() {
               <CoverConcepts key={project.path} path={project.path} title={byId("title").value || project.name} artists={artistLine(byId("artists").value, byId("featuring").value)} brief={byId("coverBrief").value} />
             </Card>
             <Card title="Captions">
+              <CaptionLanguage
+                value={kitInput.captionLanguage ?? "fr"}
+                own={!!meta.launchKit?.captionLanguage}
+                onChange={(lang) => setKitCaptionLanguage(project.path, lang === (settings.captionLanguage ?? "fr") ? undefined : lang)}
+              />
               <FieldRow field={byId("captions")} onChange={(v) => setKitEdit(project.path, "captions", v)} bare />
             </Card>
           </div>
@@ -692,10 +700,6 @@ function TimeInput({ value, onCommit }: { value: number; onCommit: (seconds: num
   );
 }
 
-/** README language: the kit's language (French or English). */
-function kitLang(language: string | null): KitLang {
-  return language === "French" ? "fr" : "en";
-}
 
 /** After an export: what's in the kit and what to do with it (same text as README.md). */
 function KitExportedDialog({ guide, lang, dir, onClose }: { guide: KitGuide; lang: KitLang; dir: string; onClose: () => void }) {
@@ -752,6 +756,27 @@ function KitExportedDialog({ guide, lang, dir, onClose }: { guide: KitGuide; lan
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** This kit's caption language; changing it rewrites the template captions
+ * (AI drafts are flagged for a rewrite). */
+function CaptionLanguage({ value, own, onChange }: { value: KitLang; own: boolean; onChange: (lang: KitLang) => void }) {
+  return (
+    <div className="mb-2 flex items-center gap-2 text-xs text-engrave" role="group" aria-label="Caption language">
+      <span>Captions in</span>
+      {(["fr", "en"] as const).map((l) => (
+        <button
+          key={l}
+          onClick={() => onChange(l)}
+          aria-pressed={value === l}
+          className={`rounded px-2 py-0.5 ${value === l ? "bg-cream text-chassis" : "border border-rule text-body hover:bg-raised"}`}
+        >
+          {l === "fr" ? "Français" : "English"}
+        </button>
+      ))}
+      <span>{own ? "for this kit" : "(from Settings)"}</span>
     </div>
   );
 }
