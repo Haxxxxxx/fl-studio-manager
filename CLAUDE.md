@@ -15,6 +15,8 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 - **Files view:** `FilesPanel` in the song drawer; `src-tauri/src/files.rs` lists the song's Launch Kit folder.
 - Not built yet: group vs personal stats, design identity (1c), stems, distributor-specific export formats.
 
+- **Multi-DAW:** projects from FL Studio, Ableton Live, REAPER, Studio One, Pro Tools, Cubase and Bitwig are scanned (`src-tauri/src/daws.rs`: detection by extension, per-DAW backup/render/recording folders, readers returning the same `FlpMetadata` shape). Readable: .flp, .als (gzipped XML), .rpp (text), .song (zip, best-effort). Pro Tools/Cubase/Bitwig are closed formats: tracked but nothing read from inside. `ProjectInfo.daw` drives the UI (`src/lib/daws.ts`); render-from-app and packaging are FL-only.
+
 ## Commands
 - `npm ci && npm run tauri dev`: run the app. Setup per OS: [SETUP.md](SETUP.md).
 - `npm run build`: tsc + vite (must stay clean).

@@ -1,6 +1,7 @@
 import type { AiFieldReview, Album, AudioAnalysis, KitFieldId, MasterSpec, Person, ProjectInfo, Snippet, SongMeta } from "../types";
 import { detectKey, detectedPeople } from "./people";
 import { KEYS, renderFreshness } from "./songs";
+import { dawOf } from "./daws";
 
 // The Launch Kit: everything a release needs, pre-filled from the project.
 // Principles (docs/ROADMAP.md): fast by default, never a black box. Every
@@ -140,7 +141,7 @@ function generate(input: KitInput) {
   const title = cleanTitle(project.name);
   const flpTitle = project.flpTitle?.trim();
   g.title = flpTitle
-    ? { value: flpTitle, source: "detected", note: "From the title in FL Studio's project info" }
+    ? { value: flpTitle, source: "detected", note: `From the title in the ${dawOf(project).label} project` }
     : {
         value: title,
         source: "detected",
@@ -153,7 +154,7 @@ function generate(input: KitInput) {
   if (leads.length) {
     g.artists = { value: joinNames(leads), source: "detected", note: "From the song's credits" };
   } else if (project.artist?.trim()) {
-    g.artists = { value: project.artist.trim(), source: "detected", note: "From the artist in FL Studio's project info" };
+    g.artists = { value: project.artist.trim(), source: "detected", note: `From the artist in the ${dawOf(project).label} project` };
   } else {
     const found = detectedPeople(project, people).map((p) => p.name).filter((n) => !feats.includes(n));
     g.artists = found.length
@@ -179,13 +180,17 @@ function generate(input: KitInput) {
     : { value: "", source: "missing", note: "Credit a producer in the song panel, or type it here" };
 
   g.genre = project.genre
-    ? { value: project.genre, source: "detected", note: "From the project info in FL Studio" }
+    ? { value: project.genre, source: "detected", note: `From the project info in ${dawOf(project).label}` }
     : { value: "Hip-Hop/Rap", source: "suggested", note: "Crew default. Change it if this one's different" };
 
   g.bpm =
     project.tempoBpm != null
-      ? { value: String(Math.round(project.tempoBpm * 10) / 10), source: "detected", note: "From the .flp tempo" }
-      : { value: "", source: "missing", note: "No tempo found in the project" };
+      ? { value: String(Math.round(project.tempoBpm * 10) / 10), source: "detected", note: `From the ${dawOf(project).label} project's tempo` }
+      : {
+          value: "",
+          source: "missing",
+          note: dawOf(project).readable === "none" ? `${dawOf(project).label} projects can't be read from outside. Type the tempo once` : "No tempo found in the project",
+        };
 
   const typedKey = meta.key;
   const nameKey = detectKey(project.trackNames);
@@ -515,19 +520,20 @@ export function aiSummary(fields: KitField[]): {
 
 /** Kit-level problems that aren't one field's. */
 export function kitChecks(project: ProjectInfo, analysis?: AudioAnalysis | null): Check[] {
+  const tip = dawOf(project).exportTip;
   const freshness = renderFreshness(project);
   if (freshness === "none") return [{ level: "missing", message: "No mixdown yet. Render one: it's the file you'll upload" }];
   const out: Check[] = [];
   if (freshness === "stale") out.push({ level: "warn", message: "The project was saved after the latest mixdown. Re-render before exporting" });
-  if (analysis?.master) out.push(...masterChecks(analysis.master));
+  if (analysis?.master) out.push(...masterChecks(analysis.master, tip));
   return out;
 }
 
-const FL_EXPORT_TIP = "In FL Studio: File → Export → Wave file, 44,100 Hz, 24-bit.";
+const DEFAULT_EXPORT_TIP = "In FL Studio: File → Export → Wave file, 44,100 Hz, 24-bit.";
 
 /** What distributors accept: lossless WAV (FLAC at some), 44.1 kHz,
  * 16 or 24-bit, stereo, not clipping. */
-export function masterChecks(m: MasterSpec): Check[] {
+export function masterChecks(m: MasterSpec, FL_EXPORT_TIP = DEFAULT_EXPORT_TIP): Check[] {
   const out: Check[] = [];
   const name = m.container.toUpperCase() || "This file";
   if (m.container === "mp3" || m.container === "ogg") {

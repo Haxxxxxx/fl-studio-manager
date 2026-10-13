@@ -1,6 +1,7 @@
 mod actions;
 mod ai;
 mod audio;
+mod daws;
 mod cover;
 mod files;
 mod key;

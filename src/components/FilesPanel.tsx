@@ -52,7 +52,7 @@ export function FilesPanel({ project }: { project: ProjectInfo }) {
       <FileRow
         icon={<History size={13} />}
         label="Backups"
-        detail={project.backups.length ? `${project.backups.length} in Backup/ · ${formatBytes(backupsSize)}` : "none yet"}
+        detail={project.backups.length ? `${project.backups.length} backups · ${formatBytes(backupsSize)}` : "none yet"}
         onReveal={project.backups[0] && !demoMode ? () => reveal(project.backups[0].path) : undefined}
       />
       <FileRow
