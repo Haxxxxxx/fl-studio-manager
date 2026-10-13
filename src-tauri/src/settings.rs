@@ -56,6 +56,9 @@ fn apply_preferences(saved: &mut Settings, from: Settings) {
     saved.ai_model = from.ai_model;
     saved.ai_language = from.ai_language;
     saved.ai_include_notes = from.ai_include_notes;
+    if matches!(from.caption_language.as_str(), "fr" | "en") {
+        saved.caption_language = from.caption_language;
+    }
 }
 
 /// Runs a native picker off the main thread. None = cancelled.

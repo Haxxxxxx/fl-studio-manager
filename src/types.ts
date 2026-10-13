@@ -89,6 +89,8 @@ export interface Settings {
   aiLanguage: string | null;
   /** Send the song's notes with "Check kit" (off by default). */
   aiIncludeNotes: boolean;
+  /** Language of Launch Kit captions and the kit README (overridable per kit). */
+  captionLanguage: CaptionLang;
   /** ffmpeg for shorts; null = found automatically. */
   ffmpegPath: string | null;
 }
@@ -167,7 +169,12 @@ export type KitFieldId =
 
 /** The user's side of a launch kit. Everything else is regenerated from the
  * project each time, so the .flp stays the source of truth. */
+/** Languages captions are written in. */
+export type CaptionLang = "fr" | "en";
+
 export interface LaunchKitMeta {
+  /** This kit's caption language, when it differs from Settings. */
+  captionLanguage?: CaptionLang;
   /** Values the user typed over the generated ones. */
   edits?: Partial<Record<KitFieldId, string>>;
   /** Snippet label → start (s), when moved off the detected spot. */
@@ -211,7 +218,7 @@ export interface KitAiMeta {
     model: string;
     atMs: number;
     /** The facts the text was written for; if they change, it's outdated. */
-    basis?: { title: string; artists: string; releaseDate: string };
+    basis?: { title: string; artists: string; releaseDate: string; language?: CaptionLang };
   };
   review?: { fields: Partial<Record<KitFieldId, AiFieldReview>>; model: string; atMs: number };
 }
