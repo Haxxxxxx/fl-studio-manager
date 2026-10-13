@@ -2,6 +2,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
+  DetectedFolder,
   AiStatus,
   AudioAnalysis,
   CoverImage,
@@ -35,7 +36,8 @@ export async function saveSettings(settings: Settings): Promise<Settings> {
 // can never point the app at other folders or programs. Each returns the
 // saved settings (unchanged if the picker was cancelled).
 export const pickWatchedFolder = (): Promise<Settings> => invoke("pick_watched_folder");
-export const linkDetectedProjectsFolder = (): Promise<Settings> => invoke("link_detected_projects_folder");
+/** Links a folder detection found (Rust refuses anything it didn't detect). */
+export const linkDetectedFolder = (path: string): Promise<Settings> => invoke("link_detected_folder", { path });
 export const removeWatchedFolder = (folder: string): Promise<Settings> => invoke("remove_watched_folder", { folder });
 export const pickOutputFolder = (): Promise<Settings> => invoke("pick_output_folder");
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
@@ -56,8 +58,9 @@ export async function detectFlStudio(): Promise<string | null> {
 }
 
 /** The first DAW projects folder found (FL Studio, Studio One, REAPER, Ableton, Cubase, Bitwig, Pro Tools defaults). */
-export async function detectProjectsFolder(): Promise<string | null> {
-  return invoke("detect_projects_folder");
+/** Every DAW's default projects folder on this computer (read-only). */
+export async function detectDawFolders(): Promise<DetectedFolder[]> {
+  return invoke("detect_daw_folders");
 }
 
 /** FL Studio, the format and the export folder come from Settings on the Rust side. */
