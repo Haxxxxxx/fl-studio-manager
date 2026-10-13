@@ -18,9 +18,9 @@ import {
 } from "../lib/launchKit";
 import { draftCopy, reviewKit } from "../lib/ai";
 import { formatRelative } from "../lib/format";
-import { songLabel, statusInfo } from "../lib/songs";
 import type { AiFieldReview, AudioAnalysis, ProjectInfo, Snippet } from "../types";
 import { useVisibleSongs } from "./LibraryView";
+import { SongPicker } from "./SongPicker";
 import { btn, btnPrimary, input } from "./ui";
 
 // Snippet colors: the dark categorical slots, in fixed order (as elsewhere).
@@ -141,20 +141,15 @@ export function LaunchKitView() {
             <Rocket size={18} />
             <h1 className="text-lg font-semibold text-white">Launch Kit</h1>
           </div>
-          <select
-            value={project.path}
-            onChange={(e) => {
-              openLaunchKit(e.target.value);
+          <SongPicker
+            songs={songs}
+            current={project}
+            workspace={workspace}
+            onSelect={(path) => {
+              openLaunchKit(path);
               setExportState({ status: "idle" });
             }}
-            className={`${input} !w-80`}
-          >
-            {ordered.map((p) => (
-              <option key={p.path} value={p.path}>
-                {songLabel(p, songs)} · {statusInfo(workspace.songs[p.path]?.status).label}
-              </option>
-            ))}
-          </select>
+          />
           <KitStatus missing={missing} warnings={warnings} accepted={!!accepted} aiVerified={ai.verified} />
           <div className="ml-auto flex gap-2">
             <button
