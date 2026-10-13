@@ -94,6 +94,20 @@ function tempoFeel(bpm: number): string {
   return "fast, or a half-time feel";
 }
 
+/** An audio key estimate at or above this is shown as detected. */
+export const KEY_SURE = 0.6;
+const PITCH: Record<string, number> = { C: 0, "C#": 1, D: 2, Eb: 3, E: 4, F: 5, "F#": 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
+
+/** C and Am share every note: the estimate often can't tell them apart. */
+export function relativeKeys(a: string, b: string): boolean {
+  const parse = (k: string) => ({ pc: PITCH[k.replace(/m$/, "")], minor: k.endsWith("m") });
+  const x = parse(a);
+  const y = parse(b);
+  if (x.pc === undefined || y.pc === undefined || x.minor === y.minor) return false;
+  const [maj, min] = x.minor ? [y, x] : [x, y];
+  return (maj.pc + 9) % 12 === min.pc;
+}
+
 function joinNames(names: string[]): string {
   return [...new Set(names)].join(", ");
 }
@@ -141,11 +155,24 @@ function generate({ project, meta, people, albums, analysis, today = new Date() 
 
   const typedKey = meta.key;
   const nameKey = detectKey(project.trackNames);
+  const audioKey = analysis?.key;
+  const sure = (c: number) => `${Math.round(c * 100)}% sure`;
   g.key = typedKey
-    ? { value: typedKey, source: "detected", note: "Set in the song panel" }
+    ? {
+        value: typedKey,
+        source: "detected",
+        note:
+          audioKey && audioKey.confidence >= KEY_SURE && audioKey.key !== typedKey && !relativeKeys(audioKey.key, typedKey)
+            ? `Set in the song panel. The audio sounds more like ${audioKey.key} (${sure(audioKey.confidence)})`
+            : "Set in the song panel",
+      }
     : nameKey
       ? { value: nameKey, source: "suggested", note: "Written in a mixer track name" }
-      : { value: "", source: "missing", note: "Not in the project. Optional, but playlists and DJs use it" };
+      : audioKey
+        ? audioKey.confidence >= KEY_SURE
+          ? { value: audioKey.key, source: "detected", note: `Estimated from the mixdown (${sure(audioKey.confidence)})` }
+          : { value: audioKey.key, source: "suggested", note: `Estimated from the mixdown, not sure (${sure(audioKey.confidence)}). Check it by ear` }
+        : { value: "", source: "missing", note: "Not in the project. Optional, but playlists and DJs use it" };
 
   g.duration = analysis
     ? { value: formatDuration(analysis.durationSec), source: "detected", note: "Measured from the latest mixdown" }

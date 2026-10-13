@@ -213,6 +213,8 @@ export interface AudioAnalysis {
   /** Loudness per window, loudest = 1. */
   energy: number[];
   snippets: Snippet[];
+  /** Estimated from the audio (Krumhansl–Schmuckler); missing for sample data. */
+  key?: { key: string; confidence: number } | null;
 }
 
 /** A collaborator or contact. Aliases are how they appear in track names

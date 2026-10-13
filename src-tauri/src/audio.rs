@@ -26,6 +26,8 @@ pub struct AudioAnalysis {
     /// RMS loudness per window, normalized so the loudest is 1.
     pub energy: Vec<f32>,
     pub snippets: Vec<Snippet>,
+    /// Estimated from the audio; None for silence or too short a file.
+    pub key: Option<crate::key::KeyEstimate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -84,6 +86,7 @@ fn decode(path: &Path, mut on_chunk: impl FnMut(&[f32], usize, u32) -> bool) -> 
 pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
     let mut energy = Vec::new();
     let (mut acc, mut n, mut frames, mut rate) = (0f64, 0usize, 0u64, 0u32);
+    let mut chroma = crate::key::Chroma::new();
     decode(path, |samples, channels, sr| {
         rate = sr;
         let window = ((sr as f64 * WINDOW_SEC) as usize).max(1);
@@ -91,6 +94,7 @@ pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
             // Mean power across channels (a mono sum would cancel
             // out-of-phase stereo content).
             acc += frame.iter().map(|&x| (x as f64) * (x as f64)).sum::<f64>() / channels as f64;
+            chroma.push(frame.iter().sum::<f32>() / channels as f32, sr);
             n += 1;
             if n == window {
                 energy.push((acc / n as f64).sqrt() as f32);
@@ -114,7 +118,7 @@ pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
     }
     let duration_sec = frames as f64 / rate as f64;
     let snippets = pick_snippets(&energy, duration_sec, bpm);
-    Ok(AudioAnalysis { duration_sec, window_sec: WINDOW_SEC, energy, snippets })
+    Ok(AudioAnalysis { duration_sec, window_sec: WINDOW_SEC, energy, snippets, key: chroma.estimate() })
 }
 
 /// Start (in windows) of the loudest run of `len` windows, skipping any
