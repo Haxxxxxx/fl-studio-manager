@@ -35,18 +35,8 @@ export function kitContext({ project, meta, people, albums, analysis, today = ne
   };
 }
 
-// The Rust side picks the provider (Claude in dev builds, Gemini in release,
-// unless Settings says otherwise) and drops `temperature` for Claude.
 const call = (settings: Settings, system: string, prompt: string, schema: object, temperature: number) =>
-  api.aiGenerateJson({
-    provider: settings.aiProvider,
-    model: settings.aiModel,
-    claudeModel: settings.claudeModel,
-    system,
-    prompt,
-    schema,
-    temperature,
-  });
+  api.aiGenerateJson({ model: settings.aiModel, system, prompt, schema, temperature });
 
 // ---- Drafting ----
 

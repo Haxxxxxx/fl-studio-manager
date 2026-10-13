@@ -67,10 +67,6 @@ export interface Settings {
   aiLanguage: string | null;
   /** ffmpeg for shorts; null = found automatically. */
   ffmpegPath: string | null;
-  /** null = "auto". */
-  aiProvider: AiProviderChoice | null;
-  /** Claude model id; null = the default. */
-  claudeModel: string | null;
 }
 
 export type RenderFormat = "wav" | "mp3" | "ogg";
@@ -166,11 +162,7 @@ export interface KitAiMeta {
   review?: { fields: Partial<Record<KitFieldId, AiFieldReview>>; model: string; atMs: number };
 }
 
-export type AiProvider = "gemini" | "claude";
-/** "auto" = Claude in dev builds (npm run tauri dev), Gemini in release builds. */
-export type AiProviderChoice = "auto" | AiProvider;
-
-export interface AiProviderStatus {
+export interface AiStatus {
   configured: boolean;
   source: "env" | "settings" | null;
   defaultModel: string;
@@ -192,19 +184,6 @@ export interface CoverImage {
   seedApplied: boolean;
   width: number | null;
   height: number | null;
-}
-
-export interface AiStatus {
-  /** The active provider has a key. */
-  configured: boolean;
-  /** Who answers, given the choice and the keys; null = no key at all. */
-  provider: AiProvider | null;
-  devBuild: boolean;
-  gemini: AiProviderStatus;
-  claude: AiProviderStatus;
-  /** The active provider's key source and default model. */
-  source: "env" | "settings" | null;
-  defaultModel: string;
 }
 
 export interface Snippet {

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
-import type { AiProvider, AiProviderChoice, AiProviderStatus, RenderFormat } from "../types";
+import type { RenderFormat } from "../types";
 
 const IS_MAC = navigator.userAgent.includes("Mac");
 
@@ -307,28 +307,19 @@ const AI_LANGUAGES = ["English", "French", "Spanish", "German", "Portuguese", "I
 const field =
   "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none";
 
-/** One provider's key: status, write-only input, save/remove. */
-function ProviderKey({
-  provider,
-  label,
-  envVar,
-  placeholder,
-  status,
-}: {
-  provider: AiProvider;
-  label: string;
-  envVar: string;
-  placeholder: string;
-  status: AiProviderStatus | undefined;
-}) {
+/** Gemini key (write-only from here), model and copy language. */
+function AiSettings() {
+  const aiStatus = useAppStore((s) => s.aiStatus);
   const refreshAiStatus = useAppStore((s) => s.refreshAiStatus);
+  const settings = useAppStore((s) => s.settings);
+  const updateSettings = useAppStore((s) => s.updateSettings);
   const [key, setKey] = useState("");
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
   async function saveKey(value: string | null) {
     setMessage(null);
     try {
-      await api.setAiKey(value, provider);
+      await api.setAiKey(value);
       await refreshAiStatus();
       setKey("");
       setMessage({ kind: "ok", text: value ? "Key saved on this computer." : "Key removed." });
@@ -337,20 +328,29 @@ function ProviderKey({
     }
   }
 
+  const status = !aiStatus?.configured
+    ? "Off: no key yet"
+    : aiStatus.source === "env"
+      ? "On: using GEMINI_API_KEY from the environment"
+      : "On: key saved on this computer";
+
   return (
-    <div>
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="text-white/70">{label}</span>
-        <span className={status?.configured ? "text-emerald-300" : "text-white/40"}>
-          {!status?.configured ? "No key" : status.source === "env" ? `Using ${envVar}` : "Key saved"}
-        </span>
-      </div>
-      <div className="mt-1 flex items-center gap-2">
+    <section>
+      <h2 className="text-sm font-semibold text-white/90">AI (Launch Kit drafts and checks)</h2>
+      <p className="mt-1 text-xs text-white/40">
+        Uses Google Gemini on its free tier. Get a free key at{" "}
+        <button onClick={() => api.openExternal("https://aistudio.google.com/apikey")} className="text-orange-300 underline">
+          aistudio.google.com/apikey
+        </button>
+        . Everything works without it; the AI only adds drafts and a second opinion.
+      </p>
+      <div className={`mt-3 text-xs ${aiStatus?.configured ? "text-emerald-300" : "text-white/50"}`}>{status}</div>
+      <div className="mt-2 flex items-center gap-2">
         <input
           type="password"
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          placeholder={status?.configured ? "Paste a new key to replace it" : placeholder}
+          placeholder={aiStatus?.configured ? "Paste a new key to replace it" : "Paste your Gemini API key"}
           autoComplete="off"
           spellCheck={false}
           className={field}
@@ -358,106 +358,20 @@ function ProviderKey({
         <button onClick={() => saveKey(key)} disabled={!key.trim()} className="rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-400 disabled:opacity-40">
           Save
         </button>
-        {status?.source === "settings" && (
+        {aiStatus?.source === "settings" && (
           <button onClick={() => saveKey(null)} className="rounded-md border border-white/15 px-3 py-2 text-sm text-white/70 hover:bg-white/5">
             Remove
           </button>
         )}
       </div>
-      {message && <div className={`mt-1 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
-    </div>
-  );
-}
-
-const PROVIDER_CHOICES: { id: AiProviderChoice; label: string }[] = [
-  { id: "auto", label: "Auto" },
-  { id: "claude", label: "Claude" },
-  { id: "gemini", label: "Gemini" },
-];
-
-/** Provider choice, keys (write-only from here), models and copy language. */
-function AiSettings() {
-  const aiStatus = useAppStore((s) => s.aiStatus);
-  const refreshAiStatus = useAppStore((s) => s.refreshAiStatus);
-  const settings = useAppStore((s) => s.settings);
-  const updateSettings = useAppStore((s) => s.updateSettings);
-  const choice = settings.aiProvider ?? "auto";
-
-  async function choose(id: AiProviderChoice) {
-    await updateSettings({ aiProvider: id === "auto" ? null : id });
-    await refreshAiStatus();
-  }
-
-  const active = aiStatus?.provider;
-  const activeLine = !active
-    ? "Off: add a key below."
-    : `${active === "claude" ? "Claude" : "Gemini"} answers${choice === "auto" ? ` (auto: ${aiStatus?.devBuild ? "dev build" : "release build"})` : ""}${aiStatus?.configured ? "" : ", but it has no key yet"}.`;
-
-  return (
-    <section>
-      <h2 className="text-sm font-semibold text-white/90">AI (Launch Kit drafts and checks)</h2>
-      <p className="mt-1 text-xs text-white/40">
-        Everything works without AI; it only adds drafts and a second opinion. <b className="font-medium text-white/60">Auto</b> uses Claude
-        while developing (<code className="rounded bg-white/10 px-1">npm run tauri dev</code>) so dev sessions don't use up the free Gemini
-        quota, and Gemini (free) in the released app.
-      </p>
-      <div className="mt-3 flex items-center gap-2">
-        <div className="flex rounded-md border border-white/10 p-0.5">
-          {PROVIDER_CHOICES.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => choose(p.id)}
-              className={`rounded px-3 py-1 text-xs ${choice === p.id ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"}`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <span className={`text-xs ${aiStatus?.configured ? "text-emerald-300" : "text-white/50"}`}>{activeLine}</span>
-      </div>
-      <div className="mt-4 flex flex-col gap-3">
-        <ProviderKey
-          provider="claude"
-          label="Anthropic API key (Claude, for development; paid per use)"
-          envVar="ANTHROPIC_API_KEY"
-          placeholder="Paste your Anthropic API key (console.anthropic.com)"
-          status={aiStatus?.claude}
-        />
-        <ProviderKey
-          provider="gemini"
-          label="Gemini API key (free tier, for the released app)"
-          envVar="GEMINI_API_KEY"
-          placeholder="Paste your Gemini API key"
-          status={aiStatus?.gemini}
-        />
-        <p className="text-[11px] text-white/35">
-          Free Gemini key:{" "}
-          <button onClick={() => api.openExternal("https://aistudio.google.com/apikey")} className="text-orange-300 underline">
-            aistudio.google.com/apikey
-          </button>
-          . Anthropic key:{" "}
-          <button onClick={() => api.openExternal("https://console.anthropic.com/settings/keys")} className="text-orange-300 underline">
-            console.anthropic.com
-          </button>{" "}
-          (needs billing).
-        </p>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-3">
+      {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
+      <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="text-xs text-white/50">
-          Claude model
-          <input
-            defaultValue={settings.claudeModel ?? ""}
-            onBlur={(e) => updateSettings({ claudeModel: e.target.value.trim() || null })}
-            placeholder={aiStatus?.claude.defaultModel ?? "claude-opus-5-5"}
-            className={`${field} mt-1`}
-          />
-        </label>
-        <label className="text-xs text-white/50">
-          Gemini model
+          Model
           <input
             defaultValue={settings.aiModel ?? ""}
             onBlur={(e) => updateSettings({ aiModel: e.target.value.trim() || null })}
-            placeholder={aiStatus?.gemini.defaultModel ?? "gemini-3.8-flash"}
+            placeholder={aiStatus?.defaultModel ?? "gemini-3.8-flash"}
             className={`${field} mt-1`}
           />
         </label>
@@ -475,9 +389,9 @@ function AiSettings() {
         </label>
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-white/30">
-        Keys stay on this computer (their own file in the app config folder, not settings.json) and are never shown again. AI calls send
-        the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. On Gemini's free tier Google may
-        use them to improve its products. Claude is billed to your Anthropic account (claude-haiku-5-5 is the cheapest option).
+        The key stays on this computer (its own file in the app config folder, not settings.json) and is never shown again. AI calls
+        send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. On the free tier Google
+        may use them to improve its products.
       </p>
     </section>
   );

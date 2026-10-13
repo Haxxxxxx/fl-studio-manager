@@ -3,8 +3,6 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type {
-  AiProvider,
-  AiProviderChoice,
   AiStatus,
   AudioAnalysis,
   CoverImage,
@@ -123,26 +121,24 @@ export async function exportLaunchKit(args: {
 }
 
 /** Whether a Gemini key is set (never the key itself). */
-export async function aiStatus(provider: AiProviderChoice | null): Promise<AiStatus> {
-  return invoke("ai_status", { provider });
+export async function aiStatus(): Promise<AiStatus> {
+  return invoke("ai_status");
 }
 
-/** Saves a provider's key on this machine (Gemini by default); null removes it. */
-export async function setAiKey(key: string | null, provider: AiProvider = "gemini"): Promise<void> {
-  return invoke("set_ai_key", { key, provider });
+/** Saves the Gemini key on this machine; null removes it. */
+export async function setAiKey(key: string | null): Promise<void> {
+  return invoke("set_ai_key", { key });
 }
 
-/** One structured AI call (Gemini or Claude, retries on the Rust side):
- * JSON matching `schema`, plus the provider and model that answered. */
+/** One structured Gemini call (retries and a backup model on the Rust
+ * side): JSON matching `schema`, plus the model that actually answered. */
 export async function aiGenerateJson(args: {
-  provider: AiProviderChoice | null;
   model: string | null;
-  claudeModel: string | null;
   system: string;
   prompt: string;
   schema: object;
   temperature: number;
-}): Promise<{ model: string; provider: AiProvider; data: unknown }> {
+}): Promise<{ model: string; data: unknown }> {
   return invoke("ai_generate_json", args);
 }
 

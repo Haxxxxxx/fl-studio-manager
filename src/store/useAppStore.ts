@@ -30,8 +30,6 @@ const DEFAULT_SETTINGS: Settings = {
   aiModel: null,
   aiLanguage: null,
   ffmpegPath: null,
-  aiProvider: null,
-  claudeModel: null,
 };
 
 export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "settings";
@@ -517,7 +515,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     aiStatus: null,
     refreshAiStatus: async () => {
-      const aiStatus = await api.aiStatus(get().settings.aiProvider).catch(() => null);
+      const aiStatus = await api.aiStatus().catch(() => null);
       set({ aiStatus });
     },
     setKitCover: (path, cover) => {
