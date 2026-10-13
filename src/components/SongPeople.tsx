@@ -200,7 +200,7 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
                 value={p.note ?? ""}
                 onChange={(e) => updatePitch(project.path, p.id, { note: e.target.value })}
                 placeholder="Note (feedback, price, link…)"
-                className="ml-5 mt-0.5 w-[calc(100%-1.25rem)] bg-transparent text-[11px] text-white/50 placeholder:text-white/20 focus:outline-none"
+                className="ml-5 mt-0.5 w-[calc(100%-1.25rem)] bg-transparent text-[11px] text-white/50 placeholder:text-white/50 focus:outline-none"
               />
             </div>
           );

@@ -12,6 +12,8 @@ export interface StemsInfo {
   newestMs: number;
 }
 
+export type DawId = "fl-studio" | "ableton" | "reaper" | "studio-one" | "pro-tools" | "cubase" | "bitwig";
+
 export interface ProjectInfo {
   path: string;
   name: string;
@@ -34,6 +36,10 @@ export interface ProjectInfo {
   renders: FileEntry[];
   recordingsCount: number;
   recordingsBytes: number;
+  /** Which DAW the project belongs to (missing from pre-multi-DAW data = FL Studio). */
+  daw?: DawId;
+  /** The DAW version that saved it, when readable ("Ableton Live 11.3.4"). */
+  dawVersion?: string | null;
   /** Title and comment from FL Studio's project info (File → Project info). */
   flpTitle?: string | null;
   comment?: string | null;

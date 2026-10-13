@@ -10,10 +10,15 @@ import { input } from "./base";
 /** Whether the newest mixdown is current, outdated, or missing. */
 export function MixdownBadge({ project }: { project: ProjectInfo }) {
   const f = renderFreshness(project);
-  if (f === "none") return <span className="text-xs text-white/20">—</span>;
+  if (f === "none")
+    return (
+      <span className="text-xs text-white/45" aria-label="No mixdown">
+        —
+      </span>
+    );
   if (f === "fresh")
     return (
-      <span className="flex items-center text-emerald-400/80" title="Mixdown is newer than the last save" aria-label="Mixdown current">
+      <span className="flex items-center text-emerald-400/80" title="Mixdown is newer than the last save" role="img" aria-label="Mixdown current">
         <CheckCircle2 size={13} />
       </span>
     );

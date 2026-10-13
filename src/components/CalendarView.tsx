@@ -48,7 +48,7 @@ export function CalendarView() {
 
         {entries.length === 0 && (
           <div className="flex flex-col items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-6 py-12 text-center">
-            <CalendarDays size={28} className="text-white/45" />
+            <CalendarDays size={28} className="text-white/62" />
             <div className="text-sm font-medium text-white/80">No release dates yet</div>
             <div className="max-w-sm text-xs text-white/62">
               Give a release a date in Releases, or set a release date in a song's Launch Kit. It shows up here with how ready it is.

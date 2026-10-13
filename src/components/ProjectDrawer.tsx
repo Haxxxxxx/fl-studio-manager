@@ -27,6 +27,7 @@ import { detectKey } from "../lib/people";
 import { SongCredits, SongPitches } from "./SongPeople";
 import { ShareToggle } from "./CrewPanel";
 import { FilesPanel } from "./FilesPanel";
+import { canRenderInApp, dawOf } from "../lib/daws";
 import { ConfirmButton, StatusSelect, TagEditor, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { Fact, Section } from "../ui";
 
@@ -110,7 +111,7 @@ export function ProjectDrawer() {
       <div className="flex-1 overflow-auto px-5 py-4">
         <div className="flex flex-wrap gap-2">
           <button onClick={() => openInFlStudio(project.path)} disabled={demoMode} className={btnPrimary}>
-            <PlayCircle size={14} /> Open in FL
+            <PlayCircle size={14} /> Open in {dawOf(project).short === "FL" ? "FL" : dawOf(project).label}
           </button>
           <button onClick={() => revealInFileManager(project.path)} disabled={demoMode} className={btn}>
             <FolderOpen size={14} /> Reveal
@@ -120,7 +121,8 @@ export function ProjectDrawer() {
           </button>
           <button
             onClick={() => run(async () => (await startRender([project.path]), ""), () => "Render started")}
-            disabled={demoMode || rendering}
+            disabled={demoMode || rendering || !canRenderInApp(project)}
+            title={canRenderInApp(project) ? "Render a mixdown with FL Studio" : `Rendering from the app works with FL Studio. ${dawOf(project).exportTip}`}
             className={btn}
           >
             <Download size={14} /> Render
@@ -128,7 +130,7 @@ export function ProjectDrawer() {
           <button
             title="Zip the project with every sample it uses — FL opens it directly. For sharing, collabs or archiving."
             onClick={() => run(async () => (await startPackage([project.path]), ""), () => "Package created — see the panel at the bottom.")}
-            disabled={demoMode || packaging}
+            disabled={demoMode || packaging || !canRenderInApp(project)}
             className={btn}
           >
             <Package size={14} /> Package
@@ -262,7 +264,10 @@ export function ProjectDrawer() {
               value={project.timeSigNum ? `${project.timeSigNum}/${project.timeSigDenom}` : "—"}
             />
             <Fact label="Last saved" value={formatDateTime(project.modifiedAtMs)} />
-            <Fact label="FL version" value={project.flVersion?.split(".").slice(0, 3).join(".") ?? "—"} />
+            <Fact
+              label={`${dawOf(project).label} version`}
+              value={(project.flVersion?.split(".").slice(0, 3).join(".") ?? project.dawVersion?.replace(/^(Ableton Live|Studio One|REAPER)\s*/i, "")) || "—"}
+            />
             <Fact
               label="Recordings"
               value={project.recordingsCount ? `${project.recordingsCount} · ${formatBytes(project.recordingsBytes)}` : "none"}
@@ -348,9 +353,9 @@ export function ProjectDrawer() {
               {visibleBackups.map((b) => (
                 <li key={b.path} className="group relative flex items-center gap-2 py-1 text-xs">
                   <span className="absolute -left-[15.5px] h-2 w-2 rounded-full bg-white/20" />
-                  <History size={12} className="text-white/45" />
+                  <History size={12} className="text-white/62" />
                   <span className="flex-1 text-white/60">{formatDateTime(b.modifiedAtMs)}</span>
-                  <span className="text-white/45">{formatBytes(b.sizeBytes)}</span>
+                  <span className="text-white/62">{formatBytes(b.sizeBytes)}</span>
                   <button
                     title="Restore as a new file next to the project (the current version is untouched)"
                     disabled={demoMode}

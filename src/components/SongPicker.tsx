@@ -180,7 +180,7 @@ export function SongPicker({
               <div key={g.id} role="group" aria-label={g.label}>
                 <div className="sticky top-0 flex items-baseline gap-2 bg-[#17171c] px-4 pb-1 pt-2.5">
                   <span className="text-[12px] font-semibold text-white/50">{g.label}</span>
-                  <span className="text-[10px] text-white/45">
+                  <span className="text-[10px] text-white/62">
                     {g.songs.length} · {g.hint}
                   </span>
                 </div>

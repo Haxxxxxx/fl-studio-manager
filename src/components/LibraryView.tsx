@@ -20,6 +20,7 @@ import { useAppStore, type SortKey, type StatusFilter } from "../store/useAppSto
 import { useCrewStore } from "../store/useCrewStore";
 import { useCanShare } from "./CrewPanel";
 import { detectKey } from "../lib/people";
+import { dawOf } from "../lib/daws";
 import { formatDate } from "../lib/format";
 import {
   KEYS,
@@ -391,12 +392,21 @@ export function LibraryView() {
                       </button>
                     </td>
                     <td className="px-1 py-2" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => toggleFavorite(project.path)} className="flex text-white/20 hover:text-orange-300">
+                      <button
+                        onClick={() => toggleFavorite(project.path)}
+                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        className="flex text-white/45 hover:text-orange-300"
+                      >
                         <Star size={13} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-orange-400" : ""} />
                       </button>
                     </td>
                     <td className="max-w-[280px] px-2 py-2">
                       <div className="flex items-center gap-2">
+                        {project.daw && project.daw !== "fl-studio" && (
+                          <span className="shrink-0 rounded bg-white/10 px-1.5 py-px text-[10px] font-medium text-white/60" title={dawOf(project).label}>
+                            {dawOf(project).short}
+                          </span>
+                        )}
                         <span className="truncate font-medium text-white/90" title={project.path}>
                           {songLabel(project, songs)}
                         </span>
@@ -515,15 +525,15 @@ export function EmptyLibrary() {
       <div className="text-base font-medium text-white/80">No project folder linked yet</div>
       {suggested ? (
         <div className="max-w-md text-sm text-white/58">
-          Found your FL Studio projects folder:
+          Found a projects folder:
           <div className="mt-1.5 truncate rounded bg-white/5 px-2 py-1 font-mono text-xs text-white/60" title={suggested}>
             {suggested}
           </div>
         </div>
       ) : (
         <div className="max-w-sm text-sm text-white/58">
-          Point FL Manager at the folder where your FL Studio projects live — by default
-          Documents/Image-Line/FL Studio/Projects.
+          Point FL Manager at the folder where your projects live: FL Studio, Ableton Live, REAPER, Studio One, Pro Tools,
+          Cubase or Bitwig. You can link several.
         </div>
       )}
       <div className="mt-2 flex gap-2">

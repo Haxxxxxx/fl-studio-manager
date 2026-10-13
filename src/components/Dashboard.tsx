@@ -130,7 +130,7 @@ function MyDashboard() {
         {!scanning && (
           <>
             <div className="max-w-sm text-sm text-white/58">
-              No .flp projects in your linked folders. Check the folders in Settings, or load sample data to look around.
+              No projects in your linked folders. Check the folders in Settings, or load sample data to look around.
             </div>
             <div className="mt-2 flex gap-2">
               <button onClick={() => setView("settings")} className={btnPrimary}>
@@ -185,7 +185,7 @@ function MyDashboard() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openInFlStudio(p.path).catch((err) => console.error("couldn't open in FL Studio", err));
+                          openInFlStudio(p.path).catch((err) => console.error("couldn't open the project", err));
                         }}
                         className="flex items-center gap-1 text-white/58 opacity-0 hover:text-orange-300 group-hover:opacity-100"
                       >
@@ -381,7 +381,7 @@ function MyDashboard() {
   }
 }
 
-/** GitHub-style calendar: every FL save (current file + each backup) is a
+/** GitHub-style calendar: every save (current file + each backup) is a
  * real work session, so this shows when you actually made music. */
 function ActivityHeatmap() {
   const songs = useVisibleSongs();
@@ -759,7 +759,7 @@ function HealthCard() {
           <FolderInput size={12} className="mt-px shrink-0 text-sky-400" />
           <span>
             {samples.relocated} samples aren't at their saved path but were found in the song's folder — the project
-            was moved. FL usually finds these; re-saving the project in FL fixes the paths.
+            was moved. The DAW usually finds these; re-saving the project there fixes the paths.
           </span>
         </div>
       )}

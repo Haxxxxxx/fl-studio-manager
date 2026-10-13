@@ -90,7 +90,7 @@ export function TagEditor({
             }
           }}
           placeholder="Add tag…"
-          className="min-w-[80px] flex-1 bg-transparent py-0.5 text-xs text-white placeholder:text-white/45 focus:outline-none"
+          className="min-w-[80px] flex-1 bg-transparent py-0.5 text-xs text-white placeholder:text-white/62 focus:outline-none"
         />
       </div>
       {unused.length > 0 && (

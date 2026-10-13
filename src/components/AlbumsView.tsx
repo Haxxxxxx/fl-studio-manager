@@ -20,7 +20,7 @@ function kindLabel(kind: AlbumKind) {
 
 function tracksOf(album: Album, projects: ProjectInfo[]): (ProjectInfo | null)[] {
   const byPath = new Map(projects.map((p) => [p.path, p]));
-  // A track whose .flp was moved/renamed shows as missing rather than vanishing.
+  // A track whose project file was moved/renamed shows as missing rather than vanishing.
   return album.trackPaths.map((path) => byPath.get(path) ?? null);
 }
 
@@ -354,7 +354,7 @@ function AlbumDetail({ album }: { album: Album }) {
                     Missing: {path.split(/[/\\]/).pop()} (moved or renamed?)
                   </span>
                 )}
-                <button onClick={() => removeTrack(album.id, path)} title="Remove from release" className="text-white/45 opacity-0 hover:text-white group-hover:opacity-100">
+                <button onClick={() => removeTrack(album.id, path)} title="Remove from release" className="text-white/62 opacity-0 hover:text-white group-hover:opacity-100">
                   <X size={14} />
                 </button>
               </div>

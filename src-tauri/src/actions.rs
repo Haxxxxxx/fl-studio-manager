@@ -1,5 +1,5 @@
+use crate::daws::{self, Daw};
 use crate::models::TemplateInfo;
-use crate::scanner::backup_base_name;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -17,14 +17,14 @@ fn validate_name(name: &str) -> Result<&str, String> {
     Ok(name)
 }
 
-/// `<dir>/<base>.flp`, or `<base> (2).flp`, `(3)`… if taken.
-fn free_flp_path(dir: &Path, base: &str) -> PathBuf {
-    let first = dir.join(format!("{base}.flp"));
+/// `<dir>/<base>.<ext>`, or `<base> (2).<ext>`, `(3)`… if taken.
+fn free_path(dir: &Path, base: &str, ext: &str) -> PathBuf {
+    let first = dir.join(format!("{base}.{ext}"));
     if !first.exists() {
         return first;
     }
     (2..)
-        .map(|n| dir.join(format!("{base} ({n}).flp")))
+        .map(|n| dir.join(format!("{base} ({n}).{ext}")))
         .find(|p| !p.exists())
         .expect("unbounded range always yields a free path")
 }
@@ -144,63 +144,82 @@ pub fn create_project(template_path: String, parent_folder: String, name: String
     Ok(target.to_string_lossy().to_string())
 }
 
-/// "Save as new version": copy the .flp next to itself under a new name,
+/// The project file's own extension, as written (`flp`, `als`, `RPP`…).
+fn project_ext(path: &Path) -> Result<String, String> {
+    Daw::of_project(path).ok_or_else(|| format!("not a project file: {}", path.display()))?;
+    Ok(path.extension().unwrap_or_default().to_string_lossy().to_string())
+}
+
+/// "Save as new version": copy the project next to itself under a new name,
 /// sharing the same Audio/ and Samples/ folders.
 #[tauri::command]
 pub fn duplicate_project(project_path: String, new_name: String) -> Result<String, String> {
     let new_name = validate_name(&new_name)?;
     let src = Path::new(&project_path);
     let dir = src.parent().ok_or("invalid project path")?;
-    let target = dir.join(format!("{new_name}.flp"));
+    let ext = project_ext(src)?;
+    let target = dir.join(format!("{new_name}.{ext}"));
     if target.exists() {
-        return Err(format!("\"{new_name}.flp\" already exists in that folder"));
+        return Err(format!("\"{new_name}.{ext}\" already exists in that folder"));
     }
     copy_file(src, &target)?;
     Ok(target.to_string_lossy().to_string())
 }
 
-/// Bring a backup back as a *new* file next to the project — never
-/// overwrites the current version. `Envy (overwritten at 16h12).flp`
-/// becomes `Envy - restored 16h12.flp`.
+/// Bring a backup back as a *new* project file next to the project, never
+/// overwriting the current version. It gets the project's extension, so a
+/// REAPER `.rpp-bak` comes back as `.rpp` and a Cubase `.bak` as `.cpr`.
+/// FL's `Envy (overwritten at 16h12).flp` becomes `Envy - restored 16h12.flp`;
+/// other DAWs' timestamps are dropped (`Envy - restored.als`).
 #[tauri::command]
 pub fn restore_backup(backup_path: String, project_path: String) -> Result<String, String> {
     let backup = Path::new(&backup_path);
     let project = Path::new(&project_path);
     let dir = project.parent().ok_or("invalid project path")?;
     let project_name = project.file_stem().unwrap_or_default().to_string_lossy();
+    let ext = project_ext(project)?;
+    let daw = Daw::of_backup_file(backup)
+        .or_else(|| Daw::of_project(backup))
+        .ok_or_else(|| format!("not a backup file: {backup_path}"))?;
 
-    let stem = backup.file_stem().unwrap_or_default().to_string_lossy().to_string();
-    let when = stem[backup_base_name(&stem).len()..]
-        .trim()
-        .trim_start_matches('(')
-        .replace(')', "")
-        .replace("overwritten at ", "")
-        .replace("autosaved at ", "");
+    let when = if daw == Daw::FlStudio {
+        let stem = backup.file_stem().unwrap_or_default().to_string_lossy().to_string();
+        let base_len = daws::backup_base_name(daw, &stem).len();
+        stem.get(base_len..)
+            .unwrap_or_default()
+            .trim()
+            .trim_start_matches('(')
+            .replace(')', "")
+            .replace("overwritten at ", "")
+            .replace("autosaved at ", "")
+    } else {
+        String::new()
+    };
     let base = if when.is_empty() {
         format!("{project_name} - restored")
     } else {
         format!("{project_name} - restored {when}")
     };
-    let target = free_flp_path(dir, &base);
+    let target = free_path(dir, &base, &ext);
     copy_file(backup, &target)?;
     Ok(target.to_string_lossy().to_string())
 }
 
-/// Send backups to the Recycle Bin (recoverable). Refuses anything that
-/// isn't a .flp inside a `Backup` folder, so a bad call can't touch real
-/// projects.
+/// Whether cleanup may delete `path`: a plain file (no `..` tricks) that
+/// looks like a backup and that the last scan actually listed as one.
+fn may_trash(path: &Path, listed: impl Fn(&Path) -> bool) -> bool {
+    !path.components().any(|c| matches!(c, std::path::Component::ParentDir))
+        && daws::is_backup_file(path)
+        && listed(path)
+        && fs::symlink_metadata(path).is_ok_and(|m| m.is_file())
+}
+
+/// Send backups to the Recycle Bin (recoverable). Refuses anything the last
+/// scan didn't list as a backup, so a bad call can't touch real projects.
 #[tauri::command]
 pub async fn trash_backups(paths: Vec<String>) -> Result<u32, String> {
-    for p in &paths {
-        let path = Path::new(p);
-        let in_backup_dir = path
-            .parent()
-            .and_then(|d| d.file_name())
-            .is_some_and(|n| n.eq_ignore_ascii_case("Backup"));
-        let is_flp = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("flp"));
-        if !in_backup_dir || !is_flp {
-            return Err(format!("refusing to delete non-backup file: {p}"));
-        }
+    if let Some(p) = paths.iter().find(|p| !may_trash(Path::new(p), crate::scanner::is_listed_backup)) {
+        return Err(format!("refusing to delete non-backup file: {p}"));
     }
     let count = paths.len() as u32;
     tauri::async_runtime::spawn_blocking(move || trash::delete_all(&paths))
@@ -267,9 +286,112 @@ mod tests {
 
     #[test]
     fn trash_refuses_real_projects() {
-        let result = tauri::async_runtime::block_on(trash_backups(vec![
-            "D:\\Projects\\Envy\\Envy.flp".to_string(),
-        ]));
-        assert!(result.is_err());
+        for p in ["D:\\Projects\\Envy\\Envy.flp", "/m/Wave Project/Wave.als", "/m/Tide/Tide.rpp", "/m/Fade/Fade.cpr", "/m/Envy/Backup/cover.png"] {
+            let result = tauri::async_runtime::block_on(trash_backups(vec![p.to_string()]));
+            assert!(result.is_err(), "{p}");
+        }
+        // One real project in the batch refuses the whole batch.
+        let mixed = vec!["/m/Tide/Tide.rpp-bak".to_string(), "/m/Tide/Tide.rpp".to_string()];
+        assert!(tauri::async_runtime::block_on(trash_backups(mixed)).is_err());
+    }
+
+    #[test]
+    fn trash_needs_a_listed_plain_backup_file() {
+        let dir = std::env::temp_dir().join(format!("flsm-trash-guard-{}", std::process::id()));
+        // A real project inside a linked root that happens to be called "Backup".
+        let real = dir.join("Backup").join("Envy").join("Envy.flp");
+        let backup = dir.join("Backup").join("Envy").join("Backup").join("Envy (overwritten at 16h12).flp");
+        let folder = dir.join("Tide").join("old.bak");
+        fs::create_dir_all(backup.parent().unwrap()).unwrap();
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(&real, b"my work").unwrap();
+        fs::write(&backup, b"old").unwrap();
+        let only_backup = |p: &Path| p == backup;
+        let anything = |_: &Path| true;
+
+        assert!(may_trash(&backup, only_backup));
+        // Name heuristics alone pass for the real project; the scan list doesn't.
+        assert!(daws::is_backup_file(&real));
+        assert!(!may_trash(&real, only_backup));
+        // `..` back out of a backup folder, a directory named like a backup.
+        let sneaky = backup.parent().unwrap().join("..").join("Envy.flp");
+        assert!(!may_trash(&sneaky, anything));
+        assert!(!may_trash(&folder, anything));
+        // Never-scanned paths are refused by the real command.
+        let b = backup.to_string_lossy().to_string();
+        assert!(tauri::async_runtime::block_on(trash_backups(vec![b])).is_err());
+        assert_eq!(fs::read(&backup).unwrap(), b"old");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn trash_accepts_every_daws_backups() {
+        let dir = std::env::temp_dir().join(format!("flsm-trash-{}", std::process::id()));
+        let files = [
+            "Envy/Backup/Envy (overwritten at 16h12).flp",
+            "Wave Project/Backup/Wave [2026-10-12 143005].als",
+            "Tide/Tide.rpp-bak",
+            "Fade/Fade-01.bak",
+            "Rush/Session File Backups/Rush.bak.001.ptx",
+            "Glow/History/Glow (2).song",
+        ];
+        let paths: Vec<String> = files
+            .iter()
+            .map(|rel| {
+                let p = dir.join(rel);
+                fs::create_dir_all(p.parent().unwrap()).unwrap();
+                fs::write(&p, b"x").unwrap();
+                p.to_string_lossy().to_string()
+            })
+            .collect();
+        for p in &paths {
+            assert!(daws::is_backup_file(Path::new(p)), "{p}");
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn duplicates_keep_the_projects_extension() {
+        let dir = std::env::temp_dir().join(format!("flsm-dup-als-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("Wave.als");
+        fs::write(&src, b"gz bytes").unwrap();
+        let s = src.to_string_lossy().to_string();
+        let v2 = duplicate_project(s.clone(), "Wave v2".into()).unwrap();
+        assert!(v2.ends_with("Wave v2.als"), "{v2}");
+        assert_eq!(fs::read(&v2).unwrap(), b"gz bytes");
+        assert!(duplicate_project(s, "Wave v2".into()).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn restores_ableton_reaper_and_cubase_backups_as_projects() {
+        let dir = std::env::temp_dir().join(format!("flsm-restore-daws-{}", std::process::id()));
+        let w = |rel: &str, bytes: &[u8]| {
+            let p = dir.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, bytes).unwrap();
+            p.to_string_lossy().to_string()
+        };
+        let wave = w("Wave Project/Wave.als", b"current");
+        let wave_bak = w("Wave Project/Backup/Wave [2026-10-12 143005].als", b"old");
+        let tide = w("Tide/Tide.rpp", b"current");
+        let tide_bak = w("Tide/Tide.rpp-bak", b"old");
+        let fade = w("Fade/Fade.cpr", b"current");
+        let fade_bak = w("Fade/Fade-01.bak", b"old");
+
+        let restored = restore_backup(wave_bak.clone(), wave.clone()).unwrap();
+        assert!(restored.ends_with(&format!("Wave Project{}Wave - restored.als", std::path::MAIN_SEPARATOR)), "{restored}");
+        assert_eq!(fs::read(&restored).unwrap(), b"old");
+        let again = restore_backup(wave_bak, wave.clone()).unwrap();
+        assert!(again.ends_with("Wave - restored (2).als"), "{again}");
+
+        let restored = restore_backup(tide_bak, tide).unwrap();
+        assert!(restored.ends_with("Tide - restored.rpp"), "{restored}");
+        let restored = restore_backup(fade_bak, fade).unwrap();
+        assert!(restored.ends_with("Fade - restored.cpr"), "{restored}");
+
+        assert_eq!(fs::read(&wave).unwrap(), b"current");
+        let _ = fs::remove_dir_all(&dir);
     }
 }

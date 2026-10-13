@@ -54,7 +54,7 @@ export function Landing({ signIn }: { signIn: ReactNode }) {
         alt="The song panel: stage, key, release, tags, notes and project facts"
       />
       <Privacy />
-      <section id="signin" className="border-t border-white/10 px-6 py-24">
+      <section id="signin" className="scroll-mt-20 border-t border-white/10 px-6 py-24">
         <div className="mx-auto grid max-w-5xl gap-12 md:grid-cols-[1.1fr_1fr] md:items-center">
           <div>
             <h2 className="font-display text-5xl uppercase leading-[0.95] text-white md:text-6xl">Crew only.</h2>
@@ -109,7 +109,7 @@ function Nav() {
 
 function Hero() {
   return (
-    <section id="top" className="px-6 pt-16 md:pt-24">
+    <section id="top" className="scroll-mt-20 px-6 pt-16 md:pt-24">
       <div className="mx-auto max-w-6xl">
         <h1 className="font-display text-[3.4rem] uppercase leading-[0.92] text-white sm:text-7xl md:text-[7.5rem]">
           Who's got the hook?
@@ -204,7 +204,7 @@ function Feature({
   flip?: boolean;
 }) {
   return (
-    <section id={id} className="px-6 py-20">
+    <section id={id} className="scroll-mt-20 px-6 py-20">
       <div className={`mx-auto grid max-w-6xl items-center gap-12 ${flip ? "md:grid-cols-[1.25fr_0.75fr] md:[&>*:first-child]:order-2" : "md:grid-cols-[0.75fr_1.25fr]"}`}>
         <div>
           <p className={kicker}>
@@ -230,7 +230,7 @@ function Feature({
 
 function Privacy() {
   return (
-    <section id="privacy" className="px-6 py-24">
+    <section id="privacy" className="scroll-mt-20 px-6 py-24">
       <div className="mx-auto max-w-6xl rounded-2xl bg-[#f2efe8] p-8 text-[#0f0f12] md:p-14">
         <h2 className="font-display text-5xl uppercase leading-[0.95] md:text-7xl">Share titles, not tracks.</h2>
         <p className="mt-5 max-w-2xl text-lg">Your beats don't leave your laptop. The crew sees the facts you choose to share. That's it.</p>
@@ -238,7 +238,7 @@ function Privacy() {
           <div>
             <div className="text-xs font-bold tracking-wider text-[#0f0f12]/70">WHAT TRAVELS</div>
             <ul className="mt-3 flex flex-col gap-1.5">
-              {["title", "stage", "bpm · key", "credits · splits", "release date"].map((x) => (
+              {["title", "stage", "bpm · key · tags", "credits · splits", "release date", "mixdown: yes / no"].map((x) => (
                 <li key={x} className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[#1f8a4c]" /> {x}
                 </li>
@@ -247,7 +247,7 @@ function Privacy() {
           </div>
           <div>
             <div className="text-xs font-bold tracking-wider text-[#0f0f12]/70">WHAT STAYS ON YOUR MACHINE</div>
-            <ul className="mt-3 flex flex-col gap-1.5 text-[#0f0f12]/60">
+            <ul className="mt-3 flex flex-col gap-1.5 text-[#0f0f12]/70">
               {["audio", "project files", "samples", "notes", "track names"].map((x) => (
                 <li key={x} className="line-through decoration-[#0f0f12]/40">
                   {x}
