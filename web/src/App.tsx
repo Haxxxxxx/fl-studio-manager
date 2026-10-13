@@ -304,8 +304,14 @@ function Board() {
           <section
             key={key}
             aria-label={col.label}
-            onDragOver={(e) => (e.preventDefault(), setDragOver(key))}
-            onDragLeave={() => setDragOver((k) => (k === key ? null : k))}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              setDragOver(key);
+            }}
+            onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver((k) => (k === key ? null : k));
+              }}
             onDrop={(e) => {
               e.preventDefault();
               setDragOver(null);
@@ -335,7 +341,10 @@ function SongCard({ s, you, owner, mover, onMove }: { s: CrewSongRow; you: boole
   return (
     <article
       draggable
-      onDragStart={(e) => e.dataTransfer.setData("application/x-crew-song", s.id)}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("application/x-crew-song", s.id);
+      }}
       className="rounded-lg border border-rule bg-raised px-3 py-2.5"
     >
       <div className="truncate text-sm font-medium text-cream">{s.title}</div>
