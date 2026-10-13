@@ -183,6 +183,8 @@ export const useAppStore = create<AppState>((set, get) => {
     if (get().demoMode || !get().workspaceWritable) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+      // Re-check at fire time: sample data may have been loaded meanwhile.
+      if (get().demoMode || !get().workspaceWritable) return;
       api.saveWorkspace(get().workspace).catch((e) => console.error("saving workspace failed", e));
     }, 400);
   }
@@ -401,6 +403,12 @@ export const useAppStore = create<AppState>((set, get) => {
     dismissRenderPanel: () => set({ renderJobs: new Map() }),
 
     loadDemoData: () => {
+      // Flush a pending real save now, before the workspace is swapped.
+      if (saveTimer && !get().demoMode && get().workspaceWritable) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        api.saveWorkspace(get().workspace).catch((e) => console.error("saving workspace failed", e));
+      }
       const projects = generateSampleProjects();
       set({
         demoMode: true,
@@ -491,7 +499,9 @@ export const useAppStore = create<AppState>((set, get) => {
 
     setKitAi: (path, patch) => {
       const kit = get().workspace.songs[path]?.launchKit ?? {};
-      get().updateSong(path, { launchKit: { ...kit, ai: { ...kit.ai, ...patch } } });
+      // New or discarded drafts change the text, so the kit needs reviewing again.
+      const acceptedAtMs = "drafts" in patch ? undefined : kit.acceptedAtMs;
+      get().updateSong(path, { launchKit: { ...kit, acceptedAtMs, ai: { ...kit.ai, ...patch } } });
     },
 
     aiStatus: null,

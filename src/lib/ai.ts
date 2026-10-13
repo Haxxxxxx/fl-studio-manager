@@ -1,5 +1,5 @@
 import * as api from "./tauri";
-import { briefSpecs, type KitField, type KitInput } from "./launchKit";
+import { briefSpecs, isoDate, parseDate, type KitField, type KitInput } from "./launchKit";
 import { detectKey, detectedPeople } from "./people";
 import type { AiFieldReview, KitFieldId, Settings } from "../types";
 
@@ -16,7 +16,8 @@ export function kitContext({ project, meta, people, albums, analysis, today = ne
   const name = (id: string) => people.find((p) => p.id === id)?.name;
   const release = albums.find((a) => a.trackPaths.includes(project.path));
   return {
-    today: today.toISOString().slice(0, 10),
+    // Local dates: the UTC date is already tomorrow on an evening in the Americas.
+    today: isoDate(today),
     projectName: project.name,
     pipelineStage: meta.status ?? "unsorted",
     tags: meta.tags ?? [],
@@ -30,7 +31,7 @@ export function kitContext({ project, meta, people, albums, analysis, today = ne
     credits: (meta.credits ?? []).flatMap((c) => (name(c.personId) ? [{ name: name(c.personId), role: c.role, split: c.split ?? null }] : [])),
     peopleFoundInTrackNames: detectedPeople(project, people).map((p) => p.name),
     release: release ? { title: release.title, kind: release.kind, date: release.releaseDate } : null,
-    lastSavedInFl: new Date(project.modifiedAtMs).toISOString().slice(0, 10),
+    lastSavedInFl: isoDate(new Date(project.modifiedAtMs)),
   };
 }
 
@@ -83,7 +84,8 @@ export async function draftCopy(input: KitInput, fields: KitField[], settings: S
     `Typography: ${s("typography")}`,
     `Avoid: ${s("avoid")}`,
   ].join("\n");
-  return { captions, coverBrief };
+  const basis = { title: value("title"), artists: value("artists"), releaseDate: value("releaseDate") };
+  return { captions, coverBrief, basis };
 }
 
 // ---- Verification ----
@@ -135,7 +137,7 @@ export function sanitizeReview(raw: unknown, fields: KitField[]): Partial<Record
       MEASURED.includes(field.id) ||
       suggestion === field.value ||
       suggestion.length > limit ||
-      (field.id === "releaseDate" && !/^\d{4}-\d{2}-\d{2}$/.test(suggestion)) ||
+      (field.id === "releaseDate" && !parseDate(suggestion)) ||
       (field.id === "explicit" && suggestion !== "Yes" && suggestion !== "No")
     ) {
       suggestion = "";

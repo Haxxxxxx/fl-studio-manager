@@ -77,13 +77,21 @@ pub fn set_ai_key(app: AppHandle, key: Option<String>) -> Result<(), String> {
         };
     }
     let raw = serde_json::to_string_pretty(&AiSecrets { gemini_api_key: key }).map_err(|e| e.to_string())?;
-    fs::write(&path, raw).map_err(|e| format!("could not save the key: {e}"))?;
+    // Owner-only from the moment it exists (no world-readable window).
+    // On Windows the per-user %APPDATA% ACL is what protects it.
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        options.mode(0o600);
+        // An older file may have been created with wider permissions.
+        if path.exists() {
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).map_err(|e| format!("could not secure the key file: {e}"))?;
+        }
     }
-    Ok(())
+    let mut file = options.open(&path).map_err(|e| format!("could not save the key: {e}"))?;
+    std::io::Write::write_all(&mut file, raw.as_bytes()).map_err(|e| format!("could not save the key: {e}"))
 }
 
 /// Model ids go into the URL path: letters, digits, `.`, `-`, `_` only.

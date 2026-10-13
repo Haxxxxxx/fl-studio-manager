@@ -34,12 +34,13 @@ const SOURCE_STYLE: Record<KitField["source"], { label: string; className: strin
   missing: { label: "Needs you", className: "bg-red-500/15 text-red-300" },
 };
 
-/** Keyed by mixdown path + mtime: re-analyze only when the mixdown changes. */
+/** Keyed by mixdown path + mtime + tempo: re-analyze when the mixdown
+ * changes, or the tempo does (snippets snap to its bar grid). */
 const analysisCache = new Map<string, AudioAnalysis>();
 
 function useAnalysis(project: ProjectInfo | undefined, demoMode: boolean) {
   const render = project?.renders[0];
-  const key = render ? `${render.path}|${render.modifiedAtMs}` : null;
+  const key = render ? `${render.path}|${render.modifiedAtMs}|${project?.tempoBpm ?? ""}` : null;
   const [state, setState] = useState<{ key: string | null; analysis: AudioAnalysis | null; error: string | null; loading: boolean }>({
     key: null,
     analysis: null,
@@ -114,13 +115,13 @@ export function LaunchKitView() {
   async function handleExport() {
     if (!project) return;
     if (!settings.outputFolder) return setExportState({ status: "error", message: "Set an export folder in Settings first." });
-    const sep = settings.outputFolder.includes("\\") ? "\\" : "/";
     const title = byId("title").value || project.name;
     const artists = byId("artists").value;
     setExportState({ status: "running" });
     try {
       const dir = await api.exportLaunchKit({
-        outDir: [settings.outputFolder, "Launch Kits", title.replace(/[/\\:*?"<>|]/g, "_")].join(sep),
+        outputFolder: settings.outputFolder,
+        folderName: title,
         files: kitFiles(fields, snippets, extra),
         master: project.renders[0]?.path ?? null,
         masterName: artists ? `${artists} - ${title}` : title,
@@ -205,7 +206,7 @@ export function LaunchKitView() {
           </div>
 
           <div className="flex flex-col gap-5">
-            <AiPanel path={project.path} input={kitInput} fields={fields} />
+            <AiPanel key={project.path} path={project.path} input={kitInput} fields={fields} />
             <Card title="Snippets for reels and stories">
               <Snippets
                 project={project}
@@ -385,11 +386,16 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
 
   async function run(withDraft: boolean) {
     setError(null);
+    // A call can take a while: if the user switches between sample data and
+    // their real songs meanwhile, the result belongs to neither.
+    const startedInDemo = useAppStore.getState().demoMode;
+    const stillValid = () => useAppStore.getState().demoMode === startedInDemo;
     try {
       let current = fields;
       if (withDraft) {
         setRunning("draft");
         const d = await draftCopy(input, fields, settings);
+        if (!stillValid()) return;
         const newDrafts = { ...d, model, atMs: Date.now() };
         // Asking for new copy replaces hand edits of those two fields.
         setKitEdit(path, "captions", undefined);
@@ -401,6 +407,7 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
       }
       setRunning("review");
       const review = await reviewKit(input, current, settings);
+      if (!stillValid()) return;
       setKitAi(path, { review: { fields: review, model, atMs: Date.now() } });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

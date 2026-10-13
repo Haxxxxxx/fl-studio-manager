@@ -135,7 +135,14 @@ export interface AiFieldReview {
 
 export interface KitAiMeta {
   /** AI-written text, used unless the user edited the field. */
-  drafts?: { captions: string; coverBrief: string; model: string; atMs: number };
+  drafts?: {
+    captions: string;
+    coverBrief: string;
+    model: string;
+    atMs: number;
+    /** The facts the text was written for; if they change, it's outdated. */
+    basis?: { title: string; artists: string; releaseDate: string };
+  };
   review?: { fields: Partial<Record<KitFieldId, AiFieldReview>>; model: string; atMs: number };
 }
 

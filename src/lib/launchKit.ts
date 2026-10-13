@@ -63,12 +63,12 @@ export function formatDuration(sec: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-function isoDate(d: Date): string {
+export function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** yyyy-mm-dd → local Date, or null. */
-function parseDate(value: string): Date | null {
+export function parseDate(value: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!m) return null;
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
@@ -232,8 +232,9 @@ export function verify(id: KitFieldId, value: string, today = new Date()): Check
       return KEYS.includes(v) ? undefined : { level: "warn", message: "Write it like Am, F# or Bb" };
     case "duration": {
       if (!v) return { level: "missing", message: "No mixdown to measure" };
-      const [m, s] = v.split(":").map(Number);
-      return m * 60 + s < 30 ? { level: "warn", message: "Under 30 s: Spotify only counts a stream after 30 seconds" } : undefined;
+      const m = /^(\d+):([0-5]\d)$/.exec(v);
+      if (!m) return { level: "warn", message: "Write it as minutes:seconds, like 2:45" };
+      return +m[1] * 60 + +m[2] < 30 ? { level: "warn", message: "Under 30 s: Spotify only counts a stream after 30 seconds" } : undefined;
     }
     case "explicit":
       return v === "Yes" || v === "No" ? undefined : { level: "missing", message: "Explicit lyrics? Yes or No" };
@@ -280,10 +281,15 @@ export function buildKit(input: KitInput): KitField[] {
   const drafts = ai?.drafts;
   values.coverBrief = edits.coverBrief ?? drafts?.coverBrief ?? coverBrief(values, input.meta);
   values.captions = edits.captions ?? drafts?.captions ?? captions(values);
+  // AI text bakes in the title/artist/date it was written for.
+  const basis = drafts?.basis;
+  const draftsOutdated =
+    !!basis && (basis.title !== values.title || basis.artists !== values.artists || basis.releaseDate !== values.releaseDate);
 
   const field = (id: KitFieldId, kind: KitField["kind"], gen: { source: FieldSource; note: string }, options?: string[]): KitField => {
     const edited = edits[id] !== undefined;
     const review = ai?.review?.fields[id];
+    const outdated = draftsOutdated && !edited && (id === "captions" || id === "coverBrief");
     return {
       id,
       label: LABELS[id],
@@ -292,8 +298,10 @@ export function buildKit(input: KitInput): KitField[] {
       note: edited ? "You changed this" : gen.note,
       kind,
       options,
-      check: verify(id, values[id], input.today),
-      review: review && { ...review, stale: review.checkedValue !== values[id] },
+      check: outdated
+        ? { level: "warn", message: "Written for the old title, artist or date. Rewrite with AI or edit it" }
+        : verify(id, values[id], input.today),
+      review: review && { ...review, stale: outdated || review.checkedValue !== values[id] },
     };
   };
   const drafted = drafts
@@ -348,7 +356,8 @@ export function kitSnippets(analysis: AudioAnalysis | null, meta: SongMeta): Sni
   return (analysis?.snippets ?? []).map((s) => ({ ...s, startSec: starts[s.label] ?? s.startSec }));
 }
 
-const csvCell = (s: string) => `"${s.replace(/"/g, '""')}"`;
+// Quoted, and a leading = + - @ is defused so spreadsheets don't run it.
+const csvCell = (s: string) => `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
 
 /** The text files of an exported kit. */
 export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]): { name: string; content: string }[] {
@@ -370,7 +379,8 @@ export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]
     { name: "metadata.json", content: JSON.stringify(json, null, 2) },
     {
       name: "metadata.csv",
-      content: [meta.map((id) => csvCell(LABELS[id])).join(","), meta.map((id) => csvCell(get(id))).join(",")].join("\n") + "\n",
+      // BOM so Excel reads accented names (é, ñ) as UTF-8.
+      content: "﻿" + [meta.map((id) => csvCell(LABELS[id])).join(","), meta.map((id) => csvCell(get(id))).join(",")].join("\n") + "\n",
     },
     { name: "cover-brief.md", content: get("coverBrief") + "\n" },
     { name: "captions.md", content: get("captions") + "\n" },

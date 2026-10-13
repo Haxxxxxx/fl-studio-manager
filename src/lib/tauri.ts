@@ -105,9 +105,11 @@ export async function analyzeAudio(path: string, bpm: number | null): Promise<Au
   return invoke("analyze_audio", { path, bpm });
 }
 
-/** Writes the kit folder (text files, master copy, snippet clips). */
+/** Writes `<outputFolder>/Launch Kits/<folderName>` (text files, master
+ * copy, snippet clips). The folder name is sanitized on the Rust side. */
 export async function exportLaunchKit(args: {
-  outDir: string;
+  outputFolder: string;
+  folderName: string;
   files: { name: string; content: string }[];
   master: string | null;
   masterName: string;
