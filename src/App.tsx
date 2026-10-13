@@ -16,6 +16,35 @@ import { NewProjectModal } from "./components/NewProjectModal";
 import { useAppStore } from "./store/useAppStore";
 import { useCrewStore } from "./store/useCrewStore";
 
+const fileName = (p: string) => p.split(/[/\\]/).pop() ?? p;
+
+/** After a scan: which songs kept their stage, notes, crew share… across a rename/move. */
+function RelinkNotice() {
+  const relinked = useAppStore((s) => s.relinked);
+  const dismiss = useAppStore((s) => s.dismissRelinked);
+  if (!relinked.length) return null;
+  return (
+    <div role="status" className="absolute bottom-3 right-3 z-40 max-w-sm rounded-md border border-white/10 bg-[#1a1a20] px-4 py-3 text-xs text-white/75 shadow-xl">
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <span className="font-medium text-white">
+          Kept the details of {relinked.length} renamed or moved song{relinked.length === 1 ? "" : "s"}
+        </span>
+        <button onClick={dismiss} className="text-white/45 hover:text-white">
+          OK
+        </button>
+      </div>
+      <ul className="flex flex-col gap-0.5">
+        {relinked.slice(0, 5).map((r) => (
+          <li key={r.to} className="truncate" title={`${r.from} → ${r.to}`}>
+            {fileName(r.from)} → <span className="text-white">{r.reason === "moved" ? `moved (${fileName(r.to)})` : fileName(r.to)}</span>
+          </li>
+        ))}
+        {relinked.length > 5 && <li className="text-white/40">+{relinked.length - 5} more</li>}
+      </ul>
+    </div>
+  );
+}
+
 export default function App() {
   const init = useAppStore((s) => s.init);
   const view = useAppStore((s) => s.view);
@@ -71,6 +100,7 @@ export default function App() {
           <code className="rounded bg-black/30 px-1">npm run tauri dev</code> and use the FL Manager window that opens.
         </div>
       )}
+      <RelinkNotice />
       {startupError && (
         <div className="absolute left-1/2 top-3 z-40 max-w-xl -translate-x-1/2 rounded-md border border-red-500/40 bg-[#2a1215] px-4 py-2 text-xs text-red-200 shadow-xl">
           {startupError}

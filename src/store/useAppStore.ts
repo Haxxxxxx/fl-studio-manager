@@ -2,6 +2,7 @@ import { create } from "zustand";
 import * as api from "../lib/tauri";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
+import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
 import type {
   PackageResult,
   Person,
@@ -68,6 +69,9 @@ interface AppState {
   workspaceWritable: boolean;
   projects: ProjectInfo[];
   scanning: boolean;
+  /** Songs whose record followed a rename/move in the last scan (shown once). */
+  relinked: Relink[];
+  dismissRelinked: () => void;
   search: string;
   selected: Set<string>;
   renderJobs: Map<string, RenderJob>;
@@ -234,6 +238,8 @@ export const useAppStore = create<AppState>((set, get) => {
     workspaceWritable: false,
     projects: [],
     scanning: false,
+    relinked: [],
+    dismissRelinked: () => set({ relinked: [] }),
     search: "",
     selected: new Set(),
     renderJobs: new Map(),
@@ -353,7 +359,21 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ scanning: true });
       try {
         const projects = await api.scanProjects(folders, get().settings.outputFolder);
-        if (id === scanSeq && !get().demoMode) set({ projects });
+        if (id === scanSeq && !get().demoMode) {
+          // Renamed/moved .flp files keep their stage, tags, notes, credits,
+          // crew share and album slot (lib/relink.ts). Only on the real,
+          // writable workspace, never sample data.
+          const relinks = get().workspaceWritable ? findRelinks(projects, get().workspace, folders) : [];
+          if (relinks.length) {
+            const map = new Map(relinks.map((r) => [r.from, r.to]));
+            mutateWorkspace((ws) => applyRelinks(ws, relinks));
+            const favs = get().settings.favorites;
+            if (favs.some((f) => map.has(f))) void get().updateSettings({ favorites: favs.map((f) => map.get(f) ?? f) });
+            const open = get().detailPath;
+            set({ relinked: [...get().relinked, ...relinks], detailPath: open && map.has(open) ? map.get(open)! : open });
+          }
+          set({ projects });
+        }
       } finally {
         if (id === scanSeq) set({ scanning: false });
       }

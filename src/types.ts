@@ -5,6 +5,13 @@ export interface FileEntry {
 }
 
 /** One song: the main .flp plus what FL keeps around it (see scanner.rs). */
+export interface StemsInfo {
+  folder: string;
+  count: number;
+  bytes: number;
+  newestMs: number;
+}
+
 export interface ProjectInfo {
   path: string;
   name: string;
@@ -30,6 +37,9 @@ export interface ProjectInfo {
   /** Title and comment from FL Studio's project info (File → Project info). */
   flpTitle?: string | null;
   comment?: string | null;
+  /** Exported stems: a stems folder next to the project, or FL's split-mixer
+   * export (`<name>_<track>.wav`, two or more) beside the .flp. */
+  stems: StemsInfo | null;
   plugins: PluginInfo[];
   samples: SampleInfo[];
   /** Named mixer tracks + recorded-take labels ("Lead Voices - Nova"). */
