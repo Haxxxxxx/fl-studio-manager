@@ -101,6 +101,8 @@ export function LaunchKitView() {
   const project = songs.find((p) => p.path === launchPath) ?? ordered[0];
   const { analysis, error: analysisError, loading } = useAnalysis(project, demoMode);
   const [exportState, setExportState] = useState<{ status: "idle" | "running" } | { status: "done"; dir: string } | { status: "error"; message: string }>({ status: "idle" });
+  /** Where the last "need you" jump went, so the next click moves on. */
+  const lastJump = useRef<string | null>(null);
   /** The "what's in your kit" popup, shown once after each export. */
   const [guide, setGuide] = useState<{ guide: KitGuide; lang: KitLang; dir: string } | null>(null);
 
@@ -144,6 +146,19 @@ export function LaunchKitView() {
 
   const edits = meta.launchKit?.edits ?? {};
   const suggestions = fields.filter((f) => f.review && !f.review.stale && f.review.suggestion && f.review.suggestion !== f.value);
+
+  /** The status plate's "N need you": each click goes to the next field
+   * that needs an answer, in page order, then wraps around. */
+  function jumpToNextNeed() {
+    const targets = [...document.querySelectorAll<HTMLElement>("[data-needs-you]")];
+    if (!targets.length) return;
+    // Clicking the plate takes focus, so remember where the last jump went
+    // (by field, since rows re-render as answers come in).
+    const current = targets.findIndex((t) => (t.dataset.kitField ?? t.textContent) === lastJump.current);
+    const target = targets[(current + 1) % targets.length];
+    lastJump.current = target.dataset.kitField ?? target.textContent;
+    focusField(target);
+  }
 
   async function handleExport() {
     if (!project) return;
@@ -190,7 +205,7 @@ export function LaunchKitView() {
               setExportState({ status: "idle" });
             }}
           />
-          <KitStatus missing={missing} warnings={warnings} accepted={!!accepted} aiVerified={ai.verified} />
+          <KitStatus missing={missing} warnings={warnings} accepted={!!accepted} aiVerified={ai.verified} onJump={jumpToNextNeed} />
           <div className="ml-auto flex gap-2">
             <button
               onClick={() => acceptKit(project.path)}
@@ -224,7 +239,9 @@ export function LaunchKitView() {
           <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">{exportState.message}</div>
         )}
         {extra.map((c) => (
-          <CheckLine key={c.message} check={c} />
+          <div key={c.message} tabIndex={-1} data-needs-you={c.level === "missing" ? "" : undefined} className="rounded-md outline-none">
+            <CheckLine check={c} />
+          </div>
         ))}
         <div className="flex flex-wrap items-center gap-3 text-xs text-body">
           {suggestions.length > 0 && (
@@ -779,4 +796,29 @@ function CaptionLanguage({ value, own, onChange }: { value: KitLang; own: boolea
       <span>{own ? "for this kit" : "(from Settings)"}</span>
     </div>
   );
+}
+
+/** Scrolls a field into view, bounces it once (a highlight only with reduced
+ * motion) and moves keyboard focus to its input. The ring stays until focus
+ * leaves the field. */
+export function focusField(row: HTMLElement) {
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  document.querySelectorAll(".kit-attention").forEach((el) => el.classList.remove("kit-attention", "kit-bounce"));
+  row.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+  // The answer box first (not the Copy/Reset buttons), else a choice
+  // button, else the row itself (a project-level check).
+  const target =
+    row.querySelector<HTMLElement>("input, textarea, select") ?? row.querySelector<HTMLElement>("button:not([title])") ?? row;
+  target.focus({ preventScroll: true });
+  row.classList.add("kit-attention");
+  if (!reduced) {
+    row.classList.add("kit-bounce");
+    row.addEventListener("animationend", () => row.classList.remove("kit-bounce"), { once: true });
+  }
+  const clear = (e: FocusEvent) => {
+    if (row.contains(e.relatedTarget as Node | null)) return;
+    row.classList.remove("kit-attention", "kit-bounce");
+    row.removeEventListener("focusout", clear);
+  };
+  row.addEventListener("focusout", clear);
 }
