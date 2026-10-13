@@ -130,7 +130,10 @@ fn explain_error(status: u16, v: &Value, model: &str) -> String {
         400 if msg.to_lowercase().contains("api key") => "The Gemini API key was rejected. Check it in Settings → AI.".to_string(),
         401 | 403 => "This Gemini API key isn't allowed to use the API. Check it in Settings → AI.".to_string(),
         404 => format!("Gemini model \"{model}\" wasn't found. Pick another one in Settings → AI."),
-        429 => "Free-tier limit reached, even after waiting. Try again in a minute (daily limits reset at midnight Pacific).".to_string(),
+        429 if is_daily_quota(v) => format!(
+            "Today's free Gemini quota is used up for {model} and the backup model {FALLBACK_MODEL}. It resets at midnight Pacific (9am in Paris). Everything else in the Launch Kit keeps working."
+        ),
+        429 => format!("Gemini's free tier is busy (too many requests this minute), even on the backup model {FALLBACK_MODEL}. Wait a minute and try again."),
         500..=599 => format!(
             "Gemini is overloaded right now ({status}), even after several retries and the backup model {FALLBACK_MODEL}. This is on Google's side: try again in a few minutes."
         ),
@@ -139,11 +142,76 @@ fn explain_error(status: u16, v: &Value, model: &str) -> String {
     }
 }
 
-/// Tried once when the chosen model stays overloaded after its retries.
+/// Tried when the chosen model is overloaded or out of free quota: it has its
+/// own, larger free quota.
 pub const FALLBACK_MODEL: &str = "gemini-3.5-flash-lite";
 /// Retries after the first attempt (Google's own SDKs default to 4).
 const MAX_RETRIES: u32 = 4;
 const FALLBACK_RETRIES: u32 = 2;
+/// A rate limit (429) is retried once at most: every retry spends the same
+/// per-minute quota, so after one wait the backup model is the better bet.
+const RATE_LIMIT_RETRIES: u32 = 1;
+/// Free tier allows ~10 requests a minute per model: keep calls to one model
+/// at least this far apart, so "draft then review" doesn't trip it.
+#[cfg(not(test))]
+const MIN_GAP: Duration = Duration::from_secs(4);
+#[cfg(test)]
+const MIN_GAP: Duration = Duration::from_millis(0);
+/// After a model's daily quota runs out, skip it for this long.
+const EXHAUSTED_FOR: Duration = Duration::from_secs(30 * 60);
+
+type ModelKey = (String, String);
+/// Earliest time the next request to (endpoint, model) may go out.
+static NEXT_SLOT: std::sync::Mutex<Option<std::collections::HashMap<ModelKey, std::time::Instant>>> = std::sync::Mutex::new(None);
+/// Models whose daily quota ran out, until when.
+static EXHAUSTED: std::sync::Mutex<Option<std::collections::HashMap<ModelKey, std::time::Instant>>> = std::sync::Mutex::new(None);
+
+fn key_of(endpoint: &str, model: &str) -> ModelKey {
+    (endpoint.to_string(), model.to_string())
+}
+
+/// Wait for this model's next free slot (spacing calls by MIN_GAP).
+async fn pace(endpoint: &str, model: &str) {
+    let now = std::time::Instant::now();
+    let at = {
+        let mut slots = NEXT_SLOT.lock().unwrap_or_else(|e| e.into_inner());
+        let slots = slots.get_or_insert_with(Default::default);
+        let at = slots.get(&key_of(endpoint, model)).copied().filter(|t| *t > now).unwrap_or(now);
+        slots.insert(key_of(endpoint, model), at + MIN_GAP);
+        at
+    };
+    if at > now {
+        tokio::time::sleep(at - now).await;
+    }
+}
+
+fn is_exhausted(endpoint: &str, model: &str) -> bool {
+    let now = std::time::Instant::now();
+    EXHAUSTED
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .and_then(|m| m.get(&key_of(endpoint, model)).copied())
+        .is_some_and(|until| until > now)
+}
+
+fn mark_exhausted(endpoint: &str, model: &str) {
+    let until = std::time::Instant::now() + EXHAUSTED_FOR;
+    EXHAUSTED.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(Default::default).insert(key_of(endpoint, model), until);
+}
+
+/// A 429 that's about the day's quota (retrying today won't help), as
+/// opposed to the per-minute one. Google names the quota in the details.
+fn is_daily_quota(v: &Value) -> bool {
+    let details = v.pointer("/error/details").map(Value::to_string).unwrap_or_default();
+    let message = v.pointer("/error/message").and_then(Value::as_str).unwrap_or("");
+    details.contains("PerDay") || message.to_lowercase().contains("per day")
+}
+
+/// The other free model to try when `model` can't answer.
+fn backup_for(model: &str) -> &'static str {
+    if model == FALLBACK_MODEL { DEFAULT_MODEL } else { FALLBACK_MODEL }
+}
 /// Longest server-suggested wait we sit through; longer (daily quota) fails fast.
 const MAX_WAIT: Duration = Duration::from_secs(20);
 /// Hard cap on one AI action, retries and fallback included.
@@ -187,6 +255,7 @@ enum Failure {
 async fn generate(client: &reqwest::Client, endpoint: &str, key: &str, model: &str, body: &Value, retries: u32) -> Result<Value, Failure> {
     let mut attempt = 0;
     loop {
+        pace(endpoint, model).await;
         let sent = client
             .post(format!("{endpoint}/{model}:generateContent"))
             .header("x-goog-api-key", key)
@@ -209,7 +278,12 @@ async fn generate(client: &reqwest::Client, endpoint: &str, key: &str, model: &s
         if (200..300).contains(&status) {
             return Ok(v);
         }
-        if retryable(status) && attempt < retries {
+        if status == 429 && is_daily_quota(&v) {
+            mark_exhausted(endpoint, model);
+            return Err(Failure::Http(status, v));
+        }
+        let limit = if status == 429 { retries.min(RATE_LIMIT_RETRIES) } else { retries };
+        if retryable(status) && attempt < limit {
             let wait = retry_delay_hint(&v).unwrap_or_else(|| backoff(attempt));
             if wait <= MAX_WAIT {
                 tokio::time::sleep(wait).await;
@@ -221,13 +295,19 @@ async fn generate(client: &reqwest::Client, endpoint: &str, key: &str, model: &s
     }
 }
 
-/// The chosen model with retries; if it stays overloaded (5xx), one go on
-/// the other free model. Returns the model that answered.
+/// The chosen model with retries; if it stays overloaded (5xx) or rate
+/// limited (429), the other free model, which has its own quota. A model
+/// whose daily quota ran out is skipped for a while. Returns the model
+/// that answered.
 async fn generate_with_fallback(client: &reqwest::Client, endpoint: &str, key: &str, model: &str, body: &Value) -> (String, Result<Value, Failure>) {
+    let backup = backup_for(model);
+    if is_exhausted(endpoint, model) && !is_exhausted(endpoint, backup) {
+        return (backup.to_string(), generate(client, endpoint, key, backup, body, FALLBACK_RETRIES).await);
+    }
     let result = generate(client, endpoint, key, model, body, MAX_RETRIES).await;
-    if matches!(&result, Err(Failure::Http(s, _)) if *s >= 500) && model != FALLBACK_MODEL {
-        if let ok @ Ok(_) = generate(client, endpoint, key, FALLBACK_MODEL, body, FALLBACK_RETRIES).await {
-            return (FALLBACK_MODEL.to_string(), ok);
+    if matches!(&result, Err(Failure::Http(s, _)) if *s >= 500 || *s == 429) && !is_exhausted(endpoint, backup) {
+        if let ok @ Ok(_) = generate(client, endpoint, key, backup, body, FALLBACK_RETRIES).await {
+            return (backup.to_string(), ok);
         }
     }
     (model.to_string(), result)
@@ -307,7 +387,9 @@ mod tests {
     fn explains_http_errors() {
         let bad_key = json!({ "error": { "message": "API key not valid. Please pass a valid API key." } });
         assert!(explain_error(400, &bad_key, "m").contains("rejected"));
-        assert!(explain_error(429, &Value::Null, "m").contains("Free-tier limit"));
+        assert!(explain_error(429, &Value::Null, "m").contains("this minute"));
+        let daily = json!({ "error": { "details": [{ "violations": [{ "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }] } });
+        assert!(explain_error(429, &daily, "m").contains("resets at midnight"));
         assert!(explain_error(404, &Value::Null, "gemini-x").contains("gemini-x"));
         assert!(explain_error(503, &Value::Null, "m").contains("503"));
     }
@@ -414,6 +496,44 @@ mod tests {
         let seen = seen.lock().unwrap();
         assert!(seen.last().unwrap().contains(FALLBACK_MODEL), "last call: {}", seen.last().unwrap());
         assert_eq!(seen.len(), 2 + MAX_RETRIES as usize);
+    }
+
+    #[test]
+    fn rate_limits_go_to_the_backup_model() {
+        let limited = json!({ "error": { "code": 429, "message": "Resource exhausted." } });
+        // One retry on the chosen model (no long hint), then the backup answers.
+        let responses = vec![(429, limited.clone()), (429, limited), (200, answer("{\"ok\":true}"))];
+        let (base, seen) = mock_gemini(responses);
+        let client = reqwest::Client::new();
+        let (model, result) = tauri::async_runtime::block_on(generate_with_fallback(&client, &base, "k", DEFAULT_MODEL, &json!({})));
+        assert!(result.is_ok());
+        assert_eq!(model, FALLBACK_MODEL);
+        assert_eq!(seen.lock().unwrap().len(), 3, "429 is retried once, not four times");
+    }
+
+    #[test]
+    fn a_used_up_daily_quota_is_skipped_next_time() {
+        let daily = json!({ "error": { "code": 429, "details": [{ "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+            "violations": [{ "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }] } });
+        let (base, seen) = mock_gemini(vec![(429, daily), (200, answer("{\"a\":1}")), (200, answer("{\"b\":2}"))]);
+        let client = reqwest::Client::new();
+        // No retry on a daily quota: straight to the backup.
+        let (first, r1) = tauri::async_runtime::block_on(generate_with_fallback(&client, &base, "k", DEFAULT_MODEL, &json!({})));
+        assert!(r1.is_ok());
+        assert_eq!(first, FALLBACK_MODEL);
+        // Next action: the exhausted model isn't even tried.
+        let (second, r2) = tauri::async_runtime::block_on(generate_with_fallback(&client, &base, "k", DEFAULT_MODEL, &json!({})));
+        assert!(r2.is_ok());
+        assert_eq!(second, FALLBACK_MODEL);
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 3);
+        assert!(seen[1].contains(FALLBACK_MODEL) && seen[2].contains(FALLBACK_MODEL), "{seen:?}");
+    }
+
+    #[test]
+    fn the_backup_of_the_backup_is_the_default() {
+        assert_eq!(backup_for(DEFAULT_MODEL), FALLBACK_MODEL);
+        assert_eq!(backup_for(FALLBACK_MODEL), DEFAULT_MODEL);
     }
 
     #[test]

@@ -163,8 +163,10 @@ export type KitFieldId =
 export interface LaunchKitMeta {
   /** Values the user typed over the generated ones. */
   edits?: Partial<Record<KitFieldId, string>>;
-  /** Snippet label → start (s), when nudged off the detected spot. */
+  /** Snippet label → start (s), when moved off the detected spot. */
   snippetStarts?: Record<string, number>;
+  /** Snippet label → length (s), when changed from the detected one. */
+  snippetLengths?: Record<string, number>;
   /** Set by "Accept all"; cleared by any later edit. */
   acceptedAtMs?: number;
   ai?: KitAiMeta;
@@ -232,9 +234,14 @@ export interface CoverImage {
 }
 
 export interface Snippet {
+  /** Shown and used for file names ("Hook 30s"); follows the length. */
   label: string;
   startSec: number;
   lengthSec: number;
+  /** Why it was picked ("comes back 3 times"), from the analysis. */
+  reason?: string;
+  /** The detected snippet's label: the key the user's edits are stored under. */
+  key?: string;
 }
 
 /** The mixdown file itself, for the distributor checks. */

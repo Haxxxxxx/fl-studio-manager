@@ -11,6 +11,7 @@ mod package;
 mod render;
 mod resolve;
 mod scanner;
+mod sections;
 mod settings;
 mod shorts;
 mod workspace;
