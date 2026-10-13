@@ -90,6 +90,12 @@ export interface SongMeta {
   status?: SongStatus;
   /** The stage before the lifecycle migration (idea/wip/mixing/mastering/done). */
   legacyStatus?: string;
+  /** When the stage last changed (here or on the crew board), for sync. */
+  stageUpdatedAtMs?: number;
+  /** Shared with the crew (opt-in per song). */
+  shared?: boolean;
+  /** Stable id of this song in the crew database, set on first share. */
+  shareId?: string;
   tags?: string[];
   notes?: string;
   /** Musical key, e.g. "Am", "F#". FL doesn't store one. */
@@ -267,3 +273,46 @@ export interface Workspace {
 
 /** Whether the newest mixdown is newer than the last save of the project. */
 export type RenderFreshness = "fresh" | "stale" | "none";
+
+// ---- Crew (Supabase, EU) — rows as stored in supabase/migrations/*_crew.sql ----
+
+export interface CrewCredit {
+  name: string;
+  role: string;
+  split: number | null;
+}
+
+/** A song's shared metadata. Never audio, file paths, samples or notes. */
+export interface CrewSongRow {
+  id: string;
+  crew_id: string;
+  owner_id: string;
+  title: string;
+  stage: SongStatus | null;
+  bpm: number | null;
+  musical_key: string | null;
+  tags: string[];
+  credits: CrewCredit[];
+  release_date: string | null;
+  has_mixdown: boolean;
+  kit_accepted: boolean;
+  last_saved_at: string | null;
+  stage_updated_at: string;
+  stage_updated_by?: string | null;
+  updated_at?: string;
+}
+
+export interface CrewMemberRow {
+  crew_id: string;
+  user_id: string;
+  display_name: string;
+  role: "owner" | "member";
+  joined_at?: string;
+}
+
+export interface CrewSummary {
+  id: string;
+  name: string;
+  role: "owner" | "member";
+  displayName: string;
+}

@@ -25,6 +25,7 @@ import { KEYS, albumsOf, backupsBytes, formatBpm, missingPlugins, renderFreshnes
 import type { ProjectInfo } from "../types";
 import { detectKey } from "../lib/people";
 import { SongCredits, SongPitches } from "./SongPeople";
+import { ShareToggle } from "./CrewPanel";
 import { ConfirmButton, StatusSelect, TagEditor, btn, input, sectionLabel } from "./ui";
 
 const KEEP_BACKUPS = 5;
@@ -143,6 +144,7 @@ export function ProjectDrawer() {
             </button>
           )}
         </div>
+        <ShareToggle path={project.path} />
 
         {message && (
           <div

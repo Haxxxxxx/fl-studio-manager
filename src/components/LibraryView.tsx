@@ -19,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 import { useAppStore, type SortKey, type StatusFilter } from "../store/useAppStore";
+import { useCrewStore } from "../store/useCrewStore";
+import { useCanShare } from "./CrewPanel";
 import { detectKey } from "../lib/people";
 import { formatDate } from "../lib/format";
 import {
@@ -185,6 +187,8 @@ export function LibraryView() {
 
   const problemCount = useMemo(() => songs.filter(hasProblems).length, [songs]);
 
+  const { can: canShare, crewName } = useCanShare();
+  const setShared = useCrewStore((s) => s.setShared);
   const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.path));
   const selectedPaths = Array.from(selected);
 
@@ -285,6 +289,16 @@ export function LibraryView() {
               label="Add to release"
               options={workspace.albums.map((a) => ({ value: a.id, label: a.title }))}
               onPick={(id) => addTracks(id, selectedPaths)}
+            />
+          )}
+          {canShare && (
+            <BulkSelect
+              label="Crew"
+              options={[
+                { value: "share", label: `Share with ${crewName}` },
+                { value: "unshare", label: "Stop sharing" },
+              ]}
+              onPick={(v) => setShared(selectedPaths, v === "share")}
             />
           )}
           <BulkSelect

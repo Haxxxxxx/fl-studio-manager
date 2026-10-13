@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
+import { CrewPanel } from "./CrewPanel";
 import type { RenderFormat } from "../types";
 
 const IS_MAC = navigator.userAgent.includes("Mac");
@@ -133,6 +134,8 @@ export function SettingsView() {
             </button>
           </div>
         </section>
+
+        <CrewPanel />
 
         <AiSettings />
 
