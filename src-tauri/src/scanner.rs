@@ -817,4 +817,41 @@ mod tests {
             assert!(p.tempo_bpm.is_none() && p.samples.is_empty());
         }
     }
+
+    #[test]
+    fn a_project_full_of_network_paths_scans_without_touching_them() {
+        let root = std::env::temp_dir().join(format!("flsm-unc-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        // .flp: sample path events (id 196) pointing at network shares.
+        let mut events = Vec::new();
+        for p in [r"\\attacker\share\kick.wav", "//attacker/share/snare.wav", r"\??\UNC\attacker\share\hat.wav"] {
+            events.push(196u8);
+            events.push(p.len() as u8);
+            events.extend_from_slice(p.as_bytes());
+        }
+        let mut flp = b"FLhd\x06\0\0\0\0\0\x04\0\x60\0FLdt".to_vec();
+        flp.extend_from_slice(&(events.len() as u32).to_le_bytes());
+        flp.extend_from_slice(&events);
+        fs::write(root.join("Bait.flp"), &flp).unwrap();
+        // .als: a sample FileRef with a network path.
+        let als_xml = r#"<Ableton><LiveSet><Tracks><AudioTrack><SampleRef><FileRef><RelativePath Value="\\attacker\share\loop.wav" /><Path Value="//attacker/share/loop.wav" /></FileRef></SampleRef></AudioTrack></Tracks></LiveSet></Ableton>"#;
+        let mut als = Vec::new();
+        {
+            use std::io::Write;
+            let mut gz = flate2::write::GzEncoder::new(&mut als, flate2::Compression::default());
+            gz.write_all(als_xml.as_bytes()).unwrap();
+            gz.finish().unwrap();
+        }
+        fs::write(root.join("Bait Set.als"), &als).unwrap();
+
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(projects.len(), 2);
+        for p in &projects {
+            assert!(p.read_error.is_none(), "{}: {:?}", p.name, p.read_error);
+            assert!(!p.samples.is_empty(), "{}", p.name);
+            assert!(p.samples.iter().all(|s| s.status == SampleStatus::Missing), "{}: {:?}", p.name, p.samples);
+        }
+    }
 }

@@ -8,6 +8,7 @@ mod key;
 mod flp_metadata;
 mod models;
 mod package;
+mod paths;
 mod render;
 mod resolve;
 mod scanner;
@@ -49,6 +50,8 @@ pub fn run() {
             cover::set_cover_credentials,
             cover::generate_cover,
             cover::save_cover,
+            paths::open_project,
+            paths::reveal_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
