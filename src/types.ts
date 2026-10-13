@@ -16,6 +16,9 @@ export type DawId = "fl-studio" | "ableton" | "reaper" | "studio-one" | "pro-too
 
 export interface ProjectInfo {
   path: string;
+  /** Why nothing could be read from inside the project (damaged, oversized
+   * or hostile file). The project is still listed. */
+  readError?: string;
   name: string;
   folder: string;
   sizeBytes: number;

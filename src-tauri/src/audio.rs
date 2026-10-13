@@ -63,7 +63,16 @@ pub struct Snippet {
 
 /// Streams the file's default track as interleaved f32, chunk by chunk.
 /// `on_chunk` returns false to stop early. Returns the stored bit depth.
+/// Mixdowns come from crewmates, so a decoder panic on a malformed file is
+/// caught and becomes an error for that file (release builds unwind).
 fn decode(path: &Path, mut on_chunk: impl FnMut(&[f32], usize, u32) -> bool) -> Result<Option<u32>, String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode_unguarded(path, &mut on_chunk))).unwrap_or_else(|_| {
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        Err(format!("{name} couldn't be decoded (damaged or unusual audio file)"))
+    })
+}
+
+fn decode_unguarded(path: &Path, on_chunk: &mut impl FnMut(&[f32], usize, u32) -> bool) -> Result<Option<u32>, String> {
     let file = File::open(path).map_err(|e| format!("could not open {}: {e}", path.display()))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
@@ -596,5 +605,32 @@ mod tests {
     fn safe_names() {
         assert_eq!(safe_name("a/b:c"), "a_b_c");
         assert_eq!(safe_name(" .. "), "Untitled");
+    }
+
+    #[test]
+    fn a_mixdown_the_decoder_rejects_is_an_error_not_a_crash() {
+        let dir = std::env::temp_dir().join(format!("flsm-badaudio-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let bad = dir.join("Broken mix.wav");
+        let mut bytes = b"RIFF\xff\xff\xff\x7fWAVEfmt ".to_vec();
+        bytes.extend(std::iter::repeat_n(0xAB, 4096));
+        fs::write(&bad, &bytes).unwrap();
+        let fake = dir.join("Not audio.mp3");
+        fs::write(&fake, b"this is not an mp3 at all").unwrap();
+
+        assert!(analyze(&bad, None).is_err());
+        assert!(analyze(&fake, None).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_panic_while_decoding_is_contained() {
+        let dir = std::env::temp_dir().join(format!("flsm-panicaudio-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("tone.wav");
+        write_wav(&wav, &vec![0.1f32; 48_000], 1, 48_000).unwrap();
+        let err = decode(&wav, |_, _, _| panic!("decoder bug")).unwrap_err();
+        assert!(err.contains("couldn't be decoded"), "{err}");
+        let _ = fs::remove_dir_all(&dir);
     }
 }

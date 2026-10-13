@@ -14,7 +14,7 @@
 //! Every reader returns the same `FlpMetadata` shape the FL reader does, so
 //! the rest of the app (plugin/sample resolution, Launch Kit) is DAW-agnostic.
 
-use crate::flp_metadata::{FlpMetadata, RawPlugin};
+use crate::flp_metadata::{FlpMetadata, Lists, RawPlugin};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -23,9 +23,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
-/// Upper bound on decompressed bytes read from one .als or one zip entry,
-/// so a malformed or hostile file can't exhaust memory.
-const MAX_DECOMPRESSED: u64 = 256 * 1024 * 1024;
+/// Upper bound on bytes read from one .rpp, one unpacked .als or one zip
+/// entry. Real projects are a few MB; past this the file is refused and
+/// reported, so a malformed or hostile file can't exhaust memory.
+const MAX_TEXT: u64 = 64 * 1024 * 1024;
+/// Deepest XML nesting read from an .als (real sets stay under ~40).
+const MAX_ALS_DEPTH: usize = 256;
 /// Studio One keeps one XML per device; read at most this many, this big.
 const MAX_DEVICE_FILES: usize = 64;
 const MAX_DEVICE_BYTES: u64 = 16 * 1024 * 1024;
@@ -253,32 +256,49 @@ fn strip_timestamp_suffix(base: &str) -> String {
 /// (size, mtime) a cached read was made at.
 type Stamp = (u64, Option<SystemTime>);
 
-/// Rescans run on every window focus; an unchanged file is read once.
-static READ_CACHE: Mutex<Option<HashMap<PathBuf, (Stamp, FlpMetadata)>>> = Mutex::new(None);
+/// Rescans run on every window focus; an unchanged file is read (or
+/// refused) once.
+static READ_CACHE: Mutex<Option<HashMap<PathBuf, (Stamp, Result<FlpMetadata, String>)>>> = Mutex::new(None);
 
-/// What can be read from inside a non-FL project. Best-effort: a file that
-/// can't be parsed just yields empty metadata.
-pub fn read_project(daw: Daw, path: &Path) -> FlpMetadata {
+/// Why a project couldn't be read.
+enum ReadError {
+    /// The file couldn't be opened or read (cloud placeholder, locked file):
+    /// not cached, so the next scan tries again.
+    Io(String),
+    /// What's inside is refused (too big, too deep, too many entries):
+    /// cached until the file changes.
+    Refused(String),
+}
+
+fn io(e: impl std::fmt::Display) -> ReadError {
+    ReadError::Io(e.to_string())
+}
+
+/// What can be read from inside a non-FL project. Closed formats yield
+/// empty metadata; a file that can't be read is an error the scan reports.
+pub fn read_project(daw: Daw, path: &Path) -> Result<FlpMetadata, String> {
     if !matches!(daw, Daw::Reaper | Daw::Ableton | Daw::StudioOne) {
-        return FlpMetadata::default();
+        return Ok(FlpMetadata::default());
     }
     let stamp: Option<Stamp> = fs::metadata(path).ok().map(|m| (m.len(), m.modified().ok()));
     if let Some(stamp) = stamp {
         let cache = READ_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some((s, meta)) = cache.as_ref().and_then(|c| c.get(path)) {
+        if let Some((s, read)) = cache.as_ref().and_then(|c| c.get(path)) {
             if *s == stamp {
-                return meta.clone();
+                return read.clone();
             }
         }
     }
-    // A failed read (cloud placeholder, locked file) isn't cached, so the
-    // next scan tries again.
-    let Ok(meta) = read_uncached(daw, path) else { return FlpMetadata::default() };
+    let read = match read_uncached(daw, path) {
+        Ok(meta) => Ok(meta),
+        Err(ReadError::Refused(e)) => Err(e),
+        Err(ReadError::Io(e)) => return Err(e),
+    };
     if let Some(stamp) = stamp {
         let mut cache = READ_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        cache.get_or_insert_with(HashMap::new).insert(path.to_path_buf(), (stamp, meta.clone()));
+        cache.get_or_insert_with(HashMap::new).insert(path.to_path_buf(), (stamp, read.clone()));
     }
-    meta
+    read
 }
 
 /// Drop cached reads for projects the last scan didn't see (deleted or moved).
@@ -289,18 +309,37 @@ pub fn prune_read_cache(keep: &std::collections::HashSet<PathBuf>) {
     }
 }
 
-fn read_uncached(daw: Daw, path: &Path) -> Result<FlpMetadata, String> {
+fn read_uncached(daw: Daw, path: &Path) -> Result<FlpMetadata, ReadError> {
     match daw {
-        Daw::Reaper => fs::read(path).map(|b| parse_rpp(&String::from_utf8_lossy(&b), project_dir(path))).map_err(|e| e.to_string()),
-        Daw::Ableton => File::open(path)
-            .map(|f| {
-                let xml = flate2::read::GzDecoder::new(f).take(MAX_DECOMPRESSED);
-                parse_als_reader(BufReader::new(xml), project_dir(path))
-            })
-            .map_err(|e| e.to_string()),
+        Daw::Reaper => {
+            let text = read_capped(File::open(path).map_err(io)?, MAX_TEXT)?;
+            parse_rpp(&text, project_dir(path)).map_err(ReadError::Refused)
+        }
+        Daw::Ableton => {
+            let mut xml = flate2::read::GzDecoder::new(File::open(path).map_err(io)?).take(MAX_TEXT + 1);
+            let meta = parse_als_reader(BufReader::new(&mut xml), project_dir(path)).map_err(ReadError::Refused)?;
+            if xml.limit() == 0 {
+                return Err(too_big());
+            }
+            Ok(meta)
+        }
         Daw::StudioOne => read_song(path),
         _ => Ok(FlpMetadata::default()),
     }
+}
+
+fn too_big() -> ReadError {
+    ReadError::Refused(format!("it's over {} MB of text, so it wasn't read (damaged or not a real project)", MAX_TEXT / (1024 * 1024)))
+}
+
+/// At most `max` bytes as text; more is refused. Valid UTF-8 isn't copied.
+fn read_capped(r: impl Read, max: u64) -> Result<String, ReadError> {
+    let mut bytes = Vec::new();
+    r.take(max + 1).read_to_end(&mut bytes).map_err(io)?;
+    if bytes.len() as u64 > max {
+        return Err(too_big());
+    }
+    Ok(String::from_utf8(bytes).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()))
 }
 
 fn project_dir(path: &Path) -> &Path {
@@ -315,12 +354,6 @@ fn absolutize(raw: &str, dir: &Path) -> String {
         raw.to_string()
     } else {
         dir.join(raw).to_string_lossy().to_string()
-    }
-}
-
-fn push_unique(v: &mut Vec<String>, s: String) {
-    if !s.is_empty() && !v.contains(&s) {
-        v.push(s);
     }
 }
 
@@ -363,8 +396,9 @@ fn rpp_plugin(desc: &str) -> Option<RawPlugin> {
     Some(RawPlugin { name, vendor, path: None })
 }
 
-pub fn parse_rpp(text: &str, dir: &Path) -> FlpMetadata {
+pub fn parse_rpp(text: &str, dir: &Path) -> Result<FlpMetadata, String> {
     let mut meta = FlpMetadata::default();
+    let mut lists = Lists::default();
     let mut stack: Vec<String> = Vec::new();
     for (i, raw) in text.lines().enumerate() {
         let line = raw.trim();
@@ -382,9 +416,7 @@ pub fn parse_rpp(text: &str, dir: &Path) -> FlpMetadata {
             }
             if matches!(tag.as_str(), "VST" | "AU" | "CLAP" | "DX" | "LV2") {
                 if let Some(p) = toks.get(1).and_then(|d| rpp_plugin(d)) {
-                    if !meta.plugins.iter().any(|x| x.name == p.name) {
-                        meta.plugins.push(p);
-                    }
+                    lists.plugin(&mut meta, p)?;
                 }
             }
             stack.push(tag);
@@ -401,18 +433,18 @@ pub fn parse_rpp(text: &str, dir: &Path) -> FlpMetadata {
             }
             "NAME" if in_chunk == Some("TRACK") => {
                 if let Some(n) = toks.get(1) {
-                    push_unique(&mut meta.mixer_names, n.clone());
+                    lists.track(&mut meta, n.clone())?;
                 }
             }
             "FILE" if in_chunk == Some("SOURCE") => {
                 if let Some(f) = toks.get(1) {
-                    push_unique(&mut meta.samples, absolutize(f, dir));
+                    lists.sample(&mut meta, absolutize(f, dir))?;
                 }
             }
             _ => {}
         }
     }
-    meta
+    Ok(meta)
 }
 
 // ------------------------------------------------------------------ Ableton
@@ -438,11 +470,18 @@ struct AlsState {
     file_is_sample: bool,
 }
 
-fn als_element(name: &str, e: &quick_xml::events::BytesStart, stack: &[String], meta: &mut FlpMetadata, st: &mut AlsState) {
+fn als_element(
+    name: &str,
+    e: &quick_xml::events::BytesStart,
+    stack: &[String],
+    in_master: bool,
+    meta: &mut FlpMetadata,
+    lists: &mut Lists,
+    st: &mut AlsState,
+) -> Result<(), String> {
     let parent = stack.last().map(String::as_str).unwrap_or("");
     let grand = stack.len().checked_sub(2).and_then(|i| stack.get(i)).map(String::as_str).unwrap_or("");
     let value = || attr_value(e, "Value").unwrap_or_default();
-    let in_master = stack.iter().any(|s| s == "MasterTrack" || s == "MainTrack");
     match (name, parent) {
         ("Ableton", _) => meta.fl_version = attr_value(e, "Creator"),
         ("Manual", "Tempo") if in_master && meta.tempo_bpm.is_none() => meta.tempo_bpm = value().parse().ok(),
@@ -454,13 +493,10 @@ fn als_element(name: &str, e: &quick_xml::events::BytesStart, stack: &[String], 
             }
         }
         ("EffectiveName", "Name") if matches!(grand, "MidiTrack" | "AudioTrack" | "GroupTrack" | "ReturnTrack") => {
-            push_unique(&mut meta.mixer_names, value());
+            lists.track(meta, value())?;
         }
         ("PlugName", "VstPluginInfo") | ("Name", "Vst3PluginInfo") => {
-            let n = value();
-            if !n.is_empty() && !meta.plugins.iter().any(|p| p.name == n) {
-                meta.plugins.push(RawPlugin { name: n, vendor: None, path: None });
-            }
+            lists.plugin(meta, RawPlugin { name: value(), vendor: None, path: None })?;
         }
         ("Name", "AuPluginInfo") => st.au_name = Some(value()),
         ("Manufacturer", "AuPluginInfo") => st.au_vendor = Some(value()),
@@ -475,35 +511,49 @@ fn als_element(name: &str, e: &quick_xml::events::BytesStart, stack: &[String], 
         ("FileRef", _) => st.file_is_sample = parent == "SampleRef",
         _ => {}
     }
+    Ok(())
+}
+
+fn is_master(name: &str) -> bool {
+    name == "MasterTrack" || name == "MainTrack"
 }
 
 #[cfg(test)]
-pub fn parse_als(xml: &str, dir: &Path) -> FlpMetadata {
+pub fn parse_als(xml: &str, dir: &Path) -> Result<FlpMetadata, String> {
     parse_als_reader(xml.as_bytes(), dir)
 }
 
 /// Streams the set's XML, so a big .als never sits in memory as one string.
-pub fn parse_als_reader<R: BufRead>(input: R, dir: &Path) -> FlpMetadata {
+pub fn parse_als_reader<R: BufRead>(input: R, dir: &Path) -> Result<FlpMetadata, String> {
     use quick_xml::events::Event;
     let mut meta = FlpMetadata::default();
+    let mut lists = Lists::default();
     let mut reader = quick_xml::Reader::from_reader(input);
     let mut stack: Vec<String> = Vec::new();
+    // Open MasterTrack/MainTrack elements (a counter, not a stack scan per element).
+    let mut masters = 0usize;
     let mut st = AlsState::default();
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
+                if stack.len() >= MAX_ALS_DEPTH {
+                    return Err(format!("its XML is nested more than {MAX_ALS_DEPTH} levels deep, so it wasn't read (damaged or not a real set)"));
+                }
                 let name = e.name().as_ref().to_string();
-                als_element(&name, &e, &stack, &mut meta, &mut st);
+                als_element(&name, &e, &stack, masters > 0, &mut meta, &mut lists, &mut st)?;
+                masters += usize::from(is_master(&name));
                 stack.push(name);
             }
             Ok(Event::Empty(e)) => {
                 let name = e.name().as_ref().to_string();
-                als_element(&name, &e, &stack, &mut meta, &mut st);
+                als_element(&name, &e, &stack, masters > 0, &mut meta, &mut lists, &mut st)?;
             }
             Ok(Event::End(e)) => {
                 let name = e.name().as_ref().to_string();
-                stack.pop();
+                if stack.pop().is_some_and(|n| is_master(&n)) {
+                    masters -= 1;
+                }
                 if name == "FileRef" {
                     // Live 11+: RelativePath/@Value; Live 9-10: RelativePathElement dirs + Name.
                     let rel = if !st.file_rel.is_empty() {
@@ -519,7 +569,7 @@ pub fn parse_als_reader<R: BufRead>(input: R, dir: &Path) -> FlpMetadata {
                         _ => st.file_abs.clone(),
                     };
                     if st.file_is_sample && Path::new(&pick).extension().is_some() {
-                        push_unique(&mut meta.samples, pick);
+                        lists.sample(&mut meta, pick)?;
                     }
                     st.file_is_sample = false;
                     st.file_abs.clear();
@@ -528,9 +578,7 @@ pub fn parse_als_reader<R: BufRead>(input: R, dir: &Path) -> FlpMetadata {
                     st.file_name.clear();
                 } else if name == "AuPluginInfo" {
                     if let Some(n) = st.au_name.take().filter(|n| !n.is_empty()) {
-                        if !meta.plugins.iter().any(|p| p.name == n) {
-                            meta.plugins.push(RawPlugin { name: n, vendor: st.au_vendor.take().filter(|v| !v.is_empty()), path: None });
-                        }
+                        lists.plugin(&mut meta, RawPlugin { name: n, vendor: st.au_vendor.take().filter(|v| !v.is_empty()), path: None })?;
                     }
                     st.au_vendor = None;
                 }
@@ -540,16 +588,19 @@ pub fn parse_als_reader<R: BufRead>(input: R, dir: &Path) -> FlpMetadata {
         }
         buf.clear();
     }
-    meta
+    Ok(meta)
 }
 
 // ------------------------------------------------------------------ Studio One
 
-fn zip_text(archive: &mut zip::ZipArchive<File>, name: &str, max: u64) -> Option<String> {
-    let f = archive.by_name(name).ok()?;
-    let mut bytes = Vec::new();
-    f.take(max).read_to_end(&mut bytes).ok()?;
-    Some(String::from_utf8_lossy(&bytes).into_owned())
+/// One entry as text: None if it's missing or unreadable, refused past `max`.
+fn zip_text(archive: &mut zip::ZipArchive<File>, name: &str, max: u64) -> Result<Option<String>, ReadError> {
+    let Ok(f) = archive.by_name(name) else { return Ok(None) };
+    match read_capped(f, max) {
+        Ok(text) => Ok(Some(text)),
+        Err(ReadError::Io(_)) => Ok(None),
+        Err(refused) => Err(refused),
+    }
 }
 
 /// `file:///Users/x/My%20Song/a.wav` → `/Users/x/My Song/a.wav`.
@@ -575,15 +626,17 @@ fn file_url_to_path(url: &str) -> Option<String> {
     Some(String::from_utf8_lossy(&out).to_string())
 }
 
-fn read_song(path: &Path) -> Result<FlpMetadata, String> {
+fn read_song(path: &Path) -> Result<FlpMetadata, ReadError> {
     use quick_xml::events::Event;
-    let file = File::open(path).map_err(|e| e.to_string())?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    let file = File::open(path).map_err(io)?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| ReadError::Refused(format!("it isn't a readable Studio One song ({e})")))?;
     let mut meta = FlpMetadata::default();
+    let mut lists = Lists::default();
+    let refused = ReadError::Refused;
     let dir: PathBuf = project_dir(path).to_path_buf();
 
     // metainfo.xml: <Attribute id="Media:Tempo" value="140"/> pairs.
-    if let Some(xml) = zip_text(&mut archive, "metainfo.xml", MAX_DECOMPRESSED) {
+    if let Some(xml) = zip_text(&mut archive, "metainfo.xml", MAX_TEXT)? {
         let mut reader = quick_xml::Reader::from_str(&xml);
         let mut buf = Vec::new();
         loop {
@@ -608,14 +661,14 @@ fn read_song(path: &Path) -> Result<FlpMetadata, String> {
     }
 
     // Media pool: any url="file:///..." is a referenced audio file.
-    if let Some(xml) = zip_text(&mut archive, "Song/mediapool.xml", MAX_DECOMPRESSED) {
+    if let Some(xml) = zip_text(&mut archive, "Song/mediapool.xml", MAX_TEXT)? {
         let mut reader = quick_xml::Reader::from_str(&xml);
         let mut buf = Vec::new();
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     if let Some(p) = attr_value(&e, "url").and_then(|u| file_url_to_path(&u)) {
-                        push_unique(&mut meta.samples, absolutize(&p, &dir));
+                        lists.sample(&mut meta, absolutize(&p, &dir)).map_err(refused)?;
                     }
                 }
                 Ok(Event::Eof) | Err(_) => break,
@@ -626,7 +679,7 @@ fn read_song(path: &Path) -> Result<FlpMetadata, String> {
     }
 
     // Tracks (best-effort): elements named *Track with a name attribute.
-    if let Some(xml) = zip_text(&mut archive, "Song/song.xml", MAX_DECOMPRESSED) {
+    if let Some(xml) = zip_text(&mut archive, "Song/song.xml", MAX_TEXT)? {
         let mut reader = quick_xml::Reader::from_str(&xml);
         let mut buf = Vec::new();
         loop {
@@ -634,7 +687,7 @@ fn read_song(path: &Path) -> Result<FlpMetadata, String> {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     if e.name().as_ref().ends_with("Track") {
                         if let Some(n) = attr_value(&e, "name") {
-                            push_unique(&mut meta.mixer_names, n);
+                            lists.track(&mut meta, n).map_err(refused)?;
                         }
                     }
                 }
@@ -653,17 +706,16 @@ fn read_song(path: &Path) -> Result<FlpMetadata, String> {
         .map(String::from)
         .collect();
     for name in device_files {
-        let Some(xml) = zip_text(&mut archive, &name, MAX_DEVICE_BYTES) else { continue };
+        // Best-effort: an oversized device file is skipped, not fatal.
+        let Ok(Some(xml)) = zip_text(&mut archive, &name, MAX_DEVICE_BYTES) else { continue };
         let mut reader = quick_xml::Reader::from_str(&xml);
         let mut buf = Vec::new();
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     if attr_value(&e, "x:id").as_deref() == Some("deviceData") {
-                        if let Some(n) = attr_value(&e, "name").filter(|n| !n.is_empty()) {
-                            if !meta.plugins.iter().any(|p| p.name == n) {
-                                meta.plugins.push(RawPlugin { name: n, vendor: None, path: None });
-                            }
+                        if let Some(n) = attr_value(&e, "name") {
+                            lists.plugin(&mut meta, RawPlugin { name: n, vendor: None, path: None }).map_err(refused)?;
                         }
                     }
                 }
@@ -745,7 +797,7 @@ mod tests {
     NAME 808
   >
 >"#;
-        let m = parse_rpp(rpp, Path::new("/music/Night Run"));
+        let m = parse_rpp(rpp, Path::new("/music/Night Run")).unwrap();
         assert_eq!(m.fl_version.as_deref(), Some("REAPER 7.22"));
         assert_eq!((m.tempo_bpm, m.time_sig_num, m.time_sig_denom), (Some(142.0), Some(4), Some(4)));
         assert_eq!(m.mixer_names, vec!["Lead Vox - Ana", "808"]);
@@ -788,7 +840,7 @@ mod tests {
     </MasterTrack>
   </LiveSet>
 </Ableton>"#;
-        let m = parse_als(xml, Path::new("/elsewhere/Night Run Project"));
+        let m = parse_als(xml, Path::new("/elsewhere/Night Run Project")).unwrap();
         assert_eq!(m.fl_version.as_deref(), Some("Ableton Live 11.3.4"));
         assert_eq!(m.tempo_bpm, Some(128.0));
         assert_eq!((m.time_sig_num, m.time_sig_denom), (Some(4), Some(4)));
@@ -808,7 +860,7 @@ mod tests {
   </FileRef></SampleRef></AudioTrack></Tracks>
   <MainTrack><DeviceChain><Mixer><Tempo><Manual Value="92.5" /></Tempo></Mixer></DeviceChain></MainTrack>
 </LiveSet></Ableton>"#;
-        let m = parse_als(xml, Path::new("/p"));
+        let m = parse_als(xml, Path::new("/p")).unwrap();
         assert_eq!(m.tempo_bpm, Some(92.5));
         assert_eq!(m.samples, vec!["/p/Samples/Imported/kick.wav"]);
     }
@@ -821,7 +873,7 @@ mod tests {
         let mut gz = flate2::write::GzEncoder::new(File::create(&path).unwrap(), flate2::Compression::default());
         gz.write_all(br#"<Ableton Creator="Ableton Live 11.0"><LiveSet><MasterTrack><DeviceChain><Mixer><Tempo><Manual Value="140" /></Tempo></Mixer></DeviceChain></MasterTrack></LiveSet></Ableton>"#).unwrap();
         gz.finish().unwrap();
-        let m = read_project(Daw::Ableton, &path);
+        let m = read_project(Daw::Ableton, &path).unwrap();
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(m.tempo_bpm, Some(140.0));
     }
@@ -848,7 +900,7 @@ mod tests {
         zw.start_file("Devices/audiosynthfolder.xml", opts).unwrap();
         zw.write_all(br#"<SynthFolder xmlns:x="x"><Attributes x:id="deviceData" name="Serum"/></SynthFolder>"#).unwrap();
         zw.finish().unwrap();
-        let m = read_project(Daw::StudioOne, &path);
+        let m = read_project(Daw::StudioOne, &path).unwrap();
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(m.title.as_deref(), Some("Night Run"));
         assert_eq!(m.fl_version.as_deref(), Some("Studio One 6.5.2"));
@@ -864,7 +916,7 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let p = dir.join("Session.ptx");
         fs::write(&p, b"\x03\x00binary").unwrap();
-        let m = read_project(Daw::ProTools, &p);
+        let m = read_project(Daw::ProTools, &p).unwrap();
         let _ = fs::remove_dir_all(&dir);
         assert!(m.tempo_bpm.is_none() && m.plugins.is_empty());
     }
@@ -911,7 +963,7 @@ mod tests {
   </Devices></DeviceChain>
   <SampleRef><FileRef><Path Value="/lib/Samples/kick.wav" /></FileRef></SampleRef>
 </AudioTrack></Tracks></LiveSet></Ableton>"#;
-        let m = parse_als(xml, Path::new("/p"));
+        let m = parse_als(xml, Path::new("/p")).unwrap();
         assert_eq!(m.samples, vec!["/lib/Samples/kick.wav"]);
     }
 
@@ -937,12 +989,40 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("Tide.rpp");
         fs::write(&path, "<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n  TEMPO 90 4 4\n>\n").unwrap();
-        assert_eq!(read_project(Daw::Reaper, &path).tempo_bpm, Some(90.0));
-        assert_eq!(read_project(Daw::Reaper, &path).tempo_bpm, Some(90.0));
+        assert_eq!(read_project(Daw::Reaper, &path).unwrap().tempo_bpm, Some(90.0));
+        assert_eq!(read_project(Daw::Reaper, &path).unwrap().tempo_bpm, Some(90.0));
         fs::write(&path, "<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n  TEMPO 142.5 4 4\n>\n").unwrap();
-        let m = read_project(Daw::Reaper, &path);
+        let m = read_project(Daw::Reaper, &path).unwrap();
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(m.tempo_bpm, Some(142.5));
     }
-}
 
+    #[test]
+    fn refuses_an_als_nested_too_deep() {
+        let depth = MAX_ALS_DEPTH + 10;
+        let xml = format!("{}{}", "<a>".repeat(depth), "</a>".repeat(depth));
+        let err = parse_als(&xml, Path::new("/p")).unwrap_err();
+        assert!(err.contains("nested"), "{err}");
+        // A million levels is refused just as fast (no per-element stack scan).
+        let deep = "<a>".repeat(1_000_000);
+        assert!(parse_als(&deep, Path::new("/p")).is_err());
+    }
+
+    #[test]
+    fn refuses_text_over_the_cap() {
+        assert!(matches!(read_capped(&b"0123456789"[..], 9), Err(ReadError::Refused(_))));
+        assert_eq!(read_capped(&b"0123456789"[..], 10).ok().as_deref(), Some("0123456789"));
+        // Invalid UTF-8 still reads (lossy), never fails.
+        assert_eq!(read_capped(&[b'a', 0xff, b'b'][..], 10).ok().as_deref(), Some("a\u{fffd}b"));
+    }
+
+    #[test]
+    fn refuses_a_project_listing_too_many_tracks() {
+        let mut rpp = String::from("<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n");
+        for i in 0..=crate::flp_metadata::MAX_TRACK_NAMES {
+            rpp.push_str(&format!("  <TRACK\n    NAME \"t{i}\"\n  >\n"));
+        }
+        rpp.push_str(">\n");
+        assert!(parse_rpp(&rpp, Path::new("/p")).unwrap_err().contains("track names"));
+    }
+}

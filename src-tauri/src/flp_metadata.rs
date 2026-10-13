@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
@@ -59,16 +60,73 @@ pub struct FlpMetadata {
     pub mixer_names: Vec<String>,
 }
 
+/// Most a project may list before it's refused as damaged or hostile (real
+/// projects use a few hundred at most). A refused file is reported, not read.
+pub const MAX_SAMPLES: usize = 5_000;
+pub const MAX_PLUGINS: usize = 2_000;
+pub const MAX_TRACK_NAMES: usize = 2_000;
+
+/// Deduplicating, capped lists shared by every project reader: a hash set
+/// keeps each add constant-time, the caps bound memory and the work done
+/// later per sample (one disk lookup each).
+#[derive(Default)]
+pub struct Lists {
+    samples: HashSet<String>,
+    plugins: HashSet<String>,
+    tracks: HashSet<String>,
+}
+
+fn add(seen: &mut HashSet<String>, list: &mut Vec<String>, item: String, max: usize, what: &str) -> Result<(), String> {
+    if item.is_empty() || seen.contains(&item) {
+        return Ok(());
+    }
+    if list.len() >= max {
+        return Err(too_many(max, what));
+    }
+    seen.insert(item.clone());
+    list.push(item);
+    Ok(())
+}
+
+fn too_many(max: usize, what: &str) -> String {
+    format!("it lists more than {max} {what}, so it wasn't read (damaged or not a real project)")
+}
+
+impl Lists {
+    pub fn sample(&mut self, meta: &mut FlpMetadata, path: String) -> Result<(), String> {
+        add(&mut self.samples, &mut meta.samples, path, MAX_SAMPLES, "samples")
+    }
+
+    pub fn track(&mut self, meta: &mut FlpMetadata, name: String) -> Result<(), String> {
+        add(&mut self.tracks, &mut meta.mixer_names, name, MAX_TRACK_NAMES, "track names")
+    }
+
+    pub fn plugin(&mut self, meta: &mut FlpMetadata, plugin: RawPlugin) -> Result<(), String> {
+        if plugin.name.is_empty() || self.plugins.contains(&plugin.name) {
+            return Ok(());
+        }
+        if meta.plugins.len() >= MAX_PLUGINS {
+            return Err(too_many(MAX_PLUGINS, "plugins"));
+        }
+        self.plugins.insert(plugin.name.clone());
+        meta.plugins.push(plugin);
+        Ok(())
+    }
+}
+
 /// Best-effort metadata reader for FL Studio's undocumented `.flp` binary
 /// format. Layout reverse-engineered by the PyFLP project; see comments
 /// above for the exact event IDs this pulls from.
 pub fn parse_flp_metadata(path: &Path) -> Result<FlpMetadata, String> {
     let file = File::open(path).map_err(|e| format!("could not open file: {e}"))?;
+    let len = file.metadata().map(|m| m.len()).ok();
     let mut reader = BufReader::new(file);
-    parse_from_reader(&mut reader)
+    parse_from_reader(&mut reader, len)
 }
 
-fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
+/// `file_len`, when known, bounds the data chunk: a size past the end of the
+/// file is a damaged (or crafted) header.
+fn parse_from_reader<R: Read>(reader: &mut R, file_len: Option<u64>) -> Result<FlpMetadata, String> {
     let mut header = [0u8; 14];
     reader
         .read_exact(&mut header)
@@ -91,7 +149,12 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
         data_header[6],
         data_header[7],
     ]) as u64;
+    // 14-byte FLhd chunk + 8-byte FLdt header come first.
+    if file_len.is_some_and(|len| data_size > len.saturating_sub(22)) {
+        return Err("its data size doesn't match the file (truncated or damaged)".to_string());
+    }
 
+    let mut lists = Lists::default();
     let mut meta = FlpMetadata {
         ppq: Some(ppq),
         ..Default::default()
@@ -199,7 +262,7 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                     meta.fl_version = Some(text);
                 } else if id == ID_PLUGIN_DATA {
                     if let Some(plugin) = parse_wrapper_data(&payload) {
-                        push_unique(&mut meta.plugins, plugin);
+                        lists.plugin(&mut meta, plugin)?;
                     }
                 } else {
                     let text = decode_flp_text(&payload, is_unicode);
@@ -213,21 +276,13 @@ fn parse_from_reader<R: Read>(reader: &mut R) -> Result<FlpMetadata, String> {
                         ID_URL => meta.url = Some(text),
                         ID_GENRE => meta.genre = Some(text),
                         ID_ARTISTS => meta.artist = Some(text),
-                        ID_SAMPLE_PATH => {
-                            if !text.is_empty() && !meta.samples.contains(&text) {
-                                meta.samples.push(text);
-                            }
-                        }
-                        ID_INSERT_NAME => {
-                            if !text.is_empty() && !meta.mixer_names.contains(&text) {
-                                meta.mixer_names.push(text);
-                            }
-                        }
+                        ID_SAMPLE_PATH => lists.sample(&mut meta, text)?,
+                        ID_INSERT_NAME => lists.track(&mut meta, text)?,
                         ID_PLUGIN_INTERNAL_NAME => {
                             // Empty = a plain sampler channel; the wrapper's
                             // real name arrives in its Data event.
                             if !text.is_empty() && text != WRAPPER {
-                                push_unique(&mut meta.plugins, RawPlugin { name: text.clone(), ..Default::default() });
+                                lists.plugin(&mut meta, RawPlugin { name: text.clone(), ..Default::default() })?;
                             }
                             current_plugin = Some(text);
                         }
@@ -288,12 +343,6 @@ fn parse_wrapper_data(data: &[u8]) -> Option<RawPlugin> {
         }
     }
     (!plugin.name.is_empty()).then_some(plugin)
-}
-
-fn push_unique(plugins: &mut Vec<RawPlugin>, plugin: RawPlugin) {
-    if !plugins.iter().any(|p| p.name == plugin.name) {
-        plugins.push(plugin);
-    }
 }
 
 fn skip_bytes<R: Read>(reader: &mut R, mut remaining: u64) -> std::io::Result<()> {
@@ -414,7 +463,7 @@ mod tests {
     fn parses_synthetic_flp_metadata() {
         let bytes = build_synthetic_flp();
         let mut cursor = Cursor::new(bytes);
-        let meta = parse_from_reader(&mut cursor).expect("parse should succeed");
+        let meta = parse_from_reader(&mut cursor, None).expect("parse should succeed");
 
         assert_eq!(meta.ppq, Some(96));
         assert_eq!(meta.fl_version.as_deref(), Some("20.9.1.1234"));
@@ -455,7 +504,7 @@ mod tests {
         file.extend_from_slice(&events);
 
         let mut cursor = Cursor::new(file);
-        let meta = parse_from_reader(&mut cursor).expect("parse should succeed");
+        let meta = parse_from_reader(&mut cursor, None).expect("parse should succeed");
 
         assert_eq!(meta.title.as_deref(), Some("Old School Loop"));
         assert_eq!(meta.tempo_bpm, Some(128.25));
@@ -496,7 +545,7 @@ mod tests {
         file.extend_from_slice(&(events.len() as u32).to_le_bytes());
         file.extend_from_slice(&events);
 
-        let meta = parse_from_reader(&mut Cursor::new(file)).unwrap();
+        let meta = parse_from_reader(&mut Cursor::new(file), None).unwrap();
         assert_eq!(meta.samples, vec!["%FLStudioUserData%\\Projects\\Envy\\Samples\\Kick.wav"]);
         let names: Vec<_> = meta.plugins.iter().map(|p| p.name.as_str()).collect();
         assert_eq!(names, vec!["Fruity Limiter", "FabFilter Pro-Q 3"]);
@@ -527,6 +576,52 @@ mod tests {
     #[test]
     fn rejects_non_flp_bytes() {
         let mut cursor = Cursor::new(b"not an flp file".to_vec());
-        assert!(parse_from_reader(&mut cursor).is_err());
+        assert!(parse_from_reader(&mut cursor, None).is_err());
+    }
+
+    /// An .flp around `events`, declaring `declared` bytes of data.
+    fn flp_file(events: &[u8], declared: u32) -> Vec<u8> {
+        let mut file = Vec::new();
+        file.extend_from_slice(b"FLhd");
+        file.extend_from_slice(&6u32.to_le_bytes());
+        file.extend_from_slice(&0i16.to_le_bytes());
+        file.extend_from_slice(&4u16.to_le_bytes());
+        file.extend_from_slice(&96u16.to_le_bytes());
+        file.extend_from_slice(b"FLdt");
+        file.extend_from_slice(&declared.to_le_bytes());
+        file.extend_from_slice(events);
+        file
+    }
+
+    #[test]
+    fn refuses_a_data_size_past_the_end_of_the_file() {
+        let mut events = Vec::new();
+        push_text_event(&mut events, ID_TITLE, &ascii_with_nul("Lies"));
+        let file = flp_file(&events, u32::MAX);
+        let len = file.len() as u64;
+        let err = parse_from_reader(&mut Cursor::new(file), Some(len)).unwrap_err();
+        assert!(err.contains("data size"), "{err}");
+        // The honest size still reads.
+        let ok = flp_file(&events, events.len() as u32);
+        let len = ok.len() as u64;
+        assert_eq!(parse_from_reader(&mut Cursor::new(ok), Some(len)).unwrap().title.as_deref(), Some("Lies"));
+    }
+
+    #[test]
+    fn refuses_a_project_with_too_many_samples_and_dedupes_repeats() {
+        let mut events = Vec::new();
+        for i in 0..=MAX_SAMPLES {
+            push_text_event(&mut events, ID_SAMPLE_PATH, &ascii_with_nul(&format!("/s/{i}.wav")));
+        }
+        let err = parse_from_reader(&mut Cursor::new(flp_file(&events, events.len() as u32)), None).unwrap_err();
+        assert!(err.contains("samples"), "{err}");
+
+        // A million repeats of one sample are one sample (and stay fast).
+        let mut events = Vec::new();
+        for _ in 0..200_000 {
+            push_text_event(&mut events, ID_SAMPLE_PATH, &ascii_with_nul("/s/kick.wav"));
+        }
+        let meta = parse_from_reader(&mut Cursor::new(flp_file(&events, events.len() as u32)), None).unwrap();
+        assert_eq!(meta.samples, vec!["/s/kick.wav".to_string()]);
     }
 }
