@@ -65,6 +65,18 @@ export function cleanTitle(name: string): string {
   return t || name;
 }
 
+/** The kit's title before any edit: the title saved inside the project,
+ * else the file name without version tags. The export folder is named
+ * after the (edited) title, so everything that finds the folder uses this. */
+export function defaultKitTitle(project: Pick<ProjectInfo, "name" | "flpTitle">): string {
+  return project.flpTitle?.trim() || cleanTitle(project.name) || project.name;
+}
+
+/** The kit folder's name for a song: the edited title, else the default. */
+export function kitTitleFor(project: Pick<ProjectInfo, "name" | "flpTitle">, meta?: SongMeta): string {
+  return meta?.launchKit?.edits?.title || defaultKitTitle(project);
+}
+
 export function formatDuration(sec: number): string {
   const s = Math.round(sec);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;

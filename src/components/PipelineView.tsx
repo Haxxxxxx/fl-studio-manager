@@ -26,7 +26,8 @@ export function PipelineView() {
   const settings = useAppStore((s) => s.settings);
   const demoMode = useAppStore((s) => s.demoMode);
   const [dragOver, setDragOver] = useState<string | null>(null);
-  const [board, setBoard] = useState<"mine" | "crew">("mine");
+  const board = useAppStore((s) => s.pipelineBoard);
+  const setBoard = useAppStore((s) => s.setPipelineBoard);
   const { can: canShare, crewName } = useCanShare();
   const crewSongCount = useCrewStore((s) => s.songs.length);
   // No local projects: the crew board is the only board.
@@ -84,8 +85,9 @@ export function PipelineView() {
               onDrop={(e) => {
                 e.preventDefault();
                 setDragOver(null);
+                // Only your songs: dragged text or links aren't songs.
                 const path = e.dataTransfer.getData("text/plain");
-                if (path) setStatus([path], col.id);
+                if (songs.some((p) => p.path === path)) setStatus([path], col.id);
               }}
               className={`flex min-w-[190px] flex-1 basis-0 flex-col rounded-lg border ${
                 dragOver === key ? "border-orange-400/50 bg-orange-500/[0.05]" : "border-white/5 bg-white/[0.02]"

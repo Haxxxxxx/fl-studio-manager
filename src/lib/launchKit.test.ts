@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Album, Person, ProjectInfo, SongMeta } from "../types";
-import { artistLine, buildKit, kitFiles, masterBaseName, verify, type KitInput } from "./launchKit";
+import { artistLine, buildKit, kitFiles, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
 
 const today = new Date(2026, 9, 13); // Tue 13 Oct 2026
 const people: Person[] = [
@@ -123,5 +123,22 @@ describe("distributor sheet", () => {
     expect(sheet).toContain("- Preview / TikTok start: 0:42 (the Hook 15s snippet)");
     expect(sheet).toContain("- ISRC: (leave empty: assigned for free)");
     expect(sheet).toContain("- ℗ / © line: ℗ 2026 Night Crew");
+  });
+});
+
+describe("kitTitleFor", () => {
+  // The Files panel finds the exported kit folder by this name, so it must
+  // agree with the title field the export writes.
+  it("matches the kit's title field in every case", () => {
+    const cases: [Partial<ProjectInfo>, SongMeta][] = [
+      [{}, {}],
+      [{ flpTitle: "Night Run (Remix)" }, {}],
+      [{ flpTitle: "  " }, {}],
+      [{ flpTitle: "Night Run (Remix)" }, { launchKit: { edits: { title: "Night Run" } } }],
+    ];
+    for (const [over, meta] of cases) {
+      const p = project(over);
+      expect(kitTitleFor(p, meta)).toBe(value(buildKit(input(meta, { project: p })), "title"));
+    }
   });
 });
