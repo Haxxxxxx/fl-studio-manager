@@ -1,187 +1,220 @@
-# Music Command Center: Product Roadmap
+# Hivo (formerly FL Manager): Roadmap and status
 
-> Working vision document. Drop this into the Claude Code project as shared context.
-
----
-
-## 1. Context
-
-- **The crew:** five friends making rap music: beats, lyrics, vocals, recording. Three of them already release on Spotify and Deezer.
-- **My role:** the technical / operations person. Not an artist. My job is to keep the whole machine visible, organized and moving, and to build the tooling behind a potential label.
-- **What already exists:** an app that links directly to the **FL Studio project folders**, monitors every song, and surfaces statistics about them. It also has some monitoring and testing features. Repo on GitHub, runs on localhost.
-- **Main DAW:** FL Studio.
-- **This is my initiative.** The crew isn't currently struggling with a visible mess, so the pitch has to show clear value and momentum, not fix a complaint they already have.
-
-### What a label is, in practice
-
-A label is structure around three things:
-
-1. **Releasing** the music
-2. **Promoting** it
-3. **Handling the money**
-
-The crew already has the hardest part covered: real music, already on streaming platforms. **The money side (splits, contracts, registration) is deliberately out of scope for now.** This project focuses on releasing and promoting.
-
-The most useful role for a technical person in a small crew is **operations**: everything around a release that isn't the music itself (tracking who's working on what, release calendars, where files live, track metadata, consistent social presence). The classic killer of small music crews is **losing track of half-finished songs**.
+> Status as of **13 October 2026**. This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
 
 ---
 
-## 2. Vision
+## 1. Where we are, in one minute
 
-Turn the existing FL Studio monitor into a **creation-aware command center** that follows a song end to end: from the project file being worked on, all the way to release and promotion.
-
-### The positioning gap
-
-- Distributors (DistroKid, TuneCore, etc.) only touch the song at the **very end**, the finished file. They know nothing about how it was made.
-- This app is plugged into the **FL Studio project while it is being created**. Nobody owns that moment.
-- The gap between "song is finished" and "the world hears it" is currently manual and disconnected. That's where the value is.
-
-### The deal-breaker feature: the one-click Launch Kit
-
-"Deal-breaker" here means a feature so good that users can't do without it, and that other platforms end up having to copy, the way Snapchat's Stories and Instagram's Reels became standard everywhere. The deal-breaker usually hides in the thing only you can do; here, that's being connected to the project file during creation.
-
-When a track is finished in FL Studio, the app already knows everything about it (stems, tempo, energy, timestamps, collaborators). From that, it **auto-generates the whole launch kit**:
-
-- Track metadata (title, artists, BPM, key, genre, credits)
-- Snippet clips for reels / stories, cut from the strongest moments of the track
-- Suggested release timing
-- Cover art brief
-- Draft captions and promo copy
-
-The artist reviews, edits if needed, and presses go.
-
-**The project file is the single source of truth that drives everything downstream.**
+- **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion. It comes with a web dashboard for the crew.
+- **The name.** The app is being renamed from **FL Manager** to **Hivo**, with a new hive-cell logo. The rename is done in code and waits in **pull request #25**.
+- **Phase 0 (stabilize, demo-ready).** Done, except two things: the crew pitch, and cleaning the git history before the repo can go public.
+- **Phase 1 (crew dashboard, Launch Kit, design identity).** Built and merged.
+- **Phase 2 (plugins, hardware, social publishing, distributor integrations).** Not started; ideas only.
+- **Biggest blockers today:**
+  - downloadable installers are stuck behind a GitHub billing issue;
+  - reliable sign-in emails need a mail provider and a domain;
+  - the repo can't go public until the history scrub.
 
 ---
 
-## 3. Product principles
+## 2. State of the codebase
 
-1. **Fast by default, never a black box.** Everything is pre-filled automatically, but nothing is hidden.
-2. **AI verification layer.** Every auto-generated or pre-filled field is checked by an AI pass before it is shown as "ready", to catch nonsense, inconsistencies or hallucinated data. Flag low-confidence fields visibly.
-3. **Fully editable, fully optional.** The user can:
-   - accept all pre-filled data as-is,
-   - edit any individual field,
-   - or ignore the automation entirely and do everything by hand.
-4. **Detect what you can, ask once for the rest.** Never make the user re-enter something the app could find on its own; never pretend to know something it can't.
-5. **Design matters.** The app must look like it belongs to artists, not accountants. Catchy, clean, with a strong identity representative of the label / the crew. A demo should make people go "wait, that's magic".
-6. **Focus beats breadth.** Build the sharpest slice first, make it gorgeous, then expand. A scattered "does everything" app usually loses to a focused one.
-7. **Learn what's painful before building it.** Prefer the simplest version that works (even a shared sheet or checklist) to validate a need before investing in full software for it.
-
----
-
-## 4. Song lifecycle (the backbone)
-
-Every track lives in exactly one stage at a time:
-
-| Stage | What it means |
-|---|---|
-| **1. Creation** | Beat and lyrics exist, still rough |
-| **2. Production** | Recording, mixing, mastering until final |
-| **3. Prep** | Cover art, metadata, release date, sending to distributor |
-| **4. Release** | Release day |
-| **5. Promotion** | Posts, reels, stories, follow-up after release |
-
-The shared dashboard shows every track on a board by stage, so anyone in the crew can see what's cooking and what's stuck.
+- **Main branch** is green. Everything below marked "ready" is merged.
+- **Stack:**
+  - desktop: Tauri 2 (Rust backend) with React 19, TypeScript, Zustand and Tailwind;
+  - web dashboard: Vite on Vercel;
+  - crew backend: Supabase in the EU (Ireland).
+- **Tests:**
+  - 59 unit tests for the app logic;
+  - 90 Rust tests for scanning, files and audio;
+  - 57 database tests covering crew rules, privacy and limits.
+  - Both builds are clean.
+- **Pull requests:** 23 merged since the start (#1 to #24). One is open: **#25, the Hivo rename**.
+- **Live:**
+  - crew website: https://fl-manager-crew.vercel.app (still shows the FL Manager name until #25 merges);
+  - Claude Design project "fl-Manager": holds the 28 synced components, already in the Hivo / System 02 look.
+- **Quality pass done:** a three-part audit (Rust↔app bridge, app wiring, crew backend) found and fixed every broken link between features (PR #24).
+- **Free stack, by choice:**
+  - Gemini free tier for AI text;
+  - Cloudflare Workers AI (free) for cover concepts;
+  - ffmpeg on your own computer for video;
+  - Supabase and Vercel free tiers;
+  - no paid APIs.
 
 ---
 
-## 5. Phases
+## 3. Features: what's ready, what's in progress, what's blocked, what's only an idea
 
-### Phase 0: Stabilize & make it demo-ready (solo work, before pitching the crew)
+### Ready to use (merged)
 
-Goal: the existing app runs cleanly and impresses on first demo.
+**Your songs, from any DAW**
+- Scans your project folders for FL Studio, Ableton Live, REAPER and Studio One, and reads tempo, plugins, samples and track names from inside them. Pro Tools, Cubase and Bitwig projects are listed and tracked, but their files are closed formats, so nothing is read from inside.
+- Groups everything that belongs to a song: backups, mixdowns, recorded takes and stems.
+- If you rename or move a project, the song keeps its stage, notes and credits.
+- Sample data mode, to demo the app without real projects.
 
-- [x] Review the current codebase, fix fragile parts
-- [x] Make it run cleanly on a **fresh machine**
-- [x] Make the **FL Studio project folder path configurable** (no hardcoded paths)
-- [ ] Remove anything personal or sensitive from the repo (usernames in paths, API keys, local folders) since the GitHub may be public _(current files clean; old commits still contain artist names + personal author email: rewrite history before going public)_
-- [x] Write a short **setup guide** (README)
-- [x] Polish the one or two **most impressive statistics** for the demo
-- [ ] Prepare the pitch for the crew:
-  - What problem does this solve for us?
-  - What does it look like in six months?
-  - What do I need from them to make it work?
-  - Bring big shared decisions (label name, structure, money splits) as **questions, not answers**, so everyone feels like a co-owner
-  - Position my role clearly: "I run the backbone of this thing"
+**The song panel**
+- Stage, key, tags, notes, releases, credits and who it was pitched to.
+- A Files view showing where everything lives: project, backups, takes, stems, mixdowns and the Launch Kit folder.
+- **Actions:**
+  - Open in the right DAW, or reveal in the folder.
+  - Save as a new version.
+  - Restore a backup.
+  - Safely clean old backups (it can only delete files the scan listed as backups).
+- **FL Studio only:** render a mixdown from the app, and package a project with all its samples into a zip.
 
-### Phase 1: Shared dashboard + the Launch Kit (the core product)
+**Seeing the whole picture**
+- Pipeline board: every song by stage (Creation, Production, Prep, Release, Promotion), with drag and drop.
+- **Dashboard:**
+  - song counts, a year of studio activity, stalled songs (no save in 21+ days) and the next release;
+  - who's on what, and a plugin toolkit (which plugins each song uses);
+  - a health check: "will this computer open your songs" (missing plugins or samples).
+  - A Me / Crew switch.
+- Releases (EPs, albums) with their track lists, and a release calendar with readiness checks.
+- People: credits, splits, and pitches.
 
-Goal: from personal monitor to crew tool, and build the deal-breaker.
+**The Launch Kit (the deal-breaker)**
+- Fills in the release metadata by itself:
+  - title, artists, producers, genre, BPM;
+  - key (from the project, or estimated from the mixdown), duration;
+  - songwriters and splits from the credits.
+- Every field shows where it came from: Detected, Suggested, AI draft, Edited, or Needs you.
+- Checks the master against distributor specs (WAV, 44.1 kHz, no clipping).
+- Suggests a release date: the first Friday at least 28 days out that doesn't clash with the crew's other drops.
+- Finds the strongest moments in the mixdown, and cuts snippets for reels and stories.
+- Renders 9:16 shorts locally with ffmpeg, free, no upload.
+- Writes a cover art brief and generates cover concepts with FLUX (free tier).
+- **AI layer (optional, Gemini free tier):**
+  - drafts captions;
+  - reviews every field with a verdict and a confidence score.
+  - It never overrides measured values like BPM or duration.
+- Accept all, edit any field, reset, or do it all by hand.
+- Exports a ready folder: metadata (JSON and CSV), a sheet to paste into your distributor, the cover brief, captions, a checklist, the snippets, the shorts and the chosen cover.
 
-**1a. Shared crew dashboard**
-- [x] Multi-user: each crew member's FL Studio projects visible to the group _(opt-in per song; metadata only; Supabase EU + web dashboard)_
-- [x] Board view of all tracks by lifecycle stage (Creation → Promotion) _(local: your own projects; shared once multi-user lands)_
-- [x] Who's working on what, last activity per project, stalled tracks _(dashboard: Crew + Stalled cards)_
-- [x] Decide which stats matter **to the group** vs. only to me, and surface the group ones _(Dashboard: Me / Crew switch)_
-- [x] Release calendar (planned and past release dates)
-- [x] Clear view of **where each track's files live** (project, stems, bounces, artwork) _(song panel → Files: project, backups, takes, stems, mixdowns, Launch Kit)_
+**The crew (shared, EU-hosted)**
+- Sign in with an email code; no passwords.
+- Create a crew, invite with a code, join, leave. You can be in up to 10 crews.
+- Owners can revoke invite codes and remove members.
+- Each song is shared only if you choose to. Only facts travel: title, stage, BPM, key, tags, credits, dates, and "has a mixdown". Audio, file paths, samples, notes and track names never leave your computer.
+- Live updates for everyone, including when a song is unshared or someone leaves.
+- A song only disappears from the crew when you unshare it, never because a scan missed it.
 
-**1b. Launch Kit MVP**
-- [ ] Extract everything possible from the FL Studio project / exported audio (BPM, key, duration, stems, timestamps, contributors)
-- [ ] Auto-generate metadata, snippet clips, release timing suggestion, cover art brief, captions
-- [ ] AI verification pass on every generated field, with confidence flags
-- [ ] Full edit UI: accept all, edit per field, or fill everything manually
-- [ ] Export the kit in a format ready for the distributor
+**The crew website**
+- A landing page (what it is, privacy, sign in).
+- Once signed in: the crew board (change a stage by dragging), the calendar, and the crew page. Works on a phone.
 
-**1c. Design identity**
-- [ ] Define a visual identity that represents the label / crew
-- [ ] Apply it consistently across the app
+**Design**
+- "System 02, built like a rack unit": solid warm greys, engraved labels, LED status lights, one hot orange, condensed caps for titles and buttons.
+- Designed in Claude Design and applied across the app and the website.
+- The component library is synced back to Claude Design, so new designs there use the real components.
 
-### Phase 2: Ecosystem & integrations
+### In progress
 
-Goal: the app becomes the place the artist never needs to leave.
+- **The Hivo rename (PR #25).** App name, hive-cell logo and wordmark, app icons, favicons and link preview, plus the Claude Design re-sync inputs. Once merged: redeploy the website.
+- **Live sign-in email template** still says "FL Manager". It needs a `supabase config push` or a quick edit in the Supabase dashboard after the rename.
 
-**2a. Plugin awareness & recommendations**
-- Recommend the right plugins (production, vocals) at the right stage, knowing what the user already has.
-- **Locally installed plugins: detectable automatically.**
-  - Scan standard plugin folders (VST/VST3, plus AU on macOS). Typical locations, to verify per OS:
-    - Windows: `C:\Program Files\Common Files\VST3`, common VST2 folders
-    - macOS: `/Library/Audio/Plug-Ins/VST3`, `/Library/Audio/Plug-Ins/Components` (+ user-level `~/Library/...`)
-  - Read FL Studio's own plugin database (under the Image-Line folder in Documents, "Plugin database"), which lists what FL has registered. Verify exact path/format.
-- **Cloud-only / account-locked plugins: NOT detectable.** No local trace, and we have no access to the user's FL / vendor accounts.
-- **Market catalog:** build or source a catalog of available plugins to compare against what's installed. Investigate public sources / vendor APIs; may need to be curated manually at first.
+### Blocked
 
-**2b. Hardware awareness**
-- **Idea:** USB devices expose a **Vendor ID (VID) and Product ID (PID)**. Enumerate connected devices and match them against public ID databases (e.g. the `usb.ids` list) to identify interfaces, controllers, synths.
-  - Windows: SetupAPI / WMI
-  - macOS: IOKit / `system_profiler SPUSBDataType`
-  - Also: MIDI device names (via the OS MIDI APIs) and audio device names (CoreAudio / WASAPI) are often more readable than raw IDs
-- **Limits:** only works for devices currently connected; generic or unknown IDs won't resolve; non-USB gear (outboard analog, etc.) is invisible.
+- **Downloadable installers.**
+  - The cloud build (Windows .exe/.msi and Mac .dmg) is written and ready.
+  - GitHub refuses to run it: "recent account payments have failed or your spending limit needs to be increased".
+  - **Unblock:** fix GitHub billing, or make the repo public (which needs the history scrub first).
+- **Going public with the repo.** Old commits still contain artist names and a personal email. **Unblock:** rewrite the git history.
+- **Sign-in emails at crew scale.** Supabase's built-in email sender is heavily rate-limited. **Unblock:** pick a domain for Hivo, then connect a free mail provider (Brevo was the plan).
+- **The crew pitch (Phase 0).** Waiting on you: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
 
-**2c. "Confirm once" studio profile (covers what detection can't)**
-- Hybrid approach: auto-detect everything possible, then ask the user **once** to confirm their setup (cloud plugins, unplugged or analog hardware)
-- Suggest likely matches to make it fast and pleasant, not a chore
-- Editable anytime
+### Decisions waiting on you
 
-**2d. Social publishing**
-- Connect the user's social accounts and publish posts, reels and stories directly from the app, closing the loop: the launch kit flows straight to the audience.
-- Use a third-party posting API rather than building each integration: candidates to evaluate are **Typefully, Buffer, Ayrshare** (check which ones actually support Instagram reels/stories and TikTok).
-- Support whichever socials each artist uses, not only Instagram.
-- Help keep the crew's social presence **consistent** (shared visual identity, posting calendar across members).
-- **Caveat:** Instagram publishing via third parties is strict (generally requires a Business/Creator account, with limits on formats like stories). Validate early.
-- This is the delivery pipe: it only matters once the Launch Kit content flowing through it is great, hence Phase 2.
+- **Crash safety in release builds.** Right now a crash while reading a damaged project file closes the whole app (the release build is set to abort on panic). The recommendation is to switch to unwind so it just skips that file.
+- **Stage conflicts between devices.** When two people move the same song at nearly the same time, the app compares device and server clocks. With a badly wrong clock, the wrong move can win. Rare, but it needs a design call.
+- **A Hivo domain**, needed for the website address and for sign-in emails.
 
-**2e. Distribution integrations**
-- Connect to distributors / third-party tools for easier publication on Spotify, Deezer, etc. (push the Launch Kit's metadata and assets instead of re-typing them).
-- Check which distributors offer APIs or partner integrations; some may only allow manual upload, in which case the app exports a ready-to-upload package.
+### Thought about, not built
+
+- **Logic Pro.** Not readable today. The link-preview design mentioned it, so the rendered image lists FL Studio, Ableton Live, REAPER and Pro Tools instead.
+- **Render and package for DAWs other than FL Studio.** Today the app tells you where to export in your DAW instead.
+- **Exporting stems from the app.** Stems are detected and shown, not created.
+- **Distributor-specific export formats** (per-distributor templates instead of one universal sheet).
+- **Shared releases.** The database already has a table for crew releases, but the apps don't sync releases yet; only songs are shared.
+- **Phase 2, in full:**
+  - **Plugin recommendations:** suggest plugins by stage, knowing what's installed. Today the app knows which plugins each song uses and whether this computer has them. It does not scan plugin folders or compare against a market catalog.
+  - **Hardware awareness:** identify connected interfaces, controllers and synths (USB IDs, MIDI and audio device names).
+  - **A "confirm once" studio profile** for what can't be detected (cloud plugins, analog gear).
+  - **Social publishing** straight from the Launch Kit (via a posting service such as Typefully, Buffer or Ayrshare; Instagram rules to check early).
+  - **Distributor integrations** (push metadata and files instead of re-typing; many distributors only allow manual upload).
+- **Money (splits, contracts, rights registration).** Deliberately out of scope until the crew decides together.
 
 ---
 
-## 6. Known constraints & open questions
+## 4. Vision (unchanged)
 
-- Distribution to Spotify / Deezer goes through aggregators/distributors; the app prepares the kit, it doesn't replace the distributor (at least initially).
-- What is the best way to read FL Studio project data (`.flp` parsing vs. exported audio vs. folder metadata)?
-- Where do the shared dashboard's data live (hosted backend vs. sync between machines)?
-- Which AI model / service does the verification layer use, and what does "verified" mean concretely per field?
-- Plugin market catalog: is there a reliable public source, or does it need curation?
-- Privacy: what data from each member's machine is shared with the group?
-- Label structure: benefits and issues of formalizing a label, to discuss with the crew.
-- Money (splits, contracts, rights registration): intentionally deferred, to be decided together later.
+- **The crew:** five friends making rap music; three already release on Spotify and Deezer. You run operations: everything around a release that isn't the music itself. The classic killer of small crews is losing track of half-finished songs.
+- **The gap:** distributors only touch the finished file. Hivo is plugged into the project while it's being made, so the gap between "song is finished" and "the world hears it" can be one click.
+- **The deal-breaker:** the one-click Launch Kit. The project file is the single source of truth that drives everything downstream.
+
+## 5. Product principles (unchanged)
+
+1. Fast by default, never a black box.
+2. Every generated field is checked by an AI pass, with visible confidence.
+3. Fully editable and fully optional: accept all, edit any field, or do it by hand.
+4. Detect what you can, ask once for the rest.
+5. Design matters: it should look like it belongs to artists.
+6. Focus beats breadth.
+7. Learn what's painful before building it.
+
+## 6. Song lifecycle
+
+Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Production** (recording, mixing, mastering), **Prep** (cover, metadata, date, distributor), **Release** (release day), **Promotion** (posts, reels, follow-up). Songs nobody has placed yet are **Unsorted**.
 
 ---
 
-## 7. Notes for Claude Code
+## 7. Phase checklist
 
-- **Start with Phase 0.** Review the current code and get it stable and demo-ready before anything else.
-- Keep paths, credentials and API keys out of the code (config / env files).
-- When building later phases, prioritize the **Launch Kit** as the first new feature; it's the demo moment.
+**Phase 0: stabilize and demo-ready**
+- [x] Review the code, fix fragile parts
+- [x] Runs cleanly on a fresh machine
+- [x] Project folders are configurable, no hardcoded paths
+- [ ] Repo clean enough to be public: current files are clean; **old commits need a history rewrite**
+- [x] Setup guide
+- [x] Polished demo stats
+- [ ] Crew pitch
+
+**Phase 1a: shared crew dashboard**
+- [x] Each member's songs visible to the group (opt-in, metadata only, EU)
+- [x] Board by stage
+- [x] Who's on what, last activity, stalled songs
+- [x] Group stats vs personal stats (Me / Crew switch)
+- [x] Release calendar
+- [x] Where each song's files live
+
+**Phase 1b: Launch Kit**
+- [x] Extract everything possible from the project and the mixdown
+- [x] Generate metadata, snippets, release timing, cover brief, captions (plus shorts and cover concepts)
+- [x] AI verification on every field, with confidence
+- [x] Full edit UI: accept all, edit per field, or manual
+- [x] Export a distributor-ready kit (one universal format; per-distributor formats not built)
+
+**Phase 1c: design identity**
+- [x] A visual identity for the crew (System 02, Hivo brand)
+- [x] Applied across the app and the website
+
+**Phase 2: ecosystem**: not started (see "Thought about, not built").
+
+---
+
+## 8. Suggested next steps
+
+1. Merge the Hivo rename (#25), redeploy the website, update the sign-in email template.
+2. Pick a Hivo domain; set up the mail provider so crew sign-in is reliable.
+3. Fix GitHub billing (or scrub history and go public) to get real installers for the crew.
+4. Prepare and give the crew pitch with the demo.
+5. Decide crash safety (abort vs unwind) before handing installers out.
+6. Then choose the first Phase 2 slice. Social publishing from the Launch Kit is the natural next "magic" moment.
+
+## 9. Notes for Claude Code
+
+- Read `CLAUDE.md` first: it has the commands, rules and where each feature lives.
+- Keep paths, credentials and keys out of the code. Only the public Supabase key ships in apps.
+- Free stack only; ask before adding anything paid.
+- Never change the app identifier (`com.theiaweb.flstudiomanager`): it's where everyone's data lives.
