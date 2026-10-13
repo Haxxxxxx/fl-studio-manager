@@ -28,6 +28,7 @@ import {
   statusInfo,
 } from "../lib/songs";
 import { EmptyLibrary, useVisibleSongs } from "./LibraryView";
+import { CrewCards } from "./CrewCards";
 import { ProgressBar } from "./AlbumsView";
 import { StatusDot, btn, btnPrimary } from "./ui";
 
@@ -201,6 +202,8 @@ export function Dashboard() {
             })}
           </div>
         </Card>
+
+        <CrewCards songs={songs} />
 
         <Card title={`Studio activity — saves per day, last 12 months`}>
           <ActivityHeatmap />

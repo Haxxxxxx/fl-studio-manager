@@ -1,0 +1,134 @@
+import { useMemo } from "react";
+import { AlertTriangle, CalendarDays, Hourglass, Users } from "lucide-react";
+import { useAppStore } from "../store/useAppStore";
+import { buildCalendar } from "../lib/calendar";
+import { crewActivity, stalledSongs, STALLED_DAYS } from "../lib/crew";
+import { formatRelative } from "../lib/format";
+import { STATUSES, UNSORTED, statusInfo } from "../lib/songs";
+import type { ProjectInfo } from "../types";
+import { StatusDot } from "./ui";
+
+/** Dashboard row: next release, stalled tracks, who's working on what. */
+export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
+  const projects = useAppStore((s) => s.projects);
+  const workspace = useAppStore((s) => s.workspace);
+  const setView = useAppStore((s) => s.setView);
+  const openDetail = useAppStore((s) => s.openDetail);
+  const openAlbum = useAppStore((s) => s.openAlbum);
+  const openLaunchKit = useAppStore((s) => s.openLaunchKit);
+  const openPerson = useAppStore((s) => s.openPerson);
+
+  const next = useMemo(() => buildCalendar(projects, workspace).find((e) => e.daysAway >= 0), [projects, workspace]);
+  const stalled = useMemo(() => stalledSongs(songs, workspace), [songs, workspace]);
+  const crew = useMemo(() => crewActivity(workspace.people, songs, workspace), [songs, workspace]);
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <Card icon={<CalendarDays size={13} />} title="Next release" action={{ label: "Calendar", run: () => setView("calendar") }}>
+        {next ? (
+          <button
+            onClick={() => (next.source.type === "album" ? openAlbum(next.source.id) : openLaunchKit(next.source.path))}
+            className="flex w-full flex-col gap-1.5 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: next.color }} />
+              <span className="truncate text-sm font-medium text-white/90">{next.title}</span>
+            </div>
+            <div className="text-2xl font-semibold text-white">
+              {next.daysAway === 0 ? "Today" : next.daysAway === 1 ? "Tomorrow" : formatRelative(next.dateMs)}
+            </div>
+            <div className="text-[11px] text-white/45">
+              {new Date(next.dateMs).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+              {next.tracks.length > 0 && ` · ${next.finished}/${next.tracks.length} finished · ${next.kitsAccepted}/${next.tracks.length} kits`}
+            </div>
+            {next.checks.find((c) => c.level === "warn") && (
+              <div className="flex items-start gap-1.5 text-[11px] text-amber-300">
+                <AlertTriangle size={11} className="mt-px shrink-0" /> {next.checks.find((c) => c.level === "warn")!.message}
+              </div>
+            )}
+          </button>
+        ) : (
+          <div className="text-xs text-white/40">
+            Nothing dated yet.{" "}
+            <button onClick={() => setView("albums")} className="underline hover:text-white">
+              Plan a release
+            </button>
+          </div>
+        )}
+      </Card>
+
+      <Card icon={<Hourglass size={13} />} title={`Stalled · no save in ${STALLED_DAYS}+ days`}>
+        {stalled.length === 0 ? (
+          <div className="text-xs text-white/40">Nothing stuck in Creation or Production.</div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {stalled.slice(0, 5).map((s) => (
+              <button key={s.song.path} onClick={() => openDetail(s.song.path)} className="flex items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-white/[0.04]">
+                <StatusDot color={statusInfo(s.status).color} size={6} />
+                <span className="min-w-0 flex-1 truncate text-white/80">{s.song.name}</span>
+                <span className="shrink-0 tabular-nums text-white/40">{s.idleDays}d</span>
+              </button>
+            ))}
+            {stalled.length > 5 && <div className="px-1 text-[11px] text-white/35">+{stalled.length - 5} more</div>}
+          </div>
+        )}
+      </Card>
+
+      <Card icon={<Users size={13} />} title="Crew · who's on what" action={{ label: "People", run: () => openPerson(null) }}>
+        {crew.length === 0 ? (
+          <div className="text-xs text-white/40">
+            Add the crew in{" "}
+            <button onClick={() => openPerson(null)} className="underline hover:text-white">
+              People
+            </button>{" "}
+            to see who's working on what. Names in mixer tracks are picked up automatically.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {crew.slice(0, 5).map((m) => (
+              <button key={m.person.id} onClick={() => openPerson(m.person.id)} className="flex flex-col gap-1 rounded px-1 py-0.5 text-left hover:bg-white/[0.04]">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="min-w-0 flex-1 truncate text-white/85">{m.person.name}</span>
+                  <span className="shrink-0 text-white/45">
+                    {m.active} active · {m.lastSessionMs ? formatRelative(m.lastSessionMs) : "no sessions"}
+                  </span>
+                </div>
+                <div className="flex h-1.5 gap-px overflow-hidden rounded-full bg-white/5" title="Their songs by stage">
+                  {[{ id: "unsorted" as const, ...UNSORTED }, ...STATUSES].map((st) =>
+                    m.byStage[st.id] ? <span key={st.id} style={{ flexGrow: m.byStage[st.id], background: st.color }} /> : null,
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function Card({
+  icon,
+  title,
+  action,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: { label: string; run: () => void };
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+      <div className="mb-3 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">
+        {icon} {title}
+        {action && (
+          <button onClick={action.run} className="ml-auto normal-case tracking-normal text-white/40 hover:text-white">
+            {action.label} →
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}

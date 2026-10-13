@@ -32,7 +32,7 @@ const DEFAULT_SETTINGS: Settings = {
   ffmpegPath: null,
 };
 
-export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "settings";
+export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "calendar" | "settings";
 export type SortKey = "modified" | "name" | "status" | "tempo" | "key" | "versions";
 export type SortDir = "asc" | "desc";
 /** "unsorted" = songs with no status yet. */
