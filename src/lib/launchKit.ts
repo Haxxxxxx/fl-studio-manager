@@ -571,10 +571,22 @@ export function masterChecks(m: MasterSpec, FL_EXPORT_TIP = DEFAULT_EXPORT_TIP):
   return out;
 }
 
-/** Snippets with the user's nudges applied. */
+/** Lengths a snippet can be set to (reels/stories/TikTok-friendly). */
+export const SNIPPET_LENGTHS = [7, 15, 30, 60];
+
+/** Snippets with the user's moves and lengths applied. The label follows
+ * the length ("Hook 15s" set to 30 s reads "Hook 30s"); `key` keeps the
+ * detected label the edits are stored under. Clips always fit the track. */
 export function kitSnippets(analysis: AudioAnalysis | null, meta: SongMeta): Snippet[] {
   const starts = meta.launchKit?.snippetStarts ?? {};
-  return (analysis?.snippets ?? []).map((s) => ({ ...s, startSec: starts[s.label] ?? s.startSec }));
+  const lengths = meta.launchKit?.snippetLengths ?? {};
+  const duration = analysis?.durationSec ?? Infinity;
+  return (analysis?.snippets ?? []).map((s) => {
+    const lengthSec = Math.min(lengths[s.label] ?? s.lengthSec, duration);
+    const startSec = Math.min(Math.max(0, starts[s.label] ?? s.startSec), Math.max(0, duration - lengthSec));
+    const label = lengthSec === s.lengthSec ? s.label : `${s.label.replace(/\s*\d+s$/, "")} ${Math.round(lengthSec)}s`;
+    return { ...s, key: s.label, label, startSec, lengthSec };
+  });
 }
 
 // Quoted, and a leading = + - @ is defused so spreadsheets don't run it.

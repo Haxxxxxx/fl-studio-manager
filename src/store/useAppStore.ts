@@ -143,6 +143,8 @@ interface AppState {
   /** Several fields at once; null clears every edit (back to generated). */
   setKitEdits: (path: string, edits: Partial<Record<KitFieldId, string>> | null) => void;
   setSnippetStart: (path: string, label: string, startSec: number | undefined) => void;
+  /** Change a snippet's length (undefined = back to the detected length). */
+  setSnippetLength: (path: string, label: string, lengthSec: number | undefined) => void;
   acceptKit: (path: string) => void;
   /** Merge AI drafts/review into a song's kit. */
   setKitAi: (path: string, patch: Partial<KitAiMeta>) => void;
@@ -623,6 +625,14 @@ export const useAppStore = create<AppState>((set, get) => {
       if (startSec === undefined) delete snippetStarts[label];
       else snippetStarts[label] = startSec;
       get().updateSong(path, { launchKit: { ...kit, snippetStarts, acceptedAtMs: undefined } });
+    },
+
+    setSnippetLength: (path, label, lengthSec) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      const snippetLengths = { ...kit.snippetLengths };
+      if (lengthSec === undefined) delete snippetLengths[label];
+      else snippetLengths[label] = lengthSec;
+      get().updateSong(path, { launchKit: { ...kit, snippetLengths, acceptedAtMs: undefined } });
     },
 
     setKitEdits: (path, edits) => {

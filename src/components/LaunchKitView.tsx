@@ -11,6 +11,7 @@ import {
   kitChecks,
   kitFiles,
   kitSnippets,
+  SNIPPET_LENGTHS,
   DISTRIBUTION_FIELDS,
   artistLine,
   masterBaseName,
@@ -82,6 +83,7 @@ export function LaunchKitView() {
   const crewName = useCrewStore((s) => s.crews.find((c) => c.id === s.activeCrewId)?.name ?? null);
   const crewSongs = useCrewStore((s) => s.songs);
   const setSnippetStart = useAppStore((s) => s.setSnippetStart);
+  const setSnippetLength = useAppStore((s) => s.setSnippetLength);
   const acceptKit = useAppStore((s) => s.acceptKit);
 
   // Songs closest to release first: ones with a mixdown, then by stage
@@ -272,7 +274,8 @@ export function LaunchKitView() {
                 loading={loading}
                 error={analysisError}
                 demoMode={demoMode}
-                onMove={(label, start) => setSnippetStart(project.path, label, start)}
+                onMove={(key, start) => setSnippetStart(project.path, key, start)}
+                onLength={(key, length) => setSnippetLength(project.path, key, length)}
               />
             </Card>
             <ShortsPanel
@@ -322,6 +325,9 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
 
   const model = settings.aiModel || aiStatus.defaultModel;
   const summary = aiSummary(fields);
+  // Every field already reviewed against its current value: a re-check would
+  // only spend free quota for the same answer.
+  const upToDate = summary.state === "checked" && summary.skipped === 0;
   const drafts = input.meta.launchKit?.ai?.drafts;
   const reviewedAt = input.meta.launchKit?.ai?.review?.atMs;
   const answeredBy = [drafts?.model, input.meta.launchKit?.ai?.review?.model];
@@ -384,8 +390,13 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
         <button onClick={() => run(true)} disabled={!!running} className={btnPrimary}>
           <Sparkles size={14} /> {running === "draft" ? "Writing…" : "Write captions & brief"}
         </button>
-        <button onClick={() => run(false)} disabled={!!running} className={btn}>
-          <Check size={14} /> {running === "review" ? "Checking every field…" : summary.state === "unchecked" ? "Check kit" : "Re-check"}
+        <button
+          onClick={() => run(false)}
+          disabled={!!running || upToDate}
+          title={upToDate ? "Already checked, and nothing changed since: no need to spend free AI quota" : undefined}
+          className={btn}
+        >
+          <Check size={14} /> {running === "review" ? "Checking every field…" : summary.state === "unchecked" ? "Check kit" : upToDate ? "Checked" : "Re-check"}
         </button>
         {drafts && !running && (
           <button onClick={() => setKitAi(path, { drafts: undefined })} className="text-xs text-engrave hover:text-cream" title="Back to the template text">
@@ -419,6 +430,7 @@ function Snippets({
   error,
   demoMode,
   onMove,
+  onLength,
 }: {
   project: ProjectInfo;
   analysis: AudioAnalysis | null;
@@ -426,10 +438,16 @@ function Snippets({
   loading: boolean;
   error: string | null;
   demoMode: boolean;
-  onMove: (label: string, start: number | undefined) => void;
+  onMove: (key: string, start: number | undefined) => void;
+  onLength: (key: string, length: number | undefined) => void;
 }) {
   const audio = useRef<HTMLAudioElement | null>(null);
+  const strip = useRef<HTMLDivElement | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
+  const [playhead, setPlayhead] = useState<number | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  // While dragging, the snippet's live start (saved once, on release).
+  const [drag, setDrag] = useState<{ key: string; offset: number; start: number; moved: boolean } | null>(null);
   const render = project.renders[0];
 
   useEffect(() => () => audio.current?.pause(), [render?.path]);
@@ -441,65 +459,166 @@ function Snippets({
 
   const duration = analysis.durationSec;
   const bar = project.tempoBpm ? 240 / project.tempoBpm : 1;
+  const keyOf = (s: Snippet) => s.key ?? s.label;
+  const active = selected ?? keyOf(snippets[0]);
   // ~240 bars across, each the max of its windows so peaks survive.
   const step = Math.max(1, Math.ceil(analysis.energy.length / 240));
   const bars = Array.from({ length: Math.ceil(analysis.energy.length / step) }, (_, i) => Math.max(...analysis.energy.slice(i * step, i * step + step)));
+  const clampStart = (start: number, length: number) => Math.round(Math.min(Math.max(0, start), Math.max(0, duration - length)) * 10) / 10;
+  const timeAt = (clientX: number) => {
+    const r = strip.current!.getBoundingClientRect();
+    return ((clientX - r.left) / r.width) * duration;
+  };
+  const shown = (s: Snippet) => (drag && drag.key === keyOf(s) ? { ...s, startSec: drag.start } : s);
 
   function play(s: Snippet) {
     const el = audio.current;
     if (!el) return;
-    if (playing === s.label) {
+    if (playing === keyOf(s)) {
       el.pause();
+      setPlayhead(null);
       return setPlaying(null);
     }
     el.currentTime = s.startSec;
     el.ontimeupdate = () => {
+      setPlayhead(el.currentTime);
       if (el.currentTime >= s.startSec + s.lengthSec) {
         el.pause();
         setPlaying(null);
+        setPlayhead(null);
       }
     };
-    el.play().then(() => setPlaying(s.label)).catch(() => setPlaying(null));
+    el.play().then(() => setPlaying(keyOf(s))).catch(() => setPlaying(null));
+  }
+
+  // Drag a snippet along the waveform, or click empty space to put the
+  // selected snippet there.
+  function down(e: React.PointerEvent, s?: Snippet) {
+    if (!strip.current) return;
+    e.preventDefault();
+    const t = timeAt(e.clientX);
+    if (s) {
+      setSelected(keyOf(s));
+      setDrag({ key: keyOf(s), offset: t - s.startSec, start: s.startSec, moved: false });
+    } else {
+      const target = snippets.find((x) => keyOf(x) === active)!;
+      const start = clampStart(t - target.lengthSec / 2, target.lengthSec);
+      setDrag({ key: active, offset: t - start, start, moved: true });
+    }
+    strip.current.setPointerCapture(e.pointerId);
+  }
+  function move(e: React.PointerEvent) {
+    if (!drag) return;
+    const s = snippets.find((x) => keyOf(x) === drag.key)!;
+    setDrag({ ...drag, start: clampStart(timeAt(e.clientX) - drag.offset, s.lengthSec), moved: true });
+  }
+  function up() {
+    if (drag?.moved) onMove(drag.key, drag.start);
+    setDrag(null);
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative h-20 w-full">
-        <svg viewBox={`0 0 ${bars.length} 100`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-label="Loudness of the mixdown over time">
+      <div
+        ref={strip}
+        className="relative h-24 w-full cursor-crosshair touch-none select-none"
+        onPointerDown={(e) => down(e)}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={() => setDrag(null)}
+        title="Drag a snippet to move it, or click to put the selected one there"
+      >
+        <svg viewBox={`0 0 ${bars.length} 100`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-label="Loudness of the mixdown over time">
           {bars.map((e, i) => (
             <rect key={i} x={i + 0.15} y={100 - e * 100} width={0.7} height={e * 100} fill="rgba(255,255,255,0.22)" />
           ))}
         </svg>
-        {snippets.map((s, i) => (
-          <div
-            key={s.label}
-            title={s.label}
-            className="absolute bottom-0 top-0 rounded-sm border-x-2"
-            style={{
-              left: `${(s.startSec / duration) * 100}%`,
-              width: `${(s.lengthSec / duration) * 100}%`,
-              background: `${SNIPPET_COLORS[i % 3]}2e`,
-              borderColor: SNIPPET_COLORS[i % 3],
-            }}
-          />
-        ))}
+        {snippets.map((raw, i) => {
+          const s = shown(raw);
+          const isActive = keyOf(s) === active;
+          return (
+            <div
+              key={keyOf(s)}
+              role="slider"
+              aria-label={`${s.label} start`}
+              aria-valuemin={0}
+              aria-valuemax={Math.round(duration - s.lengthSec)}
+              aria-valuenow={Math.round(s.startSec)}
+              aria-valuetext={formatDuration(s.startSec)}
+              tabIndex={0}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                down(e, raw);
+              }}
+              onKeyDown={(e) => {
+                const d = e.key === "ArrowLeft" ? -bar : e.key === "ArrowRight" ? bar : 0;
+                if (d) {
+                  e.preventDefault();
+                  onMove(keyOf(s), clampStart(s.startSec + d, s.lengthSec));
+                }
+              }}
+              title={`${s.label}: drag to move`}
+              className={`absolute bottom-0 top-0 cursor-grab rounded-sm border-x-2 active:cursor-grabbing ${isActive ? "z-10" : ""}`}
+              style={{
+                left: `${(s.startSec / duration) * 100}%`,
+                width: `${(s.lengthSec / duration) * 100}%`,
+                background: `${SNIPPET_COLORS[i % 3]}${isActive ? "44" : "22"}`,
+                borderColor: SNIPPET_COLORS[i % 3],
+              }}
+            >
+              {isActive && (
+                <span className="pointer-events-none absolute left-1 top-1 whitespace-nowrap rounded-sm bg-chassis/80 px-1 font-mono text-[10px] uppercase tracking-[0.08em] text-cream">
+                  {s.label}
+                </span>
+              )}
+            </div>
+          );
+        })}
+        {playhead !== null && (
+          <div className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-cream" style={{ left: `${(playhead / duration) * 100}%` }} />
+        )}
       </div>
       <div className="flex justify-between text-[10px] text-engrave">
         <span>0:00</span>
         <span>{formatDuration(duration)}</span>
       </div>
       <div className="flex flex-col gap-1.5">
-        {snippets.map((s, i) => {
-          const moved = s.startSec !== analysis.snippets.find((d) => d.label === s.label)?.startSec;
-          const nudge = (d: number) => onMove(s.label, Math.min(Math.max(0, s.startSec + d), Math.max(0, duration - s.lengthSec)));
+        {snippets.map((raw, i) => {
+          const s = shown(raw);
+          const key = keyOf(s);
+          const detected = analysis.snippets.find((d) => d.label === key);
+          const moved = detected && (s.startSec !== detected.startSec || s.lengthSec !== detected.lengthSec);
+          const nudge = (d: number) => onMove(key, clampStart(s.startSec + d, s.lengthSec));
           return (
-            <div key={s.label} className="flex items-center gap-2 rounded-md bg-panel px-2.5 py-1.5 text-xs">
+            <div
+              key={key}
+              onClick={() => setSelected(key)}
+              className={`flex flex-wrap items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${key === active ? "border-rule-strong bg-raised" : "border-transparent bg-panel"}`}
+            >
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: SNIPPET_COLORS[i % 3] }} />
               <span className="w-24 text-cream">{s.label}</span>
-              <span className="w-24 tabular-nums text-engrave">
-                {formatDuration(s.startSec)}–{formatDuration(s.startSec + s.lengthSec)}
-              </span>
-              <span className="flex-1 text-[11px] text-engrave">{moved ? "moved by you" : i === 0 ? "loudest stretch" : ""}</span>
+              <TimeInput value={s.startSec} onCommit={(v) => onMove(key, clampStart(v, s.lengthSec))} />
+              <span className="text-engrave">→ {formatDuration(s.startSec + s.lengthSec)}</span>
+              <select
+                value={s.lengthSec}
+                onChange={(e) => {
+                  const len = Number(e.target.value);
+                  onLength(key, len === detected?.lengthSec ? undefined : len);
+                  if (s.startSec + len > duration) onMove(key, clampStart(s.startSec, len));
+                }}
+                aria-label={`${s.label} length`}
+                className="rounded border border-rule-strong bg-chassis px-1.5 py-0.5 text-cream"
+              >
+                {[...new Set([...SNIPPET_LENGTHS, detected?.lengthSec ?? 15])]
+                  .filter((l) => l <= duration)
+                  .sort((a, b) => a - b)
+                  .map((l) => (
+                    <option key={l} value={l}>
+                      {l}s
+                    </option>
+                  ))}
+              </select>
+              <span className="min-w-0 flex-1 truncate text-[11px] text-engrave">{moved ? "edited by you" : (s.reason ?? "")}</span>
               <button onClick={() => nudge(-bar)} title={project.tempoBpm ? "1 bar earlier" : "1 s earlier"} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
                 <Minus size={12} />
               </button>
@@ -507,7 +626,14 @@ function Snippets({
                 <Plus size={12} />
               </button>
               {moved && (
-                <button onClick={() => onMove(s.label, undefined)} title="Back to the detected spot" className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
+                <button
+                  onClick={() => {
+                    onMove(key, undefined);
+                    onLength(key, undefined);
+                  }}
+                  title="Back to the detected spot and length"
+                  className="rounded p-1 text-engrave hover:bg-rule hover:text-cream"
+                >
                   <RotateCcw size={12} />
                 </button>
               )}
@@ -517,14 +643,43 @@ function Snippets({
                 title={demoMode ? "No audio in sample data" : "Play this snippet"}
                 className="flex items-center gap-1 rounded bg-rule px-2 py-1 text-cream hover:bg-rule-strong disabled:opacity-40"
               >
-                {playing === s.label ? <Pause size={12} /> : <Play size={12} />}
+                {playing === key ? <Pause size={12} /> : <Play size={12} />}
               </button>
             </div>
           );
         })}
       </div>
       {!demoMode && <audio ref={audio} src={api.audioSrc(render.path)} preload="none" />}
-      <div className="text-[11px] text-engrave">Clips are cut on export, with short fades, into snippets/ in the kit.</div>
+      <div className="text-[11px] text-engrave">
+        Drag a snippet on the waveform, click to drop the selected one there, or type a start time. Clips are cut on export, with short fades, into
+        snippets/ in the kit.
+      </div>
     </div>
+  );
+}
+
+/** m:ss(.s) start time you can type; commits on Enter or when leaving the field. */
+function TimeInput({ value, onCommit }: { value: number; onCommit: (seconds: number) => void }) {
+  const [text, setText] = useState<string | null>(null);
+  const commit = () => {
+    if (text === null) return;
+    const m = text.trim().match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/);
+    if (m) onCommit((m[1] ? Number(m[1]) * 60 : 0) + Number(m[2]));
+    setText(null);
+  };
+  return (
+    <input
+      value={text ?? formatDuration(value)}
+      onChange={(e) => setText(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        if (e.key === "Escape") setText(null);
+      }}
+      onClick={(e) => e.stopPropagation()}
+      aria-label="Start time"
+      className="w-14 rounded border border-rule-strong bg-chassis px-1.5 py-0.5 font-mono tabular-nums text-cream focus:border-hot focus:outline-none"
+    />
   );
 }
