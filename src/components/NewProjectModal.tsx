@@ -122,7 +122,7 @@ export function NewProjectModal() {
             ))}
           </select>
           {factory.length === 0 && userTemplates.length === 0 && (
-            <div className="mt-1 text-xs text-white/58">
+            <div className="mt-1 text-xs text-engrave">
               {settings.flStudioPath
                 ? "No templates found. Save any project into a Templates folder inside a linked folder to start new songs from it."
                 : "Set the FL Studio path in Settings to see its templates."}
@@ -140,7 +140,7 @@ export function NewProjectModal() {
             ))}
           </select>
           {trimmed && parentFolder && (
-            <div className="mt-1 truncate text-[11px] text-white/55">
+            <div className="mt-1 truncate text-[11px] text-engrave">
               {parentFolder}
               {sep}
               {trimmed}
@@ -174,7 +174,7 @@ export function NewProjectModal() {
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-white/70">
+        <label className="flex items-center gap-2 text-sm text-body">
           <input type="checkbox" checked={openAfter} onChange={(e) => setOpenAfter(e.target.checked)} className="accent-orange-500" />
           Open in FL Studio after creating
         </label>

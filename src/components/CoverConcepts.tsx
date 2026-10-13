@@ -57,9 +57,9 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
 
   if (!coverStatus?.configured) {
     return (
-      <div className="mt-4 flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">
+      <div className="mt-4 flex items-center gap-3 rounded-lg border border-rule bg-panel p-3 text-sm">
         <ImageIcon size={16} className="shrink-0 text-orange-300" />
-        <span className="flex-1 text-xs text-white/60">
+        <span className="flex-1 text-xs text-body">
           Turn this brief into cover concepts with FLUX. It's free: a Cloudflare account gives about {PER_DAY} images a day, no card needed.
         </span>
         <button onClick={() => setView("settings")} className={btn}>
@@ -124,9 +124,9 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-3 border-t border-white/5 pt-4">
+    <div className="mt-4 flex flex-col gap-3 border-t border-rule pt-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[12px] font-semibold text-white/58">Cover concepts · FLUX</span>
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">Cover concepts · FLUX</span>
         <div className="ml-auto flex flex-wrap gap-2">
           <button onClick={generateFour} disabled={running || !brief.trim()} className={session.concepts.length ? btn : btnPrimary}>
             <Images size={14} /> {running ? "Painting…" : session.concepts.length ? "4 new concepts" : "Generate 4 concepts"}
@@ -158,8 +158,8 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
               disabled={!c.image}
               aria-pressed={session.picked === i}
               aria-label={`Concept ${i + 1}`}
-              className={`relative aspect-square overflow-hidden rounded-md border bg-white/[0.03] ${
-                session.picked === i ? "border-orange-400 ring-2 ring-orange-400/60" : "border-white/10 hover:border-white/30"
+              className={`relative aspect-square overflow-hidden rounded-md border bg-panel ${
+                session.picked === i ? "border-orange-400 ring-2 ring-orange-400/60" : "border-rule hover:border-engrave"
               }`}
             >
               {c.image ? (
@@ -167,10 +167,10 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
               ) : c.error ? (
                 <span className="absolute inset-0 flex items-center justify-center p-3 text-center text-[11px] leading-snug text-red-300">{c.error}</span>
               ) : (
-                <span className="absolute inset-0 flex animate-pulse items-center justify-center text-[11px] text-white/55">Painting…</span>
+                <span className="absolute inset-0 flex animate-pulse items-center justify-center text-[11px] text-engrave">Painting…</span>
               )}
               {session.picked === i && (
-                <span className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-medium text-[#0f0f12]">
+                <span className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-medium text-chassis">
                   <Check size={10} /> Picked
                 </span>
               )}
@@ -180,7 +180,7 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
       )}
 
       {session.concepts.length > 0 && !running && session.picked == null && session.concepts.some((c) => c.image) && (
-        <div className="text-xs text-white/50">Click a concept to pick it.</div>
+        <div className="text-xs text-engrave">Click a concept to pick it.</div>
       )}
       {message && (
         <div className={`flex items-center gap-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>
@@ -193,21 +193,21 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
         </div>
       )}
       {!session.concepts.length && saved?.savedPath && (
-        <div className="flex items-center gap-2 text-xs text-white/50">
+        <div className="flex items-center gap-2 text-xs text-engrave">
           A concept is saved in the kit (cover-concept.jpg).
-          <button onClick={() => api.revealInFileManager(saved.savedPath!)} className="flex items-center gap-1 text-white/60 underline hover:text-white">
+          <button onClick={() => api.revealInFileManager(saved.savedPath!)} className="flex items-center gap-1 text-body underline hover:text-cream">
             <FolderOpen size={12} /> Show
           </button>
         </div>
       )}
 
       {picked && (
-        <details className="text-[11px] text-white/58">
-          <summary className="cursor-pointer hover:text-white/70">
+        <details className="text-[11px] text-engrave">
+          <summary className="cursor-pointer hover:text-body">
             Prompt sent to FLUX (seed {picked.seed}
             {picked.image && !picked.image.seedApplied ? ", not applied by Cloudflare" : ""})
           </summary>
-          <p className="mt-1 whitespace-pre-wrap font-mono leading-relaxed text-white/50">{picked.prompt}</p>
+          <p className="mt-1 whitespace-pre-wrap font-mono leading-relaxed text-engrave">{picked.prompt}</p>
         </details>
       )}
 
@@ -215,7 +215,7 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
         Concepts are drafts at {size?.width && size.height ? `${size.width} × ${size.height}` : "1024 × 1024"} px. Distributors need 3000 × 3000:
         a designer (or an upscaler) makes the final from the pick and adds the title and artist name, which FLUX leaves out on purpose.
       </div>
-      <div className="text-[11px] leading-relaxed text-white/50">
+      <div className="text-[11px] leading-relaxed text-engrave">
         Each concept uses about {Math.round(NEURONS_PER_IMAGE)} of Cloudflare's {FREE_NEURONS_PER_DAY.toLocaleString("en")} free daily neurons (about {PER_DAY} a day).
         Only the image prompt goes to Cloudflare: it's built from this brief, without the title, names or notes.
       </div>

@@ -32,12 +32,12 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
           >
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-sm" style={{ background: next.color }} />
-              <span className="truncate text-sm font-medium text-white/90">{next.title}</span>
+              <span className="truncate text-sm font-medium text-cream">{next.title}</span>
             </div>
-            <div className="font-display text-3xl leading-none text-white">
+            <div className="font-display text-3xl leading-none text-cream">
               {next.daysAway === 0 ? "Today" : next.daysAway === 1 ? "Tomorrow" : formatRelative(next.dateMs)}
             </div>
-            <div className="text-[11px] text-white/62">
+            <div className="text-[11px] text-body">
               {new Date(next.dateMs).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
               {next.tracks.length > 0 && ` · ${next.finished}/${next.tracks.length} finished · ${next.kitsAccepted}/${next.tracks.length} kits`}
             </div>
@@ -48,9 +48,9 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
             )}
           </button>
         ) : (
-          <div className="text-xs text-white/58">
+          <div className="text-xs text-engrave">
             Nothing dated yet.{" "}
-            <button onClick={() => setView("albums")} className="underline hover:text-white">
+            <button onClick={() => setView("albums")} className="underline hover:text-cream">
               Plan a release
             </button>
           </div>
@@ -59,26 +59,26 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
 
       <Card icon={<Hourglass size={13} />} title={`Stalled · no save in ${STALLED_DAYS}+ days`}>
         {stalled.length === 0 ? (
-          <div className="text-xs text-white/58">Nothing stuck in Creation or Production.</div>
+          <div className="text-xs text-engrave">Nothing stuck in Creation or Production.</div>
         ) : (
           <div className="flex flex-col gap-1">
             {stalled.slice(0, 5).map((s) => (
-              <button key={s.song.path} onClick={() => openDetail(s.song.path)} className="flex items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-white/[0.04]">
+              <button key={s.song.path} onClick={() => openDetail(s.song.path)} className="flex items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-panel">
                 <StatusDot color={statusInfo(s.status).color} size={6} />
-                <span className="min-w-0 flex-1 truncate text-white/80">{s.song.name}</span>
-                <span className="shrink-0 tabular-nums text-white/58">{s.idleDays}d</span>
+                <span className="min-w-0 flex-1 truncate text-cream">{s.song.name}</span>
+                <span className="shrink-0 tabular-nums text-engrave">{s.idleDays}d</span>
               </button>
             ))}
-            {stalled.length > 5 && <div className="px-1 text-[11px] text-white/55">+{stalled.length - 5} more</div>}
+            {stalled.length > 5 && <div className="px-1 text-[11px] text-engrave">+{stalled.length - 5} more</div>}
           </div>
         )}
       </Card>
 
       <Card icon={<Users size={13} />} title="Crew · who's on what" action={{ label: "People", run: () => openPerson(null) }}>
         {crew.length === 0 ? (
-          <div className="text-xs text-white/58">
+          <div className="text-xs text-engrave">
             Add the crew in{" "}
-            <button onClick={() => openPerson(null)} className="underline hover:text-white">
+            <button onClick={() => openPerson(null)} className="underline hover:text-cream">
               People
             </button>{" "}
             to see who's working on what. Names in mixer tracks are picked up automatically.
@@ -86,14 +86,14 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
         ) : (
           <div className="flex flex-col gap-1.5">
             {crew.slice(0, 5).map((m) => (
-              <button key={m.person.id} onClick={() => openPerson(m.person.id)} className="flex flex-col gap-1 rounded px-1 py-0.5 text-left hover:bg-white/[0.04]">
+              <button key={m.person.id} onClick={() => openPerson(m.person.id)} className="flex flex-col gap-1 rounded px-1 py-0.5 text-left hover:bg-panel">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="min-w-0 flex-1 truncate text-white/85">{m.person.name}</span>
-                  <span className="shrink-0 text-white/62">
+                  <span className="min-w-0 flex-1 truncate text-cream">{m.person.name}</span>
+                  <span className="shrink-0 text-body">
                     {m.active} active · {m.lastSessionMs ? formatRelative(m.lastSessionMs) : "no sessions"}
                   </span>
                 </div>
-                <div className="flex h-1.5 gap-px overflow-hidden rounded-full bg-white/5" title="Their songs by stage">
+                <div className="flex h-1.5 gap-px overflow-hidden rounded-full bg-raised" title="Their songs by stage">
                   {[{ id: "unsorted" as const, ...UNSORTED }, ...STATUSES].map((st) =>
                     m.byStage[st.id] ? <span key={st.id} style={{ flexGrow: m.byStage[st.id], background: st.color }} /> : null,
                   )}
@@ -119,11 +119,11 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-white/58">
+    <div className="rounded-lg border border-rule bg-panel p-4">
+      <div className="mb-3 flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">
         {icon} {title}
         {action && (
-          <button onClick={action.run} className="ml-auto normal-case tracking-normal text-white/58 hover:text-white">
+          <button onClick={action.run} className="ml-auto font-display text-[13px] font-semibold tracking-[0.06em] text-body hover:text-cream">
             {action.label} →
           </button>
         )}

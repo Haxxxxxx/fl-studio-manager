@@ -24,22 +24,22 @@ function RelinkNotice() {
   const dismiss = useAppStore((s) => s.dismissRelinked);
   if (!relinked.length) return null;
   return (
-    <div role="status" className="absolute bottom-3 right-3 z-40 max-w-sm rounded-md border border-white/10 bg-[#1a1a20] px-4 py-3 text-xs text-white/75 shadow-xl">
+    <div role="status" className="absolute bottom-3 right-3 z-40 max-w-sm rounded-md border border-rule bg-raised px-4 py-3 text-xs text-body shadow-xl">
       <div className="mb-1.5 flex items-center justify-between gap-3">
-        <span className="font-medium text-white">
+        <span className="font-medium text-cream">
           Kept the details of {relinked.length} renamed or moved song{relinked.length === 1 ? "" : "s"}
         </span>
-        <button onClick={dismiss} className="text-white/62 hover:text-white">
+        <button onClick={dismiss} className="text-body hover:text-cream">
           OK
         </button>
       </div>
       <ul className="flex flex-col gap-0.5">
         {relinked.slice(0, 5).map((r) => (
           <li key={r.to} className="truncate" title={`${r.from} → ${r.to}`}>
-            {fileName(r.from)} → <span className="text-white">{r.reason === "moved" ? `moved (${fileName(r.to)})` : fileName(r.to)}</span>
+            {fileName(r.from)} → <span className="text-cream">{r.reason === "moved" ? `moved (${fileName(r.to)})` : fileName(r.to)}</span>
           </li>
         ))}
-        {relinked.length > 5 && <li className="text-white/58">+{relinked.length - 5} more</li>}
+        {relinked.length > 5 && <li className="text-engrave">+{relinked.length - 5} more</li>}
       </ul>
     </div>
   );
@@ -72,14 +72,14 @@ export default function App() {
 
   if (!settingsLoaded) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0f0f12] text-sm text-white/58">
+      <div className="flex h-screen items-center justify-center bg-chassis text-sm text-engrave">
         Loading...
       </div>
     );
   }
 
   return (
-    <div className="relative flex h-screen bg-[#0f0f12] text-white">
+    <div className="relative flex h-screen bg-chassis text-cream">
       <Sidebar />
       {view === "dashboard" && <Dashboard />}
       {view === "library" && <LibraryView />}

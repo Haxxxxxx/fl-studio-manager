@@ -31,7 +31,7 @@ export function CrewBoard() {
 
   if (songs.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-white/62">
+      <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-body">
         Nothing shared yet. Share songs from their panel or the Library, and ask the crew to do the same.
       </div>
     );
@@ -61,14 +61,14 @@ export function CrewBoard() {
                 moveCrewSong(id, col.id ?? null).catch((err) => setError(err instanceof Error ? err.message : String(err)));
               }}
               className={`flex min-w-[190px] flex-1 basis-0 flex-col rounded-lg border ${
-                dragOver === key ? "border-orange-400/50 bg-orange-500/[0.05]" : "border-white/5 bg-white/[0.02]"
+                dragOver === key ? "border-orange-400/50 bg-orange-500/[0.05]" : "border-rule bg-panel"
               }`}
             >
               <div className="flex flex-wrap items-center gap-x-2 px-3 pb-2 pt-2.5">
                 <StatusDot color={col.color} />
-                <span className="text-xs font-medium text-white/80">{col.label}</span>
-                <span className="text-xs text-white/50">{items.length}</span>
-                <span className="basis-full pt-0.5 text-[10px] leading-snug text-white/50">{col.hint}</span>
+                <span className="text-xs font-medium text-cream">{col.label}</span>
+                <span className="text-xs text-engrave">{items.length}</span>
+                <span className="basis-full pt-0.5 text-[10px] leading-snug text-engrave">{col.hint}</span>
               </div>
               <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto px-2 pb-2">
                 {items.map((s) => {
@@ -81,15 +81,15 @@ export function CrewBoard() {
                       onDragStart={(e) => e.dataTransfer.setData("application/x-crew-song", s.id)}
                       onClick={() => path && openDetail(path)}
                       title={mine ? "Your song" : `${nameOf.get(s.owner_id) ?? "A crewmate"}'s song`}
-                      className={`cursor-grab rounded-md border px-3 py-2 active:cursor-grabbing ${mine ? "border-orange-400/20 bg-[#1b1a1d]" : "border-white/5 bg-[#18181d]"} hover:border-white/15`}
+                      className={`cursor-grab rounded-md border px-3 py-2 active:cursor-grabbing ${mine ? "border-orange-400/20 bg-raised" : "border-rule bg-raised"} hover:border-rule-strong`}
                     >
-                      <div className="truncate text-sm font-medium text-white/90">{s.title}</div>
-                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/62">
+                      <div className="truncate text-sm font-medium text-cream">{s.title}</div>
+                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-body">
                         <span className={mine ? "text-orange-200/80" : ""}>{mine ? "You" : (nameOf.get(s.owner_id) ?? "Crewmate")}</span>
                         {s.bpm != null && <span>· {Math.round(s.bpm)} BPM</span>}
                         {s.musical_key && <span>· {s.musical_key}</span>}
                       </div>
-                      <div className="mt-1 flex items-center gap-2 text-[10px] text-white/55">
+                      <div className="mt-1 flex items-center gap-2 text-[10px] text-engrave">
                         {s.last_saved_at && <span>saved {formatRelative(Date.parse(s.last_saved_at))}</span>}
                         {s.release_date && <span>· out {s.release_date}</span>}
                         <span className="ml-auto flex items-center gap-1">
@@ -98,7 +98,7 @@ export function CrewBoard() {
                         </span>
                       </div>
                       {s.stage_updated_by && s.stage_updated_by !== s.owner_id && (
-                        <div className="mt-1 text-[10px] text-white/50">moved by {s.stage_updated_by === userId ? "you" : (nameOf.get(s.stage_updated_by) ?? "a crewmate")}</div>
+                        <div className="mt-1 text-[10px] text-engrave">moved by {s.stage_updated_by === userId ? "you" : (nameOf.get(s.stage_updated_by) ?? "a crewmate")}</div>
                       )}
                     </div>
                   );

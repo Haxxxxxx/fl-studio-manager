@@ -31,7 +31,7 @@ import { btn, btnPrimary } from "./ui";
 import { Card, CheckLine, FieldRow, KitStatus } from "../ui";
 
 // Snippet colors: the dark categorical slots, in fixed order (as elsewhere).
-const SNIPPET_COLORS = ["#3987e5", "#d95926", "#199e70"];
+const SNIPPET_COLORS = ["#ff5a1f", "#f2efe8", "#3ddc84"];
 
 
 /** Keyed by mixdown path + mtime + tempo: re-analyze when the mixdown
@@ -97,7 +97,7 @@ export function LaunchKitView() {
 
   if (!project) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-white/58">
+      <div className="flex flex-1 items-center justify-center text-sm text-engrave">
         Link a project folder (or load sample data) to build a launch kit.
       </div>
     );
@@ -167,7 +167,7 @@ export function LaunchKitView() {
         <header className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-orange-300">
             <Rocket size={18} />
-            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-white">Launch Kit</h1>
+            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">Launch Kit</h1>
           </div>
           <SongPicker
             songs={songs}
@@ -213,11 +213,11 @@ export function LaunchKitView() {
         {extra.map((c) => (
           <CheckLine key={c.message} check={c} />
         ))}
-        <div className="flex flex-wrap items-center gap-3 text-xs text-white/62">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-body">
           {suggestions.length > 0 && (
             <button
               onClick={() => setKitEdits(project.path, Object.fromEntries(suggestions.map((f) => [f.id, f.review!.suggestion!])))}
-              className="rounded bg-violet-500/15 px-2 py-1 text-violet-200 hover:bg-violet-500/25"
+              className="rounded border border-dashed border-engrave px-2 py-1 text-cream hover:bg-raised"
             >
               Use all {suggestions.length} AI suggestion{suggestions.length === 1 ? "" : "s"}
             </button>
@@ -225,7 +225,7 @@ export function LaunchKitView() {
           {Object.keys(edits).length > 0 && (
             <button
               onClick={() => window.confirm("Undo every change you made in this kit?") && setKitEdits(project.path, null)}
-              className="hover:text-white"
+              className="hover:text-cream"
             >
               Reset all edits
             </button>
@@ -235,7 +235,7 @@ export function LaunchKitView() {
               window.confirm("Clear every pre-filled value so you can fill the kit in by hand? (Reset all edits brings them back.)") &&
               setKitEdits(project.path, Object.fromEntries(fields.filter((f) => f.kind !== "multiline").map((f) => [f.id, ""])))
             }
-            className="hover:text-white"
+            className="hover:text-cream"
           >
             Start blank
           </button>
@@ -244,7 +244,7 @@ export function LaunchKitView() {
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-5">
           <div className="flex flex-col gap-5">
             <Card title="Metadata">
-              <div className="flex flex-col divide-y divide-white/5">
+              <div className="flex flex-col divide-y divide-rule">
                 {METADATA_FIELDS.map((id) => (
                   <FieldRow key={id} field={byId(id)} onChange={(v) => setKitEdit(project.path, id, v)} />
                 ))}
@@ -254,7 +254,7 @@ export function LaunchKitView() {
               <FieldRow field={byId("releaseDate")} onChange={(v) => setKitEdit(project.path, "releaseDate", v)} />
             </Card>
             <Card title="Distribution: what the upload form asks">
-              <div className="flex flex-col divide-y divide-white/5">
+              <div className="flex flex-col divide-y divide-rule">
                 {DISTRIBUTION_FIELDS.map((id) => (
                   <FieldRow key={id} field={byId(id)} onChange={(v) => setKitEdit(project.path, id, v)} />
                 ))}
@@ -310,9 +310,9 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
 
   if (!aiStatus?.configured) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-violet-400/20 bg-violet-500/[0.06] p-4 text-sm">
-        <Sparkles size={16} className="shrink-0 text-violet-300" />
-        <span className="flex-1 text-white/60">AI drafts and checks are off. They need a free Gemini API key.</span>
+      <div className="flex items-center gap-3 rounded-lg border border-dashed border-rule-strong bg-panel p-4 text-sm">
+        <Sparkles size={16} className="shrink-0 text-body" />
+        <span className="flex-1 text-body">AI drafts and checks are off. They need a free Gemini API key.</span>
         <button onClick={() => setView("settings")} className={btn}>
           Add a key
         </button>
@@ -375,10 +375,10 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
               .join(" ") || "No problems found.";
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-violet-400/20 bg-violet-500/[0.06] p-4">
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-rule-strong bg-panel p-4">
       <div className="flex items-center gap-2">
-        <Sparkles size={15} className="text-violet-300" />
-        <span className="text-[12px] font-semibold text-violet-200/70">AI layer · {model}</span>
+        <Sparkles size={15} className="text-body" />
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">AI layer · {model}</span>
       </div>
       <div className="flex flex-wrap gap-2">
         <button onClick={() => run(true)} disabled={!!running} className={btnPrimary}>
@@ -388,23 +388,23 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
           <Check size={14} /> {running === "review" ? "Checking every field…" : summary.state === "unchecked" ? "Check kit" : "Re-check"}
         </button>
         {drafts && !running && (
-          <button onClick={() => setKitAi(path, { drafts: undefined })} className="text-xs text-white/58 hover:text-white" title="Back to the template text">
+          <button onClick={() => setKitAi(path, { drafts: undefined })} className="text-xs text-engrave hover:text-cream" title="Back to the template text">
             Discard AI drafts
           </button>
         )}
       </div>
-      <div className={`text-xs ${summary.verified ? "text-emerald-300" : summary.state === "checked" ? "text-amber-300" : "text-white/50"}`}>
+      <div className={`text-xs ${summary.verified ? "text-emerald-300" : summary.state === "checked" ? "text-amber-300" : "text-engrave"}`}>
         {line}
-        {reviewedAt && <span className="text-white/55"> · checked {formatRelative(reviewedAt)}</span>}
+        {reviewedAt && <span className="text-engrave"> · checked {formatRelative(reviewedAt)}</span>}
       </div>
       {running && (
-        <div className="text-[11px] text-white/58">If Gemini is busy this retries on its own; it gives up after 2 minutes.</div>
+        <div className="text-[11px] text-engrave">If Gemini is busy this retries on its own; it gives up after 2 minutes.</div>
       )}
       {backupUsed && !running && (
-        <div className="text-[11px] text-white/58">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>
+        <div className="text-[11px] text-engrave">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>
       )}
       {error && <div className="text-xs text-red-300">{error}</div>}
-      <div className="text-[11px] leading-relaxed text-white/50">
+      <div className="text-[11px] leading-relaxed text-engrave">
         Sends the song name, tags, notes, mixer track names, credits and these fields to Google Gemini. No audio, no file paths. On the free tier Google may use them to improve its products.
       </div>
     </div>
@@ -434,10 +434,10 @@ function Snippets({
 
   useEffect(() => () => audio.current?.pause(), [render?.path]);
 
-  if (!render) return <div className="py-6 text-center text-xs text-white/58">Render a mixdown to get snippets.</div>;
-  if (loading) return <div className="py-6 text-center text-xs text-white/58">Listening to the mixdown…</div>;
+  if (!render) return <div className="py-6 text-center text-xs text-engrave">Render a mixdown to get snippets.</div>;
+  if (loading) return <div className="py-6 text-center text-xs text-engrave">Listening to the mixdown…</div>;
   if (error || !analysis) return <div className="py-6 text-center text-xs text-red-300">{error ?? "No analysis"}</div>;
-  if (!snippets.length) return <div className="py-6 text-center text-xs text-white/58">The mixdown is shorter than 15 seconds.</div>;
+  if (!snippets.length) return <div className="py-6 text-center text-xs text-engrave">The mixdown is shorter than 15 seconds.</div>;
 
   const duration = analysis.durationSec;
   const bar = project.tempoBpm ? 240 / project.tempoBpm : 1;
@@ -484,7 +484,7 @@ function Snippets({
           />
         ))}
       </div>
-      <div className="flex justify-between text-[10px] text-white/50">
+      <div className="flex justify-between text-[10px] text-engrave">
         <span>0:00</span>
         <span>{formatDuration(duration)}</span>
       </div>
@@ -493,21 +493,21 @@ function Snippets({
           const moved = s.startSec !== analysis.snippets.find((d) => d.label === s.label)?.startSec;
           const nudge = (d: number) => onMove(s.label, Math.min(Math.max(0, s.startSec + d), Math.max(0, duration - s.lengthSec)));
           return (
-            <div key={s.label} className="flex items-center gap-2 rounded-md bg-white/[0.03] px-2.5 py-1.5 text-xs">
+            <div key={s.label} className="flex items-center gap-2 rounded-md bg-panel px-2.5 py-1.5 text-xs">
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: SNIPPET_COLORS[i % 3] }} />
-              <span className="w-24 text-white/80">{s.label}</span>
-              <span className="w-24 tabular-nums text-white/50">
+              <span className="w-24 text-cream">{s.label}</span>
+              <span className="w-24 tabular-nums text-engrave">
                 {formatDuration(s.startSec)}–{formatDuration(s.startSec + s.lengthSec)}
               </span>
-              <span className="flex-1 text-[11px] text-white/50">{moved ? "moved by you" : i === 0 ? "loudest stretch" : ""}</span>
-              <button onClick={() => nudge(-bar)} title={project.tempoBpm ? "1 bar earlier" : "1 s earlier"} className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
+              <span className="flex-1 text-[11px] text-engrave">{moved ? "moved by you" : i === 0 ? "loudest stretch" : ""}</span>
+              <button onClick={() => nudge(-bar)} title={project.tempoBpm ? "1 bar earlier" : "1 s earlier"} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
                 <Minus size={12} />
               </button>
-              <button onClick={() => nudge(bar)} title={project.tempoBpm ? "1 bar later" : "1 s later"} className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
+              <button onClick={() => nudge(bar)} title={project.tempoBpm ? "1 bar later" : "1 s later"} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
                 <Plus size={12} />
               </button>
               {moved && (
-                <button onClick={() => onMove(s.label, undefined)} title="Back to the detected spot" className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
+                <button onClick={() => onMove(s.label, undefined)} title="Back to the detected spot" className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
                   <RotateCcw size={12} />
                 </button>
               )}
@@ -515,7 +515,7 @@ function Snippets({
                 onClick={() => play(s)}
                 disabled={demoMode}
                 title={demoMode ? "No audio in sample data" : "Play this snippet"}
-                className="flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-white/80 hover:bg-white/15 disabled:opacity-40"
+                className="flex items-center gap-1 rounded bg-rule px-2 py-1 text-cream hover:bg-rule-strong disabled:opacity-40"
               >
                 {playing === s.label ? <Pause size={12} /> : <Play size={12} />}
               </button>
@@ -524,7 +524,7 @@ function Snippets({
         })}
       </div>
       {!demoMode && <audio ref={audio} src={api.audioSrc(render.path)} preload="none" />}
-      <div className="text-[11px] text-white/55">Clips are cut on export, with short fades, into snippets/ in the kit.</div>
+      <div className="text-[11px] text-engrave">Clips are cut on export, with short fades, into snippets/ in the kit.</div>
     </div>
   );
 }
