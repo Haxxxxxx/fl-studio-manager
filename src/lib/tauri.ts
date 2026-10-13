@@ -2,7 +2,16 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { PackageResult, ProjectInfo, RenderEvent, Settings, TemplateInfo, Workspace } from "../types";
+import type {
+  AudioAnalysis,
+  PackageResult,
+  ProjectInfo,
+  RenderEvent,
+  Settings,
+  Snippet,
+  TemplateInfo,
+  Workspace,
+} from "../types";
 
 export async function scanProjects(folders: string[], outputFolder: string | null): Promise<ProjectInfo[]> {
   return invoke("scan_projects", { folders, outputFolder });
@@ -88,6 +97,22 @@ export async function packageProjects(args: {
 
 export function onPackageProgress(handler: (result: PackageResult) => void): Promise<UnlistenFn> {
   return listen<PackageResult>("package-progress", (e) => handler(e.payload));
+}
+
+/** Duration, loudness curve and the strongest snippets of a mixdown. */
+export async function analyzeAudio(path: string, bpm: number | null): Promise<AudioAnalysis> {
+  return invoke("analyze_audio", { path, bpm });
+}
+
+/** Writes the kit folder (text files, master copy, snippet clips). */
+export async function exportLaunchKit(args: {
+  outDir: string;
+  files: { name: string; content: string }[];
+  master: string | null;
+  masterName: string;
+  clips: Snippet[];
+}): Promise<string> {
+  return invoke("export_launch_kit", args);
 }
 
 /** URL the webview can stream a local audio file from (asset protocol). */

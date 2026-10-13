@@ -89,6 +89,47 @@ export interface SongMeta {
   archived?: boolean;
   credits?: Credit[];
   pitches?: Pitch[];
+  launchKit?: LaunchKitMeta;
+}
+
+// ---- Launch Kit ----
+
+export type KitFieldId =
+  | "title"
+  | "artists"
+  | "producers"
+  | "genre"
+  | "bpm"
+  | "key"
+  | "duration"
+  | "explicit"
+  | "releaseDate"
+  | "coverBrief"
+  | "captions";
+
+/** The user's side of a launch kit. Everything else is regenerated from the
+ * project each time, so the .flp stays the source of truth. */
+export interface LaunchKitMeta {
+  /** Values the user typed over the generated ones. */
+  edits?: Partial<Record<KitFieldId, string>>;
+  /** Snippet label → start (s), when nudged off the detected spot. */
+  snippetStarts?: Record<string, number>;
+  /** Set by "Accept all"; cleared by any later edit. */
+  acceptedAtMs?: number;
+}
+
+export interface Snippet {
+  label: string;
+  startSec: number;
+  lengthSec: number;
+}
+
+export interface AudioAnalysis {
+  durationSec: number;
+  windowSec: number;
+  /** Loudness per window, loudest = 1. */
+  energy: number[];
+  snippets: Snippet[];
 }
 
 /** A collaborator or contact. Aliases are how they appear in track names

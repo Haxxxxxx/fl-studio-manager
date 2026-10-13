@@ -12,6 +12,7 @@ import {
   History,
   PlayCircle,
   Plus,
+  Rocket,
   RotateCcw,
   Star,
   Trash2,
@@ -47,6 +48,7 @@ export function ProjectDrawer() {
   const trashBackups = useAppStore((s) => s.trashBackups);
   const startPackage = useAppStore((s) => s.startPackage);
   const packaging = useAppStore((s) => s.packaging);
+  const openLaunchKit = useAppStore((s) => s.openLaunchKit);
 
   const [versionName, setVersionName] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -109,6 +111,9 @@ export function ProjectDrawer() {
           </button>
           <button onClick={() => revealInFileManager(project.path)} disabled={demoMode} className={btn}>
             <FolderOpen size={14} /> Reveal
+          </button>
+          <button onClick={() => openLaunchKit(project.path)} className={btn} title="Metadata, snippets, release date, captions">
+            <Rocket size={14} /> Launch Kit
           </button>
           <button
             onClick={() => run(async () => (await startRender([project.path]), ""), () => "Render started")}
