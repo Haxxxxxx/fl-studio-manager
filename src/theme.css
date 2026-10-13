@@ -5,7 +5,7 @@
    templates/redesign): solid warm greys, engraved mono labels, LED status,
    one hot orange. Condensed caps for titles and buttons, Plex for the rest. */
 @theme {
-  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-display: "Barlow Condensed", sans-serif;
   --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 

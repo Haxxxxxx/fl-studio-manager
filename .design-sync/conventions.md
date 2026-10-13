@@ -32,7 +32,7 @@ Components are styled with Tailwind classes. `styles.css` holds the classes the 
 | Rules | `border-rule` (#2C2B27), `border-rule-strong` (#3D3C37), `divide-rule` |
 | Ink | `text-cream` (#F2EFE8 values, selected), `text-body` (#C9C5BB prose), `text-engrave` (#8D897F labels) |
 | Engraved label | `engrave` export = `font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave` |
-| Signal | `bg-hot`/`text-hot` (#FF5A1F), `ok` (#3DDC84), `warn` (#FFC233), `missing` (#FF4040) |
+| Signal | `bg-hot`/`text-hot` (#FF5A1F) for the main action and "needs you". LED colours ok #3DDC84, warn #FFC233, missing #FF4040: pass the hex to `StatusDot` (only `text-warn`/`border-warn` exist as classes) |
 | Type | `font-display` (Barlow Condensed: titles in caps, buttons, big figures), `font-sans` (IBM Plex Sans), `font-mono` (IBM Plex Mono: labels, data, BPM, dates) |
 | Selected | `bg-cream text-chassis` |
 | Numbers | `font-display text-4xl font-semibold tabular-nums text-cream` for figures, `font-mono tabular-nums` in columns |
@@ -43,7 +43,7 @@ Song stage colors are one blue ramp, dark → light (use with `StatusDot`, never
 
 ## Building blocks
 
-- Brand: `LogoMark` (the FL rack key, orange with one LED).
+- Brand: `LogoMark` (the Hivo hive cell with a lit LED; `tone="light"` on cream) and `Wordmark` ("Hiv" + the cell as the "o").
 - Layout and numbers: `Card` (engraved title + optional `action`), `StatTile`, `HeroStat`, `Stat`, `Meter` (segmented LED bar), `Section`, `Fact` (inside a `<dl>`).
 - Controls: `Button`, `Input`, `Chip` (filter, cream when selected), `Toggle` (LED switch), `StatusSelect` (stage picker), `TagEditor`, `ConfirmButton` (two-click destructive, arms red), `Modal`.
 - Music: `StatusDot` (LED), `MixdownBadge` (LED + Mix current / Mix outdated / No mixdown), `SongLines`, `FileRow`, `Avatar` (initials key).
