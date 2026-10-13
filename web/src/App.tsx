@@ -4,6 +4,7 @@ import { STATUSES, UNSORTED, statusInfo } from "@shared/lib/songs";
 import { formatRelative } from "@shared/lib/format";
 import type { CrewSongRow, SongStatus } from "@shared/types";
 import { useWeb } from "./store";
+import { Landing } from "./Landing";
 
 const input =
   "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-base text-white placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none sm:text-sm";
@@ -37,7 +38,7 @@ export function App() {
   }, [init]);
 
   if (!ready) return <Centered>Loading…</Centered>;
-  if (!userId) return <Shell><SignIn /></Shell>;
+  if (!userId) return <Landing signIn={<SignIn />} />;
   if (crews.length === 0) return <Shell><Join /></Shell>;
   return <Dashboard topError={error} />;
 }
