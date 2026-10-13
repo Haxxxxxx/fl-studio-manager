@@ -2,6 +2,7 @@ mod actions;
 mod ai;
 mod audio;
 mod cover;
+mod files;
 mod flp_metadata;
 mod models;
 mod package;
@@ -33,6 +34,7 @@ pub fn run() {
             actions::restore_backup,
             actions::trash_backups,
             package::package_projects,
+            files::kit_files,
             audio::analyze_audio,
             audio::export_launch_kit,
             ai::ai_status,

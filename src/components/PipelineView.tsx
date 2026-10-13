@@ -6,6 +6,9 @@ import { STATUSES, UNSORTED, albumsOf, formatBpm } from "../lib/songs";
 import type { ProjectInfo, SongStatus } from "../types";
 import { EmptyLibrary, MixdownBadge, useVisibleSongs } from "./LibraryView";
 import { StatusDot } from "./ui";
+import { CrewBoard } from "./CrewBoard";
+import { useCanShare } from "./CrewPanel";
+import { useCrewStore } from "../store/useCrewStore";
 
 const COLUMNS: { id: SongStatus | undefined; label: string; color: string; hint: string }[] = [
   { id: undefined, ...UNSORTED },
@@ -22,6 +25,11 @@ export function PipelineView() {
   const settings = useAppStore((s) => s.settings);
   const demoMode = useAppStore((s) => s.demoMode);
   const [dragOver, setDragOver] = useState<string | null>(null);
+  const [board, setBoard] = useState<"mine" | "crew">("mine");
+  const { can: canShare, crewName } = useCanShare();
+  const crewSongCount = useCrewStore((s) => s.songs.length);
+  // No local projects: the crew board is the only board.
+  const shownBoard = canShare && (board === "crew" || settings.watchedFolders.length === 0) ? "crew" : "mine";
 
   const columns = useMemo(() => {
     const byStatus = new Map<string, ProjectInfo[]>(COLUMNS.map((c) => [c.id ?? "", []]));
@@ -29,7 +37,8 @@ export function PipelineView() {
     return byStatus;
   }, [songs, workspace.songs]);
 
-  if (settings.watchedFolders.length === 0 && !demoMode) {
+  // Crew members without FL projects (a manager, a promoter) still get the crew board.
+  if (settings.watchedFolders.length === 0 && !demoMode && !canShare) {
     return <EmptyLibrary />;
   }
 
@@ -38,9 +47,31 @@ export function PipelineView() {
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-3">
         <div>
           <h1 className="text-sm font-semibold text-white/90">Pipeline</h1>
-          <p className="text-xs text-white/40">Every song is in one stage, from Creation to Promotion. Drag songs between stages.</p>
+          <p className="text-xs text-white/40">
+            {shownBoard === "crew"
+              ? `${crewName}'s shared songs. Anyone in the crew can move a card.`
+              : "Every song is in one stage, from Creation to Promotion. Drag songs between stages."}
+          </p>
         </div>
+        {canShare && (
+          <div className="flex rounded-md border border-white/10 p-0.5 text-xs" role="tablist" aria-label="Board">
+            {(["mine", "crew"] as const).map((b) => (
+              <button
+                key={b}
+                role="tab"
+                aria-selected={shownBoard === b}
+                onClick={() => setBoard(b)}
+                className={`rounded px-3 py-1 ${shownBoard === b ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"}`}
+              >
+                {b === "mine" ? "My songs" : `Crew · ${crewSongCount}`}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+      {shownBoard === "crew" ? (
+        <CrewBoard />
+      ) : (
       <div className="flex flex-1 gap-3 overflow-x-auto p-4">
         {COLUMNS.map((col) => {
           const key = col.id ?? "";
@@ -118,6 +149,7 @@ export function PipelineView() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

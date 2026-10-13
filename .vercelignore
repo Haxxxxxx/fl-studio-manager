@@ -1,0 +1,6 @@
+/*
+!/web
+!/src
+/web/node_modules
+/web/dist
+*.local
