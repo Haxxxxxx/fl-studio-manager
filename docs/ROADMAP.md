@@ -100,7 +100,8 @@
 - Sign in with an email code; no passwords.
 - Create a crew, invite with a code, join, leave. You can be in up to 10 crews.
 - Owners can revoke invite codes and remove members.
-- Each song is shared only if you choose to. Only facts travel: title, stage, BPM, key, tags, credits, dates, and "has a mixdown". Audio, file paths, samples, notes and track names never leave your computer.
+- Each song is shared only if you choose to. Only facts travel: title (editable for the crew), stage, BPM, key, tags, credits, dates, "has a mixdown", "kit accepted" and the last save date. Audio, file paths, samples, notes and track names never leave your computer through sharing.
+- The optional AI features are the one exception, and say so where they're switched on: the song name, tags, tempo, key, credits and kit text go to Google Gemini (notes only if you turn that on), and a cover prompt goes to Cloudflare.
 - Live updates for everyone, including when a song is unshared or someone leaves.
 - A song only disappears from the crew when you unshare it, never because a scan missed it.
 

@@ -3,7 +3,7 @@ import { Check, ClipboardCopy, LogOut, RefreshCw, Users } from "lucide-react";
 import { useCrewStore } from "../store/useCrewStore";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
-import { orphanedShares, shareElsewhere, sharedHere } from "../lib/crewSync";
+import { orphanedShares, shareElsewhere, sharedHere, sharedTitle } from "../lib/crewSync";
 import { btn, btnPrimary, ConfirmButton, input } from "../ui";
 
 const field = input;
@@ -19,8 +19,10 @@ export function CrewPanel() {
         <Users size={15} /> Crew
       </h2>
       <p className="mt-1 text-xs text-engrave">
-        Share chosen songs with your crew: everyone sees them on the crew board, the calendar and in "who's on what". Only metadata is shared
-        (title, stage, BPM, key, tags, credits, release date), never audio, file paths, samples or notes. Stored in the EU.
+        Share chosen songs with your crew: everyone sees them on the crew board, the calendar and in "who's on what". For each shared
+        song the crew sees its title, stage, BPM, key, tags, credits, release date, whether it has a mixdown, whether its Launch Kit is
+        accepted, and when the project was last saved. They also see your crew and display names (not your email, which only the
+        sign-in service keeps). Never audio, file paths, samples, notes or track names. Stored in the EU (Ireland).
       </p>
       <div className="mt-3">
         {!crew.enabled ? (
@@ -397,6 +399,8 @@ export function ShareToggle({ path }: { path: string }) {
   const crewId = useCrewStore((s) => s.activeCrewId);
   const userId = useCrewStore((s) => s.userId);
   const meta = useAppStore((s) => s.workspace.songs[path]);
+  const projectName = useAppStore((s) => s.projects.find((p) => p.path === path)?.name ?? "");
+  const updateSong = useAppStore((s) => s.updateSong);
   const crews = useCrewStore((s) => s.crews);
   const setShared = useCrewStore((s) => s.setShared);
   const moveShares = useCrewStore((s) => s.moveShares);
@@ -439,22 +443,42 @@ export function ShareToggle({ path }: { path: string }) {
     );
   }
   return (
-    <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-rule bg-panel px-3 py-2 text-xs">
-      <input
-        type="checkbox"
-        checked={shared}
-        disabled={busy}
-        onChange={(e) =>
-          // Still waiting to be removed from another crew: finish that removal now, then share here.
-          e.target.checked && elsewhere ? void run(() => moveShares([path])) : setShared([path], e.target.checked)
-        }
-        className="accent-[#ff5a1f]"
-      />
-      <Users size={13} className="text-body" />
-      <span className="flex-1 text-body">
-        Share with <b className="font-medium text-cream">{crewName}</b>
-      </span>
-      <span className={error ? "text-red-300" : "text-engrave"}>{error ?? (shared ? "On the crew board" : "Only you see it")}</span>
-    </label>
+    <div className="mt-3 rounded-md border border-rule bg-panel text-xs">
+      <label className="flex cursor-pointer items-center gap-2 px-3 py-2">
+        <input
+          type="checkbox"
+          checked={shared}
+          disabled={busy}
+          onChange={(e) =>
+            // Still waiting to be removed from another crew: finish that removal now, then share here.
+            e.target.checked && elsewhere ? void run(() => moveShares([path])) : setShared([path], e.target.checked)
+          }
+          className="accent-[#ff5a1f]"
+        />
+        <Users size={13} className="text-body" />
+        <span className="flex-1 text-body">
+          Share with <b className="font-medium text-cream">{crewName}</b>
+        </span>
+        <span className={error ? "text-red-300" : "text-engrave"}>{error ?? (shared ? "On the crew board" : "Only you see it")}</span>
+      </label>
+      {shared && (
+        <label className="flex items-center gap-2 border-t border-rule px-3 py-2 text-engrave">
+          <span className="shrink-0">Crew sees it as</span>
+          <input
+            key={meta?.shareTitle ?? ""}
+            defaultValue={meta?.shareTitle ?? ""}
+            placeholder={sharedTitle(projectName)}
+            maxLength={200}
+            aria-label="Title the crew sees"
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v !== (meta?.shareTitle ?? "")) updateSong(path, { shareTitle: v || undefined });
+            }}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            className="min-w-0 flex-1 rounded border border-rule bg-chassis px-2 py-1 text-body placeholder:text-engrave"
+          />
+        </label>
+      )}
+      </div>
   );
 }
