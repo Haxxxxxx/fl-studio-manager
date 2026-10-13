@@ -1,0 +1,31 @@
+{
+  "shape": "package",
+  "pkg": "fl-manager-ui",
+  "globalName": "FLManagerUI",
+  "buildCmd": "npm run build && node scripts/design-lib.mjs",
+  "entry": ".design-sync/lib/index.ts",
+  "srcDir": "../../src/ui",
+  "cssEntry": "styles.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "provider": { "component": "Theme", "props": { "padded": true } },
+  "overrides": {
+    "Modal": { "cardMode": "single", "viewport": "720x460" },
+    "Card": { "cardMode": "column" },
+    "CheckLine": { "cardMode": "column" },
+    "Chip": { "cardMode": "column" },
+    "FieldRow": { "cardMode": "column" },
+    "FileRow": { "cardMode": "column" },
+    "Input": { "cardMode": "column" },
+    "SongLines": { "cardMode": "column" },
+    "StatTile": { "cardMode": "column" },
+    "StatusDot": { "cardMode": "column" },
+    "TagEditor": { "cardMode": "column" }
+  },
+  "dtsPropsFor": {
+    "StatusSelect": "/** Song stage; undefined = Unsorted. */ value: \"creation\" | \"production\" | \"prep\" | \"release\" | \"promotion\" | undefined; onChange: (status: \"creation\" | \"production\" | \"prep\" | \"release\" | \"promotion\" | undefined) => void; /** Smaller pill for dense rows. */ compact?: boolean;",
+    "CheckLine": "check: { level: \"warn\" | \"missing\"; message: string };",
+    "AiLine": "review: { verdict: \"ok\" | \"check\" | \"wrong\"; /** 0-1 */ confidence: number; reason: string; suggestion?: string; checkedValue: string; /** true when the value changed since the check */ stale: boolean }; onUse: (value: string) => void;",
+    "MixdownBadge": "/** Only these fields are read: the newest render vs the last save. */ project: { modifiedAtMs: number; renders: { path: string; sizeBytes: number; modifiedAtMs: number }[] };",
+    "FieldRow": "field: { id: string; label: string; value: string; /** where the value came from: badge color + label */ source: \"detected\" | \"suggested\" | \"ai\" | \"edited\" | \"missing\"; /** plain-words provenance shown next to the badge */ note: string; kind: \"text\" | \"multiline\" | \"date\" | \"choice\"; options?: string[]; check?: { level: \"warn\" | \"missing\"; message: string }; review?: { verdict: \"ok\" | \"check\" | \"wrong\"; confidence: number; reason: string; suggestion?: string; checkedValue: string; stale: boolean } }; /** undefined = reset to the generated value */ onChange: (value: string | undefined) => void; /** hide the label row padding (inside a titled Card) */ bare?: boolean;"
+  }
+}

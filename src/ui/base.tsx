@@ -184,6 +184,26 @@ export const input =
 export const sectionLabel = "text-[11px] font-medium uppercase tracking-wide text-white/35";
 
 
+/** The app's dark surface: background, text color and the system font stack
+ * (the same values as <body> in src/index.css). Every component is designed
+ * for it: white text at reduced opacity on near-black. Wrap a screen in it. */
+export function Theme({ children, className = "", padded = false }: { children: ReactNode; className?: string; padded?: boolean }) {
+  return (
+    <div
+      className={className}
+      style={{
+        background: "#0f0f12",
+        color: "#e6e6ea",
+        colorScheme: "dark",
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif',
+        padding: padded ? 16 : undefined,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** The app's button. Secondary (outlined) by default; primary for the one main action on a screen. */
 export function Button({
   variant = "secondary",
