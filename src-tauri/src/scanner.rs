@@ -199,14 +199,19 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
             }
             let Ok(meta) = entry.metadata() else { continue };
 
-            // Best-effort: a corrupt or oddly-shaped project shouldn't fail
-            // the whole scan, it just shows up with no metadata. A reader
-            // bug (panic) is contained the same way, in builds that unwind.
-            let flp = std::panic::catch_unwind(|| match daw {
-                Daw::FlStudio => flp_metadata::parse_flp_metadata(path).unwrap_or_default(),
+            // A corrupt, oversized or hostile project never fails the whole
+            // scan: it's listed with no metadata and the reason. A reader bug
+            // (panic) is contained the same way (release builds unwind, see
+            // Cargo.toml).
+            let read = std::panic::catch_unwind(|| match daw {
+                Daw::FlStudio => flp_metadata::parse_flp_metadata(path),
                 other => daws::read_project(other, path),
-            })
-            .unwrap_or_default();
+            });
+            let (flp, read_error) = match read {
+                Ok(Ok(flp)) => (flp, None),
+                Ok(Err(e)) => (Default::default(), Some(e)),
+                Err(_) => (Default::default(), Some("the reader crashed on this file (damaged or unusual project)".to_string())),
+            };
 
             projects.push(ProjectInfo {
                 path: path.to_string_lossy().to_string(),
@@ -243,6 +248,7 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
                     }
                     names
                 },
+                read_error,
             });
         }
     }
@@ -771,5 +777,44 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         assert_eq!(projects.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), vec!["Wave"]);
     }
-}
 
+    #[test]
+    fn damaged_or_hostile_projects_are_reported_and_the_scan_completes() {
+        let root = std::env::temp_dir().join(format!("flsm-hostile-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        // A gzipped .als nested far past the depth cap (a few KB on disk).
+        let mut als = Vec::new();
+        {
+            use std::io::Write;
+            let mut gz = flate2::write::GzEncoder::new(&mut als, flate2::Compression::best());
+            gz.write_all("<a>".repeat(200_000).as_bytes()).unwrap();
+            gz.finish().unwrap();
+        }
+        fs::write(root.join("Deep.als"), &als).unwrap();
+        // An .flp whose header claims 4 GB of data.
+        let mut flp = b"FLhd\x06\0\0\0\0\0\x04\0\x60\0FLdt".to_vec();
+        flp.extend_from_slice(&u32::MAX.to_le_bytes());
+        fs::write(root.join("Liar.flp"), &flp).unwrap();
+        // An .rpp just over the 64 MB text cap (sparse, so it's quick to make).
+        let big = fs::File::create(root.join("Huge.rpp")).unwrap();
+        big.set_len(64 * 1024 * 1024 + 1).unwrap();
+        drop(big);
+        // And a normal project next to them.
+        fs::write(root.join("Fine.rpp"), b"<REAPER_PROJECT 0.1 \"7.22/win64\" 1\n  TEMPO 92 4 4\n>\n").unwrap();
+
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        let get = |name: &str| projects.iter().find(|p| p.name == name).unwrap_or_else(|| panic!("{name} missing"));
+
+        assert_eq!(projects.len(), 4);
+        assert_eq!(get("Fine").tempo_bpm, Some(92.0));
+        assert!(get("Fine").read_error.is_none());
+        for (name, why) in [("Deep", "nested"), ("Liar", "data size"), ("Huge", "MB")] {
+            let p = get(name);
+            let err = p.read_error.as_deref().unwrap_or_else(|| panic!("{name}: no error"));
+            assert!(err.contains(why), "{name}: {err}");
+            assert!(p.tempo_bpm.is_none() && p.samples.is_empty());
+        }
+    }
+}

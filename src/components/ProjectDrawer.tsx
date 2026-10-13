@@ -153,6 +153,11 @@ export function ProjectDrawer() {
           )}
         </div>
         <ShareToggle path={project.path} />
+        {project.readError && (
+          <div className="mt-3 rounded-md border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-200/80">
+            Couldn't read inside this project: {project.readError}. It's still tracked; tempo, samples and plugins are missing.
+          </div>
+        )}
 
         {message && (
           <div
