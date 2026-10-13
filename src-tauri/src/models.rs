@@ -100,6 +100,12 @@ pub struct Settings {
     /// ffmpeg for shorts; None = found automatically.
     #[serde(default)]
     pub ffmpeg_path: Option<String>,
+    /// "auto" (Claude in dev builds, Gemini in release), "gemini" or "claude".
+    #[serde(default)]
+    pub ai_provider: Option<String>,
+    /// Claude model id; None = the default (ai::DEFAULT_CLAUDE_MODEL).
+    #[serde(default)]
+    pub claude_model: Option<String>,
 }
 
 impl Default for Settings {
@@ -113,6 +119,8 @@ impl Default for Settings {
             ai_model: None,
             ai_language: None,
             ffmpeg_path: None,
+            ai_provider: None,
+            claude_model: None,
         }
     }
 }
