@@ -8,8 +8,23 @@ import type { ProjectInfo, Snippet } from "../types";
 import { btn, btnPrimary } from "./ui";
 
 /** 9:16 shorts from the snippets, rendered locally with ffmpeg (free). */
-export function ShortsPanel({ project, fields, snippets }: { project: ProjectInfo; fields: KitField[]; snippets: Snippet[] }) {
+export function ShortsPanel({
+  project,
+  fields,
+  snippets,
+  analysisLoading,
+  analysisError,
+}: {
+  project: ProjectInfo;
+  fields: KitField[];
+  snippets: Snippet[];
+  analysisLoading: boolean;
+  analysisError: string | null;
+}) {
   const settings = useAppStore((s) => s.settings);
+  const updateSettings = useAppStore((s) => s.updateSettings);
+  const [checkCount, setCheckCount] = useState(0);
+  const recheck = () => setCheckCount((n) => n + 1);
   const demoMode = useAppStore((s) => s.demoMode);
   const setView = useAppStore((s) => s.setView);
   const [status, setStatus] = useState<api.ShortsStatus | null>(null);
@@ -26,7 +41,7 @@ export function ShortsPanel({ project, fields, snippets }: { project: ProjectInf
     return () => {
       live = false;
     };
-  }, [settings.ffmpegPath]);
+  }, [settings.ffmpegPath, checkCount]);
 
   const value = (id: KitField["id"]) => fields.find((f) => f.id === id)?.value ?? "";
   const layoutInput = {
@@ -39,17 +54,28 @@ export function ShortsPanel({ project, fields, snippets }: { project: ProjectInf
   const layoutKey = JSON.stringify(layoutInput);
   const preview = useMemo(() => drawShortLayout(layoutInput), [layoutKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const blocker = demoMode
-    ? "No audio in sample data. Link a real folder to render."
+  async function chooseExportFolder() {
+    const folder = await api.pickFolder();
+    if (folder) await updateSettings({ outputFolder: folder });
+  }
+
+  // What stops a render, in the order the user should fix it, each with a
+  // one-click fix where there is one.
+  const blocker: { message: string; action?: { label: string; run: () => void } } | null = demoMode
+    ? { message: "Sample data has no audio. Link your real project folder to render shorts." }
     : !project.renders[0]
-      ? "Render a mixdown first: shorts use its snippets."
-      : !snippets.length
-        ? "No snippets yet."
-        : !settings.outputFolder
-          ? "Set an export folder in Settings first."
-          : status && !status.encoder
-            ? "ffmpeg is needed (free). See below."
-            : null;
+      ? { message: "This song has no mixdown yet. Export a WAV or MP3 from FL Studio next to the project (or into your export folder), then come back." }
+      : analysisLoading
+        ? { message: "Listening to the mixdown to find the snippets…" }
+        : analysisError
+          ? { message: `Couldn't read the mixdown: ${analysisError}` }
+          : !snippets.length
+            ? { message: "The mixdown is shorter than 15 seconds, so there's nothing to cut." }
+            : !settings.outputFolder
+              ? { message: "Choose where shorts get saved (your export folder).", action: { label: "Choose export folder", run: chooseExportFolder } }
+              : status && !status.encoder
+                ? { message: "ffmpeg is needed (free, one install). See the steps below.", action: { label: "Check again", run: recheck } }
+                : null;
 
   async function render() {
     if (!settings.outputFolder || !project.renders[0]) return;
@@ -103,10 +129,20 @@ export function ShortsPanel({ project, fields, snippets }: { project: ProjectInf
             <div className="text-white/40">Looking for ffmpeg…</div>
           )}
           <div>
-            <button onClick={render} disabled={!!blocker || state.kind === "running"} title={blocker ?? undefined} className={btnPrimary}>
+            <button onClick={render} disabled={!!blocker || state.kind === "running"} title={blocker?.message} className={btnPrimary}>
               <Clapperboard size={14} /> {state.kind === "running" ? `Rendering ${snippets.length} shorts…` : `Render ${snippets.length} short${snippets.length === 1 ? "" : "s"}`}
             </button>
-            {blocker && <div className="mt-1.5 text-[11px] text-white/40">{blocker}</div>}
+            {blocker && (
+              <div className="mt-2 flex items-center gap-2 rounded-md border border-amber-400/25 bg-amber-500/[0.07] px-2.5 py-2 text-[12px] text-amber-100/90">
+                <AlertTriangle size={13} className="shrink-0 text-amber-300" />
+                <span className="flex-1">{blocker.message}</span>
+                {blocker.action && (
+                  <button onClick={blocker.action.run} className="shrink-0 rounded bg-amber-400/20 px-2 py-1 font-medium text-amber-50 hover:bg-amber-400/30">
+                    {blocker.action.label}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           {state.kind === "error" && <div className="text-red-300">{state.message}</div>}
         </div>
