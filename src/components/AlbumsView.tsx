@@ -4,8 +4,8 @@ import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
 import { ALBUM_COLORS, STATUSES, UNSORTED, formatBpm, isFinished, renderFreshness, statusInfo } from "../lib/songs";
 import type { Album, AlbumKind, ProjectInfo, Workspace } from "../types";
-import { MixdownBadge } from "./LibraryView";
 import { ConfirmButton, Modal, StatusDot, StatusSelect, btn, btnPrimary, input, sectionLabel } from "./ui";
+import { MixdownBadge, Stat } from "../ui";
 
 const KINDS: { id: AlbumKind; label: string }[] = [
   { id: "album", label: "Album" },
@@ -387,15 +387,6 @@ function AlbumDetail({ album }: { album: Album }) {
       </div>
 
       {picking && <TrackPicker album={album} onClose={() => setPicking(false)} />}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wide text-white/35">{label}</div>
-      <div className="mt-0.5 text-base font-semibold text-white">{value}</div>
     </div>
   );
 }

@@ -35,6 +35,7 @@ import { STALLED_DAYS } from "../lib/crew";
 import { pathsByShareId } from "../lib/crewSync";
 import { ProgressBar } from "./AlbumsView";
 import { StatusDot, btn, btnPrimary } from "./ui";
+import { Card, HeroStat, SongLines, StatTile } from "../ui";
 
 // Storage is part-to-whole over four categories: dark categorical slots
 // 1–4 in fixed order (validated adjacent-pair against #16161b; the 8.4 CVD
@@ -775,15 +776,6 @@ function HealthCard() {
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div>
-      <div className="text-lg font-semibold leading-none text-white">{value}</div>
-      <div className="mt-0.5 text-[10px] uppercase tracking-wide text-white/35">{label}</div>
-    </div>
-  );
-}
-
 function TempoTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -792,30 +784,6 @@ function TempoTooltip({ active, payload, label }: any) {
       <div className="mt-0.5 font-medium text-white">
         {payload[0].value} song{payload[0].value === 1 ? "" : "s"}
       </div>
-    </div>
-  );
-}
-
-function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
-      <div className="flex items-center gap-1.5 text-white/40">
-        {icon}
-        <span className="text-[11px] uppercase tracking-wide">{label}</span>
-      </div>
-      <div className="mt-1.5 text-2xl font-semibold text-white">{value}</div>
-    </div>
-  );
-}
-
-function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-white/40">{title}</div>
-        {action}
-      </div>
-      {children}
     </div>
   );
 }
@@ -962,20 +930,6 @@ function CrewDashboard() {
           )}
         </Card>
       </div>
-    </div>
-  );
-}
-
-function SongLines({ items, onOpen }: { items: { id: string; title: string; sub?: string; right: string }[]; onOpen: (id: string) => void }) {
-  return (
-    <div className="flex flex-col">
-      {items.map((it) => (
-        <button key={it.id} onClick={() => onOpen(it.id)} className="flex items-center gap-3 rounded px-1 py-1 text-left text-xs hover:bg-white/[0.04]">
-          <span className="min-w-0 flex-1 truncate text-white/85">{it.title}</span>
-          {it.sub && <span className="text-white/45">{it.sub}</span>}
-          <span className="w-20 text-right tabular-nums text-white/55">{it.right}</span>
-        </button>
-      ))}
     </div>
   );
 }
