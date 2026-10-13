@@ -110,7 +110,7 @@ export function SettingsView() {
         <section>
           <h2 className="text-sm font-semibold text-cream">Project folders</h2>
           <p className="mt-1 text-xs text-engrave">
-            FL Manager scans these folders (recursively) for projects from FL Studio, Ableton Live, REAPER, Studio One, Pro Tools, Cubase and Bitwig.
+            Hivo scans these folders (recursively) for projects from FL Studio, Ableton Live, REAPER, Studio One, Pro Tools, Cubase and Bitwig.
           </p>
           <div className="mt-3 flex flex-col gap-2">
             {settings.watchedFolders.map((folder) => (

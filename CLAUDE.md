@@ -1,4 +1,4 @@
-# FL Manager / Music Command Center
+# Hivo (formerly FL Manager)
 
 Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend) that reads FL Studio project folders for a five-person rap crew. Product vision, phases and principles: **[docs/ROADMAP.md](docs/ROADMAP.md)**. Read it before planning features.
 

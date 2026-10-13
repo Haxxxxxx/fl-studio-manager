@@ -1,4 +1,4 @@
-# FL Manager
+# Hivo
 
 A native desktop studio manager for FL Studio. Point it at your projects folder and it organizes your songs — pipeline stages, tags, notes, albums/EPs — shows what you've actually been working on, and creates, versions and batch-renders projects via FL Studio itself.
 

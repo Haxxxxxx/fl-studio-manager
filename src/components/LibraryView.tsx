@@ -545,7 +545,7 @@ export function EmptyLibrary() {
         </div>
       ) : (
         <div className="max-w-sm text-sm text-engrave">
-          Point FL Manager at the folder where your projects live: FL Studio, Ableton Live, REAPER, Studio One, Pro Tools,
+          Point Hivo at the folder where your projects live: FL Studio, Ableton Live, REAPER, Studio One, Pro Tools,
           Cubase or Bitwig. You can link several.
         </div>
       )}

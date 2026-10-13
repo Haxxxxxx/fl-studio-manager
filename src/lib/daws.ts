@@ -1,6 +1,6 @@
 import type { DawId } from "../types";
 
-// The DAWs FL Manager reads projects from (src-tauri/src/daws.rs). What the
+// The DAWs Hivo reads projects from (src-tauri/src/daws.rs). What the
 // app can do with a project depends on its DAW: rendering from the app uses
 // FL Studio's command-line renderer, and packages are FL's flat .flp + samples zips.
 

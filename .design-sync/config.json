@@ -8,19 +8,50 @@
   "srcDir": "../../src/ui",
   "cssEntry": "styles.css",
   "readmeHeader": ".design-sync/conventions.md",
-  "provider": { "component": "Theme", "props": { "padded": true } },
+  "provider": {
+    "component": "Theme",
+    "props": {
+      "padded": true
+    }
+  },
   "overrides": {
-    "Modal": { "cardMode": "single", "viewport": "720x460" },
-    "Card": { "cardMode": "column" },
-    "CheckLine": { "cardMode": "column" },
-    "Chip": { "cardMode": "column" },
-    "FieldRow": { "cardMode": "column" },
-    "FileRow": { "cardMode": "column" },
-    "Input": { "cardMode": "column" },
-    "SongLines": { "cardMode": "column" },
-    "StatTile": { "cardMode": "column" },
-    "StatusDot": { "cardMode": "column" },
-    "TagEditor": { "cardMode": "column" }
+    "Modal": {
+      "cardMode": "single",
+      "viewport": "720x460"
+    },
+    "Card": {
+      "cardMode": "column"
+    },
+    "CheckLine": {
+      "cardMode": "column"
+    },
+    "Chip": {
+      "cardMode": "column"
+    },
+    "FieldRow": {
+      "cardMode": "column"
+    },
+    "FileRow": {
+      "cardMode": "column"
+    },
+    "Input": {
+      "cardMode": "column"
+    },
+    "SongLines": {
+      "cardMode": "column"
+    },
+    "StatTile": {
+      "cardMode": "column"
+    },
+    "StatusDot": {
+      "cardMode": "column"
+    },
+    "TagEditor": {
+      "cardMode": "column"
+    },
+    "Wordmark": {
+      "cardMode": "column"
+    }
   },
   "dtsPropsFor": {
     "StatusSelect": "/** Song stage; undefined = Unsorted. */ value: \"creation\" | \"production\" | \"prep\" | \"release\" | \"promotion\" | undefined; onChange: (status: \"creation\" | \"production\" | \"prep\" | \"release\" | \"promotion\" | undefined) => void; /** Smaller pill for dense rows. */ compact?: boolean;",

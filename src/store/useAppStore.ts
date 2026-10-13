@@ -472,7 +472,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const { paths: projectPaths, names: outputNames, skipped } = splitRenderable(requested, byPath, options?.names);
       if (projectPaths.length === 0) {
         const daw = dawOf(byPath.get(requested[0]) ?? {});
-        throw new Error(`Rendering from FL Manager works with FL Studio projects. Export this one from ${daw.label}: ${daw.exportTip}`);
+        throw new Error(`Rendering from Hivo works with FL Studio projects. Export this one from ${daw.label}: ${daw.exportTip}`);
       }
 
       const sep = settings.outputFolder.includes("\\") ? "\\" : "/";

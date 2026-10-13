@@ -68,7 +68,7 @@ export function Landing({ signIn }: { signIn: ReactNode }) {
       <footer className="border-t border-rule px-6 py-10 text-xs text-body">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <span className="flex items-center gap-2">
-            <LogoMark size={20} /> FL Manager · made with and for the crew
+            <LogoMark size={20} /> Hivo · made with and for the crew
           </span>
           <span className="font-mono">crew data: EU (Ireland) · audio: never leaves your machine</span>
         </div>
@@ -81,7 +81,7 @@ function Nav() {
   return (
     <header className="sticky top-0 z-20 border-b border-rule bg-chassis/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-8 px-6 py-4">
-        <a href="#top" aria-label="FL Manager">
+        <a href="#top" aria-label="Hivo">
           <LogoLockup size={32} />
         </a>
         <nav className="hidden gap-6 text-sm text-body md:flex">
@@ -129,7 +129,7 @@ function Hero() {
         <Shot
           src="/shots/dashboard.jpg"
           caption="fig. 00 · the crew's studio · sample data"
-          alt="FL Manager's dashboard: songs, stalled tracks, next release, crew activity and a year of studio sessions"
+          alt="Hivo's dashboard: songs, stalled tracks, next release, crew activity and a year of studio sessions"
           eager
         />
       </div>
