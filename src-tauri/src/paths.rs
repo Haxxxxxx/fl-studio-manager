@@ -25,20 +25,27 @@ fn refuse_remote(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Opens a DAW project in its app (FL Studio, Live, REAPER…).
-#[tauri::command]
-pub fn open_project(path: String) -> Result<(), String> {
-    refuse_remote(&path)?;
-    if Daw::of_project(Path::new(&path)).is_none() {
+fn check_project(path: &str) -> Result<(), String> {
+    refuse_remote(path)?;
+    if Daw::of_project(Path::new(path)).is_none() {
         return Err("only DAW project files can be opened".to_string());
     }
+    Ok(())
+}
+
+/// Opens a DAW project from a linked folder in its app (FL Studio, Live, REAPER…).
+#[tauri::command]
+pub fn open_project(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    check_project(&path)?;
+    crate::scope::Scope::load(&app)?.project(&path)?;
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| format!("couldn't open it: {e}"))
 }
 
-/// Shows a file or folder in Finder / Explorer.
+/// Shows a file from a linked folder or the export folder in Finder / Explorer.
 #[tauri::command]
-pub fn reveal_path(path: String) -> Result<(), String> {
+pub fn reveal_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
     refuse_remote(&path)?;
+    crate::scope::Scope::load(&app)?.known_file(&path)?;
     tauri_plugin_opener::reveal_item_in_dir(&path).map_err(|e| format!("couldn't show it: {e}"))
 }
 
@@ -67,8 +74,8 @@ mod tests {
 
     #[test]
     fn opening_refuses_remote_paths_and_non_projects() {
-        assert!(open_project(r"\\host\share\Song.flp".into()).unwrap_err().contains("network"));
-        assert!(open_project("/tmp/payload.app".into()).unwrap_err().contains("only DAW project"));
-        assert!(reveal_path("//host/share/Song.flp".into()).unwrap_err().contains("network"));
+        assert!(check_project(r"\\host\share\Song.flp").unwrap_err().contains("network"));
+        assert!(check_project("/tmp/payload.app").unwrap_err().contains("only DAW project"));
+        assert!(refuse_remote("//host/share/Song.flp").unwrap_err().contains("network"));
     }
 }

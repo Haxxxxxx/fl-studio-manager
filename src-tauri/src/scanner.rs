@@ -447,18 +447,19 @@ fn read_files(dir: &Path) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
+/// Scans the linked folders and the export folder from Settings (never
+/// folders named by the webview: the backup cleanup trusts this listing).
 #[tauri::command]
-pub async fn scan_projects(
-    app: AppHandle,
-    folders: Vec<String>,
-    output_folder: Option<String>,
-) -> Result<Vec<ProjectInfo>, String> {
+pub async fn scan_projects(app: AppHandle) -> Result<Vec<ProjectInfo>, String> {
+    let scope = crate::scope::Scope::load(&app)?;
+    let folders: Vec<String> = scope.folders().iter().map(|f| f.to_string_lossy().to_string()).collect();
+    let output_folder = scope.output_folder().map(|o| o.to_string_lossy().to_string());
     // Let the webview stream renders from linked folders and the export
     // folder (in-app playback) without opening the asset protocol to the
     // whole disk.
-    let scope = app.asset_protocol_scope();
+    let assets = app.asset_protocol_scope();
     for folder in folders.iter().chain(output_folder.iter()) {
-        let _ = scope.allow_directory(folder, true);
+        let _ = assets.allow_directory(folder, true);
     }
     let projects = tauri::async_runtime::spawn_blocking(move || scan(&folders, output_folder.as_deref()))
         .await

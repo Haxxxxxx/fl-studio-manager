@@ -150,7 +150,6 @@ export function LaunchKitView() {
     setExportState({ status: "running" });
     try {
       const dir = await api.exportLaunchKit({
-        outputFolder: settings.outputFolder,
         folderName: title,
         files: kitFiles(fields, snippets, extra),
         master: project.renders[0]?.path ?? null,

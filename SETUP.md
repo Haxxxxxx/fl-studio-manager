@@ -65,7 +65,7 @@ The key is stored only on that computer (`ai.json` in the app config folder, own
 The Launch Kit turns each snippet into a 1080×1920 MP4 (H.264 + AAC, 30 fps), the format Reels, TikTok and YouTube Shorts take. Each one is the song's art, title, artist and release date, an animated waveform, and the **real audio** from your mixdown. It runs locally with ffmpeg: no upload, no account, no cost.
 
 1. Install ffmpeg once: `brew install ffmpeg` (Mac) or `winget install Gyan.FFmpeg` (Windows), then restart the app.
-2. The app finds it automatically, including Homebrew's folder, which apps opened from Finder can't see on the PATH. If it doesn't, set the path in **Settings → Shorts**, or set `FFMPEG_PATH`.
+2. The app finds it automatically, including Homebrew's folder, which apps opened from Finder can't see on the PATH. If it doesn't, click **Browse** in **Settings → Shorts** and pick the `ffmpeg` file (only a file named ffmpeg is accepted), or set `FFMPEG_PATH`.
 3. Launch Kit → **Render 3 shorts**. They're saved in `<export folder>/Launch Kits/<song>/shorts/` and play right in the app.
 
 ## Optional: free cover concepts (Cloudflare)

@@ -58,9 +58,18 @@ fn factory_templates_dir(fl_studio_path: &str) -> Option<PathBuf> {
         .map(|e| e.path().to_path_buf())
 }
 
+/// FL Studio from Settings, if it's set and is FL Studio.
+fn fl_from_settings(app: &tauri::AppHandle) -> Option<String> {
+    crate::scope::Scope::load(app).ok()?.fl_studio().ok().map(|p| p.to_string_lossy().to_string())
+}
+
 /// FL's factory templates: `<templates>/<category>/<name>/<name>.flp`.
 #[tauri::command]
-pub fn list_templates(fl_studio_path: Option<String>) -> Vec<TemplateInfo> {
+pub fn list_templates(app: tauri::AppHandle) -> Vec<TemplateInfo> {
+    templates_for(fl_from_settings(&app))
+}
+
+fn templates_for(fl_studio_path: Option<String>) -> Vec<TemplateInfo> {
     let Some(base) = fl_studio_path.as_deref().and_then(factory_templates_dir) else {
         return Vec::new();
     };
@@ -93,7 +102,11 @@ pub fn list_templates(fl_studio_path: Option<String>) -> Vec<TemplateInfo> {
 
 /// The template FL itself uses for File → New, from its registry settings.
 #[tauri::command]
-pub fn default_template(fl_studio_path: Option<String>) -> Option<String> {
+pub fn default_template(app: tauri::AppHandle) -> Option<String> {
+    default_template_for(fl_from_settings(&app))
+}
+
+fn default_template_for(fl_studio_path: Option<String>) -> Option<String> {
     #[cfg(target_os = "windows")]
     {
         use winreg::enums::HKEY_CURRENT_USER;
@@ -128,13 +141,37 @@ pub fn default_template(fl_studio_path: Option<String>) -> Option<String> {
 /// New song from a template, laid out the way FL does it:
 /// `<parent>/<name>/<name>.flp`. Returns the new .flp path.
 #[tauri::command]
-pub fn create_project(template_path: String, parent_folder: String, name: String) -> Result<String, String> {
-    let name = validate_name(&name)?;
-    let template = Path::new(&template_path);
+pub fn create_project(app: tauri::AppHandle, template_path: String, parent_folder: String, name: String) -> Result<String, String> {
+    let scope = crate::scope::Scope::load(&app)?;
+    let fl = fl_from_settings(&app);
+    let parent = scope.folder_in_roots(&parent_folder)?;
+    check_template(&scope, fl, &template_path)?;
+    create_in(&template_path, &parent, &name)
+}
+
+/// A template is an .flp from FL's factory templates, FL's own default
+/// template, or a project in a linked folder. Nothing else is copied.
+fn check_template(scope: &crate::scope::Scope, fl: Option<String>, template_path: &str) -> Result<(), String> {
+    let template = Path::new(template_path);
+    let is_flp = template.extension().is_some_and(|e| e.eq_ignore_ascii_case("flp"));
+    let real = template.canonicalize().map_err(|_| format!("template not found: {template_path}"))?;
+    let factory = fl.as_deref().and_then(factory_templates_dir).and_then(|d| d.canonicalize().ok());
+    let allowed = factory.is_some_and(|d| real.starts_with(d))
+        || default_template_for(fl).is_some_and(|d| Path::new(&d).canonicalize().is_ok_and(|d| d == real))
+        || scope.fl_project(template_path).is_ok();
+    if !is_flp || !allowed {
+        return Err(format!("not an FL Studio template: {template_path}"));
+    }
+    Ok(())
+}
+
+fn create_in(template_path: &str, parent_folder: &Path, name: &str) -> Result<String, String> {
+    let name = validate_name(name)?;
+    let template = Path::new(template_path);
     if !template.is_file() {
         return Err(format!("template not found: {template_path}"));
     }
-    let dir = Path::new(&parent_folder).join(name);
+    let dir = parent_folder.join(name);
     let target = dir.join(format!("{name}.flp"));
     if target.exists() {
         return Err(format!("a project named \"{name}\" already exists there"));
@@ -153,7 +190,12 @@ fn project_ext(path: &Path) -> Result<String, String> {
 /// "Save as new version": copy the project next to itself under a new name,
 /// sharing the same Audio/ and Samples/ folders.
 #[tauri::command]
-pub fn duplicate_project(project_path: String, new_name: String) -> Result<String, String> {
+pub fn duplicate_project(app: tauri::AppHandle, project_path: String, new_name: String) -> Result<String, String> {
+    crate::scope::Scope::load(&app)?.project(&project_path)?;
+    duplicate(project_path, new_name)
+}
+
+fn duplicate(project_path: String, new_name: String) -> Result<String, String> {
     let new_name = validate_name(&new_name)?;
     let src = Path::new(&project_path);
     let dir = src.parent().ok_or("invalid project path")?;
@@ -172,7 +214,17 @@ pub fn duplicate_project(project_path: String, new_name: String) -> Result<Strin
 /// FL's `Envy (overwritten at 16h12).flp` becomes `Envy - restored 16h12.flp`;
 /// other DAWs' timestamps are dropped (`Envy - restored.als`).
 #[tauri::command]
-pub fn restore_backup(backup_path: String, project_path: String) -> Result<String, String> {
+pub fn restore_backup(app: tauri::AppHandle, backup_path: String, project_path: String) -> Result<String, String> {
+    let scope = crate::scope::Scope::load(&app)?;
+    scope.project(&project_path)?;
+    // Only a backup the last scan listed (the scan only walks linked folders).
+    if !crate::scanner::is_listed_backup(Path::new(&backup_path)) || scope.known_file(&backup_path).is_err() {
+        return Err(format!("not a backup of a linked project: {backup_path}"));
+    }
+    restore(backup_path, project_path)
+}
+
+fn restore(backup_path: String, project_path: String) -> Result<String, String> {
     let backup = Path::new(&backup_path);
     let project = Path::new(&project_path);
     let dir = project.parent().ok_or("invalid project path")?;
@@ -329,8 +381,8 @@ mod tests {
 
         let p = project.to_string_lossy().to_string();
         let b = backup.to_string_lossy().to_string();
-        let first = restore_backup(b.clone(), p.clone()).unwrap();
-        let second = restore_backup(b, p).unwrap();
+        let first = restore(b.clone(), p.clone()).unwrap();
+        let second = restore(b, p).unwrap();
 
         assert!(first.ends_with("Envy - restored 16h12.flp"), "{first}");
         assert!(second.ends_with("Envy - restored 16h12 (2).flp"), "{second}");
@@ -347,17 +399,17 @@ mod tests {
         let t = template.to_string_lossy().to_string();
         let parent = dir.to_string_lossy().to_string();
 
-        let created = create_project(t.clone(), parent.clone(), "Envy".into()).unwrap();
+        let created = create_in(&t, Path::new(&parent), "Envy").unwrap();
         assert!(created.ends_with(&format!("Envy{}Envy.flp", std::path::MAIN_SEPARATOR)), "{created}");
         assert_eq!(fs::read(&created).unwrap(), b"template bytes");
         // Same name again must fail, not overwrite.
         fs::write(&created, b"my work").unwrap();
-        assert!(create_project(t, parent, "Envy".into()).is_err());
+        assert!(create_in(&t, Path::new(&parent), "Envy").is_err());
         assert_eq!(fs::read(&created).unwrap(), b"my work");
 
-        let v2 = duplicate_project(created.clone(), "Envy v2".into()).unwrap();
+        let v2 = duplicate(created.clone(), "Envy v2".into()).unwrap();
         assert_eq!(fs::read(&v2).unwrap(), b"my work");
-        assert!(duplicate_project(created, "Envy v2".into()).is_err());
+        assert!(duplicate(created, "Envy v2".into()).is_err());
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -434,10 +486,10 @@ mod tests {
         let src = dir.join("Wave.als");
         fs::write(&src, b"gz bytes").unwrap();
         let s = src.to_string_lossy().to_string();
-        let v2 = duplicate_project(s.clone(), "Wave v2".into()).unwrap();
+        let v2 = duplicate(s.clone(), "Wave v2".into()).unwrap();
         assert!(v2.ends_with("Wave v2.als"), "{v2}");
         assert_eq!(fs::read(&v2).unwrap(), b"gz bytes");
-        assert!(duplicate_project(s, "Wave v2".into()).is_err());
+        assert!(duplicate(s, "Wave v2".into()).is_err());
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -457,15 +509,15 @@ mod tests {
         let fade = w("Fade/Fade.cpr", b"current");
         let fade_bak = w("Fade/Fade-01.bak", b"old");
 
-        let restored = restore_backup(wave_bak.clone(), wave.clone()).unwrap();
+        let restored = restore(wave_bak.clone(), wave.clone()).unwrap();
         assert!(restored.ends_with(&format!("Wave Project{}Wave - restored.als", std::path::MAIN_SEPARATOR)), "{restored}");
         assert_eq!(fs::read(&restored).unwrap(), b"old");
-        let again = restore_backup(wave_bak, wave.clone()).unwrap();
+        let again = restore(wave_bak, wave.clone()).unwrap();
         assert!(again.ends_with("Wave - restored (2).als"), "{again}");
 
-        let restored = restore_backup(tide_bak, tide).unwrap();
+        let restored = restore(tide_bak, tide).unwrap();
         assert!(restored.ends_with("Tide - restored.rpp"), "{restored}");
-        let restored = restore_backup(fade_bak, fade).unwrap();
+        let restored = restore(fade_bak, fade).unwrap();
         assert!(restored.ends_with("Fade - restored.cpr"), "{restored}");
 
         assert_eq!(fs::read(&wave).unwrap(), b"current");
@@ -515,5 +567,22 @@ mod tests {
         assert!(!may_delete_permanently(&local));
         assert!(backups_on_risky_volumes(vec![local.to_string_lossy().to_string()]).is_empty());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn new_songs_and_templates_stay_inside_settings() {
+        let f = crate::scope::tests::fixture("create");
+        let s = |p: &Path| p.to_string_lossy().to_string();
+        // Parent folder: a linked folder only.
+        assert!(f.scope.folder_in_roots(&s(&f.root)).is_ok());
+        assert!(f.scope.folder_in_roots(&s(&f.outside)).is_err());
+        assert!(f.scope.folder_in_roots(&s(&f.root.join("..").join("Elsewhere"))).is_err());
+        // Template: an .flp from a linked folder (no FL Studio set here).
+        assert!(check_template(&f.scope, None, &s(&f.root.join("Envy").join("Envy.flp"))).is_ok());
+        assert!(check_template(&f.scope, None, &s(&f.outside.join("Other.flp"))).is_err(), "outside");
+        assert!(check_template(&f.scope, None, &s(&f.outside.join("secret.txt"))).is_err(), "not an .flp");
+        assert!(check_template(&f.scope, None, &s(&f.root.join("Wave Project").join("Wave.als"))).is_err(), "not FL");
+        // Restore: only a backup the scan listed.
+        assert!(!crate::scanner::is_listed_backup(&f.outside.join("secret.txt")));
     }
 }

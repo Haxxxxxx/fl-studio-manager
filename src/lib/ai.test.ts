@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Person, ProjectInfo, Settings, SongMeta } from "../types";
 import { buildKit, type KitInput } from "./launchKit";
 
-const sent: { prompt: string }[] = [];
+/** What reached the Rust side: typed facts, never a prompt. */
+const sent: { kind: string; context: object; fields: Record<string, string> }[] = [];
 vi.mock("./tauri", () => ({
-  aiGenerateJson: vi.fn(async (req: { prompt: string }) => {
+  aiKit: vi.fn(async (req: { kind: string; context: object; fields: Record<string, string> }) => {
     sent.push(req);
     return {
       model: "test-model",
@@ -100,15 +101,20 @@ describe("AI payload", () => {
     const fields = buildKit(input);
     await reviewKit(input, fields, settings(false)).catch(() => {});
     await reviewKit(input, fields, settings(true)).catch(() => {});
-    expect(sent[0].prompt).not.toContain(NOTES);
-    expect(sent[1].prompt).toContain(NOTES);
-    for (const s of sent) expect(s.prompt).not.toContain("SomePack");
+    expect(sent.map((s) => s.kind)).toEqual(["review", "review"]);
+    expect(flat(sent[0])).not.toContain(NOTES);
+    expect(flat(sent[1])).toContain(NOTES);
+    for (const s of sent) expect(flat(s)).not.toContain("SomePack");
+    expect(Object.keys(sent[0]).sort()).toEqual(["context", "fields", "kind", "language", "model"]);
   });
 
   it("drafts never see the notes, even with the setting on (they feed the FLUX prompt)", async () => {
     await draftCopy(input, buildKit(input), settings(true));
-    expect(sent[0].prompt).not.toContain(NOTES);
-    expect(sent[0].prompt).not.toContain("SomePack");
+    expect(sent[0].kind).toBe("draft");
+    expect(flat(sent[0])).not.toContain(NOTES);
+    expect(flat(sent[0])).not.toContain("SomePack");
+    // Drafts don't send the long fields (the cover brief quotes the notes).
+    expect(Object.keys(sent[0].fields)).not.toContain("coverBrief");
   });
 
   it("the disclosure matches the setting", () => {

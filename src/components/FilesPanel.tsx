@@ -34,7 +34,7 @@ export function FilesPanel({ project }: { project: ProjectInfo }) {
     let live = true;
     if (demoMode || !settings.outputFolder) return setKit([]);
     api
-      .kitFiles(settings.outputFolder, kitTitle)
+      .kitFiles(kitTitle)
       .then((files) => live && setKit(files ?? []))
       .catch(() => live && setKit([]));
     return () => {

@@ -1,6 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   AiStatus,
@@ -17,17 +16,32 @@ import type {
   Workspace,
 } from "../types";
 
-export async function scanProjects(folders: string[], outputFolder: string | null): Promise<ProjectInfo[]> {
-  return invoke("scan_projects", { folders, outputFolder });
+/** Scans the linked folders and export folder saved in Settings (Rust reads them). */
+export async function scanProjects(): Promise<ProjectInfo[]> {
+  return invoke("scan_projects");
 }
 
 export async function getSettings(): Promise<Settings> {
   return invoke("get_settings");
 }
 
-export async function saveSettings(settings: Settings): Promise<void> {
+/** Saves preferences. Path settings are kept as saved (they change only
+ * through the pickers below); returns what's saved. */
+export async function saveSettings(settings: Settings): Promise<Settings> {
   return invoke("save_settings", { settings });
 }
+
+// Path settings: native pickers and detection run in Rust, so the webview
+// can never point the app at other folders or programs. Each returns the
+// saved settings (unchanged if the picker was cancelled).
+export const pickWatchedFolder = (): Promise<Settings> => invoke("pick_watched_folder");
+export const linkDetectedProjectsFolder = (): Promise<Settings> => invoke("link_detected_projects_folder");
+export const removeWatchedFolder = (folder: string): Promise<Settings> => invoke("remove_watched_folder", { folder });
+export const pickOutputFolder = (): Promise<Settings> => invoke("pick_output_folder");
+export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
+export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
+export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");
+export const clearPathSetting = (which: "flStudio" | "ffmpeg" | "outputFolder"): Promise<Settings> => invoke("clear_path_setting", { which });
 
 export async function getWorkspace(): Promise<Workspace | null> {
   return invoke("get_workspace");
@@ -46,13 +60,8 @@ export async function detectProjectsFolder(): Promise<string | null> {
   return invoke("detect_projects_folder");
 }
 
-export async function renderProjects(args: {
-  projectPaths: string[];
-  outputFolder: string;
-  flStudioPath: string;
-  format: string;
-  outputNames?: string[];
-}): Promise<void> {
+/** FL Studio, the format and the export folder come from Settings on the Rust side. */
+export async function renderProjects(args: { projectPaths: string[]; subfolder?: string; outputNames?: string[] }): Promise<void> {
   return invoke("render_projects", args);
 }
 
@@ -62,12 +71,12 @@ export function onRenderProgress(
   return listen<RenderEvent>("render-progress", (e) => handler(e.payload));
 }
 
-export async function listTemplates(flStudioPath: string | null): Promise<TemplateInfo[]> {
-  return invoke("list_templates", { flStudioPath });
+export async function listTemplates(): Promise<TemplateInfo[]> {
+  return invoke("list_templates");
 }
 
-export async function defaultTemplate(flStudioPath: string | null): Promise<string | null> {
-  return invoke("default_template", { flStudioPath });
+export async function defaultTemplate(): Promise<string | null> {
+  return invoke("default_template");
 }
 
 export async function createProject(args: {
@@ -104,12 +113,7 @@ export async function packagePreview(projectPaths: string[]): Promise<PackagePla
 
 /** Zipped loop packages (.flp + samples, flat) — FL opens these directly.
  * `approved` lines up with `projectPaths`: the sample paths the user confirmed. */
-export async function packageProjects(args: {
-  projectPaths: string[];
-  outputFolder: string;
-  subfolder?: string;
-  approved: string[][];
-}): Promise<PackageResult[]> {
+export async function packageProjects(args: { projectPaths: string[]; subfolder?: string; approved: string[][] }): Promise<PackageResult[]> {
   return invoke("package_projects", args);
 }
 
@@ -122,10 +126,9 @@ export async function analyzeAudio(path: string, bpm: number | null): Promise<Au
   return invoke("analyze_audio", { path, bpm });
 }
 
-/** Writes `<outputFolder>/Launch Kits/<folderName>` (text files, master
+/** Writes `<export folder>/Launch Kits/<folderName>` (text files, master
  * copy, snippet clips). The folder name is sanitized on the Rust side. */
 export async function exportLaunchKit(args: {
-  outputFolder: string;
   folderName: string;
   files: { name: string; content: string }[];
   master: string | null;
@@ -145,16 +148,17 @@ export async function setAiKey(key: string | null): Promise<void> {
   return invoke("set_ai_key", { key });
 }
 
-/** One structured Gemini call (retries and a backup model on the Rust
- * side): JSON matching `schema`, plus the model that actually answered. */
-export async function aiGenerateJson(args: {
+/** A Launch Kit draft or check (retries and a backup model on the Rust
+ * side). Rust builds the prompt from these typed facts; it refuses unknown
+ * keys and drops notes unless Settings allows them. */
+export async function aiKit(request: {
+  kind: "draft" | "review";
   model: string | null;
-  system: string;
-  prompt: string;
-  schema: object;
-  temperature: number;
+  language: string | null;
+  context: object;
+  fields: Record<string, string>;
 }): Promise<{ model: string; data: unknown }> {
-  return invoke("ai_generate_json", args);
+  return invoke("ai_kit", { request });
 }
 
 export interface ShortsStatus {
@@ -164,8 +168,8 @@ export interface ShortsStatus {
   error: string | null;
 }
 
-export async function shortsStatus(ffmpegPath: string | null): Promise<ShortsStatus> {
-  return invoke("shorts_status", { ffmpegPath });
+export async function shortsStatus(): Promise<ShortsStatus> {
+  return invoke("shorts_status");
 }
 
 export interface ShortResult {
@@ -174,12 +178,10 @@ export interface ShortResult {
   error: string | null;
 }
 
-/** Renders 9:16 MP4s into `<outputFolder>/Launch Kits/<folderName>/shorts/`. */
+/** Renders 9:16 MP4s into `<export folder>/Launch Kits/<folderName>/shorts/`. */
 export async function renderShorts(args: {
-  ffmpegPath: string | null;
   master: string;
   clips: { label: string; startSec: number; lengthSec: number; layoutPng: string }[];
-  outputFolder: string;
   folderName: string;
 }): Promise<ShortResult[]> {
   return invoke("render_shorts", args);
@@ -201,8 +203,8 @@ export async function generateCover(prompt: string, seed: number | null): Promis
   return invoke("generate_cover", { prompt, seed });
 }
 
-/** Writes `<outputFolder>/Launch Kits/<folderName>/cover-concept.jpg`. */
-export async function saveCover(args: { outputFolder: string; folderName: string; imageB64: string }): Promise<string> {
+/** Writes `<export folder>/Launch Kits/<folderName>/cover-concept.jpg`. */
+export async function saveCover(args: { folderName: string; imageB64: string }): Promise<string> {
   return invoke("save_cover", args);
 }
 
@@ -213,9 +215,9 @@ export interface KitFile {
   sizeBytes: number;
 }
 
-/** What's in `<outputFolder>/Launch Kits/<folderName>/` (empty if never exported). */
-export async function kitFiles(outputFolder: string, folderName: string): Promise<KitFile[]> {
-  return invoke("kit_files", { outputFolder, folderName });
+/** What's in `<export folder>/Launch Kits/<folderName>/` (empty if never exported). */
+export async function kitFiles(folderName: string): Promise<KitFile[]> {
+  return invoke("kit_files", { folderName });
 }
 
 /** URL the webview can stream a local audio file from (asset protocol). */
@@ -223,15 +225,7 @@ export function audioSrc(path: string): string {
   return convertFileSrc(path);
 }
 
-export async function pickFolder(): Promise<string | null> {
-  const result = await openDialog({ directory: true, multiple: false });
-  return typeof result === "string" ? result : null;
-}
 
-export async function pickExecutable(): Promise<string | null> {
-  const result = await openDialog({ directory: false, multiple: false });
-  return typeof result === "string" ? result : null;
-}
 
 /** Opens a DAW project in its app. Rust refuses network paths and non-projects. */
 export async function openInFlStudio(path: string): Promise<void> {
