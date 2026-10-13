@@ -5,7 +5,7 @@ import * as api from "../lib/tauri";
 import { CrewPanel } from "./CrewPanel";
 import { canRenderInApp } from "../lib/daws";
 import { aiDisclosure } from "../lib/ai";
-import type { RenderFormat } from "../types";
+import type { CaptionLang, RenderFormat } from "../types";
 
 const IS_MAC = navigator.userAgent.includes("Mac");
 
@@ -306,7 +306,6 @@ function ShortsSettings() {
   );
 }
 
-const AI_LANGUAGES = ["English", "French", "Spanish", "German", "Portuguese", "Italian"];
 const field =
   "w-full rounded-md border border-rule bg-raised px-3 py-2 text-sm text-cream placeholder:text-engrave focus:border-orange-400/50 focus:outline-none";
 
@@ -379,15 +378,14 @@ function AiSettings() {
           />
         </label>
         <label className="text-xs text-engrave">
-          Language for captions and briefs
+          Caption language (each Launch Kit can change it)
           <select
-            value={settings.aiLanguage ?? "English"}
-            onChange={(e) => updateSettings({ aiLanguage: e.target.value === "English" ? null : e.target.value })}
+            value={settings.captionLanguage ?? "fr"}
+            onChange={(e) => updateSettings({ captionLanguage: e.target.value as CaptionLang })}
             className={`${field} mt-1`}
           >
-            {AI_LANGUAGES.map((l) => (
-              <option key={l}>{l}</option>
-            ))}
+            <option value="fr">Français</option>
+            <option value="en">English</option>
           </select>
         </label>
       </div>

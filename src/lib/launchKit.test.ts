@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Album, Person, ProjectInfo, SongMeta } from "../types";
-import { artistLine, buildKit, kitFiles, kitGuide, kitReadme, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
+import { artistLine, buildKit, captionLanguageIssue, kitFiles, kitGuide, kitReadme, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
 
 const today = new Date(2026, 9, 13); // Tue 13 Oct 2026
 const people: Person[] = [
@@ -190,5 +190,42 @@ describe("README in every kit", () => {
     const g = kitGuide("en", { title: "X", master: "X.wav", snippets: [] });
     const readme = kitReadme(g, "en");
     for (const item of g.items) expect(readme).toContain(item.file);
+  });
+});
+
+describe("caption language", () => {
+  const meta: SongMeta = { credits: [{ personId: "a", role: "Lead rap", split: 100 }], launchKit: { edits: { releaseDate: "2026-11-20" } } };
+  const captions = (lang?: "fr" | "en") => value(buildKit(input(meta, lang ? { captionLanguage: lang } : {})), "captions");
+
+  it("defaults to French, every caption fully French", () => {
+    const fr = captions();
+    expect(fr).toContain("ANNONCE");
+    expect(fr).toContain("Lien en bio");
+    expect(fr).toContain("vendredi 20 novembre");
+    expect(fr).not.toMatch(/\b(out|link|drops|ANNOUNCE)\b/);
+    expect(captionLanguageIssue(fr, "fr")).toBeUndefined();
+  });
+
+  it("English kits are fully English", () => {
+    const en = captions("en");
+    expect(en).toContain("RELEASE DAY");
+    expect(en).toContain("Friday 20 November");
+    expect(en).not.toMatch(/\b(dispo|lien|sort)\b/);
+    expect(captionLanguageIssue(en, "en")).toBeUndefined();
+  });
+
+  it("flags a caption that mixes in the other language", () => {
+    const mixed = 'ANNONCE\n"Night Run" de Ana, dispo vendredi.\nPre-save link in bio.';
+    expect(captionLanguageIssue(mixed, "fr")).toMatch(/Not all in French: .*link/);
+    const field = buildKit(input({ ...meta, launchKit: { edits: { ...meta.launchKit!.edits, captions: mixed } } })).find((f) => f.id === "captions")!;
+    expect(field.check?.message).toMatch(/Not all in French/);
+    // Titles, names and hashtags don't count.
+    expect(captionLanguageIssue('ANNONCE\n"Out Now In The Bio" dispo partout. #linkinbio #thenewone', "fr")).toBeUndefined();
+  });
+
+  it("AI drafts written in the other language are flagged for a rewrite", () => {
+    const drafts = { captions: "ANNOUNCE\nOut now.", coverBrief: "x", model: "m", atMs: 1, basis: { title: "Night Run", artists: "Ana", releaseDate: "2026-11-20", language: "en" as const } };
+    const kit = buildKit(input({ ...meta, launchKit: { ...meta.launchKit, ai: { drafts } } }, { captionLanguage: "fr" }));
+    expect(kit.find((f) => f.id === "captions")!.check?.message).toMatch(/another title, artist, date or language/);
   });
 });

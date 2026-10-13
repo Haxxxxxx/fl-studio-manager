@@ -5,6 +5,7 @@ import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/s
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
 import { canRenderInApp, dawOf, splitRenderable } from "../lib/daws";
 import type {
+  CaptionLang,
   PackagePlan,
   PackageResult,
   Person,
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: Settings = {
   aiModel: null,
   aiLanguage: null,
   aiIncludeNotes: false,
+  captionLanguage: "fr",
   ffmpegPath: null,
 };
 
@@ -168,6 +170,8 @@ interface AppState {
   refreshAiStatus: () => Promise<void>;
   /** Set or clear the picked cover concept (metadata only). */
   setKitCover: (path: string, cover: KitCoverMeta | undefined) => void;
+  /** This kit's caption language; undefined = the one in Settings. */
+  setKitCaptionLanguage: (path: string, lang: CaptionLang | undefined) => void;
   /** null until loaded; whether Cloudflare credentials are set. */
   coverStatus: CoverStatus | null;
   refreshCoverStatus: () => Promise<void>;
@@ -705,6 +709,10 @@ export const useAppStore = create<AppState>((set, get) => {
     setKitCover: (path, cover) => {
       const kit = get().workspace.songs[path]?.launchKit ?? {};
       get().updateSong(path, { launchKit: { ...kit, cover } });
+    },
+    setKitCaptionLanguage: (path, captionLanguage) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      get().updateSong(path, { launchKit: { ...kit, captionLanguage, acceptedAtMs: undefined } });
     },
     coverStatus: null,
     refreshCoverStatus: async () => {

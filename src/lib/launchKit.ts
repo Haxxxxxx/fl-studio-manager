@@ -1,4 +1,4 @@
-import type { AiFieldReview, Album, AudioAnalysis, KitFieldId, MasterSpec, Person, ProjectInfo, Snippet, SongMeta } from "../types";
+import type { AiFieldReview, Album, AudioAnalysis, CaptionLang, KitFieldId, MasterSpec, Person, ProjectInfo, Snippet, SongMeta } from "../types";
 import { detectKey, detectedPeople } from "./people";
 import { KEYS, renderFreshness } from "./songs";
 import { dawOf } from "./daws";
@@ -41,6 +41,8 @@ export interface KitInput {
   today?: Date;
   /** Language the lyrics are in (Settings → AI language), for distributors. */
   language?: string | null;
+  /** Caption language (the kit's own, else Settings). French by default. */
+  captionLanguage?: CaptionLang;
   /** Default label: the crew's name, if in a crew. */
   labelName?: string | null;
   /** Release dates already taken (other releases, the crew's): avoided. */
@@ -101,9 +103,49 @@ export function fridayAfter(today: Date, days: number): Date {
   return d;
 }
 
-export function humanDate(value: string): string {
+export function humanDate(value: string, lang?: CaptionLang): string {
   const d = parseDate(value);
-  return d ? d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) : "[release date]";
+  const locale = lang === "fr" ? "fr-FR" : lang === "en" ? "en-GB" : undefined;
+  if (!d) return lang === "fr" ? "[date de sortie]" : "[release date]";
+  return d.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" });
+}
+
+/** Section headings of the captions text, per language. */
+export const CAPTION_HEADINGS: Record<CaptionLang, { announce: string; teaser: string; releaseDay: string }> = {
+  fr: { announce: "ANNONCE", teaser: "TEASER (à poster avec l'extrait du hook)", releaseDay: "JOUR DE SORTIE" },
+  en: { announce: "ANNOUNCE", teaser: "TEASER (post with the Hook snippet)", releaseDay: "RELEASE DAY" },
+};
+
+export const CAPTION_LANGUAGE_NAMES: Record<CaptionLang, string> = { fr: "French", en: "English" };
+
+// Common words that give a caption's language away (titles, names, hashtags
+// and handles are ignored). Short lists on purpose: they only need to catch
+// a caption, or part of one, written in the other language.
+const LANG_WORDS: Record<CaptionLang, Set<string>> = {
+  en: new Set(["the", "is", "are", "out", "now", "link", "in", "bio", "and", "you", "your", "this", "drops", "ready", "not", "new", "on", "it", "for", "with", "everywhere", "tonight", "today", "pre-save", "listen", "stream", "get", "who", "what"]),
+  fr: new Set(["le", "la", "les", "est", "sont", "dispo", "disponible", "lien", "dans", "et", "tu", "ton", "ta", "tes", "vous", "ce", "cette", "sort", "sortie", "pas", "nouveau", "nouvelle", "sur", "des", "du", "partout", "maintenant", "ce soir", "écoute", "écoutez", "qui", "quoi", "avec", "pour"]),
+};
+
+/** Caption blocks with words in the other language, or undefined when the
+ * whole text reads as `lang`. */
+export function captionLanguageIssue(text: string, lang: CaptionLang): string | undefined {
+  const other: CaptionLang = lang === "fr" ? "en" : "fr";
+  const headings = new Set(Object.values(CAPTION_HEADINGS).flatMap((h) => Object.values(h)));
+  const offending: string[] = [];
+  for (const block of text.split(/\n\s*\n/)) {
+    const lines = block.split("\n").filter((l) => !headings.has(l.trim()));
+    const words = lines
+      .join(" ")
+      .replace(/"[^"]*"|“[^”]*”|«[^»]*»/g, " ") // quoted titles
+      .replace(/[#@][\p{L}\p{N}_]+/gu, " ") // hashtags, handles
+      .toLowerCase()
+      .match(/[\p{L}'-]+/gu) ?? [];
+    const hits = words.filter((w) => LANG_WORDS[other].has(w) && !LANG_WORDS[lang].has(w));
+    if (hits.length >= 2) offending.push(hits.slice(0, 3).join(", "));
+  }
+  if (!offending.length) return undefined;
+  const name = lang === "fr" ? "French" : "English";
+  return `Not all in ${name}: ${offending.join("; ")}`;
 }
 
 function tempoFeel(bpm: number): string {
@@ -309,20 +351,29 @@ function coverBrief(v: Record<KitFieldId, string>, meta: SongMeta): string {
   return lines.filter((l) => l !== null).join("\n");
 }
 
-function captions(v: Record<KitFieldId, string>): string {
-  const who = artistLine(v.artists, v.featuring) || "[artist]";
+function captions(v: Record<KitFieldId, string>, lang: CaptionLang): string {
+  const h = CAPTION_HEADINGS[lang];
   const prod = v.producers ? `\nprod. ${v.producers}` : "";
-  const date = humanDate(v.releaseDate);
+  const date = humanDate(v.releaseDate, lang);
+  if (lang === "fr") {
+    const who = artistLine(v.artists, v.featuring) || "[artiste]";
+    return [
+      `${h.announce}\n"${v.title}" de ${who}, dispo le ${date}.\nPré-save : lien en bio.`,
+      `${h.teaser}\nVous êtes pas prêts pour celui-là. "${v.title}" sort le ${date}.`,
+      `${h.releaseDay}\n"${v.title}" est dispo partout.${prod}\nLien en bio.`,
+    ].join("\n\n");
+  }
+  const who = artistLine(v.artists, v.featuring) || "[artist]";
   return [
-    `ANNOUNCE\n"${v.title}" by ${who}, out ${date}.\nPre-save link in bio.`,
-    `TEASER (post with the Hook snippet)\nYou're not ready for this one. "${v.title}" drops ${date}.`,
-    `RELEASE DAY\n"${v.title}" is out now everywhere.${prod}\nLink in bio.`,
+    `${h.announce}\n"${v.title}" by ${who}, out ${date}.\nPre-save link in bio.`,
+    `${h.teaser}\nYou're not ready for this one. "${v.title}" drops ${date}.`,
+    `${h.releaseDay}\n"${v.title}" is out now everywhere.${prod}\nLink in bio.`,
   ].join("\n\n");
 }
 
 /** The verification layer. Deterministic sanity checks for now; an AI pass
  * (roadmap principle 2) plugs in here and returns the same Check shape. */
-export function verify(id: KitFieldId, value: string, today = new Date()): Check | undefined {
+export function verify(id: KitFieldId, value: string, today = new Date(), captionLang: CaptionLang = "fr"): Check | undefined {
   const v = value.trim();
   switch (id) {
     case "title":
@@ -363,8 +414,12 @@ export function verify(id: KitFieldId, value: string, today = new Date()): Check
       return;
     }
     case "coverBrief":
-    case "captions":
       return /\[[^\]]+\]/.test(v) ? { level: "warn", message: "Fill in the [placeholders]" } : undefined;
+    case "captions": {
+      if (/\[[^\]]+\]/.test(v)) return { level: "warn", message: "Fill in the [placeholders]" };
+      const mixed = captionLanguageIssue(v, captionLang);
+      return mixed ? { level: "warn", message: mixed } : undefined;
+    }
     case "featuring":
       return;
     case "songwriters": {
@@ -458,11 +513,16 @@ export function buildKit(input: KitInput): KitField[] {
   const year = /^(\d{4})-/.exec(values.releaseDate)?.[1] ?? String((input.today ?? new Date()).getFullYear());
   values.copyright = edits.copyright ?? (values.label ? `℗ ${year} ${values.label}` : "");
   values.coverBrief = edits.coverBrief ?? drafts?.coverBrief ?? coverBrief(values, input.meta);
-  values.captions = edits.captions ?? drafts?.captions ?? captions(values);
+  const captionLang = input.captionLanguage ?? "fr";
+  values.captions = edits.captions ?? drafts?.captions ?? captions(values, captionLang);
   // AI text bakes in the title/artist/date it was written for.
   const basis = drafts?.basis;
   const draftsOutdated =
-    !!basis && (basis.title !== values.title || basis.artists !== values.artists || basis.releaseDate !== values.releaseDate);
+    !!basis &&
+    (basis.title !== values.title ||
+      basis.artists !== values.artists ||
+      basis.releaseDate !== values.releaseDate ||
+      (basis.language ?? "en") !== captionLang);
 
   const field = (id: KitFieldId, kind: KitField["kind"], gen: { source: FieldSource; note: string }, options?: string[]): KitField => {
     const edited = edits[id] !== undefined;
@@ -477,8 +537,8 @@ export function buildKit(input: KitInput): KitField[] {
       kind,
       options,
       check: outdated
-        ? { level: "warn", message: "Written for the old title, artist or date. Rewrite with AI or edit it" }
-        : verify(id, values[id], input.today),
+        ? { level: "warn", message: "Written for another title, artist, date or language. Rewrite with AI or edit it" }
+        : verify(id, values[id], input.today, captionLang),
       review: review && { ...review, stale: outdated || review.checkedValue !== values[id] },
     };
   };
@@ -651,7 +711,7 @@ function distributorSheet(get: (id: KitFieldId) => string, snippets: Snippet[], 
     "## Release",
     `- Release type: ${or(get("releaseType"), "Single")}`,
     `- Release title: ${or(get("releaseTitle"), get("title"))}`,
-    `- Release date: ${get("releaseDate")}${get("releaseDate") ? ` (${humanDate(get("releaseDate"))})` : ""}`,
+    `- Release date: ${get("releaseDate")}${get("releaseDate") ? ` (${humanDate(get("releaseDate"), "en")})` : ""}`,
     `- Label: ${or(get("label"), "(your artist name)")}`,
     `- ℗ / © line: ${or(get("copyright"), "(year + label)")}`,
     `- UPC / EAN: ${or(get("upc"), "(leave empty: assigned for free)")}`,

@@ -124,9 +124,16 @@ pub struct Settings {
     /// Send the song's notes with "Check kit" (off by default).
     #[serde(default)]
     pub ai_include_notes: bool,
+    /// Launch Kit caption language, "fr" or "en" (French by default).
+    #[serde(default = "default_caption_language")]
+    pub caption_language: String,
     /// ffmpeg for shorts; None = found automatically.
     #[serde(default)]
     pub ffmpeg_path: Option<String>,
+}
+
+fn default_caption_language() -> String {
+    "fr".to_string()
 }
 
 impl Default for Settings {
@@ -140,6 +147,7 @@ impl Default for Settings {
             ai_model: None,
             ai_language: None,
             ai_include_notes: false,
+            caption_language: default_caption_language(),
             ffmpeg_path: None,
         }
     }
