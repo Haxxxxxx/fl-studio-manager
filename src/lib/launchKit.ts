@@ -1,4 +1,4 @@
-import type { AiFieldReview, Album, AudioAnalysis, KitFieldId, Person, ProjectInfo, Snippet, SongMeta } from "../types";
+import type { AiFieldReview, Album, AudioAnalysis, KitFieldId, MasterSpec, Person, ProjectInfo, Snippet, SongMeta } from "../types";
 import { detectKey, detectedPeople } from "./people";
 import { KEYS, renderFreshness } from "./songs";
 
@@ -343,11 +343,43 @@ export function aiSummary(fields: KitField[]): {
 }
 
 /** Kit-level problems that aren't one field's. */
-export function kitChecks(project: ProjectInfo): Check[] {
+export function kitChecks(project: ProjectInfo, analysis?: AudioAnalysis | null): Check[] {
   const freshness = renderFreshness(project);
   if (freshness === "none") return [{ level: "missing", message: "No mixdown yet. Render one: it's the file you'll upload" }];
-  if (freshness === "stale") return [{ level: "warn", message: "The project was saved after the latest mixdown. Re-render before exporting" }];
-  return [];
+  const out: Check[] = [];
+  if (freshness === "stale") out.push({ level: "warn", message: "The project was saved after the latest mixdown. Re-render before exporting" });
+  if (analysis?.master) out.push(...masterChecks(analysis.master));
+  return out;
+}
+
+const FL_EXPORT_TIP = "In FL Studio: File → Export → Wave file, 44,100 Hz, 24-bit.";
+
+/** What distributors accept: lossless WAV (FLAC at some), 44.1 kHz,
+ * 16 or 24-bit, stereo, not clipping. */
+export function masterChecks(m: MasterSpec): Check[] {
+  const out: Check[] = [];
+  const name = m.container.toUpperCase() || "This file";
+  if (m.container === "mp3" || m.container === "ogg") {
+    out.push({ level: "warn", message: `The master is ${name}: distributors want lossless WAV. ${FL_EXPORT_TIP}` });
+  } else if (m.container === "flac") {
+    out.push({ level: "warn", message: `FLAC master: DistroKid takes it, most others want WAV. ${FL_EXPORT_TIP}` });
+  }
+  if (m.sampleRate === 48000) {
+    out.push({ level: "warn", message: `48 kHz master: most distributors want 44.1 kHz. ${FL_EXPORT_TIP}` });
+  } else if (m.sampleRate && m.sampleRate !== 44100) {
+    out.push({ level: "warn", message: `${(m.sampleRate / 1000).toFixed(1)} kHz master: distributors want 44.1 kHz. ${FL_EXPORT_TIP}` });
+  }
+  if (m.bitsPerSample != null && m.bitsPerSample !== 16 && m.bitsPerSample !== 24) {
+    out.push({ level: "warn", message: `${m.bitsPerSample}-bit master: distributors want 16 or 24-bit. ${FL_EXPORT_TIP}` });
+  }
+  if (m.channels === 1) out.push({ level: "warn", message: "Mono master: distributors expect stereo" });
+  if (m.clippedSamples >= 3) {
+    out.push({
+      level: "warn",
+      message: `Hits full scale ${m.clippedSamples.toLocaleString("en")} times: likely clipping. Leave about 1 dB of headroom (Spotify asks for −1 dB true peak)`,
+    });
+  }
+  return out;
 }
 
 /** Snippets with the user's nudges applied. */
