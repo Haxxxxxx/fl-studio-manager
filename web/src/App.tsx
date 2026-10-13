@@ -6,6 +6,7 @@ import { formatRelative } from "@shared/lib/format";
 import type { CrewSongRow, SongStatus } from "@shared/types";
 import { useWeb } from "./store";
 import { Landing } from "./Landing";
+import { crewText } from "@shared/lib/crewMessages";
 
 const input =
   "w-full rounded-lg border border-rule-strong bg-chassis px-3 py-2.5 text-base text-cream placeholder:text-engrave shadow-[inset_0_2px_3px_rgb(0_0_0/0.5)] focus:border-hot focus:outline-none sm:text-sm";
@@ -91,6 +92,7 @@ function SignIn() {
           <button disabled={busy || !/^\S+@\S+\.\S+$/.test(email.trim())} className={primary}>
             {busy ? "Sending…" : "Email me a code"}
           </button>
+          <p className="text-xs text-engrave">{crewText("signInHint")}</p>
         </form>
       ) : (
         <form
@@ -163,7 +165,8 @@ function Join({ another = false, onDone }: { another?: boolean; onDone?: () => v
       {!another && (
         <>
           <h1 className="text-xl font-semibold">Join your crew</h1>
-          <p className="text-sm text-engrave">Signed in as {email}. Enter the invite code from your crew.</p>
+          <p className="text-sm text-body" role="status">{crewText("noCrew", undefined, { email: email ?? "" })}</p>
+          <p className="text-xs text-engrave">{crewText("noInviteYet")}</p>
         </>
       )}
       <input
