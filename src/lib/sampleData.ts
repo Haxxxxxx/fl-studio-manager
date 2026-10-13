@@ -96,6 +96,7 @@ export function generateSampleProjects(count = 28): ProjectInfo[] {
       renders,
       recordingsCount: Math.floor(rand() * 20),
       recordingsBytes: Math.floor(rand() * 400 * 1024 * 1024),
+      stems: null,
       plugins: PLUGINS.filter(() => rand() > 0.55).map((p) => ({
         ...p,
         // One third-party plugin "not installed" on a few songs.
