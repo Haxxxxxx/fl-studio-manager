@@ -138,6 +138,14 @@ describe("payload always passes the database checks", () => {
     expect(creditsSize(credits)).toBeLessThanOrEqual(8192);
   });
 
+  it("a split outside 0-100 is sent as null (the database refuses it)", () => {
+    expect(sharedCredits([{ name: "A", role: "", split: 150 }, { name: "B", role: "", split: -5 }, { name: "C", role: "", split: 100 }]).map((c) => c.split)).toEqual([
+      null,
+      null,
+      100,
+    ]);
+  });
+
   it("a non-finite split is sent as null", () => {
     expect(sharedCredits([{ name: "Producer", role: "beat", split: Number.NaN }])).toEqual([{ name: "Producer", role: "beat", split: null }]);
   });

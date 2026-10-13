@@ -101,7 +101,8 @@ export function sharedCredits(credits: CrewCredit[]): CrewCredit[] {
     const credit = {
       name: chars(c.name.trim(), NAME_CHARS),
       role: chars((c.role ?? "").trim(), ROLE_CHARS),
-      split: typeof c.split === "number" && Number.isFinite(c.split) ? c.split : null,
+      // The database takes 0-100 or nothing; anything else would fail the whole push.
+      split: typeof c.split === "number" && Number.isFinite(c.split) && c.split >= 0 && c.split <= 100 ? c.split : null,
     };
     if (!credit.name) continue;
     if (out.length >= CREDITS_MAX || bytes + creditCost(credit) > CREDITS_BYTES) break;
