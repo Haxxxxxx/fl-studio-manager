@@ -3,7 +3,7 @@ import { AlertTriangle, Clapperboard, FolderOpen } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import { drawShortLayout } from "../lib/shorts";
-import type { KitField } from "../lib/launchKit";
+import { artistLine, type KitField } from "../lib/launchKit";
 import type { ProjectInfo, Snippet } from "../types";
 import { btn, btnPrimary } from "./ui";
 
@@ -46,7 +46,7 @@ export function ShortsPanel({
   const value = (id: KitField["id"]) => fields.find((f) => f.id === id)?.value ?? "";
   const layoutInput = {
     title: value("title") || project.name,
-    artists: value("artists"),
+    artists: artistLine(value("artists"), value("featuring")),
     producers: value("producers"),
     key: value("key"),
     releaseDate: value("releaseDate"),

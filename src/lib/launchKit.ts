@@ -38,6 +38,12 @@ export interface KitInput {
   albums: Album[];
   analysis: AudioAnalysis | null;
   today?: Date;
+  /** Language the lyrics are in (Settings → AI language), for distributors. */
+  language?: string | null;
+  /** Default label: the crew's name, if in a crew. */
+  labelName?: string | null;
+  /** Release dates already taken (other releases, the crew's): avoided. */
+  busyDates?: string[];
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -98,8 +104,19 @@ function joinNames(names: string[]): string {
   return [...new Set(names)].join(", ");
 }
 
+/** "Ana feat. Ben": how the artist reads on a cover, a caption or a file name. */
+export function artistLine(artists: string, featuring: string): string {
+  return featuring.trim() ? `${artists} feat. ${featuring.trim()}` : artists;
+}
+
+/** Roles that write: lyrics (rap, vocals, topline) or music (production). */
+const WRITER_ROLE = /writ|lyric|compos|author|rap|vocal|sing|mc|lead|artist|feat|prod|beat|topline/i;
+const KIND_LABEL: Record<Album["kind"], string> = { single: "Single", ep: "EP", album: "Album", mixtape: "Mixtape" };
+export const RELEASE_TYPES = ["Single", "EP", "Album", "Mixtape"];
+
 /** Generated value + provenance for every field, before user edits. */
-function generate({ project, meta, people, albums, analysis, today = new Date() }: KitInput) {
+function generate(input: KitInput) {
+  const { project, meta, people, albums, analysis, today = new Date() } = input;
   const name = (id: string) => people.find((p) => p.id === id)?.name;
   const credits = (meta.credits ?? []).map((c) => ({ ...c, name: name(c.personId) })).filter((c) => c.name);
   const byRole = (re: RegExp) => credits.filter((c) => re.test(c.role)).map((c) => c.name!);
@@ -107,23 +124,40 @@ function generate({ project, meta, people, albums, analysis, today = new Date() 
   const g: Record<KitFieldId, { value: string; source: FieldSource; note: string }> = {} as never;
 
   const title = cleanTitle(project.name);
-  g.title = {
-    value: title,
-    source: "detected",
-    note: title === project.name ? "From the project name" : `From the project name "${project.name}", version tag removed`,
-  };
+  const flpTitle = project.flpTitle?.trim();
+  g.title = flpTitle
+    ? { value: flpTitle, source: "detected", note: "From the title in FL Studio's project info" }
+    : {
+        value: title,
+        source: "detected",
+        note: title === project.name ? "From the project name" : `From the project name "${project.name}", version tag removed`,
+      };
 
+  // Distributors take featured artists separately from the main artist.
   const feats = byRole(/feat/i);
   const leads = byRole(/artist|rap|vocal|sing|mc|lead/i).filter((n) => !feats.includes(n));
-  const featPart = feats.length ? ` feat. ${joinNames(feats)}` : "";
   if (leads.length) {
-    g.artists = { value: joinNames(leads) + featPart, source: "detected", note: "From the song's credits" };
+    g.artists = { value: joinNames(leads), source: "detected", note: "From the song's credits" };
+  } else if (project.artist?.trim()) {
+    g.artists = { value: project.artist.trim(), source: "detected", note: "From the artist in FL Studio's project info" };
   } else {
-    const found = detectedPeople(project, people).map((p) => p.name);
+    const found = detectedPeople(project, people).map((p) => p.name).filter((n) => !feats.includes(n));
     g.artists = found.length
-      ? { value: joinNames(found) + featPart, source: "suggested", note: "Found in mixer track names. Confirm who's the main artist" }
+      ? { value: joinNames(found), source: "suggested", note: "Found in mixer track names. Confirm who's the main artist" }
       : { value: "", source: "missing", note: "Credit the artist in the song panel, or type it here" };
   }
+  g.featuring = feats.length
+    ? { value: joinNames(feats), source: "detected", note: "Credited as feat. in the song panel" }
+    : { value: "", source: "suggested", note: "No featured artist credited. Leave empty if there's none" };
+
+  const writers = credits.filter((c) => WRITER_ROLE.test(c.role) && !/mix|master|engineer|design|photo/i.test(c.role));
+  g.songwriters = writers.length
+    ? {
+        value: writers.map((c) => `${c.name} (${c.role})${c.split != null ? ` ${c.split}%` : ""}`).join("; "),
+        source: "detected",
+        note: "From the song's credits. Distributors want legal names, not artist names",
+      }
+    : { value: "", source: "missing", note: "Who wrote it? Legal names, separated by ;  e.g. Jane Doe (lyrics) 50%; John Roe (music) 50%" };
 
   const producers = byRole(/prod|beat/i);
   g.producers = producers.length
@@ -154,13 +188,50 @@ function generate({ project, meta, people, albums, analysis, today = new Date() 
   g.explicit = { value: "", source: "missing", note: "Can't be detected from audio. Answer once" };
 
   const album = albums.find((a) => a.trackPaths.includes(project.path) && a.releaseDate);
-  g.releaseDate = album?.releaseDate
-    ? { value: album.releaseDate, source: "detected", note: `From the release "${album.title}"` }
-    : {
-        value: isoDate(fridayAfter(today, LEAD_DAYS)),
-        source: "suggested",
-        note: `First Friday ${LEAD_DAYS}+ days out: time to deliver to the distributor and pitch to Spotify editorial`,
-      };
+  if (album?.releaseDate) {
+    g.releaseDate = { value: album.releaseDate, source: "detected", note: `From the release "${album.title}"` };
+  } else {
+    // First Friday with enough lead time that nobody else is releasing on.
+    const busy = new Set(input.busyDates ?? []);
+    let friday = fridayAfter(today, LEAD_DAYS);
+    let skipped = 0;
+    while (busy.has(isoDate(friday)) && skipped < 12) {
+      friday = new Date(friday.getFullYear(), friday.getMonth(), friday.getDate() + 7);
+      skipped++;
+    }
+    g.releaseDate = {
+      value: isoDate(friday),
+      source: "suggested",
+      note:
+        `First Friday ${LEAD_DAYS}+ days out: time to deliver to the distributor and pitch to Spotify editorial` +
+        (skipped ? `. Skipped ${skipped} Friday${skipped === 1 ? "" : "s"} that already ha${skipped === 1 ? "s" : "ve"} a release (yours or the crew's)` : ""),
+    };
+  }
+
+  // Distribution details.
+  const label = input.labelName?.trim();
+  g.label = label
+    ? { value: label, source: "suggested", note: "Your crew's name. Self-releasing? Your artist name works too" }
+    : g.artists.value
+      ? { value: g.artists.value.split(",")[0].trim(), source: "suggested", note: "Self-released: the artist name is the usual label" }
+      : { value: "", source: "suggested", note: "Your label, or your artist name if self-released" };
+  g.language = input.language?.trim()
+    ? { value: input.language.trim(), source: "suggested", note: "Your language in Settings → AI. Change it if this song's different" }
+    : { value: "", source: "missing", note: "The language of the lyrics (Instrumental if none). Distributors require it" };
+  g.isrc = { value: "", source: "suggested", note: "Leave empty: your distributor assigns one for free. Fill it if this song already has one" };
+  g.upc = { value: "", source: "suggested", note: "Leave empty: assigned for free with the release. Fill it to reuse an existing one" };
+  const inAlbum = albums.find((a) => a.trackPaths.includes(project.path));
+  g.releaseType = inAlbum
+    ? { value: KIND_LABEL[inAlbum.kind], source: "detected", note: `From the release "${inAlbum.title}"` }
+    : { value: "Single", source: "suggested", note: "Not part of a release in Releases, so a single" };
+  g.trackNumber = inAlbum
+    ? { value: String(inAlbum.trackPaths.indexOf(project.path) + 1), source: "detected", note: `Its place in "${inAlbum.title}"` }
+    : { value: "1", source: "suggested", note: "A single is track 1" };
+  // releaseTitle and copyright are derived from final values in buildKit.
+  g.releaseTitle = inAlbum
+    ? { value: inAlbum.title, source: "detected", note: "From Releases" }
+    : { value: "", source: "suggested", note: "A single's release title is the song title" };
+  g.copyright = { value: "", source: "suggested", note: "℗ line: release year + label. Edit if someone else owns the master" };
 
   return g;
 }
@@ -181,7 +252,7 @@ function coverBrief(v: Record<KitFieldId, string>, meta: SongMeta): string {
   const bpm = Number(v.bpm);
   const minor = /m$/.test(v.key);
   const lines = [
-    ...briefSpecs(v.title, v.artists),
+    ...briefSpecs(v.title, artistLine(v.artists, v.featuring)),
     "",
     "Vibe cues from the project:",
     v.bpm && !Number.isNaN(bpm) ? `- Tempo: ${v.bpm} BPM (${tempoFeel(bpm)})` : null,
@@ -195,7 +266,7 @@ function coverBrief(v: Record<KitFieldId, string>, meta: SongMeta): string {
 }
 
 function captions(v: Record<KitFieldId, string>): string {
-  const who = v.artists || "[artist]";
+  const who = artistLine(v.artists, v.featuring) || "[artist]";
   const prod = v.producers ? `\nprod. ${v.producers}` : "";
   const date = humanDate(v.releaseDate);
   return [
@@ -250,6 +321,34 @@ export function verify(id: KitFieldId, value: string, today = new Date()): Check
     case "coverBrief":
     case "captions":
       return /\[[^\]]+\]/.test(v) ? { level: "warn", message: "Fill in the [placeholders]" } : undefined;
+    case "featuring":
+      return;
+    case "songwriters": {
+      if (!v) return { level: "missing", message: "Distributors need the songwriters' legal names" };
+      const parts = v.split(";").map((p) => p.trim()).filter(Boolean);
+      const splits = parts.map((p) => /(\d+(?:[.,]\d+)?)\s*%/.exec(p)?.[1]).map((n) => (n ? Number(n.replace(",", ".")) : null));
+      const given = splits.filter((n): n is number => n !== null);
+      if (given.length && given.length < parts.length) return { level: "warn", message: "Give every writer a split, or none" };
+      const sum = given.reduce((a, b) => a + b, 0);
+      if (given.length && Math.abs(sum - 100) > 0.5) return { level: "warn", message: `Splits add up to ${Math.round(sum * 10) / 10}%, not 100%` };
+      return;
+    }
+    case "label":
+      return v ? undefined : { level: "warn", message: "No label: most distributors use the artist name" };
+    case "copyright":
+      return /\b(19|20)\d{2}\b/.test(v) ? undefined : { level: "warn", message: "Add the year, like ℗ 2026 Your Label" };
+    case "language":
+      return v ? undefined : { level: "missing", message: "Language of the lyrics (or Instrumental)" };
+    case "isrc":
+      return !v || /^[A-Z]{2}-?[A-Z0-9]{3}-?\d{2}-?\d{5}$/i.test(v) ? undefined : { level: "warn", message: "An ISRC looks like FR-AB1-26-00001" };
+    case "upc":
+      return !v || /^\d{12,13}$/.test(v) ? undefined : { level: "warn", message: "A UPC/EAN is 12 or 13 digits" };
+    case "releaseTitle":
+      return v ? undefined : { level: "missing", message: "The release needs a title" };
+    case "releaseType":
+      return RELEASE_TYPES.includes(v) ? undefined : { level: "missing", message: "Single, EP, Album or Mixtape?" };
+    case "trackNumber":
+      return /^\d{1,3}$/.test(v) && Number(v) > 0 ? undefined : { level: "warn", message: "A track number, like 1" };
   }
 }
 
@@ -265,7 +364,39 @@ const LABELS: Record<KitFieldId, string> = {
   releaseDate: "Release date",
   coverBrief: "Cover art brief",
   captions: "Captions",
+  featuring: "Featuring",
+  songwriters: "Songwriters",
+  label: "Label",
+  copyright: "℗ / © line",
+  language: "Lyrics language",
+  isrc: "ISRC",
+  upc: "UPC / EAN",
+  releaseTitle: "Release title",
+  releaseType: "Release type",
+  trackNumber: "Track number",
 };
+
+/** What a distributor's upload form asks beyond the basics. */
+export const DISTRIBUTION_FIELDS: KitFieldId[] = [
+  "featuring",
+  "songwriters",
+  "releaseType",
+  "releaseTitle",
+  "trackNumber",
+  "label",
+  "copyright",
+  "language",
+  "isrc",
+  "upc",
+];
+
+/** File name for the master and the sheet: "Ana feat. Ben - Night Run". */
+export function masterBaseName(fields: KitField[], fallback: string): string {
+  const get = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
+  const title = get("title") || fallback;
+  const who = artistLine(get("artists"), get("featuring"));
+  return who ? `${who} - ${title}` : title;
+}
 
 export const METADATA_FIELDS: KitFieldId[] = ["title", "artists", "producers", "genre", "bpm", "key", "duration", "explicit"];
 
@@ -279,6 +410,9 @@ export function buildKit(input: KitInput): KitField[] {
   // flows into the captions unless those were edited too.
   const ai = input.meta.launchKit?.ai;
   const drafts = ai?.drafts;
+  values.releaseTitle = edits.releaseTitle ?? (g.releaseTitle.value || values.title);
+  const year = /^(\d{4})-/.exec(values.releaseDate)?.[1] ?? String((input.today ?? new Date()).getFullYear());
+  values.copyright = edits.copyright ?? (values.label ? `℗ ${year} ${values.label}` : "");
   values.coverBrief = edits.coverBrief ?? drafts?.coverBrief ?? coverBrief(values, input.meta);
   values.captions = edits.captions ?? drafts?.captions ?? captions(values);
   // AI text bakes in the title/artist/date it was written for.
@@ -319,6 +453,16 @@ export function buildKit(input: KitInput): KitField[] {
     field("releaseDate", "date", g.releaseDate),
     field("coverBrief", "multiline", drafted),
     field("captions", "multiline", drafted),
+    field("featuring", "text", g.featuring),
+    field("songwriters", "text", g.songwriters),
+    field("releaseType", "choice", g.releaseType, RELEASE_TYPES),
+    field("releaseTitle", "text", g.releaseTitle.value ? g.releaseTitle : { source: "suggested", note: "Same as the song title (a single)" }),
+    field("trackNumber", "text", g.trackNumber),
+    field("label", "text", g.label),
+    field("copyright", "text", g.copyright),
+    field("language", "text", g.language),
+    field("isrc", "text", g.isrc),
+    field("upc", "text", g.upc),
   ];
 }
 
@@ -362,7 +506,7 @@ const csvCell = (s: string) => `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"
 /** The text files of an exported kit. */
 export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]): { name: string; content: string }[] {
   const get = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
-  const meta = METADATA_FIELDS.concat("releaseDate");
+  const meta = METADATA_FIELDS.concat("releaseDate", DISTRIBUTION_FIELDS);
   const aiFlags: Check[] = fields.flatMap((f) =>
     f.review && !f.review.stale && (f.review.verdict !== "ok" || f.review.confidence < LOW_CONFIDENCE)
       ? [{ level: "warn" as const, message: `${f.label}: AI says ${f.review.reason || f.review.verdict}` }]
@@ -382,6 +526,7 @@ export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]
       // BOM so Excel reads accented names (é, ñ) as UTF-8.
       content: "﻿" + [meta.map((id) => csvCell(LABELS[id])).join(","), meta.map((id) => csvCell(get(id))).join(",")].join("\n") + "\n",
     },
+    { name: "distributor-sheet.md", content: distributorSheet(get, snippets, open, masterBaseName(fields, get("title"))) },
     { name: "cover-brief.md", content: get("coverBrief") + "\n" },
     { name: "captions.md", content: get("captions") + "\n" },
     {
@@ -392,6 +537,52 @@ export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]
         "\n",
     },
   ];
+}
+
+/** Every value in the order distributors' upload forms ask for it, ready to
+ * copy field by field (DistroKid, TuneCore, CD Baby, Amuse…). */
+function distributorSheet(get: (id: KitFieldId) => string, snippets: Snippet[], open: Check[], master: string): string {
+  const or = (v: string, empty: string) => v.trim() || empty;
+  const hook = snippets.find((s) => /hook/i.test(s.label)) ?? snippets[0];
+  const writers = get("songwriters")
+    .split(";")
+    .map((w) => w.trim())
+    .filter(Boolean);
+  const lines = [
+    `# Distributor sheet: "${get("title")}"`,
+    "",
+    "Copy each value into your distributor's upload form. Optional fields left empty: leave them blank there too.",
+    "",
+    "## Release",
+    `- Release type: ${or(get("releaseType"), "Single")}`,
+    `- Release title: ${or(get("releaseTitle"), get("title"))}`,
+    `- Release date: ${get("releaseDate")}${get("releaseDate") ? ` (${humanDate(get("releaseDate"))})` : ""}`,
+    `- Label: ${or(get("label"), "(your artist name)")}`,
+    `- ℗ / © line: ${or(get("copyright"), "(year + label)")}`,
+    `- UPC / EAN: ${or(get("upc"), "(leave empty: assigned for free)")}`,
+    "",
+    `## Track ${or(get("trackNumber"), "1")}`,
+    `- Track title: ${get("title")}`,
+    `- Primary artist(s): ${get("artists")}`,
+    `- Featured artist(s): ${or(get("featuring"), "(none)")}`,
+    `- Songwriters (legal names):${writers.length ? "\n" + writers.map((w) => `  - ${w}`).join("\n") : " (missing)"}`,
+    `- Producer(s): ${or(get("producers"), "(none credited)")}`,
+    `- Genre: ${get("genre")}`,
+    `- Lyrics language: ${or(get("language"), "(missing)")}`,
+    `- Explicit: ${or(get("explicit"), "(answer Yes or No)")}`,
+    `- ISRC: ${or(get("isrc"), "(leave empty: assigned for free)")}`,
+    hook ? `- Preview / TikTok start: ${formatDuration(hook.startSec)} (the ${hook.label} snippet)` : null,
+    `- BPM / key: ${[get("bpm"), get("key")].filter(Boolean).join(" / ") || "(not needed)"}`,
+    `- Duration: ${get("duration")}`,
+    "",
+    "## Files",
+    `- Audio: "${master}" in this folder. Distributors want WAV, 16 or 24-bit, 44.1 kHz.`,
+    "- Cover: 3000 × 3000 px JPG, RGB. cover-concept.jpg is a draft to brief the designer, not the final cover.",
+    "",
+    "## Before you submit",
+    open.length ? open.map((c) => `- [ ] ${c.message}`).join("\n") : "- [x] All checks passed",
+  ];
+  return lines.filter((l) => l !== null).join("\n") + "\n";
 }
 
 /** Plausible analysis for sample data (no real audio): verse/hook shape. */
