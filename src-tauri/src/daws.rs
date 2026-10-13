@@ -271,7 +271,9 @@ pub fn read_project(daw: Daw, path: &Path) -> FlpMetadata {
             }
         }
     }
-    let meta = read_uncached(daw, path);
+    // A failed read (cloud placeholder, locked file) isn't cached, so the
+    // next scan tries again.
+    let Ok(meta) = read_uncached(daw, path) else { return FlpMetadata::default() };
     if let Some(stamp) = stamp {
         let mut cache = READ_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         cache.get_or_insert_with(HashMap::new).insert(path.to_path_buf(), (stamp, meta.clone()));
@@ -279,8 +281,16 @@ pub fn read_project(daw: Daw, path: &Path) -> FlpMetadata {
     meta
 }
 
-fn read_uncached(daw: Daw, path: &Path) -> FlpMetadata {
-    let read = match daw {
+/// Drop cached reads for projects the last scan didn't see (deleted or moved).
+pub fn prune_read_cache(keep: &std::collections::HashSet<PathBuf>) {
+    let mut cache = READ_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(c) = cache.as_mut() {
+        c.retain(|p, _| keep.contains(p));
+    }
+}
+
+fn read_uncached(daw: Daw, path: &Path) -> Result<FlpMetadata, String> {
+    match daw {
         Daw::Reaper => fs::read(path).map(|b| parse_rpp(&String::from_utf8_lossy(&b), project_dir(path))).map_err(|e| e.to_string()),
         Daw::Ableton => File::open(path)
             .map(|f| {
@@ -290,8 +300,7 @@ fn read_uncached(daw: Daw, path: &Path) -> FlpMetadata {
             .map_err(|e| e.to_string()),
         Daw::StudioOne => read_song(path),
         _ => Ok(FlpMetadata::default()),
-    };
-    read.unwrap_or_default()
+    }
 }
 
 fn project_dir(path: &Path) -> &Path {

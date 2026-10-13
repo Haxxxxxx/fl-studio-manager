@@ -454,9 +454,31 @@ pub async fn scan_projects(
     for folder in folders.iter().chain(output_folder.iter()) {
         let _ = scope.allow_directory(folder, true);
     }
-    tauri::async_runtime::spawn_blocking(move || scan(&folders, output_folder.as_deref()))
+    let projects = tauri::async_runtime::spawn_blocking(move || scan(&folders, output_folder.as_deref()))
         .await
-        .map_err(|e| format!("scan failed: {e}"))
+        .map_err(|e| format!("scan failed: {e}"))?;
+    remember_scan(&projects);
+    Ok(projects)
+}
+
+/// Backups the last scan listed. Cleanup only deletes paths from this set,
+/// so the webview can never point it at a real project.
+static LISTED_BACKUPS: std::sync::Mutex<Option<HashSet<PathBuf>>> = std::sync::Mutex::new(None);
+
+fn remember_scan(projects: &[ProjectInfo]) {
+    let listed: HashSet<PathBuf> = projects.iter().flat_map(|p| p.backups.iter().map(|b| PathBuf::from(&b.path))).collect();
+    *LISTED_BACKUPS.lock().unwrap_or_else(|e| e.into_inner()) = Some(listed);
+    let scanned: HashSet<PathBuf> = projects.iter().map(|p| PathBuf::from(&p.path)).collect();
+    daws::prune_read_cache(&scanned);
+}
+
+/// Whether the last scan listed `path` as some project's backup.
+pub fn is_listed_backup(path: &Path) -> bool {
+    LISTED_BACKUPS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .is_some_and(|set| set.contains(path))
 }
 
 #[cfg(test)]

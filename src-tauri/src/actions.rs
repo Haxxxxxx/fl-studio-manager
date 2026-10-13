@@ -205,12 +205,20 @@ pub fn restore_backup(backup_path: String, project_path: String) -> Result<Strin
     Ok(target.to_string_lossy().to_string())
 }
 
-/// Send backups to the Recycle Bin (recoverable). Refuses anything the
-/// scanner wouldn't list as a backup, so a bad call can't touch real
-/// projects.
+/// Whether cleanup may delete `path`: a plain file (no `..` tricks) that
+/// looks like a backup and that the last scan actually listed as one.
+fn may_trash(path: &Path, listed: impl Fn(&Path) -> bool) -> bool {
+    !path.components().any(|c| matches!(c, std::path::Component::ParentDir))
+        && daws::is_backup_file(path)
+        && listed(path)
+        && fs::symlink_metadata(path).is_ok_and(|m| m.is_file())
+}
+
+/// Send backups to the Recycle Bin (recoverable). Refuses anything the last
+/// scan didn't list as a backup, so a bad call can't touch real projects.
 #[tauri::command]
 pub async fn trash_backups(paths: Vec<String>) -> Result<u32, String> {
-    if let Some(p) = paths.iter().find(|p| !daws::is_backup_file(Path::new(p))) {
+    if let Some(p) = paths.iter().find(|p| !may_trash(Path::new(p), crate::scanner::is_listed_backup)) {
         return Err(format!("refusing to delete non-backup file: {p}"));
     }
     let count = paths.len() as u32;
@@ -285,6 +293,35 @@ mod tests {
         // One real project in the batch refuses the whole batch.
         let mixed = vec!["/m/Tide/Tide.rpp-bak".to_string(), "/m/Tide/Tide.rpp".to_string()];
         assert!(tauri::async_runtime::block_on(trash_backups(mixed)).is_err());
+    }
+
+    #[test]
+    fn trash_needs_a_listed_plain_backup_file() {
+        let dir = std::env::temp_dir().join(format!("flsm-trash-guard-{}", std::process::id()));
+        // A real project inside a linked root that happens to be called "Backup".
+        let real = dir.join("Backup").join("Envy").join("Envy.flp");
+        let backup = dir.join("Backup").join("Envy").join("Backup").join("Envy (overwritten at 16h12).flp");
+        let folder = dir.join("Tide").join("old.bak");
+        fs::create_dir_all(backup.parent().unwrap()).unwrap();
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(&real, b"my work").unwrap();
+        fs::write(&backup, b"old").unwrap();
+        let only_backup = |p: &Path| p == backup;
+        let anything = |_: &Path| true;
+
+        assert!(may_trash(&backup, only_backup));
+        // Name heuristics alone pass for the real project; the scan list doesn't.
+        assert!(daws::is_backup_file(&real));
+        assert!(!may_trash(&real, only_backup));
+        // `..` back out of a backup folder, a directory named like a backup.
+        let sneaky = backup.parent().unwrap().join("..").join("Envy.flp");
+        assert!(!may_trash(&sneaky, anything));
+        assert!(!may_trash(&folder, anything));
+        // Never-scanned paths are refused by the real command.
+        let b = backup.to_string_lossy().to_string();
+        assert!(tauri::async_runtime::block_on(trash_backups(vec![b])).is_err());
+        assert_eq!(fs::read(&backup).unwrap(), b"old");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
