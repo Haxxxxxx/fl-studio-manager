@@ -351,7 +351,14 @@ pub fn safe_name(name: &str) -> String {
         .map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() { '_' } else { c })
         .collect();
     let trimmed = cleaned.trim().trim_matches('.').to_string();
-    if trimmed.is_empty() { "Untitled".to_string() } else { trimmed }
+    if trimmed.is_empty() {
+        return "Untitled".to_string();
+    }
+    // Windows reserves these device names, with or without an extension.
+    let stem = trimmed.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
+    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || (stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT")) && stem.as_bytes()[3].is_ascii_digit());
+    if reserved { format!("_{trimmed}") } else { trimmed }
 }
 
 /// Cuts each clip out of `src` (one decode pass) into `<out_dir>/<label>.wav`
@@ -605,6 +612,11 @@ mod tests {
     fn safe_names() {
         assert_eq!(safe_name("a/b:c"), "a_b_c");
         assert_eq!(safe_name(" .. "), "Untitled");
+        for reserved in ["CON", "con", "NUL.txt", "Com1", "LPT9.wav", "aux "] {
+            assert!(safe_name(reserved).starts_with('_'), "{reserved}");
+        }
+        assert_eq!(safe_name("Console"), "Console");
+        assert_eq!(safe_name("COM10"), "COM10");
     }
 
     #[test]

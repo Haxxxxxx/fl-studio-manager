@@ -38,6 +38,12 @@ quick-xml = "0.42"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+# GetDriveTypeW: backups on removable/network drives skip the Recycle Bin.
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# statfs: network volumes have no Trash.
+libc = "0.2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
