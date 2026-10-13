@@ -39,6 +39,10 @@ pub struct ProjectInfo {
     pub time_sig_num: Option<u8>,
     pub time_sig_denom: Option<u8>,
     pub fl_version: Option<String>,
+    /// Which DAW the project belongs to (by file type).
+    pub daw: crate::daws::Daw,
+    /// The DAW version that saved it, when the file says ("Ableton Live 11.3.4").
+    pub daw_version: Option<String>,
     /// Lives under a `Templates` folder — FL's user-template location.
     pub is_template: bool,
     /// Newest first.

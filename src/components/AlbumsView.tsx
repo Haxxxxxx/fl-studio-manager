@@ -20,7 +20,7 @@ function kindLabel(kind: AlbumKind) {
 
 function tracksOf(album: Album, projects: ProjectInfo[]): (ProjectInfo | null)[] {
   const byPath = new Map(projects.map((p) => [p.path, p]));
-  // A track whose .flp was moved/renamed shows as missing rather than vanishing.
+  // A track whose project file was moved/renamed shows as missing rather than vanishing.
   return album.trackPaths.map((path) => byPath.get(path) ?? null);
 }
 

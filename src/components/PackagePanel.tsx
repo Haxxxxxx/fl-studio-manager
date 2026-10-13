@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, FolderOpen, Loader2, X, XCircle } from "lu
 import { useAppStore } from "../store/useAppStore";
 import { formatBytes } from "../lib/format";
 import { revealInFileManager } from "../lib/tauri";
+import { stripProjectExt } from "../lib/daws";
 
 export function PackagePanel() {
   const results = useAppStore((s) => s.packageResults);
@@ -9,7 +10,7 @@ export function PackagePanel() {
   const dismiss = useAppStore((s) => s.dismissPackageResults);
   if (results === null) return null;
 
-  const name = (p: string) => (p.split(/[/\\]/).pop() ?? p).replace(/\.flp$/i, "");
+  const name = (p: string) => stripProjectExt(p.split(/[/\\]/).pop() ?? p);
   const firstZip = results.find((r) => r.zipPath)?.zipPath;
 
   return (
