@@ -13,7 +13,7 @@ const NOUNS = [
   "Tide", "Mirage", "Signal", "Fever", "Orbit", "Static",
 ];
 
-const STATUSES: (SongStatus | undefined)[] = ["idea", "wip", "wip", "mixing", "mastering", "done", "done", undefined];
+const STATUSES: (SongStatus | undefined)[] = ["creation", "creation", "production", "production", "prep", "release", "promotion", undefined];
 const TAGS = ["dark", "chill", "club", "vocals", "808", "sample-based", "collab"];
 const DAY = 24 * 60 * 60 * 1000;
 const VOCALISTS = ["Kadence", "Milo", "Nova"];
@@ -148,7 +148,7 @@ export function generateSampleWorkspace(projects: ProjectInfo[]): Workspace {
   songs[paths[0]].credits = [{ personId: "p-kadence", role: "Vocals", split: 50 }];
 
   return {
-    version: 1,
+    version: 2,
     songs,
     people,
     albums: [

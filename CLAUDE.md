@@ -10,7 +10,8 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 - The user wants a **fully free** stack: Gemini free tier for text, local ffmpeg for video, Cloudflare Workers AI (FLUX) for cover concepts. Don't add paid APIs without asking.
 
 - **Cover concepts:** FLUX.1 [schnell] on Cloudflare Workers AI (free 10k neurons/day). `src-tauri/src/cover.rs` holds the account ID + token (`cover.json` in the config dir, or `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`), calls the model and saves `cover-concept.jpg` into the kit folder. `src/lib/cover.ts` turns the cover brief into a prompt: square, no text, no real likeness, no title or names. `src/components/CoverConcepts.tsx` is the 2x2 picker. Images stay in memory. The workspace stores only the pick's seed, prompt and saved path (`LaunchKitMeta.cover`).
-- Not built yet: stems, and distributor-specific export formats. The shared crew dashboard (1a) needs a backend decision first.
+- **Phase 1a (local part):** stages are the roadmap lifecycle (`creation → production → prep → release → promotion`, workspace v2; `migrateWorkspace` in `src/lib/songs.ts` maps the old ids and keeps `legacyStatus`). "Finished" = `isFinished()` = Prep or later. `src/lib/calendar.ts` + `CalendarView` = release calendar (dated releases + Launch Kit dates, with readiness checks). `src/lib/crew.ts` + `CrewCards` = next release, stalled tracks (21+ days without a save in Creation/Production), who's on what.
+- Not built yet: multi-user sharing (needs a backend decision), where-files-live view, stems, distributor-specific export formats.
 
 ## Commands
 - `npm ci && npm run tauri dev`: run the app. Setup per OS: [SETUP.md](SETUP.md).
@@ -21,4 +22,3 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 - Developed on Windows and macOS. Crew members use both. `.flp` files store paths with the saving OS's separators (see `native()` in `src-tauri/src/resolve.rs`).
 - No hardcoded paths, usernames, real artist names or keys in code, tests or docs. Use placeholders.
 - App data (statuses, releases, people) lives in `workspace.json` in the app config dir, keyed by `.flp` path. Never write to `.flp` files.
-- Song stages in code (`idea → wip → mixing → mastering → done`) don't yet match the roadmap lifecycle (Creation → Production → Prep → Release → Promotion). Migrate them deliberately, with a workspace migration.

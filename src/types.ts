@@ -83,10 +83,13 @@ export interface RenderEvent {
 
 // ---- Workspace: the app's own data, which FL Studio doesn't store ----
 
-export type SongStatus = "idea" | "wip" | "mixing" | "mastering" | "done";
+/** The song lifecycle (docs/ROADMAP.md): one stage at a time. */
+export type SongStatus = "creation" | "production" | "prep" | "release" | "promotion";
 
 export interface SongMeta {
   status?: SongStatus;
+  /** The stage before the lifecycle migration (idea/wip/mixing/mastering/done). */
+  legacyStatus?: string;
   tags?: string[];
   notes?: string;
   /** Musical key, e.g. "Am", "F#". FL doesn't store one. */
@@ -254,7 +257,8 @@ export interface Album {
 }
 
 export interface Workspace {
-  version: 1;
+  /** 2 = roadmap lifecycle stages (see migrateWorkspace). */
+  version: 2;
   /** Keyed by .flp path. */
   songs: Record<string, SongMeta>;
   albums: Album[];
