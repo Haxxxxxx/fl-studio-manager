@@ -14,8 +14,15 @@ const MEASURED: KitFieldId[] = ["bpm", "duration"];
 const NEVER_SUGGEST: KitFieldId[] = ["isrc", "upc", "songwriters", "trackNumber"];
 const LONG_TEXT: KitFieldId[] = ["captions", "coverBrief"];
 
-/** Facts about the song, as sent to the model. No file paths or usernames. */
-export function kitContext({ project, meta, people, albums, analysis, today = new Date() }: KitInput) {
+export interface ContextOptions {
+  /** The user's notes (off unless "Include notes" is on in Settings). */
+  includeNotes?: boolean;
+}
+
+/** Facts about the song, as sent to the model. Never file paths, usernames,
+ * sample names or the raw mixer track names: only what was found in them
+ * (a key, crew members' names). Notes only when the user opted in. */
+export function kitContext({ project, meta, people, albums, analysis, today = new Date() }: KitInput, { includeNotes = false }: ContextOptions = {}) {
   const name = (id: string) => people.find((p) => p.id === id)?.name;
   const release = albums.find((a) => a.trackPaths.includes(project.path));
   return {
@@ -24,18 +31,28 @@ export function kitContext({ project, meta, people, albums, analysis, today = ne
     projectName: project.name,
     pipelineStage: meta.status ?? "unsorted",
     tags: meta.tags ?? [],
-    notes: (meta.notes ?? "").slice(0, 1500),
+    ...(includeNotes && meta.notes?.trim() ? { notes: meta.notes.trim().slice(0, 1500) } : {}),
     tempoBpm: project.tempoBpm,
     timeSignature: project.timeSigNum && project.timeSigDenom ? `${project.timeSigNum}/${project.timeSigDenom}` : null,
     keySetInApp: meta.key ?? null,
     keyWrittenInTrackNames: detectKey(project.trackNames),
     mixdownDurationSec: analysis ? Math.round(analysis.durationSec) : null,
-    mixerTrackNames: project.trackNames.slice(0, 80),
     credits: (meta.credits ?? []).flatMap((c) => (name(c.personId) ? [{ name: name(c.personId), role: c.role, split: c.split ?? null }] : [])),
     peopleFoundInTrackNames: detectedPeople(project, people).map((p) => p.name),
     release: release ? { title: release.title, kind: release.kind, date: release.releaseDate } : null,
     lastSavedInFl: isoDate(new Date(project.modifiedAtMs)),
   };
+}
+
+/** What AI calls send, worded once for every place that says it. */
+export function aiDisclosure(includeNotes: boolean): string {
+  return (
+    "Sends the song name (the project file's name), stage, tags, tempo, key, credits, release dates and the kit fields to Google Gemini" +
+    (includeNotes ? ", plus your notes when checking a kit" : "") +
+    ". Never audio, file paths, sample names or your track names (only a key or a crew member's name spotted in them)" +
+    (includeNotes ? "" : ", and never your notes") +
+    ". On the free tier Google may use what it receives to improve its products."
+  );
 }
 
 const call = (settings: Settings, system: string, prompt: string, schema: object, temperature: number) =>
@@ -63,14 +80,16 @@ Rules:
 - Use only facts from CONTEXT and FIELDS. Never invent stream counts, chart positions, features, quotes, places, labels, links or people.
 - No placeholders; for links write "link in bio".
 - Captions: short and punchy, native to Instagram and TikTok, at most 2 emojis and 3 hashtags each. Put the title in quotes and name the artist exactly as given. "announce" and "teaser" mention the release date as given; "releaseDay" says it's out now.
-- Cover concept: art direction a designer can act on, drawn from the title, tags, notes, tempo and key. Concrete and visual, one strong idea. The only text on a cover is the title and artist name.
+- Cover concept: art direction a designer can act on, drawn from the title, tags, tempo and key. Concrete and visual, one strong idea. The only text on a cover is the title and artist name.
 - Write everything in ${language}.`;
 
 function fieldValues(fields: KitField[]) {
   return Object.fromEntries(fields.filter((f) => !LONG_TEXT.includes(f.id)).map((f) => [f.id, f.value]));
 }
 
-/** AI-written captions and cover brief, in the kit's text format. */
+/** AI-written captions and cover brief, in the kit's text format. Never sees
+ * the notes, even when they're included in checks: the cover concept it
+ * writes becomes the FLUX prompt, which goes to Cloudflare. */
 export async function draftCopy(input: KitInput, fields: KitField[], settings: Settings) {
   const prompt = `CONTEXT:\n${JSON.stringify(kitContext(input), null, 1)}\n\nFIELDS:\n${JSON.stringify(fieldValues(fields), null, 1)}`;
   const answer = await call(settings, draftSystem(settings.aiLanguage || "English"), prompt, DRAFT_SCHEMA, 0.8);
@@ -121,7 +140,7 @@ Return exactly one entry for EVERY field in FIELDS:
 - confidence: 0 to 1, how sure you are of your verdict.
 - reason: one short sentence a musician understands.
 - suggestion: a corrected value only when the verdict is "check" or "wrong" AND a better value follows from the context; otherwise "". Never suggest values for bpm or duration (they are measured). Dates as YYYY-MM-DD. explicit is "Yes" or "No".
-Look for: titles that still look like file names or carry version tags (v2, final, master); artists or producers not supported by the credits or mixer track names; a genre that contradicts the tags or notes; captions or a cover brief that state facts missing from the context, or contradict the title, artist or release date; release dates in the past or not on a Friday; keys written in a non-standard way.
+Look for: titles that still look like file names or carry version tags (v2, final, master); artists or producers not supported by the credits or peopleFoundInTrackNames; a genre that contradicts the tags (or the notes, when given); captions or a cover brief that state facts missing from the context, or contradict the title, artist or release date; release dates in the past or not on a Friday; keys written in a non-standard way.
 Judge only from the context. When the context can't confirm something, prefer "check" with lower confidence over "wrong".`;
 
 /** Keeps only well-formed verdicts; measured fields never get suggestions. */
@@ -158,9 +177,23 @@ export function sanitizeReview(raw: unknown, fields: KitField[]): Partial<Record
   return out;
 }
 
+/** The cover brief template quotes the notes ("- Notes: …"): dropped unless they're included. */
+export function withoutNotesLine(brief: string): string {
+  return brief
+    .split("\n")
+    .filter((l) => !/^\s*-?\s*notes\s*:/i.test(l))
+    .join("\n");
+}
+
+/** What the "Check kit" call sends: CONTEXT and FIELDS. */
+export function reviewPayload(input: KitInput, fields: KitField[], includeNotes: boolean) {
+  const values = Object.fromEntries(fields.map((f) => [f.id, f.id === "coverBrief" && !includeNotes ? withoutNotesLine(f.value) : f.value]));
+  return { context: kitContext(input, { includeNotes }), values };
+}
+
 export async function reviewKit(input: KitInput, fields: KitField[], settings: Settings) {
-  const values = Object.fromEntries(fields.map((f) => [f.id, f.value]));
-  const prompt = `CONTEXT:\n${JSON.stringify(kitContext(input), null, 1)}\n\nFIELDS:\n${JSON.stringify(values, null, 1)}`;
+  const { context, values } = reviewPayload(input, fields, !!settings.aiIncludeNotes);
+  const prompt = `CONTEXT:\n${JSON.stringify(context, null, 1)}\n\nFIELDS:\n${JSON.stringify(values, null, 1)}`;
   const answer = await call(settings, REVIEW_SYSTEM, prompt, reviewSchema(fields.map((f) => f.id)), 0.1);
   const review = sanitizeReview(answer.data, fields);
   if (Object.keys(review).length === 0) throw new Error("Gemini's check came back empty. Try again.");

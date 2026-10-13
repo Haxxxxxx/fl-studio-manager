@@ -117,6 +117,9 @@ pub struct Settings {
     /// Language for AI-written captions and briefs ("English", "French"…).
     #[serde(default)]
     pub ai_language: Option<String>,
+    /// Send the song's notes with "Check kit" (off by default).
+    #[serde(default)]
+    pub ai_include_notes: bool,
     /// ffmpeg for shorts; None = found automatically.
     #[serde(default)]
     pub ffmpeg_path: Option<String>,
@@ -132,6 +135,7 @@ impl Default for Settings {
             favorites: Vec::new(),
             ai_model: None,
             ai_language: None,
+            ai_include_notes: false,
             ffmpeg_path: None,
         }
     }

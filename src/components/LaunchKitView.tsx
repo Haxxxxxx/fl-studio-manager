@@ -20,7 +20,7 @@ import {
   type KitField,
   type KitInput,
 } from "../lib/launchKit";
-import { draftCopy, reviewKit } from "../lib/ai";
+import { aiDisclosure, draftCopy, reviewKit } from "../lib/ai";
 import { formatRelative } from "../lib/format";
 import { stageRank } from "../lib/songs";
 import type { AudioAnalysis, ProjectInfo, Snippet } from "../types";
@@ -416,7 +416,7 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
       )}
       {error && <div className="text-xs text-red-300">{error}</div>}
       <div className="text-[11px] leading-relaxed text-engrave">
-        Sends the song name, tags, notes, mixer track names, credits and these fields to Google Gemini. No audio, no file paths. On the free tier Google may use them to improve its products.
+        {aiDisclosure(!!settings.aiIncludeNotes)}
       </div>
     </div>
   );

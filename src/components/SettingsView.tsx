@@ -4,6 +4,7 @@ import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import { CrewPanel } from "./CrewPanel";
 import { canRenderInApp } from "../lib/daws";
+import { aiDisclosure } from "../lib/ai";
 import type { RenderFormat } from "../types";
 
 const IS_MAC = navigator.userAgent.includes("Mac");
@@ -393,10 +394,21 @@ function AiSettings() {
           </select>
         </label>
       </div>
+      <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-body">
+        <input
+          type="checkbox"
+          checked={!!settings.aiIncludeNotes}
+          onChange={(e) => updateSettings({ aiIncludeNotes: e.target.checked })}
+          className="mt-0.5 accent-orange-500"
+        />
+        <span>
+          Include notes when checking a kit
+          <span className="block text-[11px] text-engrave">Off: your notes stay on this computer. Drafts never use them.</span>
+        </span>
+      </label>
       <p className="mt-2 text-[11px] leading-relaxed text-engrave">
-        The key stays on this computer (its own file in the app config folder, not settings.json) and is never shown again. AI calls
-        send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. On the free tier Google
-        may use them to improve its products.
+        The key stays on this computer (its own file in the app config folder, not settings.json) and is never shown again.{" "}
+        {aiDisclosure(!!settings.aiIncludeNotes)}
       </p>
     </section>
   );
@@ -483,8 +495,8 @@ function CoverSettings() {
       {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
       <p className="mt-2 text-[11px] leading-relaxed text-engrave">
         Both stay on this computer (their own owner-only file in the app config folder, not settings.json) and are never shown again.
-        Only the image prompt is sent to Cloudflare: it's built from the cover brief, without the song title, names or notes. No audio,
-        no file paths.
+        Only the image prompt is sent to Cloudflare. It's built from the cover brief's concept, imagery, palette, tags and any free text
+        you write in it, with the song title, artist names and the Notes line taken out. No audio, no file paths.
       </p>
     </section>
   );

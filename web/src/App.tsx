@@ -64,7 +64,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <Logo />
       {children}
       <p className="mt-auto text-[11px] leading-relaxed text-engrave">
-        Your crew's shared songs: titles, stages, BPM, key, credits and release dates. Never audio or files. Stored in the EU.
+        Your crew's shared songs: titles, stages, BPM, key, tags, credits and release dates. Never audio, files, notes or track names. Stored in the EU (Ireland).
       </p>
     </div>
   );
