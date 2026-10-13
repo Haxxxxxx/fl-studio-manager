@@ -2,6 +2,7 @@ import { create } from "zustand";
 import * as api from "../lib/tauri";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
+import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
 import type {
   PackageResult,
   Person,
@@ -68,6 +69,9 @@ interface AppState {
   workspaceWritable: boolean;
   projects: ProjectInfo[];
   scanning: boolean;
+  /** Songs whose record followed a rename/move in the last scan (shown once). */
+  relinked: Relink[];
+  dismissRelinked: () => void;
   search: string;
   selected: Set<string>;
   renderJobs: Map<string, RenderJob>;
@@ -129,6 +133,8 @@ interface AppState {
   openLaunchKit: (path: string | null) => void;
   /** undefined resets the field to its generated value. */
   setKitEdit: (path: string, id: KitFieldId, value: string | undefined) => void;
+  /** Several fields at once; null clears every edit (back to generated). */
+  setKitEdits: (path: string, edits: Partial<Record<KitFieldId, string>> | null) => void;
   setSnippetStart: (path: string, label: string, startSec: number | undefined) => void;
   acceptKit: (path: string) => void;
   /** Merge AI drafts/review into a song's kit. */
@@ -232,6 +238,8 @@ export const useAppStore = create<AppState>((set, get) => {
     workspaceWritable: false,
     projects: [],
     scanning: false,
+    relinked: [],
+    dismissRelinked: () => set({ relinked: [] }),
     search: "",
     selected: new Set(),
     renderJobs: new Map(),
@@ -351,7 +359,21 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ scanning: true });
       try {
         const projects = await api.scanProjects(folders, get().settings.outputFolder);
-        if (id === scanSeq && !get().demoMode) set({ projects });
+        if (id === scanSeq && !get().demoMode) {
+          // Renamed/moved .flp files keep their stage, tags, notes, credits,
+          // crew share and album slot (lib/relink.ts). Only on the real,
+          // writable workspace, never sample data.
+          const relinks = get().workspaceWritable ? findRelinks(projects, get().workspace, folders) : [];
+          if (relinks.length) {
+            const map = new Map(relinks.map((r) => [r.from, r.to]));
+            mutateWorkspace((ws) => applyRelinks(ws, relinks));
+            const favs = get().settings.favorites;
+            if (favs.some((f) => map.has(f))) void get().updateSettings({ favorites: favs.map((f) => map.get(f) ?? f) });
+            const open = get().detailPath;
+            set({ relinked: [...get().relinked, ...relinks], detailPath: open && map.has(open) ? map.get(open)! : open });
+          }
+          set({ projects });
+        }
       } finally {
         if (id === scanSeq) set({ scanning: false });
       }
@@ -502,6 +524,11 @@ export const useAppStore = create<AppState>((set, get) => {
       if (startSec === undefined) delete snippetStarts[label];
       else snippetStarts[label] = startSec;
       get().updateSong(path, { launchKit: { ...kit, snippetStarts, acceptedAtMs: undefined } });
+    },
+
+    setKitEdits: (path, edits) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      get().updateSong(path, { launchKit: { ...kit, edits: edits === null ? {} : { ...kit.edits, ...edits }, acceptedAtMs: undefined } });
     },
 
     acceptKit: (path) => {

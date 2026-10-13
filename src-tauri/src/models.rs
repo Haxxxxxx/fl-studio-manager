@@ -9,6 +9,18 @@ pub struct FileEntry {
     pub modified_at_ms: i64,
 }
 
+/// A song's exported stems: a `Stems` folder next to the project, or FL's
+/// split-mixer export (`<project>_<track>.wav`, two or more) beside the .flp.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StemsInfo {
+    /// The folder holding them (the stems folder, or the project folder).
+    pub folder: String,
+    pub count: u32,
+    pub bytes: u64,
+    pub newest_ms: i64,
+}
+
 /// One song: the main .flp plus everything FL Studio keeps around it.
 /// Backups (FL's `Backup/<name> (overwritten at 16h12).flp` files) are
 /// grouped under their project instead of being listed as projects.
@@ -38,6 +50,10 @@ pub struct ProjectInfo {
     /// `<project>_<date>_<track>.wav`).
     pub recordings_count: u32,
     pub recordings_bytes: u64,
+    /// Title and comment from FL Studio's project info, if filled in.
+    pub flp_title: Option<String>,
+    pub comment: Option<String>,
+    pub stems: Option<StemsInfo>,
     pub plugins: Vec<PluginInfo>,
     pub samples: Vec<SampleInfo>,
     /// Named mixer tracks and recorded-take labels ("Lead Voices - Nova"),

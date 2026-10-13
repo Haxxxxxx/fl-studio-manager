@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clapperboard, Disc3, FileAudio, FolderOpen, History, Image, Mic, Music2, Package, Rocket } from "lucide-react";
+import { Clapperboard, Disc3, FileAudio, FolderOpen, History, Image, Layers, Mic, Music2, Package, Rocket } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import { cleanTitle } from "../lib/launchKit";
@@ -59,6 +59,16 @@ export function FilesPanel({ project }: { project: ProjectInfo }) {
         label="Recorded takes"
         detail={project.recordingsCount ? `${project.recordingsCount} in Audio/ · ${formatBytes(project.recordingsBytes)}` : "none"}
         onReveal={project.recordingsCount && !demoMode ? () => reveal(audioDir) : undefined}
+      />
+      <Row
+        icon={<Layers size={13} />}
+        label="Stems"
+        detail={
+          project.stems
+            ? `${project.stems.count} in ${fileName(project.stems.folder) || "the project folder"} · ${formatBytes(project.stems.bytes)} · ${formatRelative(project.stems.newestMs)}`
+            : "none exported (a Stems folder, or FL's split mixer tracks)"
+        }
+        onReveal={project.stems && !demoMode ? () => reveal(project.stems!.folder) : undefined}
       />
       {project.renders.length === 0 ? (
         <Row icon={<Disc3 size={13} />} label="Mixdowns" detail="none yet" />

@@ -114,7 +114,7 @@ Goal: from personal monitor to crew tool, and build the deal-breaker.
 - [x] Who's working on what, last activity per project, stalled tracks _(dashboard: Crew + Stalled cards)_
 - [x] Decide which stats matter **to the group** vs. only to me, and surface the group ones _(Dashboard: Me / Crew switch)_
 - [x] Release calendar (planned and past release dates)
-- [x] Clear view of **where each track's files live** (project, stems, bounces, artwork) _(song panel → Files; stems not tracked yet)_
+- [x] Clear view of **where each track's files live** (project, stems, bounces, artwork) _(song panel → Files: project, backups, takes, stems, mixdowns, Launch Kit)_
 
 **1b. Launch Kit MVP**
 - [ ] Extract everything possible from the FL Studio project / exported audio (BPM, key, duration, stems, timestamps, contributors)

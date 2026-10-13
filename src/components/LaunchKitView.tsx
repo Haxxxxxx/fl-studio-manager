@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, ClipboardCopy, FolderOpen, Minus, Pause, Play, Plus, Rocket, RotateCcw, Sparkles } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
+import { useCrewStore } from "../store/useCrewStore";
 import * as api from "../lib/tauri";
 import {
   aiSummary,
@@ -10,7 +11,10 @@ import {
   kitChecks,
   kitFiles,
   kitSnippets,
+  DISTRIBUTION_FIELDS,
+  artistLine,
   LOW_CONFIDENCE,
+  masterBaseName,
   METADATA_FIELDS,
   type Check as KitCheck,
   type KitField,
@@ -81,6 +85,9 @@ export function LaunchKitView() {
   const settings = useAppStore((s) => s.settings);
   const demoMode = useAppStore((s) => s.demoMode);
   const setKitEdit = useAppStore((s) => s.setKitEdit);
+  const setKitEdits = useAppStore((s) => s.setKitEdits);
+  const crewName = useCrewStore((s) => s.crews.find((c) => c.id === s.activeCrewId)?.name ?? null);
+  const crewSongs = useCrewStore((s) => s.songs);
   const setSnippetStart = useAppStore((s) => s.setSnippetStart);
   const acceptKit = useAppStore((s) => s.acceptKit);
 
@@ -104,7 +111,24 @@ export function LaunchKitView() {
   }
 
   const meta = workspace.songs[project.path] ?? {};
-  const kitInput: KitInput = { project, meta, people: workspace.people, albums: workspace.albums, analysis };
+  // Fridays already taken: other releases, other kits, the crew's songs.
+  const busyDates = [
+    ...workspace.albums.filter((a) => !a.trackPaths.includes(project.path)).map((a) => a.releaseDate),
+    ...Object.entries(workspace.songs)
+      .filter(([p]) => p !== project.path)
+      .map(([, m]) => m.launchKit?.edits?.releaseDate),
+    ...crewSongs.filter((s) => s.id !== meta.shareId).map((s) => s.release_date),
+  ].filter((d): d is string => !!d);
+  const kitInput: KitInput = {
+    project,
+    meta,
+    people: workspace.people,
+    albums: workspace.albums,
+    analysis,
+    language: settings.aiLanguage ?? "English",
+    labelName: crewName,
+    busyDates,
+  };
   const fields = buildKit(kitInput);
   const snippets = kitSnippets(analysis, meta);
   const extra = kitChecks(project, analysis);
@@ -115,11 +139,19 @@ export function LaunchKitView() {
   const accepted = meta.launchKit?.acceptedAtMs;
   const byId = (id: KitField["id"]) => fields.find((f) => f.id === id)!;
 
+  const edits = meta.launchKit?.edits ?? {};
+  const suggestions = fields.filter((f) => f.review && !f.review.stale && f.review.suggestion && f.review.suggestion !== f.value);
+
   async function handleExport() {
     if (!project) return;
     if (!settings.outputFolder) return setExportState({ status: "error", message: "Set an export folder in Settings first." });
+    if (missing + ai.flagged > 0) {
+      const what = [missing && `${missing} field${missing === 1 ? "" : "s"} still need${missing === 1 ? "s" : ""} you`, ai.flagged && `the AI flagged ${ai.flagged}`]
+        .filter(Boolean)
+        .join(" and ");
+      if (!window.confirm(`${what[0].toUpperCase()}${what.slice(1)}. Export anyway? Open items go in checklist.md and the distributor sheet.`)) return;
+    }
     const title = byId("title").value || project.name;
-    const artists = byId("artists").value;
     setExportState({ status: "running" });
     try {
       const dir = await api.exportLaunchKit({
@@ -127,7 +159,7 @@ export function LaunchKitView() {
         folderName: title,
         files: kitFiles(fields, snippets, extra),
         master: project.renders[0]?.path ?? null,
-        masterName: artists ? `${artists} - ${title}` : title,
+        masterName: masterBaseName(fields, project.name),
         clips: snippets,
       });
       setExportState({ status: "done", dir });
@@ -188,6 +220,33 @@ export function LaunchKitView() {
         {extra.map((c) => (
           <CheckLine key={c.message} check={c} />
         ))}
+        <div className="flex flex-wrap items-center gap-3 text-xs text-white/45">
+          {suggestions.length > 0 && (
+            <button
+              onClick={() => setKitEdits(project.path, Object.fromEntries(suggestions.map((f) => [f.id, f.review!.suggestion!])))}
+              className="rounded bg-violet-500/15 px-2 py-1 text-violet-200 hover:bg-violet-500/25"
+            >
+              Use all {suggestions.length} AI suggestion{suggestions.length === 1 ? "" : "s"}
+            </button>
+          )}
+          {Object.keys(edits).length > 0 && (
+            <button
+              onClick={() => window.confirm("Undo every change you made in this kit?") && setKitEdits(project.path, null)}
+              className="hover:text-white"
+            >
+              Reset all edits
+            </button>
+          )}
+          <button
+            onClick={() =>
+              window.confirm("Clear every pre-filled value so you can fill the kit in by hand? (Reset all edits brings them back.)") &&
+              setKitEdits(project.path, Object.fromEntries(fields.filter((f) => f.kind !== "multiline").map((f) => [f.id, ""])))
+            }
+            className="hover:text-white"
+          >
+            Start blank
+          </button>
+        </div>
 
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-5">
           <div className="flex flex-col gap-5">
@@ -200,6 +259,13 @@ export function LaunchKitView() {
             </Card>
             <Card title="Release timing">
               <FieldRow field={byId("releaseDate")} onChange={(v) => setKitEdit(project.path, "releaseDate", v)} />
+            </Card>
+            <Card title="Distribution: what the upload form asks">
+              <div className="flex flex-col divide-y divide-white/5">
+                {DISTRIBUTION_FIELDS.map((id) => (
+                  <FieldRow key={id} field={byId(id)} onChange={(v) => setKitEdit(project.path, id, v)} />
+                ))}
+              </div>
             </Card>
           </div>
 
@@ -226,7 +292,7 @@ export function LaunchKitView() {
             />
             <Card title="Cover art brief">
               <FieldRow field={byId("coverBrief")} onChange={(v) => setKitEdit(project.path, "coverBrief", v)} bare />
-              <CoverConcepts key={project.path} path={project.path} title={byId("title").value || project.name} artists={byId("artists").value} brief={byId("coverBrief").value} />
+              <CoverConcepts key={project.path} path={project.path} title={byId("title").value || project.name} artists={artistLine(byId("artists").value, byId("featuring").value)} brief={byId("coverBrief").value} />
             </Card>
             <Card title="Captions">
               <FieldRow field={byId("captions")} onChange={(v) => setKitEdit(project.path, "captions", v)} bare />
