@@ -94,13 +94,33 @@ export const VERDICT_LABEL: Record<AiFieldReview["verdict"], string> = {
 };
 
 /** Launch Kit readiness: how many fields need you, or reviewed/ready. */
-export function KitStatus({ missing, warnings, accepted, aiVerified }: { missing: number; warnings: number; accepted: boolean; aiVerified: boolean }) {
+export function KitStatus({
+  missing,
+  warnings,
+  accepted,
+  aiVerified,
+  onJump,
+}: {
+  missing: number;
+  warnings: number;
+  accepted: boolean;
+  aiVerified: boolean;
+  /** Go to the next field that needs you (the plate becomes a button). */
+  onJump?: () => void;
+}) {
   const plate = "flex items-center gap-2 rounded px-3 py-1 font-display text-[15px] font-bold uppercase tracking-[0.04em]";
   if (missing) {
-    return (
-      <span className={`${plate} bg-hot text-chassis`}>
-        {missing} need{missing === 1 ? "s" : ""} you{warnings ? ` · ${warnings} to check` : ""}
-      </span>
+    const label = `${missing} need${missing === 1 ? "s" : ""} you${warnings ? ` · ${warnings} to check` : ""}`;
+    return onJump ? (
+      <button
+        onClick={onJump}
+        title="Go to the next field that needs you"
+        className={`${plate} bg-hot text-chassis hover:bg-hot-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cream`}
+      >
+        {label}
+      </button>
+    ) : (
+      <span className={`${plate} bg-hot text-chassis`}>{label}</span>
     );
   }
   return (
@@ -166,7 +186,12 @@ export function AiLine({ review, onUse }: { review: AiFieldReview & { stale: boo
 export function FieldRow({ field, onChange, bare = false }: { field: KitField; onChange: (v: string | undefined) => void; bare?: boolean }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className={`flex flex-col gap-1.5 ${bare ? "" : "py-3 first:pt-0 last:pb-0"}`}>
+    <div
+      id={`kit-field-${field.id}`}
+      data-kit-field={field.id}
+      data-needs-you={field.check?.level === "missing" ? "" : undefined}
+      className={`flex flex-col gap-1.5 rounded-md ${bare ? "" : "py-3 first:pt-0 last:pb-0"}`}
+    >
       <div className="flex items-center gap-2">
         {!bare && <span className="text-xs font-medium text-body">{field.label}</span>}
         <SourceBadge source={field.source} />
