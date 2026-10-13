@@ -67,7 +67,8 @@ interface CrewState {
   leaveCrew: () => Promise<void>;
   /** Share or stop sharing songs with the active crew. Songs shared with
    * another crew are left alone (see moveShares). */
-  setShared: (paths: string[], shared: boolean) => void;
+  /** Returns how many songs were skipped because they're shared with another crew. */
+  setShared: (paths: string[], shared: boolean) => number;
   /** Take songs off another crew's board and share them here instead. */
   moveShares: (paths: string[]) => Promise<void>;
   /** Move any crew song on the shared board. */
@@ -515,20 +516,25 @@ export const useCrewStore = create<CrewState>((set, get) => {
 
     setShared: (paths, shared) => {
       const sc = scope();
-      if (!sc) return;
+      if (!sc) return 0;
       const app = useAppStore.getState();
+      let skipped = 0;
       for (const path of paths) {
         const meta = app.workspace.songs[path] ?? {};
         if (shared) {
           // Shared (or being unshared) elsewhere: a new id would strand that
           // row, so leave it; moving it is explicit (moveShares).
-          if (shareElsewhere(meta, sc)) continue;
+          if (shareElsewhere(meta, sc)) {
+            skipped++;
+            continue;
+          }
           app.updateSong(path, { shared: true, shareId: meta.shareId ?? uuid(), shareCrewId: sc.crewId, shareUserId: sc.userId });
         } else if (sharedHere(meta, sc)) {
           // Keep the id so the next sync knows which row to delete.
           app.updateSong(path, { shared: false, shareCrewId: sc.crewId, shareUserId: sc.userId });
         }
       }
+      return skipped;
     },
 
     moveShares: async (paths) => {

@@ -187,6 +187,7 @@ export function LibraryView() {
 
   const { can: canShare, crewName } = useCanShare();
   const setShared = useCrewStore((s) => s.setShared);
+  const [shareNote, setShareNote] = useState<string | null>(null);
   const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.path));
   const selectedPaths = Array.from(selected);
 
@@ -292,8 +293,20 @@ export function LibraryView() {
                 { value: "share", label: `Share with ${crewName}` },
                 { value: "unshare", label: "Stop sharing" },
               ]}
-              onPick={(v) => setShared(selectedPaths, v === "share")}
+              onPick={(v) => {
+                const skipped = setShared(selectedPaths, v === "share");
+                setShareNote(
+                  skipped
+                    ? `${skipped} song${skipped === 1 ? " is" : "s are"} shared with another crew: move ${skipped === 1 ? "it" : "them"} from the song panel.`
+                    : null,
+                );
+              }}
             />
+          )}
+          {shareNote && (
+            <span role="status" className="text-xs text-amber-300">
+              {shareNote}
+            </span>
           )}
           <BulkSelect
             label="Archive"
