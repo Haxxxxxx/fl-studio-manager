@@ -3,6 +3,7 @@ mod ai;
 mod audio;
 mod cover;
 mod files;
+mod key;
 mod flp_metadata;
 mod models;
 mod package;
