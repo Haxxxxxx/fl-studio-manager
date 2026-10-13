@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Album, Person, ProjectInfo, SongMeta } from "../types";
-import { artistLine, buildKit, kitFiles, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
+import { artistLine, buildKit, kitFiles, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
 
 const today = new Date(2026, 9, 13); // Tue 13 Oct 2026
 const people: Person[] = [
@@ -140,5 +140,33 @@ describe("kitTitleFor", () => {
       const p = project(over);
       expect(kitTitleFor(p, meta)).toBe(value(buildKit(input(meta, { project: p })), "title"));
     }
+  });
+});
+
+describe("kitSnippets", () => {
+  const analysis = {
+    durationSec: 120,
+    windowSec: 0.5,
+    energy: [],
+    snippets: [
+      { label: "Hook 15s", startSec: 40, lengthSec: 15, reason: "comes back 2 times" },
+      { label: "Teaser 30s", startSec: 32, lengthSec: 30 },
+    ],
+  } as unknown as Parameters<typeof kitSnippets>[0];
+
+  it("keeps the detected snippets when nothing was edited", () => {
+    const s = kitSnippets(analysis, {});
+    expect(s.map((x) => [x.label, x.startSec, x.lengthSec, x.key])).toEqual([
+      ["Hook 15s", 40, 15, "Hook 15s"],
+      ["Teaser 30s", 32, 30, "Teaser 30s"],
+    ]);
+    expect(s[0].reason).toBe("comes back 2 times");
+  });
+
+  it("applies moves and lengths, renames by length, and stays inside the track", () => {
+    const s = kitSnippets(analysis, { launchKit: { snippetStarts: { "Hook 15s": 110 }, snippetLengths: { "Hook 15s": 30 } } });
+    // 110 + 30 would run past 2:00: pulled back to end at the last second.
+    expect(s[0]).toMatchObject({ label: "Hook 30s", key: "Hook 15s", startSec: 90, lengthSec: 30 });
+    expect(s[1]).toMatchObject({ label: "Teaser 30s", startSec: 32 });
   });
 });

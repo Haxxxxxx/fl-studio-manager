@@ -56,6 +56,9 @@ pub struct Snippet {
     pub label: String,
     pub start_sec: f64,
     pub length_sec: f64,
+    /// Why it was picked, in words ("comes back 3 times").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Streams the file's default track as interleaved f32, chunk by chunk.
@@ -108,6 +111,7 @@ pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
     let mut energy = Vec::new();
     let (mut acc, mut n, mut frames, mut rate) = (0f64, 0usize, 0u64, 0u32);
     let mut chroma = crate::key::Chroma::new();
+    let mut timbre = crate::sections::Timbre::new();
     let (mut peak_sample, mut clipped, mut chans) = (0f32, 0u64, 0usize);
     let bits_per_sample = decode(path, |samples, channels, sr| {
         rate = sr;
@@ -124,7 +128,9 @@ pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
             // Mean power across channels (a mono sum would cancel
             // out-of-phase stereo content).
             acc += frame.iter().map(|&x| (x as f64) * (x as f64)).sum::<f64>() / channels as f64;
-            chroma.push(frame.iter().sum::<f32>() / channels as f32, sr);
+            let mono = frame.iter().sum::<f32>() / channels as f32;
+            chroma.push(mono, sr);
+            timbre.push(mono, sr);
             n += 1;
             if n == window {
                 energy.push((acc / n as f64).sqrt() as f32);
@@ -147,7 +153,8 @@ pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
         energy.iter_mut().for_each(|e| *e /= peak);
     }
     let duration_sec = frames as f64 / rate as f64;
-    let snippets = pick_snippets(&energy, duration_sec, bpm);
+    let (feats, fine) = timbre.finish(WINDOW_SEC, energy.len());
+    let snippets = pick_snippets_with(&energy, &feats, &fine, duration_sec, bpm);
     let master = MasterSpec {
         container: path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase(),
         sample_rate: rate,
@@ -191,37 +198,117 @@ fn snap(start: f64, length: f64, duration: f64, bpm: Option<f64>) -> f64 {
     snapped.clamp(0.0, (duration - length).max(0.0))
 }
 
-/// The hook (loudest 15s), a 30s teaser, and an alternate 15s cut that
-/// doesn't overlap the hook.
+/// Loudness only (no timbre fingerprint): the loudest 15 s, a 30 s teaser
+/// and an alternate cut that doesn't overlap the hook.
+#[cfg(test)]
 fn pick_snippets(energy: &[f32], duration: f64, bpm: Option<f64>) -> Vec<Snippet> {
+    pick_snippets_with(energy, &[], &[], duration, bpm)
+}
+
+/// The hook (the 15 s that comes back most, weighed with loudness), a 30 s
+/// teaser that builds into it, and an alternate 15 s cut that is neither the
+/// hook nor a repeat of it. Without a fingerprint (`feats` empty) it falls
+/// back to loudness alone.
+fn pick_snippets_with(energy: &[f32], feats: &[crate::sections::Features], fine: &[f32], duration: f64, bpm: Option<f64>) -> Vec<Snippet> {
+    use crate::sections::{onset_near, repetition, segment_similarity};
     let windows = |sec: f64| (sec / WINDOW_SEC).round() as usize;
-    let snapped = |start_w: usize, len: f64| snap(start_w as f64 * WINDOW_SEC, len, duration, bpm);
-    let clip = |label: &str, start_sec: f64, length_sec: f64| Snippet { label: label.to_string(), start_sec, length_sec };
+    let bar = bpm.filter(|b| (40.0..=300.0).contains(b)).map(|b| 240.0 / b);
+    // Start on a real onset near the spot when there is one (the first beat
+    // isn't always at 0:00), else on the bar grid.
+    let place = |start_w: usize, len: f64| -> f64 {
+        let at = start_w as f64 * WINDOW_SEC;
+        let onset = onset_near(fine, at, bar.map_or(1.0, |b| b / 2.0)).map(|t| (t - 0.05).max(0.0));
+        match onset {
+            Some(t) => t.clamp(0.0, (duration - len).max(0.0)),
+            None => snap(at, len, duration, bpm),
+        }
+    };
+    let clip = |label: &str, start_sec: f64, length_sec: f64, reason: Option<String>| Snippet { label: label.to_string(), start_sec, length_sec, reason };
     let mut out = Vec::new();
     // A clip is only offered when the track is really that long.
     if duration < 15.0 {
         return out;
     }
     let len = windows(15.0);
-    let Some(hook_w) = loudest_run(energy, len, |_| false) else { return out };
-    let hook = snapped(hook_w, 15.0);
-    out.push(clip("Hook 15s", hook, 15.0));
+    if energy.len() < len {
+        return out;
+    }
+    let starts = energy.len() - len + 1;
+    let mut prefix = vec![0f64; energy.len() + 1];
+    for (i, e) in energy.iter().enumerate() {
+        prefix[i + 1] = prefix[i] + *e as f64;
+    }
+    let mean_energy = |i: usize, l: usize| ((prefix[(i + l).min(energy.len())] - prefix[i]) / l as f64) as f32;
+    let loud: Vec<f32> = (0..starts).map(|i| mean_energy(i, len)).collect();
+    let max_loud = loud.iter().cloned().fold(0f32, f32::max).max(1e-6);
+    let rep = if feats.len() == energy.len() { repetition(feats, len) } else { Vec::new() };
+    // Repetition only leads when a loud enough stretch really comes back;
+    // a song with no clear hook falls back to loudness.
+    let use_rep = rep.len() == starts && (0..starts).any(|i| loud[i] / max_loud >= 0.5 && rep[i] >= 0.75);
+    let (rmin, rmax) = rep.iter().fold((f32::MAX, f32::MIN), |(lo, hi), &r| (lo.min(r), hi.max(r)));
+    let score: Vec<f32> = (0..starts)
+        .map(|i| {
+            let e = loud[i] / max_loud;
+            if !use_rep {
+                return e;
+            }
+            let r = if rmax > rmin { (rep[i] - rmin) / (rmax - rmin) } else { 0.0 };
+            // Silence repeats perfectly: quiet stretches can't win on repetition.
+            let quiet = (e / 0.5).min(1.0);
+            // Intros and outros rarely make the reel.
+            let t0 = i as f64 * WINDOW_SEC;
+            let edge = if t0 < duration * 0.06 || t0 + 15.0 > duration * 0.94 { 0.7 } else { 1.0 };
+            (0.65 * r + 0.35 * e) * quiet * edge
+        })
+        .collect();
+    let best = score.iter().cloned().fold(f32::MIN, f32::max);
+    // The first strong occurrence: a hook usually plays 2-3 times, and the
+    // first full one is the cleanest to cut.
+    let peak = |i: usize| (i.saturating_sub(2)..(i + 3).min(starts)).all(|j| score[j] <= score[i]);
+    let hook_w = if use_rep {
+        (0..starts).find(|&i| score[i] >= best * 0.95 && peak(i)).unwrap_or(0)
+    } else {
+        (0..starts).max_by(|&a, &b| score[a].total_cmp(&score[b]).then(b.cmp(&a))).unwrap_or(0)
+    };
+    let hook = place(hook_w, 15.0);
+    let repeats = if use_rep {
+        (0..starts)
+            .filter(|&i| i + len <= hook_w || i >= hook_w + len)
+            .filter(|&i| segment_similarity(feats, hook_w, i, len) > 0.8)
+            .fold(Vec::<usize>::new(), |mut acc, i| {
+                if acc.last().is_none_or(|&l| i >= l + len) {
+                    acc.push(i);
+                }
+                acc
+            })
+            .len()
+    } else {
+        0
+    };
+    let hook_reason = if repeats > 0 {
+        format!("comes back {} times", repeats + 1)
+    } else {
+        "loudest stretch".to_string()
+    };
+    out.push(clip("Hook 15s", hook, 15.0, Some(hook_reason)));
     if duration >= 30.0 {
-        if let Some(w) = loudest_run(energy, windows(30.0), |_| false) {
-            out.push(clip("Teaser 30s", snapped(w, 30.0), 30.0));
+        if use_rep {
+            // Build into the hook: start ~8 s before it.
+            let w = windows((hook - 8.0).max(0.0));
+            out.push(clip("Teaser 30s", place(w, 30.0), 30.0, Some("builds into the hook".to_string())));
+        } else if let Some(w) = loudest_run(energy, windows(30.0), |_| false) {
+            out.push(clip("Teaser 30s", snap(w as f64 * WINDOW_SEC, 30.0, duration, bpm), 30.0, None));
         }
     }
-    // Snapping moves a start by up to half a bar: keep that much clear of
-    // the hook on both sides, then check the snapped result anyway.
-    let pad = bpm
-        .filter(|b| (40.0..=300.0).contains(b))
-        .map_or(0, |b| ((120.0 / b) / WINDOW_SEC).ceil() as usize);
+    // Clear of the hook on both sides (placement moves a start by up to half
+    // a bar), not a repeat of it, then check the placed result anyway.
+    let pad = bar.map_or(0, |b| ((b / 2.0) / WINDOW_SEC).ceil() as usize);
     let (hook_start, hook_end) = (windows(hook), windows(hook + 15.0));
-    let blocked = |i: usize| i + len + pad > hook_start && i < hook_end + pad;
+    let blocked = |i: usize| (i + len + pad > hook_start && i < hook_end + pad) || (use_rep && segment_similarity(feats, hook_w, i, len) > 0.8);
     if let Some(w) = loudest_run(energy, len, blocked) {
-        let alt = snapped(w, 15.0);
+        let alt = place(w, 15.0);
         if alt + 15.0 <= hook || alt >= hook + 15.0 {
-            out.push(clip("Alt 15s", alt, 15.0));
+            out.push(clip("Alt 15s", alt, 15.0, use_rep.then(|| "another loud part, not the hook".to_string())));
         }
     }
     out
@@ -397,6 +484,50 @@ mod tests {
         assert!(alt.start_sec + 15.0 <= hook.start_sec || alt.start_sec >= hook.start_sec + 15.0);
     }
 
+    /// A rap-shaped song at 8 kHz: intro, verse, hook, verse, the same hook,
+    /// then an outro louder than everything. Loudness alone picks the outro.
+    #[test]
+    fn finds_the_hook_that_comes_back_not_the_loud_outro() {
+        let rate = 8000u32;
+        let mut seed = 11u32;
+        let mut next = move || {
+            seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+            (seed >> 16) % 1000
+        };
+        // Each half second plays two tones; verses draw new ones, the hook
+        // replays the same 30 pairs.
+        let mut pair = || (150.0 + next() as f64 * 2.5, 300.0 + next() as f64 * 3.0);
+        let hook_pairs: Vec<(f64, f64)> = (0..30).map(|_| pair()).collect();
+        let mut plan: Vec<((f64, f64), f64)> = Vec::new();
+        plan.extend((0..20).map(|_| ((220.0, 0.0), 0.15))); // intro 0-10 s
+        plan.extend((0..60).map(|_| (pair(), 0.5))); // verse 10-40 s
+        plan.extend(hook_pairs.iter().map(|&p| (p, 0.55))); // hook 40-55 s
+        plan.extend((0..60).map(|_| (pair(), 0.5))); // verse 55-85 s
+        plan.extend(hook_pairs.iter().map(|&p| (p, 0.55))); // hook 85-100 s
+        plan.extend((0..40).map(|_| (pair(), 0.95))); // loud outro 100-120 s
+        let mut samples = Vec::new();
+        for ((f1, f2), amp) in plan {
+            for i in 0..rate / 2 {
+                let t = i as f64 / rate as f64;
+                let v = (t * f1 * std::f64::consts::TAU).sin() + if f2 > 0.0 { (t * f2 * std::f64::consts::TAU).sin() } else { 0.0 };
+                samples.push((amp * 0.5 * v) as f32);
+            }
+        }
+        let dir = temp("hook");
+        let path = dir.join("song.wav");
+        write_wav(&path, &samples, 1, rate).unwrap();
+        let a = analyze(&path, None).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        let hook = &a.snippets[0];
+        assert!((38.0..=42.5).contains(&hook.start_sec), "hook at {} (expected ~40 s, the first hook)", hook.start_sec);
+        assert_eq!(hook.reason.as_deref(), Some("comes back 2 times"));
+        let teaser = &a.snippets[1];
+        assert!(teaser.start_sec < hook.start_sec && teaser.start_sec + 30.0 > hook.start_sec + 15.0, "teaser {} builds into the hook", teaser.start_sec);
+        if let Some(alt) = a.snippets.iter().find(|s| s.label == "Alt 15s") {
+            assert!(!(83.0..=87.0).contains(&alt.start_sec), "alt isn't the second hook");
+        }
+    }
+
     #[test]
     fn snaps_to_bars() {
         // 120 BPM: a bar is 2s.
@@ -433,7 +564,7 @@ mod tests {
     fn exports_clips_with_exact_length() {
         let dir = temp("export");
         let src = fixture(&dir);
-        let clips = vec![Snippet { label: "Hook 15s".into(), start_sec: 30.0, length_sec: 15.0 }];
+        let clips = vec![Snippet { label: "Hook 15s".into(), start_sec: 30.0, length_sec: 15.0, reason: None }];
         let written = export_clips(&src, &clips, &dir.join("snippets")).unwrap();
         let bytes = fs::read(&written[0]).unwrap();
         let _ = fs::remove_dir_all(&dir);
