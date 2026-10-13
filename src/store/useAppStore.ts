@@ -63,6 +63,12 @@ interface AppState {
   settings: Settings;
   settingsLoaded: boolean;
   startupError: string | null;
+  /** The last workspace save failed (cleared by the next successful save). */
+  saveError: string | null;
+  /** Which board Pipeline shows: your songs or the crew's. */
+  pipelineBoard: "mine" | "crew";
+  setPipelineBoard: (board: "mine" | "crew") => void;
+  dismissErrors: () => void;
   /** FL's default projects folder when found and nothing is linked yet. */
   suggestedFolder: string | null;
   workspace: Workspace;
@@ -185,6 +191,10 @@ interface AppState {
   trashBackups: (paths: string[]) => Promise<number>;
 }
 
+/** Flush a pending debounced workspace save (set once the store exists). */
+let flushPending: () => Promise<void> = () => Promise.resolve();
+export const flushWorkspace = () => flushPending();
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let scanSeq = 0;
 
@@ -197,11 +207,34 @@ export const useAppStore = create<AppState>((set, get) => {
     set({ workspace: next });
     if (get().demoMode || !get().workspaceWritable) return;
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      // Re-check at fire time: sample data may have been loaded meanwhile.
-      if (get().demoMode || !get().workspaceWritable) return;
-      api.saveWorkspace(get().workspace).catch((e) => console.error("saving workspace failed", e));
-    }, 400);
+    saveTimer = setTimeout(() => void persistWorkspace(), 400);
+  }
+
+  /** Write the workspace now (the debounced save, or a flush on close). */
+  async function persistWorkspace() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+    // Re-check at fire time: sample data may have been loaded meanwhile.
+    if (get().demoMode || !get().workspaceWritable) return;
+    try {
+      await api.saveWorkspace(get().workspace);
+      if (get().saveError) set({ saveError: null });
+    } catch (e) {
+      console.error("saving workspace failed", e);
+      set({ saveError: `Couldn't save your changes (stages, notes, releases): ${String(e)}` });
+    }
+  }
+  flushPending = () => (saveTimer ? persistWorkspace() : Promise.resolve());
+
+  /** Rescan after a folder change; a failure shows in the error banner
+   * (these run from buttons, so nobody else would catch it). */
+  function scanOrReport() {
+    return get()
+      .rescan()
+      .then(() => {
+        if (get().startupError?.startsWith("Scanning failed")) set({ startupError: null });
+      })
+      .catch((e) => set({ startupError: `Scanning failed: ${String(e)}` }));
   }
 
   function mutateAlbum(id: string, fn: (album: Album) => Album) {
@@ -234,6 +267,10 @@ export const useAppStore = create<AppState>((set, get) => {
     settings: DEFAULT_SETTINGS,
     settingsLoaded: false,
     startupError: null,
+    saveError: null,
+    pipelineBoard: "mine",
+    setPipelineBoard: (board) => set({ pipelineBoard: board }),
+    dismissErrors: () => set({ startupError: null, saveError: null }),
     suggestedFolder: null,
     workspace: EMPTY_WORKSPACE,
     workspaceWritable: false,
@@ -334,14 +371,14 @@ export const useAppStore = create<AppState>((set, get) => {
       await get().updateSettings({
         watchedFolders: [...current.watchedFolders, folder],
       });
-      await get().rescan();
+      await scanOrReport();
     },
 
     removeWatchedFolder: async (folder) => {
       const current = get().settings;
       const remaining = current.watchedFolders.filter((f) => f !== folder);
       await get().updateSettings({ watchedFolders: remaining });
-      await get().rescan();
+      await scanOrReport();
       if (remaining.length === 0) {
         set({ suggestedFolder: await api.detectProjectsFolder().catch(() => null) });
       }
@@ -440,6 +477,16 @@ export const useAppStore = create<AppState>((set, get) => {
           format: settings.renderFormat,
           outputNames,
         });
+      } catch (e) {
+        // Failed before (or while) FL Studio reported progress: mark the rows
+        // that never finished, so the panel doesn't read "complete".
+        const jobs = new Map(get().renderJobs);
+        for (const path of projectPaths) {
+          const job = jobs.get(path);
+          if (job && (job.status === "queued" || job.status === "rendering")) jobs.set(path, { ...job, status: "error", message: String(e) });
+        }
+        set({ renderJobs: jobs });
+        throw e;
       } finally {
         set({ rendering: false });
         // Pick up the new mixdowns (freshness badges, playback).
@@ -451,11 +498,8 @@ export const useAppStore = create<AppState>((set, get) => {
 
     loadDemoData: () => {
       // Flush a pending real save now, before the workspace is swapped.
-      if (saveTimer && !get().demoMode && get().workspaceWritable) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-        api.saveWorkspace(get().workspace).catch((e) => console.error("saving workspace failed", e));
-      }
+      // (persistWorkspace reads the workspace synchronously, before the swap.)
+      if (saveTimer) void persistWorkspace();
       const projects = generateSampleProjects();
       set({
         demoMode: true,
@@ -480,7 +524,9 @@ export const useAppStore = create<AppState>((set, get) => {
       const favorites = isFavorite
         ? current.favorites.filter((p) => p !== path)
         : [...current.favorites, path];
-      get().updateSettings({ favorites });
+      // Sample songs have fake paths: keep their stars out of settings.json.
+      if (get().demoMode) set({ settings: { ...current, favorites } });
+      else get().updateSettings({ favorites });
     },
 
     setSort: (key) =>
@@ -705,9 +751,10 @@ export const useAppStore = create<AppState>((set, get) => {
 
     duplicateProject: async (path, newName) => {
       const created = await api.duplicateProject(path, newName);
-      // The new version inherits the song's tags and status.
+      // The new version inherits the song's tags and stage only: not its
+      // crew share (one share id per song), Launch Kit, credits or archive flag.
       const meta = get().workspace.songs[path];
-      if (meta) get().updateSong(created, { ...meta });
+      if (meta) get().updateSong(created, { tags: meta.tags, status: meta.status });
       await get().rescan();
       return created;
     },

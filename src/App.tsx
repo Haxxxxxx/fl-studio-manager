@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./components/Sidebar";
 import { Dashboard } from "./components/Dashboard";
 import { LibraryView } from "./components/LibraryView";
@@ -13,7 +14,7 @@ import { RenderPanel } from "./components/RenderPanel";
 import { PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
-import { useAppStore } from "./store/useAppStore";
+import { flushWorkspace, useAppStore } from "./store/useAppStore";
 import { useCrewStore } from "./store/useCrewStore";
 
 const fileName = (p: string) => p.split(/[/\\]/).pop() ?? p;
@@ -51,11 +52,20 @@ export default function App() {
   const settingsLoaded = useAppStore((s) => s.settingsLoaded);
   const detailPath = useAppStore((s) => s.detailPath);
   const startupError = useAppStore((s) => s.startupError);
+  const saveError = useAppStore((s) => s.saveError);
+  const dismissErrors = useAppStore((s) => s.dismissErrors);
 
   useEffect(() => {
     init();
     void useCrewStore.getState().init();
   }, [init]);
+
+  // Closing the window right after an edit: write the pending save first.
+  useEffect(() => {
+    if (!isTauri()) return;
+    const off = getCurrentWindow().onCloseRequested(() => flushWorkspace());
+    return () => void off.then((unlisten) => unlisten());
+  }, []);
 
   // Coming back from FL Studio: pick up new saves, backups and mixdowns.
   useEffect(() => {
@@ -101,9 +111,12 @@ export default function App() {
         </div>
       )}
       <RelinkNotice />
-      {startupError && (
-        <div className="absolute left-1/2 top-3 z-40 max-w-xl -translate-x-1/2 rounded-md border border-red-500/40 bg-[#2a1215] px-4 py-2 text-xs text-red-200 shadow-xl">
-          {startupError}
+      {(startupError || saveError) && (
+        <div role="alert" className="absolute left-1/2 top-3 z-40 flex max-w-xl -translate-x-1/2 items-start gap-3 rounded-md border border-red-500/40 bg-[#2a1215] px-4 py-2 text-xs text-red-200 shadow-xl">
+          <span>{saveError ?? startupError}</span>
+          <button onClick={dismissErrors} aria-label="Dismiss" className="shrink-0 text-red-200/70 hover:text-red-100">
+            ✕
+          </button>
         </div>
       )}
     </div>
