@@ -54,7 +54,9 @@ The Launch Kit works without AI. With a free Gemini API key it also writes capti
 2. In the app: **Settings → AI**, paste the key, **Save**. Developers can set `GEMINI_API_KEY` in the environment instead; it takes precedence.
 3. Optional: pick the language for captions. The default model is `gemini-3.8-flash`; change it there if Google renames models.
 
-The key is stored only on that computer (`ai.json` in the app config folder, owner-only on macOS) and the UI never shows it again. Each crew member uses their own key, so free-tier limits are per person. AI calls send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. **On the free tier Google may use what you send to improve its products.**
+**While developing (Claude):** in **Settings → AI** the provider is **Auto** by default. Auto uses **Claude** in development builds (`npm run tauri dev`) when an Anthropic key is set, so dev sessions don't use up the free Gemini quota, and **Gemini** in the released app. Add the Anthropic key in the same section, or set `ANTHROPIC_API_KEY`. The Anthropic API is **paid per use**: it needs billing at [console.anthropic.com](https://console.anthropic.com/settings/keys). The default model is `claude-opus-5-5`; `claude-haiku-5-5` is far cheaper. You can force Claude or Gemini with the switch.
+
+Keys are stored only on that computer (`ai.json` in the app config folder, owner-only on macOS) and the UI never shows them again. Each crew member uses their own key, so free-tier limits are per person. AI calls send the song name, tags, notes, mixer track names, credits and kit fields, never audio or file paths. **On the free tier Google may use what you send to improve its products.**
 
 ## Where your data lives
 

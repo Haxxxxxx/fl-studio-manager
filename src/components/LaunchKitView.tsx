@@ -371,7 +371,9 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
     return (
       <div className="flex items-center gap-3 rounded-lg border border-violet-400/20 bg-violet-500/[0.06] p-4 text-sm">
         <Sparkles size={16} className="shrink-0 text-violet-300" />
-        <span className="flex-1 text-white/60">AI drafts and checks are off. They need a free Gemini API key.</span>
+        <span className="flex-1 text-white/60">
+          AI drafts and checks are off. They need a free Gemini API key{aiStatus?.devBuild ? " (or an Anthropic key while developing)" : ""}.
+        </span>
         <button onClick={() => setView("settings")} className={btn}>
           Add a key
         </button>
@@ -379,7 +381,8 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
     );
   }
 
-  const model = settings.aiModel || aiStatus.defaultModel;
+  const onClaude = aiStatus.provider === "claude";
+  const model = (onClaude ? settings.claudeModel : settings.aiModel) || aiStatus.defaultModel;
   const summary = aiSummary(fields);
   const drafts = input.meta.launchKit?.ai?.drafts;
   const reviewedAt = input.meta.launchKit?.ai?.review?.atMs;
@@ -437,7 +440,10 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
     <div className="flex flex-col gap-3 rounded-lg border border-violet-400/20 bg-violet-500/[0.06] p-4">
       <div className="flex items-center gap-2">
         <Sparkles size={15} className="text-violet-300" />
-        <span className="text-[11px] font-medium uppercase tracking-wide text-violet-200/70">AI layer · {model}</span>
+        <span className="text-[11px] font-medium uppercase tracking-wide text-violet-200/70">
+          AI layer · {onClaude ? "Claude" : "Gemini"} · {model}
+          {aiStatus.devBuild && <span className="ml-2 rounded bg-white/10 px-1.5 py-px normal-case tracking-normal text-white/50">dev build</span>}
+        </span>
       </div>
       <div className="flex flex-wrap gap-2">
         <button onClick={() => run(true)} disabled={!!running} className={btnPrimary}>
@@ -457,14 +463,18 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
         {reviewedAt && <span className="text-white/35"> · checked {formatRelative(reviewedAt)}</span>}
       </div>
       {running && (
-        <div className="text-[11px] text-white/40">If Gemini is busy this retries on its own and can take up to a minute.</div>
+        <div className="text-[11px] text-white/40">
+          If {onClaude ? "Claude" : "Gemini"} is busy this retries on its own; it gives up after 2 minutes.
+        </div>
       )}
       {backupUsed && !running && (
         <div className="text-[11px] text-white/40">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>
       )}
       {error && <div className="text-xs text-red-300">{error}</div>}
       <div className="text-[11px] leading-relaxed text-white/30">
-        Sends the song name, tags, notes, mixer track names, credits and these fields to Google Gemini. No audio, no file paths. On the free tier Google may use them to improve its products.
+        {onClaude
+          ? "Sends the song name, tags, notes, mixer track names, credits and these fields to Anthropic (Claude, billed to your API key). No audio, no file paths."
+          : "Sends the song name, tags, notes, mixer track names, credits and these fields to Google Gemini. No audio, no file paths. On the free tier Google may use them to improve its products."}
       </div>
     </div>
   );
