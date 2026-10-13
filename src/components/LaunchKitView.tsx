@@ -131,7 +131,7 @@ export function LaunchKitView() {
   };
   const fields = buildKit(kitInput);
   const snippets = kitSnippets(analysis, meta);
-  const extra = kitChecks(project);
+  const extra = kitChecks(project, analysis);
   const all: KitCheck[] = [...extra, ...fields.flatMap((f) => (f.check ? [f.check] : []))];
   const missing = all.filter((c) => c.level === "missing").length;
   const ai = aiSummary(fields);

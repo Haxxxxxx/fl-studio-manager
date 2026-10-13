@@ -26,7 +26,27 @@ pub struct AudioAnalysis {
     /// RMS loudness per window, normalized so the loudest is 1.
     pub energy: Vec<f32>,
     pub snippets: Vec<Snippet>,
+    /// The file itself, for the distributor checks (WAV, 44.1 kHz, 16/24-bit).
+    pub master: MasterSpec,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MasterSpec {
+    /// File extension, lowercase ("wav", "mp3"…).
+    pub container: String,
+    pub sample_rate: u32,
+    pub channels: u32,
+    /// None for lossy formats (MP3/OGG have no bit depth).
+    pub bits_per_sample: Option<u32>,
+    /// Highest absolute sample, 0–1 (1 = 0 dBFS).
+    pub peak: f32,
+    /// Samples at full scale: a sign of clipping.
+    pub clipped_samples: u64,
+}
+
+/// |sample| at or above this is full scale (16-bit max is 32767/32768).
+const FULL_SCALE: f32 = 0.9999;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,8 +57,8 @@ pub struct Snippet {
 }
 
 /// Streams the file's default track as interleaved f32, chunk by chunk.
-/// `on_chunk` returns false to stop early.
-fn decode(path: &Path, mut on_chunk: impl FnMut(&[f32], usize, u32) -> bool) -> Result<(), String> {
+/// `on_chunk` returns false to stop early. Returns the stored bit depth.
+fn decode(path: &Path, mut on_chunk: impl FnMut(&[f32], usize, u32) -> bool) -> Result<Option<u32>, String> {
     let file = File::open(path).map_err(|e| format!("could not open {}: {e}", path.display()))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
@@ -51,6 +71,7 @@ fn decode(path: &Path, mut on_chunk: impl FnMut(&[f32], usize, u32) -> bool) -> 
     let mut format = probed.format;
     let track = format.default_track().ok_or("no audio track in file")?;
     let track_id = track.id;
+    let bits_per_sample = track.codec_params.bits_per_sample;
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| format!("unsupported audio codec: {e}"))?;
@@ -78,14 +99,23 @@ fn decode(path: &Path, mut on_chunk: impl FnMut(&[f32], usize, u32) -> bool) -> 
             break;
         }
     }
-    Ok(())
+    Ok(bits_per_sample)
 }
 
 pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
     let mut energy = Vec::new();
     let (mut acc, mut n, mut frames, mut rate) = (0f64, 0usize, 0u64, 0u32);
-    decode(path, |samples, channels, sr| {
+    let (mut peak_sample, mut clipped, mut chans) = (0f32, 0u64, 0usize);
+    let bits_per_sample = decode(path, |samples, channels, sr| {
         rate = sr;
+        chans = channels;
+        for &x in samples {
+            let a = x.abs();
+            peak_sample = peak_sample.max(a);
+            if a >= FULL_SCALE {
+                clipped += 1;
+            }
+        }
         let window = ((sr as f64 * WINDOW_SEC) as usize).max(1);
         for frame in samples.chunks(channels) {
             // Mean power across channels (a mono sum would cancel
@@ -114,7 +144,15 @@ pub fn analyze(path: &Path, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
     }
     let duration_sec = frames as f64 / rate as f64;
     let snippets = pick_snippets(&energy, duration_sec, bpm);
-    Ok(AudioAnalysis { duration_sec, window_sec: WINDOW_SEC, energy, snippets })
+    let master = MasterSpec {
+        container: path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase(),
+        sample_rate: rate,
+        channels: chans as u32,
+        bits_per_sample,
+        peak: peak_sample.min(1.0),
+        clipped_samples: clipped,
+    };
+    Ok(AudioAnalysis { duration_sec, window_sec: WINDOW_SEC, energy, snippets, master })
 }
 
 /// Start (in windows) of the loudest run of `len` windows, skipping any
@@ -397,6 +435,26 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         assert!(written[0].ends_with("snippets/Hook 15s.wav"));
         assert_eq!(bytes.len(), 44 + 15 * 8000 * 2);
+    }
+
+    #[test]
+    fn reads_the_master_spec_and_counts_clipping() {
+        let dir = temp("master");
+        let path = dir.join("master.wav");
+        // 2 s of stereo at 48 kHz, quiet, with 5 full-scale samples.
+        let mut samples = vec![0.25f32; 48_000 * 2 * 2];
+        for s in samples.iter_mut().take(5) {
+            *s = 1.0;
+        }
+        write_wav(&path, &samples, 2, 48_000).unwrap();
+        let a = analyze(&path, None).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(
+            (a.master.container.as_str(), a.master.sample_rate, a.master.channels, a.master.bits_per_sample),
+            ("wav", 48_000, 2, Some(16))
+        );
+        assert_eq!(a.master.clipped_samples, 5);
+        assert!(a.master.peak > 0.999);
     }
 
     #[test]
