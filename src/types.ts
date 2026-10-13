@@ -94,8 +94,14 @@ export interface SongMeta {
   stageUpdatedAtMs?: number;
   /** Shared with the crew (opt-in per song). */
   shared?: boolean;
-  /** Stable id of this song in the crew database, set on first share. */
+  /** Stable id of this song in the crew database, set on first share. Kept
+   * after unsharing (with `shared: false`) so the next sync deletes the row. */
   shareId?: string;
+  /** The crew and account it's shared with/by. A share belongs to one crew
+   * and one account: other crews and other sign-ins on this machine never
+   * push or delete it. Missing = shared before scoping (adopted on next sync). */
+  shareCrewId?: string;
+  shareUserId?: string;
   tags?: string[];
   notes?: string;
   /** Musical key, e.g. "Am", "F#". FL doesn't store one. */

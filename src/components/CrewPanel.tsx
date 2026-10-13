@@ -3,6 +3,7 @@ import { Check, ClipboardCopy, LogOut, RefreshCw, Users } from "lucide-react";
 import { useCrewStore } from "../store/useCrewStore";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
+import { orphanedShares, sharedHere } from "../lib/crewSync";
 
 const field =
   "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none";
@@ -28,6 +29,13 @@ export function CrewPanel() {
           <div className="text-xs text-white/45">Loading…</div>
         ) : !crew.userId ? (
           <SignIn />
+        ) : crew.crews.length === 0 && crew.loadError ? (
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-red-300">Couldn't load your crews: {crew.loadError}</span>
+            <button onClick={() => void crew.loadCrews().catch(() => {})} className={secondary}>
+              Try again
+            </button>
+          </div>
         ) : crew.crews.length === 0 ? (
           <CreateOrJoin />
         ) : (
@@ -178,8 +186,14 @@ function CreateOrJoin() {
 
 function CrewHome() {
   const crew = useCrewStore();
-  const sharedCount = useAppStore((s) => Object.values(s.workspace.songs).filter((m) => m.shared).length);
+  const scope = crew.activeCrewId && crew.userId ? { crewId: crew.activeCrewId, userId: crew.userId } : null;
+  const projects = useAppStore((s) => s.projects);
+  const workspace = useAppStore((s) => s.workspace);
+  const scanning = useAppStore((s) => s.scanning);
   const demoMode = useAppStore((s) => s.demoMode);
+  const sharedCount = scope ? Object.values(workspace.songs).filter((m) => sharedHere(m, scope)).length : 0;
+  // Only meaningful once a scan has found something (an empty list could be a failed scan).
+  const orphans = scope && projects.length > 0 && !scanning ? orphanedShares(projects, workspace, scope) : [];
   const active = crew.crews.find((c) => c.id === crew.activeCrewId) ?? crew.crews[0];
   const [copied, setCopied] = useState(false);
   const { busy, error, run } = useAction();
@@ -218,6 +232,17 @@ function CrewHome() {
         You share <b className="text-white/80">{sharedCount}</b> song{sharedCount === 1 ? "" : "s"}. Share songs from their panel, or select
         several in the Library.
       </div>
+      {orphans.length > 0 && (
+        <div className="flex items-center gap-3 rounded-md border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <span className="flex-1">
+            {orphans.length} shared song{orphans.length === 1 ? " isn't" : "s aren't"} in your library right now (renamed, moved or on an
+            unplugged drive), so {orphans.length === 1 ? "its" : "their"} crew card is frozen.
+          </span>
+          <button onClick={() => crew.setShared(orphans, false)} className="shrink-0 underline hover:text-white">
+            Stop sharing {orphans.length === 1 ? "it" : "them"}
+          </button>
+        </div>
+      )}
       <div>
         <div className="mb-1 text-[11px] uppercase tracking-wide text-white/35">Members · {crew.members.length}</div>
         <div className="flex flex-wrap gap-1.5">
@@ -252,7 +277,19 @@ function CrewHome() {
       {error && <div className="text-xs text-red-300">{error}</div>}
       <div className="flex gap-3 text-xs text-white/40">
         <span>{crew.email}</span>
-        <button onClick={() => void run(crew.leaveCrew)} className="hover:text-white">
+        <button
+          onClick={() => {
+            const others = crew.members.filter((m) => m.user_id !== crew.userId);
+            const note =
+              active.role === "owner" && others.length
+                ? ` ${others[0].display_name} becomes the owner.`
+                : !others.length
+                  ? " You're the last member, so the crew is deleted."
+                  : "";
+            if (window.confirm(`Leave ${active.name}? Your shared songs leave the crew board with you.${note}`)) void run(crew.leaveCrew);
+          }}
+          className="hover:text-white"
+        >
           Leave crew
         </button>
         <button onClick={() => void crew.signOut()} className="flex items-center gap-1 hover:text-white">
@@ -276,7 +313,9 @@ export function useCanShare(): { can: boolean; crewName: string | null } {
 /** Song panel: share this song with the crew (opt-in). */
 export function ShareToggle({ path }: { path: string }) {
   const { can, crewName } = useCanShare();
-  const shared = useAppStore((s) => !!s.workspace.songs[path]?.shared);
+  const crewId = useCrewStore((s) => s.activeCrewId);
+  const userId = useCrewStore((s) => s.userId);
+  const shared = useAppStore((s) => !!crewId && !!userId && sharedHere(s.workspace.songs[path], { crewId, userId }));
   const setShared = useCrewStore((s) => s.setShared);
   if (!can) return null;
   return (

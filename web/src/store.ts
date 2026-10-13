@@ -56,27 +56,49 @@ export const useWeb = create<WebState>((set, get) => {
       supabase.from("songs").select("*").eq("crew_id", id).order("updated_at", { ascending: false }),
       supabase.from("crew_members").select("*").eq("crew_id", id).order("joined_at"),
     ]);
+    if (get().activeCrewId !== id) return;
     if (songs.error) throw songs.error;
     if (members.error) throw members.error;
-    set({ songs: songs.data as CrewSongRow[], members: members.data as CrewMemberRow[] });
+    const memberRows = members.data as CrewMemberRow[];
+    if (!memberRows.some((m) => m.user_id === get().userId)) {
+      // Removed from the crew (or it was deleted): back to the crew list.
+      return void get().loadCrews().catch((e) => set({ error: errorMessage(e) }));
+    }
+    set({ songs: songs.data as CrewSongRow[], members: memberRows, error: null });
+  }
+
+  /** Refetch (after a reconnect, or when the tab/phone comes back). */
+  let lastRefresh = 0;
+  function refresh() {
+    if (!get().activeCrewId || Date.now() - lastRefresh < 5000) return;
+    lastRefresh = Date.now();
+    void loadCrewData().catch((e) => set({ error: errorMessage(e) }));
   }
 
   function subscribe(id: string | null) {
     if (channel && supabase) void supabase.removeChannel(channel);
     channel = null;
     if (!supabase || !id) return;
+    let joinedOnce = false;
     channel = supabase
       .channel(`web-crew:${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "songs", filter: `crew_id=eq.${id}` }, (p) => {
+        if (get().activeCrewId !== id) return;
         const gone = (p.old as { id?: string })?.id ?? (p.new as { id?: string })?.id;
         const songs = get().songs.filter((s) => s.id !== gone);
         if (p.eventType !== "DELETE") songs.unshift(p.new as CrewSongRow);
         set({ songs });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "crew_members", filter: `crew_id=eq.${id}` }, () => {
-        void loadCrewData().catch(() => {});
+        if (get().activeCrewId === id) void loadCrewData().catch(() => {});
       })
-      .subscribe();
+      .subscribe((status) => {
+        // Events missed while disconnected are never replayed: refetch.
+        if (status === "SUBSCRIBED") {
+          if (joinedOnce) refresh();
+          joinedOnce = true;
+        }
+      });
   }
 
   return {
@@ -93,15 +115,23 @@ export const useWeb = create<WebState>((set, get) => {
       if (initialized) return;
       initialized = true;
       if (!supabase) return set({ ready: true, error: "This site isn't connected to a crew server yet." });
-      const { data } = await supabase.auth.getSession();
-      set({ userId: data.session?.user.id ?? null, email: data.session?.user.email ?? null });
+      try {
+        const { data } = await supabase.auth.getSession();
+        set({ userId: data.session?.user.id ?? null, email: data.session?.user.email ?? null });
+      } catch (e) {
+        set({ error: errorMessage(e) });
+      }
       supabase.auth.onAuthStateChange((_e, session) => {
         const userId = session?.user.id ?? null;
         if (userId === get().userId) return;
-        set({ userId, email: session?.user.email ?? null, crews: [], activeCrewId: null, songs: [], members: [] });
-        if (userId) void get().loadCrews().catch(() => {});
-        else subscribe(null);
+        subscribe(null);
+        set({ userId, email: session?.user.email ?? null, crews: [], activeCrewId: null, songs: [], members: [], error: null });
+        // Not awaited: supabase-js forbids awaiting its own calls in this callback.
+        if (userId) setTimeout(() => void get().loadCrews().catch((e) => set({ error: errorMessage(e) })), 0);
       });
+      // A phone left on the board: catch up when it's looked at again.
+      document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && refresh());
+      window.addEventListener("online", refresh);
       if (get().userId) await get().loadCrews().catch((e) => set({ error: errorMessage(e) }));
       set({ ready: true });
     },
@@ -120,9 +150,9 @@ export const useWeb = create<WebState>((set, get) => {
 
     signOut: async () => {
       if (!supabase) return;
-      subscribe(null);
       remember(null);
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw new Error(errorMessage(error));
     },
 
     loadCrews: async () => {
@@ -159,6 +189,7 @@ export const useWeb = create<WebState>((set, get) => {
       if (!supabase) return;
       const { data, error } = await supabase.rpc("join_crew", { p_code: code, p_display_name: displayName });
       if (error) throw new Error(errorMessage(error));
+      if (!data) throw new Error("That invite code isn't valid: it's wrong, expired or used up. Ask for a new one.");
       remember(data as string);
       await get().loadCrews();
     },
@@ -172,6 +203,7 @@ export const useWeb = create<WebState>((set, get) => {
         set({ songs: before, error: errorMessage(error) });
         throw new Error(errorMessage(error));
       }
+      set({ error: null });
     },
   };
 });

@@ -75,14 +75,14 @@ select set_config('request.jwt.claims', '{"sub":"c0000000-0000-0000-0000-0000000
 select is(public.join_crew((select v from ids where k = 'code'), 'Cleo'), (select v::uuid from ids where k = 'crew'), 'the second use of a 2-use code works');
 
 select set_config('request.jwt.claims', '{"sub":"d0000000-0000-0000-0000-000000000004","role":"authenticated"}', true);
-select throws_ok($$ select public.join_crew((select v from ids where k = 'code'), 'Dan') $$, 'P0001', 'invite code already used up', 'a used-up code is refused');
+select is(public.join_crew((select v from ids where k = 'code'), 'Dan'), null, 'a used-up code is refused (null, like any invalid code)');
 
 reset role;
 insert into public.crew_invites (code, crew_id, created_by, expires_at)
   values ('EXPRDZZ2', (select v::uuid from ids where k = 'crew'), 'a0000000-0000-0000-0000-000000000001', now() - interval '1 day');
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"d0000000-0000-0000-0000-000000000004","role":"authenticated"}', true);
-select throws_ok($$ select public.join_crew('EXPRDZZ2', 'Dan') $$, 'P0001', 'invite code expired', 'an expired code is refused');
+select is(public.join_crew('EXPRDZZ2', 'Dan'), null, 'an expired code is refused');
 
 -- ----------------------------------------------------------- Ana again: ids are fixed
 select set_config('request.jwt.claims', '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
