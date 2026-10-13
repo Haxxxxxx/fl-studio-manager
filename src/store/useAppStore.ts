@@ -5,6 +5,7 @@ import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/s
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
 import { canRenderInApp, dawOf, splitRenderable } from "../lib/daws";
 import type {
+  PackagePlan,
   PackageResult,
   Person,
   Pitch,
@@ -97,6 +98,8 @@ interface AppState {
   packaging: boolean;
   /** Results of the last package run; null hides the panel. */
   packageResults: PackageResult[] | null;
+  /** Files each package would hold, waiting for the user to confirm. */
+  packagePlan: { plans: PackagePlan[]; subfolder?: string; skipped: PackageResult[] } | null;
   favoritesOnly: boolean;
   showTemplates: boolean;
   /** Song open in the detail drawer. */
@@ -130,8 +133,11 @@ interface AppState {
   setPluginFilter: (plugin: string | null) => void;
   setProblemsOnly: (value: boolean) => void;
   setShowArchived: (value: boolean) => void;
-  /** Zip songs (with their samples) into `<export folder>/Packages[/subfolder]`. */
+  /** Lists what each package would hold (packagePlan); nothing is written yet. */
   startPackage: (paths: string[], subfolder?: string) => Promise<void>;
+  /** Zip the confirmed files into `<export folder>/Packages[/subfolder]`. */
+  confirmPackage: (approved: string[][]) => Promise<void>;
+  cancelPackage: () => void;
   dismissPackageResults: () => void;
   setFavoritesOnly: (value: boolean) => void;
   setShowTemplates: (value: boolean) => void;
@@ -315,6 +321,7 @@ export const useAppStore = create<AppState>((set, get) => {
     showArchived: false,
     packaging: false,
     packageResults: null,
+    packagePlan: null,
     favoritesOnly: false,
     showTemplates: false,
     detailPath: null,
@@ -590,14 +597,25 @@ export const useAppStore = create<AppState>((set, get) => {
         set({ packageResults: skippedResults });
         throw new Error(skippedResults[0]?.error ?? "Nothing to package.");
       }
+      const plans = await api.packagePreview(paths);
+      set({ packagePlan: { plans, subfolder, skipped: skippedResults }, packageResults: null });
+    },
+
+    cancelPackage: () => set({ packagePlan: null }),
+
+    confirmPackage: async (approved) => {
+      const { settings, packaging, packagePlan } = get();
+      if (!packagePlan || packaging || !settings.outputFolder) return;
+      const { plans, subfolder, skipped: skippedResults } = packagePlan;
+      const paths = plans.map((p) => p.projectPath);
       const sep = settings.outputFolder.includes("\\") ? "\\" : "/";
-      set({ packaging: true, packageResults: skippedResults });
+      set({ packaging: true, packageResults: skippedResults, packagePlan: null });
       // Results stream in per song so the panel can show progress.
       const unlisten = await api.onPackageProgress((r) =>
         set((s) => ({ packageResults: [...(s.packageResults ?? []), r] })),
       );
       try {
-        await api.packageProjects({ projectPaths: paths, outputFolder: `${settings.outputFolder}${sep}Packages`, subfolder });
+        await api.packageProjects({ projectPaths: paths, outputFolder: `${settings.outputFolder}${sep}Packages`, subfolder, approved });
       } finally {
         unlisten();
         set({ packaging: false });

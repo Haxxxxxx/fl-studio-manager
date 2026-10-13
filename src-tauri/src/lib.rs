@@ -37,6 +37,7 @@ pub fn run() {
             actions::duplicate_project,
             actions::restore_backup,
             actions::trash_backups,
+            package::package_preview,
             package::package_projects,
             files::kit_files,
             audio::analyze_audio,

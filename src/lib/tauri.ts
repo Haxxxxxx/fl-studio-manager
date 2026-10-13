@@ -7,6 +7,7 @@ import type {
   AudioAnalysis,
   CoverImage,
   CoverStatus,
+  PackagePlan,
   PackageResult,
   ProjectInfo,
   RenderEvent,
@@ -89,11 +90,18 @@ export async function trashBackups(paths: string[]): Promise<number> {
   return invoke("trash_backups", { paths });
 }
 
-/** Zipped loop packages (.flp + samples, flat) — FL opens these directly. */
+/** What each package would hold. Nothing is written. */
+export async function packagePreview(projectPaths: string[]): Promise<PackagePlan[]> {
+  return invoke("package_preview", { projectPaths });
+}
+
+/** Zipped loop packages (.flp + samples, flat) — FL opens these directly.
+ * `approved` lines up with `projectPaths`: the sample paths the user confirmed. */
 export async function packageProjects(args: {
   projectPaths: string[];
   outputFolder: string;
   subfolder?: string;
+  approved: string[][];
 }): Promise<PackageResult[]> {
   return invoke("package_projects", args);
 }

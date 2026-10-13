@@ -310,6 +310,18 @@ export interface PackageResult {
   bytes: number;
   included: number;
   missing: string[];
+  /** Paths refused for the package ("path — reason"). */
+  refused?: string[];
+  error: string | null;
+}
+
+/** What a package would hold, shown before anything is written. */
+export interface PackagePlan {
+  projectPath: string;
+  files: { path: string; name: string; bytes: number }[];
+  /** Paths the project lists that are never packaged (not audio, hidden, network…). */
+  refused: { path: string; reason: string }[];
+  missing: string[];
   error: string | null;
 }
 
