@@ -79,7 +79,7 @@ function SignIn() {
   const { busy, error, run } = useAction();
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Sign in to your crew</h1>
+      <h2 className="text-xl font-semibold">Sign in to your crew</h2>
       {!sentTo ? (
         <form
           className="flex flex-col gap-3"
