@@ -128,14 +128,15 @@ export async function setAiKey(key: string | null): Promise<void> {
   return invoke("set_ai_key", { key });
 }
 
-/** One structured Gemini call: JSON matching `schema` comes back. */
+/** One structured Gemini call (retries and a backup model on the Rust
+ * side): JSON matching `schema`, plus the model that actually answered. */
 export async function aiGenerateJson(args: {
   model: string | null;
   system: string;
   prompt: string;
   schema: object;
   temperature: number;
-}): Promise<unknown> {
+}): Promise<{ model: string; data: unknown }> {
   return invoke("ai_generate_json", args);
 }
 
