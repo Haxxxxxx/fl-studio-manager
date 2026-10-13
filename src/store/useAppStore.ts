@@ -195,6 +195,10 @@ interface AppState {
 let flushPending: () => Promise<void> = () => Promise.resolve();
 export const flushWorkspace = () => flushPending();
 
+/** The workspace save currently being written, if any. */
+let savingNow: Promise<void> | null = null;
+/** The real favorites while sample data is shown (sample stars stay in memory). */
+let realFavorites: string[] | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let scanSeq = 0;
 
@@ -216,15 +220,30 @@ export const useAppStore = create<AppState>((set, get) => {
     saveTimer = null;
     // Re-check at fire time: sample data may have been loaded meanwhile.
     if (get().demoMode || !get().workspaceWritable) return;
-    try {
-      await api.saveWorkspace(get().workspace);
-      if (get().saveError) set({ saveError: null });
-    } catch (e) {
-      console.error("saving workspace failed", e);
-      set({ saveError: `Couldn't save your changes (stages, notes, releases): ${String(e)}` });
-    }
+    const write = api
+      .saveWorkspace(get().workspace)
+      .then(() => {
+        if (get().saveError) set({ saveError: null });
+      })
+      .catch((e) => {
+        console.error("saving workspace failed", e);
+        set({ saveError: `Couldn't save your changes (stages, notes, releases): ${String(e)}` });
+      });
+    savingNow = write;
+    await write;
+    if (savingNow === write) savingNow = null;
   }
-  flushPending = () => (saveTimer ? persistWorkspace() : Promise.resolve());
+  // On close: write a pending save, or wait for the one being written.
+  flushPending = async () => {
+    if (saveTimer) await persistWorkspace();
+    else if (savingNow) await savingNow;
+  };
+
+  /** Leaving sample data: put the real favorites back. */
+  function restoreRealFavorites() {
+    if (realFavorites) set({ settings: { ...get().settings, favorites: realFavorites } });
+    realFavorites = null;
+  }
 
   /** Rescan after a folder change; a failure shows in the error banner
    * (these run from buttons, so nobody else would catch it). */
@@ -349,7 +368,8 @@ export const useAppStore = create<AppState>((set, get) => {
     updateSettings: async (patch) => {
       const merged = { ...get().settings, ...patch };
       set({ settings: merged });
-      await api.saveSettings(merged);
+      // Sample-data stars never reach settings.json.
+      await api.saveSettings(realFavorites ? { ...merged, favorites: realFavorites } : merged);
       if ("outputFolder" in patch) await get().rescan();
     },
 
@@ -365,6 +385,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // can be saved over the real workspace.
       if (get().demoMode) {
         set({ demoMode: false, projects: [], selected: new Set(), detailPath: null, openAlbumId: null });
+        restoreRealFavorites();
         await loadWorkspace();
       }
       set({ suggestedFolder: null });
@@ -500,6 +521,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // Flush a pending real save now, before the workspace is swapped.
       // (persistWorkspace reads the workspace synchronously, before the swap.)
       if (saveTimer) void persistWorkspace();
+      realFavorites ??= get().settings.favorites;
       const projects = generateSampleProjects();
       set({
         demoMode: true,
@@ -514,6 +536,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     exitDemoMode: async () => {
       set({ demoMode: false, selected: new Set(), detailPath: null, openAlbumId: null });
+      restoreRealFavorites();
       await loadWorkspace();
       await get().rescan();
     },
@@ -526,7 +549,7 @@ export const useAppStore = create<AppState>((set, get) => {
         : [...current.favorites, path];
       // Sample songs have fake paths: keep their stars out of settings.json.
       if (get().demoMode) set({ settings: { ...current, favorites } });
-      else get().updateSettings({ favorites });
+      else void get().updateSettings({ favorites });
     },
 
     setSort: (key) =>
