@@ -15,6 +15,7 @@
 //! the rest of the app (plugin/sample resolution, Launch Kit) is DAW-agnostic.
 
 use crate::flp_metadata::{FlpMetadata, Lists, RawPlugin};
+use crate::paths::is_remote_or_device;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -565,7 +566,8 @@ pub fn parse_als_reader<R: BufRead>(input: R, dir: &Path) -> Result<FlpMetadata,
                     };
                     let rel_abs = (!rel.is_empty()).then(|| absolutize(&rel, dir));
                     let pick = match rel_abs {
-                        Some(r) if Path::new(&r).exists() || st.file_abs.is_empty() => r,
+                        // Never looked up when it names a network share (paths.rs).
+                        Some(r) if (!is_remote_or_device(&r) && Path::new(&r).exists()) || st.file_abs.is_empty() => r,
                         _ => st.file_abs.clone(),
                     };
                     if st.file_is_sample && Path::new(&pick).extension().is_some() {

@@ -1,5 +1,6 @@
 use crate::flp_metadata::RawPlugin;
 use crate::models::{PluginInfo, SampleInfo, SampleStatus};
+use crate::paths::is_remote_or_device;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -108,7 +109,12 @@ impl Resolver {
         }
     }
 
+    /// Network-share and device paths count as missing without a lookup
+    /// (on Windows, a lookup sends the user's credentials to that host).
     fn exists(&mut self, path: &str) -> bool {
+        if is_remote_or_device(path) {
+            return false;
+        }
         if let Some(&hit) = self.exists_cache.get(path) {
             return hit;
         }
@@ -148,6 +154,9 @@ impl Resolver {
     fn locate(&mut self, raw: &str, project: &Path) -> (String, SampleStatus, Option<PathBuf>) {
         // Shown as stored (what FL displays); looked up with native separators.
         let path = self.expand(raw, project);
+        if is_remote_or_device(&path) {
+            return (path, SampleStatus::Missing, None);
+        }
         let on_disk = native(&path);
         if self.exists(&on_disk) {
             return (path, SampleStatus::Ok, Some(PathBuf::from(on_disk)));
@@ -238,5 +247,27 @@ mod tests {
         let statuses: Vec<_> = r.samples(&raw, &project).into_iter().map(|s| s.status).collect();
         let _ = std::fs::remove_dir_all(&root);
         assert_eq!(statuses, vec![SampleStatus::Ok, SampleStatus::Relocated, SampleStatus::Missing]);
+    }
+
+    #[test]
+    fn network_share_samples_are_missing_without_a_lookup() {
+        let mut r = Resolver::new(None);
+        let raw = vec![
+            r"\\attacker\share\kick.wav".to_string(),
+            "//attacker/share/snare.wav".to_string(),
+            r"\\?\UNC\attacker\share\hat.wav".to_string(),
+        ];
+        let project = Path::new("/music/Envy/Envy.flp");
+        let statuses: Vec<_> = r.samples(&raw, project).into_iter().map(|s| s.status).collect();
+        assert_eq!(statuses, vec![SampleStatus::Missing; 3]);
+        let (found, missing) = r.package_files(&raw, project);
+        assert!(found.is_empty());
+        assert_eq!(missing.len(), 3);
+        // Never looked up: nothing reached the exists() cache.
+        assert!(r.exists_cache.keys().all(|k| !k.contains("attacker")), "{:?}", r.exists_cache);
+        // Plugins with a network path aren't looked up either.
+        let plugins = r.plugins(&[RawPlugin { name: "Evil".into(), vendor: None, path: Some(r"\\attacker\vst\evil.dll".into()) }]);
+        assert_eq!(plugins[0].installed, Some(false));
+        assert!(r.exists_cache.is_empty());
     }
 }

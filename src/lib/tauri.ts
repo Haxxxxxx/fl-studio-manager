@@ -1,7 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   AiStatus,
   AudioAnalysis,
@@ -218,8 +218,9 @@ export async function pickExecutable(): Promise<string | null> {
   return typeof result === "string" ? result : null;
 }
 
+/** Opens a DAW project in its app. Rust refuses network paths and non-projects. */
 export async function openInFlStudio(path: string): Promise<void> {
-  await openPath(path);
+  await invoke("open_project", { path });
 }
 
 /** Opens an https link in the default browser. */
@@ -227,6 +228,7 @@ export async function openExternal(url: string): Promise<void> {
   await openUrl(url);
 }
 
+/** Shows a file in Finder / Explorer. Rust refuses network paths. */
 export async function revealInFileManager(path: string): Promise<void> {
-  await revealItemInDir(path);
+  await invoke("reveal_path", { path });
 }
