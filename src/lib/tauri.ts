@@ -140,6 +140,34 @@ export async function aiGenerateJson(args: {
   return invoke("ai_generate_json", args);
 }
 
+export interface ShortsStatus {
+  /** Where ffmpeg was found; null = not installed / not found. */
+  path: string | null;
+  encoder: string | null;
+  error: string | null;
+}
+
+export async function shortsStatus(ffmpegPath: string | null): Promise<ShortsStatus> {
+  return invoke("shorts_status", { ffmpegPath });
+}
+
+export interface ShortResult {
+  label: string;
+  path: string | null;
+  error: string | null;
+}
+
+/** Renders 9:16 MP4s into `<outputFolder>/Launch Kits/<folderName>/shorts/`. */
+export async function renderShorts(args: {
+  ffmpegPath: string | null;
+  master: string;
+  clips: { label: string; startSec: number; lengthSec: number; layoutPng: string }[];
+  outputFolder: string;
+  folderName: string;
+}): Promise<ShortResult[]> {
+  return invoke("render_shorts", args);
+}
+
 /** URL the webview can stream a local audio file from (asset protocol). */
 export function audioSrc(path: string): string {
   return convertFileSrc(path);
