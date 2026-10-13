@@ -372,7 +372,7 @@ export const useAppStore = create<AppState>((set, get) => {
       }
       // First run on a machine with FL installed: fill the path in for them.
       if (!settings.flStudioPath) {
-        settings = await api.useDetectedFlStudio().catch(() => settings);
+        settings = (await api.useDetectedFlStudio().catch(() => null)) ?? settings;
       }
       set({ settings });
       await loadWorkspace();
