@@ -97,7 +97,7 @@ export function LaunchKitView() {
 
   if (!project) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-white/40">
+      <div className="flex flex-1 items-center justify-center text-sm text-white/58">
         Link a project folder (or load sample data) to build a launch kit.
       </div>
     );
@@ -167,7 +167,7 @@ export function LaunchKitView() {
         <header className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-orange-300">
             <Rocket size={18} />
-            <h1 className="text-lg font-semibold text-white">Launch Kit</h1>
+            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-white">Launch Kit</h1>
           </div>
           <SongPicker
             songs={songs}
@@ -213,7 +213,7 @@ export function LaunchKitView() {
         {extra.map((c) => (
           <CheckLine key={c.message} check={c} />
         ))}
-        <div className="flex flex-wrap items-center gap-3 text-xs text-white/45">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-white/62">
           {suggestions.length > 0 && (
             <button
               onClick={() => setKitEdits(project.path, Object.fromEntries(suggestions.map((f) => [f.id, f.review!.suggestion!])))}
@@ -378,7 +378,7 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
     <div className="flex flex-col gap-3 rounded-lg border border-violet-400/20 bg-violet-500/[0.06] p-4">
       <div className="flex items-center gap-2">
         <Sparkles size={15} className="text-violet-300" />
-        <span className="text-[11px] font-medium uppercase tracking-wide text-violet-200/70">AI layer · {model}</span>
+        <span className="text-[12px] font-semibold text-violet-200/70">AI layer · {model}</span>
       </div>
       <div className="flex flex-wrap gap-2">
         <button onClick={() => run(true)} disabled={!!running} className={btnPrimary}>
@@ -388,23 +388,23 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
           <Check size={14} /> {running === "review" ? "Checking every field…" : summary.state === "unchecked" ? "Check kit" : "Re-check"}
         </button>
         {drafts && !running && (
-          <button onClick={() => setKitAi(path, { drafts: undefined })} className="text-xs text-white/40 hover:text-white" title="Back to the template text">
+          <button onClick={() => setKitAi(path, { drafts: undefined })} className="text-xs text-white/58 hover:text-white" title="Back to the template text">
             Discard AI drafts
           </button>
         )}
       </div>
       <div className={`text-xs ${summary.verified ? "text-emerald-300" : summary.state === "checked" ? "text-amber-300" : "text-white/50"}`}>
         {line}
-        {reviewedAt && <span className="text-white/35"> · checked {formatRelative(reviewedAt)}</span>}
+        {reviewedAt && <span className="text-white/55"> · checked {formatRelative(reviewedAt)}</span>}
       </div>
       {running && (
-        <div className="text-[11px] text-white/40">If Gemini is busy this retries on its own; it gives up after 2 minutes.</div>
+        <div className="text-[11px] text-white/58">If Gemini is busy this retries on its own; it gives up after 2 minutes.</div>
       )}
       {backupUsed && !running && (
-        <div className="text-[11px] text-white/40">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>
+        <div className="text-[11px] text-white/58">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>
       )}
       {error && <div className="text-xs text-red-300">{error}</div>}
-      <div className="text-[11px] leading-relaxed text-white/30">
+      <div className="text-[11px] leading-relaxed text-white/50">
         Sends the song name, tags, notes, mixer track names, credits and these fields to Google Gemini. No audio, no file paths. On the free tier Google may use them to improve its products.
       </div>
     </div>
@@ -434,10 +434,10 @@ function Snippets({
 
   useEffect(() => () => audio.current?.pause(), [render?.path]);
 
-  if (!render) return <div className="py-6 text-center text-xs text-white/40">Render a mixdown to get snippets.</div>;
-  if (loading) return <div className="py-6 text-center text-xs text-white/40">Listening to the mixdown…</div>;
+  if (!render) return <div className="py-6 text-center text-xs text-white/58">Render a mixdown to get snippets.</div>;
+  if (loading) return <div className="py-6 text-center text-xs text-white/58">Listening to the mixdown…</div>;
   if (error || !analysis) return <div className="py-6 text-center text-xs text-red-300">{error ?? "No analysis"}</div>;
-  if (!snippets.length) return <div className="py-6 text-center text-xs text-white/40">The mixdown is shorter than 15 seconds.</div>;
+  if (!snippets.length) return <div className="py-6 text-center text-xs text-white/58">The mixdown is shorter than 15 seconds.</div>;
 
   const duration = analysis.durationSec;
   const bar = project.tempoBpm ? 240 / project.tempoBpm : 1;
@@ -484,7 +484,7 @@ function Snippets({
           />
         ))}
       </div>
-      <div className="flex justify-between text-[10px] text-white/30">
+      <div className="flex justify-between text-[10px] text-white/50">
         <span>0:00</span>
         <span>{formatDuration(duration)}</span>
       </div>
@@ -499,15 +499,15 @@ function Snippets({
               <span className="w-24 tabular-nums text-white/50">
                 {formatDuration(s.startSec)}–{formatDuration(s.startSec + s.lengthSec)}
               </span>
-              <span className="flex-1 text-[11px] text-white/30">{moved ? "moved by you" : i === 0 ? "loudest stretch" : ""}</span>
-              <button onClick={() => nudge(-bar)} title={project.tempoBpm ? "1 bar earlier" : "1 s earlier"} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+              <span className="flex-1 text-[11px] text-white/50">{moved ? "moved by you" : i === 0 ? "loudest stretch" : ""}</span>
+              <button onClick={() => nudge(-bar)} title={project.tempoBpm ? "1 bar earlier" : "1 s earlier"} className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
                 <Minus size={12} />
               </button>
-              <button onClick={() => nudge(bar)} title={project.tempoBpm ? "1 bar later" : "1 s later"} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+              <button onClick={() => nudge(bar)} title={project.tempoBpm ? "1 bar later" : "1 s later"} className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
                 <Plus size={12} />
               </button>
               {moved && (
-                <button onClick={() => onMove(s.label, undefined)} title="Back to the detected spot" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+                <button onClick={() => onMove(s.label, undefined)} title="Back to the detected spot" className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
                   <RotateCcw size={12} />
                 </button>
               )}
@@ -524,7 +524,7 @@ function Snippets({
         })}
       </div>
       {!demoMode && <audio ref={audio} src={api.audioSrc(render.path)} preload="none" />}
-      <div className="text-[11px] text-white/35">Clips are cut on export, with short fades, into snippets/ in the kit.</div>
+      <div className="text-[11px] text-white/55">Clips are cut on export, with short fades, into snippets/ in the kit.</div>
     </div>
   );
 }

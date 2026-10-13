@@ -21,7 +21,7 @@ export function RenderPanel() {
         {!rendering && (
           <button
             onClick={dismiss}
-            className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white"
+            className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white"
           >
             <X size={14} />
           </button>
@@ -30,7 +30,7 @@ export function RenderPanel() {
       <div className="max-h-64 overflow-auto px-2 py-2">
         {entries.map(([path, job]) => (
           <div key={path} className="flex items-center gap-2 px-2 py-1.5 text-xs">
-            {job.status === "queued" && <Clock size={13} className="shrink-0 text-white/30" />}
+            {job.status === "queued" && <Clock size={13} className="shrink-0 text-white/50" />}
             {job.status === "rendering" && (
               <Loader2 size={13} className="shrink-0 animate-spin text-orange-400" />
             )}
@@ -50,7 +50,7 @@ export function RenderPanel() {
         ))}
       </div>
       {!rendering && (
-        <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/40">
+        <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/58">
           {done} done{errored > 0 ? `, ${errored} failed` : ""}
         </div>
       )}

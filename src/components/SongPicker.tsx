@@ -32,7 +32,7 @@ function MixdownState({ song }: { song: ProjectInfo }) {
       </span>
     );
   }
-  return <span className="text-white/35">No mixdown</span>;
+  return <span className="text-white/55">No mixdown</span>;
 }
 
 function KitState({ song, workspace }: { song: ProjectInfo; workspace: Workspace }) {
@@ -149,7 +149,7 @@ export function SongPicker({
             <MixdownState song={current} />
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1 text-[11px] text-white/40 group-hover:text-white/70">
+        <span className="flex shrink-0 items-center gap-1 text-[11px] text-white/58 group-hover:text-white/70">
           Change song <ChevronDown size={14} className={open ? "rotate-180" : ""} />
         </span>
       </button>
@@ -157,7 +157,7 @@ export function SongPicker({
       {open && (
         <div className="absolute left-0 top-full z-30 mt-2 flex max-h-[70vh] w-[30rem] flex-col overflow-hidden rounded-xl border border-white/10 bg-[#17171c] shadow-2xl">
           <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2.5">
-            <Search size={14} className="text-white/35" />
+            <Search size={14} className="text-white/55" />
             <input
               ref={searchRef}
               value={query}
@@ -170,17 +170,17 @@ export function SongPicker({
               aria-label="Search songs"
               aria-controls="launch-song-list"
               aria-activedescendant={flat[active] ? `song-opt-${active}` : undefined}
-              className="flex-1 bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none"
+              className="flex-1 bg-transparent text-sm text-white placeholder:text-white/50 focus:outline-none"
             />
-            <kbd className="rounded border border-white/10 px-1 text-[10px] text-white/30">esc</kbd>
+            <kbd className="rounded border border-white/10 px-1 text-[10px] text-white/50">esc</kbd>
           </div>
           <div ref={listRef} id="launch-song-list" role="listbox" aria-label="Songs" className="overflow-y-auto py-1">
-            {groups.length === 0 && <div className="px-4 py-6 text-center text-xs text-white/40">No song matches “{query}”.</div>}
+            {groups.length === 0 && <div className="px-4 py-6 text-center text-xs text-white/58">No song matches “{query}”.</div>}
             {groups.map((g) => (
               <div key={g.id} role="group" aria-label={g.label}>
                 <div className="sticky top-0 flex items-baseline gap-2 bg-[#17171c] px-4 pb-1 pt-2.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-white/50">{g.label}</span>
-                  <span className="text-[10px] text-white/25">
+                  <span className="text-[12px] font-semibold text-white/50">{g.label}</span>
+                  <span className="text-[10px] text-white/45">
                     {g.songs.length} · {g.hint}
                   </span>
                 </div>
@@ -202,7 +202,7 @@ export function SongPicker({
                     >
                       <div className="flex items-center gap-2">
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/90">{songLabel(s, songs)}</span>
-                        <span className="shrink-0 text-[11px] text-white/35">saved {formatRelative(s.modifiedAtMs)}</span>
+                        <span className="shrink-0 text-[11px] text-white/55">saved {formatRelative(s.modifiedAtMs)}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-white/50">
                         <span className="flex items-center gap-1.5">
@@ -217,7 +217,7 @@ export function SongPicker({
               </div>
             ))}
           </div>
-          <div className="border-t border-white/10 px-4 py-2 text-[10px] text-white/30">↑ ↓ to move · Enter to open · Esc to close</div>
+          <div className="border-t border-white/10 px-4 py-2 text-[10px] text-white/50">↑ ↓ to move · Enter to open · Esc to close</div>
         </div>
       )}
     </div>

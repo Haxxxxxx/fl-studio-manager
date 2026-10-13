@@ -84,7 +84,7 @@ export function FilesPanel({ project }: { project: ProjectInfo }) {
           />
         ))
       )}
-      {project.renders.length > 4 && <div className="pl-[118px] text-[11px] text-white/35">+{project.renders.length - 4} older mixdowns</div>}
+      {project.renders.length > 4 && <div className="pl-[118px] text-[11px] text-white/55">+{project.renders.length - 4} older mixdowns</div>}
 
       <div className="mt-2 border-t border-white/5 pt-2">
         {!settings.outputFolder ? (
@@ -94,7 +94,7 @@ export function FilesPanel({ project }: { project: ProjectInfo }) {
         ) : kit.length === 0 ? (
           <div className="flex items-center gap-2">
             <FileRow icon={<Rocket size={13} />} label="Launch Kit" detail="not exported yet" />
-            <button onClick={() => openLaunchKit(project.path)} className="ml-auto shrink-0 text-[11px] text-white/45 hover:text-white">
+            <button onClick={() => openLaunchKit(project.path)} className="ml-auto shrink-0 text-[11px] text-white/62 hover:text-white">
               Open Launch Kit →
             </button>
           </div>

@@ -29,7 +29,7 @@ export function PackagePanel() {
             </button>
           )}
           {!packaging && (
-            <button onClick={dismiss} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+            <button onClick={dismiss} className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
               <X size={14} />
             </button>
           )}
@@ -48,7 +48,7 @@ export function PackagePanel() {
               )}
               <span className="min-w-0 flex-1 truncate text-white/80">{name(r.projectPath)}</span>
               {!r.error && (
-                <span className="text-white/40">
+                <span className="text-white/58">
                   {r.included} samples · {formatBytes(r.bytes)}
                 </span>
               )}
@@ -62,7 +62,7 @@ export function PackagePanel() {
           </div>
         ))}
       </div>
-      <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/35">
+      <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/55">
         Open a package directly from FL (File → Open) — samples relink automatically.
       </div>
     </div>

@@ -5,13 +5,13 @@ import type { Album, ProjectInfo, RenderFreshness, SongStatus, Workspace } from 
 // (validated with validate_palette.js --ordinal against the #16161b surface).
 // Songs nobody has triaged yet sit in neutral gray, outside the ramp.
 export const STATUSES: { id: SongStatus; label: string; color: string; hint: string }[] = [
-  { id: "creation", label: "Creation", color: "#1c5cab", hint: "Beat and lyrics exist, still rough" },
-  { id: "production", label: "Production", color: "#2a78d6", hint: "Recording, mixing, mastering until final" },
-  { id: "prep", label: "Prep", color: "#5598e7", hint: "Cover, metadata, release date, distributor" },
-  { id: "release", label: "Release", color: "#86b6ef", hint: "Release day" },
-  { id: "promotion", label: "Promotion", color: "#b7d3f6", hint: "Posts, reels, stories, follow-up" },
+  { id: "creation", label: "Creation", color: "#F5A524", hint: "Beat and lyrics exist, still rough" },
+  { id: "production", label: "Production", color: "#D6409F", hint: "Recording, mixing, mastering until final" },
+  { id: "prep", label: "Prep", color: "#8E4EC6", hint: "Cover, metadata, release date, distributor" },
+  { id: "release", label: "Release", color: "#30A46C", hint: "Release day" },
+  { id: "promotion", label: "Promotion", color: "#00A2C7", hint: "Posts, reels, stories, follow-up" },
 ];
-export const UNSORTED = { label: "Unsorted", color: "#5b5b63", hint: "Not placed in a stage yet" };
+export const UNSORTED = { label: "Unsorted", color: "#6F6F78", hint: "Not placed in a stage yet" };
 
 export function statusInfo(status: SongStatus | undefined) {
   return STATUSES.find((s) => s.id === status) ?? { id: undefined, ...UNSORTED };

@@ -73,7 +73,7 @@ export function TagEditor({
         {tags.map((t) => (
           <span key={t} className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/80">
             #{t}
-            <button onClick={() => onChange(tags.filter((x) => x !== t))} className="text-white/40 hover:text-white">
+            <button onClick={() => onChange(tags.filter((x) => x !== t))} className="text-white/58 hover:text-white">
               <X size={11} />
             </button>
           </span>
@@ -90,7 +90,7 @@ export function TagEditor({
             }
           }}
           placeholder="Add tag…"
-          className="min-w-[80px] flex-1 bg-transparent py-0.5 text-xs text-white placeholder:text-white/25 focus:outline-none"
+          className="min-w-[80px] flex-1 bg-transparent py-0.5 text-xs text-white placeholder:text-white/45 focus:outline-none"
         />
       </div>
       {unused.length > 0 && (
@@ -99,7 +99,7 @@ export function TagEditor({
             <button
               key={s}
               onClick={() => add(s)}
-              className="rounded-full border border-dashed border-white/10 px-2 py-0.5 text-[11px] text-white/35 hover:border-white/25 hover:text-white/70"
+              className="rounded-full border border-dashed border-white/10 px-2 py-0.5 text-[11px] text-white/55 hover:border-white/25 hover:text-white/70"
             >
               +{s}
             </button>
@@ -134,7 +134,7 @@ export function Modal({
       >
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
           <div className="text-sm font-semibold text-white/90">{title}</div>
-          <button onClick={onClose} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+          <button onClick={onClose} className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
             <X size={15} />
           </button>
         </div>
@@ -178,10 +178,10 @@ export function ConfirmButton({
 export const btn =
   "flex items-center gap-1.5 rounded-md border border-white/10 px-3 py-1.5 text-sm text-white/70 hover:bg-white/5 disabled:opacity-40";
 export const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-orange-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-md bg-orange-500 px-3 py-1.5 text-sm font-semibold text-[#0f0f12] hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60";
 export const input =
-  "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none";
-export const sectionLabel = "text-[11px] font-medium uppercase tracking-wide text-white/35";
+  "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-orange-400/50 focus:outline-none";
+export const sectionLabel = "text-[12px] font-semibold text-white/55";
 
 
 /** The app's dark surface: background, text color and the system font stack
@@ -223,7 +223,7 @@ export function Card({ title, action, children }: { title: string; action?: Reac
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
       <div className="mb-3 flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-white/40">{title}</div>
+        <div className="text-[12px] font-semibold text-white/58">{title}</div>
         {action}
       </div>
       {children}
@@ -235,11 +235,11 @@ export function Card({ title, action, children }: { title: string; action?: Reac
 export function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
-      <div className="flex items-center gap-1.5 text-white/40">
+      <div className="flex items-center gap-1.5 text-white/58">
         {icon}
-        <span className="text-[11px] uppercase tracking-wide">{label}</span>
+        <span className="text-[12px] font-semibold">{label}</span>
       </div>
-      <div className="mt-1.5 text-2xl font-semibold text-white">{value}</div>
+      <div className="mt-2 font-display text-4xl leading-none text-white">{value}</div>
     </div>
   );
 }
@@ -248,8 +248,8 @@ export function StatTile({ icon, label, value }: { icon: React.ReactNode; label:
 export function HeroStat({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <div className="text-lg font-semibold leading-none text-white">{value}</div>
-      <div className="mt-0.5 text-[10px] uppercase tracking-wide text-white/35">{label}</div>
+      <div className="font-display text-3xl leading-none text-white">{value}</div>
+      <div className="mt-0.5 text-[12px] font-semibold text-white/55">{label}</div>
     </div>
   );
 }
@@ -258,7 +258,7 @@ export function HeroStat({ label, value }: { label: string; value: string | numb
 export function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wide text-white/35">{label}</div>
+      <div className="text-[12px] font-semibold text-white/55">{label}</div>
       <div className="mt-0.5 text-base font-semibold text-white">{value}</div>
     </div>
   );
@@ -278,7 +278,7 @@ export function Section({ label, children }: { label: string; children: React.Re
 export function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-white/35">{label}</dt>
+      <dt className="text-white/55">{label}</dt>
       <dd className="mt-0.5 text-white/80">{value}</dd>
     </div>
   );

@@ -27,7 +27,7 @@ import { detectKey } from "../lib/people";
 import { SongCredits, SongPitches } from "./SongPeople";
 import { ShareToggle } from "./CrewPanel";
 import { FilesPanel } from "./FilesPanel";
-import { ConfirmButton, StatusSelect, TagEditor, btn, input, sectionLabel } from "./ui";
+import { ConfirmButton, StatusSelect, TagEditor, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { Fact, Section } from "../ui";
 
 const KEEP_BACKUPS = 5;
@@ -94,22 +94,22 @@ export function ProjectDrawer() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2 className="truncate text-base font-semibold text-white">{project.name}</h2>
-            <button onClick={() => toggleFavorite(project.path)} className="text-white/30 hover:text-orange-300">
+            <button onClick={() => toggleFavorite(project.path)} className="text-white/50 hover:text-orange-300">
               <Star size={15} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-orange-400" : ""} />
             </button>
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-white/35" title={project.path}>
+          <div className="mt-0.5 truncate text-[11px] text-white/55" title={project.path}>
             {project.folder}
           </div>
         </div>
-        <button onClick={() => openDetail(null)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+        <button onClick={() => openDetail(null)} className="rounded p-1 text-white/58 hover:bg-white/10 hover:text-white">
           <X size={16} />
         </button>
       </div>
 
       <div className="flex-1 overflow-auto px-5 py-4">
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => openInFlStudio(project.path)} disabled={demoMode} className={btn}>
+          <button onClick={() => openInFlStudio(project.path)} disabled={demoMode} className={btnPrimary}>
             <PlayCircle size={14} /> Open in FL
           </button>
           <button onClick={() => revealInFileManager(project.path)} disabled={demoMode} className={btn}>
@@ -210,13 +210,13 @@ export function ProjectDrawer() {
                 <button onClick={() => openAlbum(a.id)} className="hover:underline">
                   {a.title}
                 </button>
-                <button onClick={() => removeTrack(a.id, project.path)} className="text-white/35 hover:text-white">
+                <button onClick={() => removeTrack(a.id, project.path)} className="text-white/55 hover:text-white">
                   <X size={11} />
                 </button>
               </span>
             ))}
             {otherAlbums.length > 0 && (
-              <label className="relative flex cursor-pointer items-center gap-1 rounded-full border border-dashed border-white/15 px-2 py-0.5 text-[11px] text-white/40 hover:text-white/70">
+              <label className="relative flex cursor-pointer items-center gap-1 rounded-full border border-dashed border-white/15 px-2 py-0.5 text-[11px] text-white/58 hover:text-white/70">
                 <Plus size={11} /> Add to release
                 <select
                   value=""
@@ -232,7 +232,7 @@ export function ProjectDrawer() {
                 </select>
               </label>
             )}
-            {workspace.albums.length === 0 && <span className="text-xs text-white/30">No releases yet</span>}
+            {workspace.albums.length === 0 && <span className="text-xs text-white/50">No releases yet</span>}
           </div>
         </Section>
 
@@ -289,7 +289,7 @@ export function ProjectDrawer() {
           {latestRender ? (
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
               <div className="flex items-center gap-2 text-xs">
-                <Disc3 size={14} className="text-white/40" />
+                <Disc3 size={14} className="text-white/58" />
                 <span className="min-w-0 flex-1 truncate text-white/80">{fileName(latestRender.path)}</span>
                 {freshness === "fresh" ? (
                   <span className="flex items-center gap-1 text-emerald-400">
@@ -301,20 +301,20 @@ export function ProjectDrawer() {
                   </span>
                 )}
               </div>
-              <div className="mt-1 text-[11px] text-white/35">
+              <div className="mt-1 text-[11px] text-white/55">
                 Rendered {formatDateTime(latestRender.modifiedAtMs)} · {formatBytes(latestRender.sizeBytes)}
               </div>
               {!demoMode && (
                 <audio controls preload="none" src={audioSrc(latestRender.path)} className="mt-2 h-8 w-full" />
               )}
               {project.renders.length > 1 && (
-                <div className="mt-2 text-[11px] text-white/35">
+                <div className="mt-2 text-[11px] text-white/55">
                   +{project.renders.length - 1} other bounce{project.renders.length > 2 ? "s" : ""} in the folder
                 </div>
               )}
             </div>
           ) : (
-            <div className="text-xs text-white/35">No mixdown yet — render it, or bounce it from FL next to the project.</div>
+            <div className="text-xs text-white/55">No mixdown yet — render it, or bounce it from FL next to the project.</div>
           )}
         </Section>
 
@@ -337,7 +337,7 @@ export function ProjectDrawer() {
               <button type="submit" className={btn}>
                 Create
               </button>
-              <button type="button" onClick={() => setVersionName(null)} className="text-white/40 hover:text-white">
+              <button type="button" onClick={() => setVersionName(null)} className="text-white/58 hover:text-white">
                 <X size={14} />
               </button>
             </form>
@@ -348,14 +348,14 @@ export function ProjectDrawer() {
               {visibleBackups.map((b) => (
                 <li key={b.path} className="group relative flex items-center gap-2 py-1 text-xs">
                   <span className="absolute -left-[15.5px] h-2 w-2 rounded-full bg-white/20" />
-                  <History size={12} className="text-white/25" />
+                  <History size={12} className="text-white/45" />
                   <span className="flex-1 text-white/60">{formatDateTime(b.modifiedAtMs)}</span>
-                  <span className="text-white/25">{formatBytes(b.sizeBytes)}</span>
+                  <span className="text-white/45">{formatBytes(b.sizeBytes)}</span>
                   <button
                     title="Restore as a new file next to the project (the current version is untouched)"
                     disabled={demoMode}
                     onClick={() => run(() => restoreBackup(b.path, project.path), (p) => `Restored as ${fileName(String(p))}`)}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-white/40 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100"
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-white/58 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100"
                   >
                     <RotateCcw size={11} /> Restore
                   </button>
@@ -364,7 +364,7 @@ export function ProjectDrawer() {
             </ol>
           )}
           {project.backups.length > visibleBackups.length && (
-            <button onClick={() => setShowAllBackups(true)} className="mt-1 text-[11px] text-white/40 hover:text-white/70">
+            <button onClick={() => setShowAllBackups(true)} className="mt-1 text-[11px] text-white/58 hover:text-white/70">
               Show all {project.backups.length}
             </button>
           )}
@@ -382,7 +382,7 @@ export function ProjectDrawer() {
             />
           )}
           {oldBackups.length > 0 && (
-            <div className="mt-1 text-[11px] text-white/30">Keeps the {KEEP_BACKUPS} most recent.</div>
+            <div className="mt-1 text-[11px] text-white/50">Keeps the {KEEP_BACKUPS} most recent.</div>
           )}
         </Section>
       </div>
@@ -422,11 +422,11 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
             </span>
           ))}
           {native.map((p) => (
-            <span key={p.name} className="rounded bg-white/[0.04] px-1.5 py-0.5 text-[11px] text-white/45">
+            <span key={p.name} className="rounded bg-white/[0.04] px-1.5 py-0.5 text-[11px] text-white/62">
               {p.name}
             </span>
           ))}
-          {project.plugins.length === 0 && <span className="text-xs text-white/30">None found</span>}
+          {project.plugins.length === 0 && <span className="text-xs text-white/50">None found</span>}
         </div>
       </Section>
 
@@ -448,13 +448,13 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
         </div>
         {problemSamples.length > 0 && (
           <>
-            <button onClick={() => setShowSamples(!showSamples)} className="mt-1.5 text-[11px] text-white/40 hover:text-white/70">
+            <button onClick={() => setShowSamples(!showSamples)} className="mt-1.5 text-[11px] text-white/58 hover:text-white/70">
               {showSamples ? "Hide" : "Show"} {problemSamples.length} not at their stored path
             </button>
             {showSamples && (
               <ul className="mt-1.5 max-h-48 space-y-0.5 overflow-auto text-[11px]">
                 {problemSamples.map((s) => (
-                  <li key={s.path} title={s.path} className={`truncate ${s.status === "missing" ? "text-red-300" : "text-white/45"}`}>
+                  <li key={s.path} title={s.path} className={`truncate ${s.status === "missing" ? "text-red-300" : "text-white/62"}`}>
                     {s.status === "missing" ? "✕" : "↪"} {fileName(s.path)}
                   </li>
                 ))}
