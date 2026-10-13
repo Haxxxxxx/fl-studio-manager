@@ -37,6 +37,7 @@ pub fn run() {
             actions::duplicate_project,
             actions::restore_backup,
             actions::trash_backups,
+            actions::backups_on_risky_volumes,
             package::package_preview,
             package::package_projects,
             files::kit_files,

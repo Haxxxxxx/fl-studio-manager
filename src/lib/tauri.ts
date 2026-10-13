@@ -86,8 +86,15 @@ export async function restoreBackup(backupPath: string, projectPath: string): Pr
   return invoke("restore_backup", { backupPath, projectPath });
 }
 
-export async function trashBackups(paths: string[]): Promise<number> {
-  return invoke("trash_backups", { paths });
+/** Moves listed backups to the Recycle Bin / Trash. Backups on a drive
+ * without one are refused unless `allowPermanent` (the user said so). */
+export async function trashBackups(paths: string[], allowPermanent = false): Promise<number> {
+  return invoke("trash_backups", { paths, allowPermanent });
+}
+
+/** The backups among `paths` on a removable or network drive, where deleting is permanent. */
+export async function backupsOnRiskyVolumes(paths: string[]): Promise<string[]> {
+  return invoke("backups_on_risky_volumes", { paths });
 }
 
 /** What each package would hold. Nothing is written. */

@@ -206,26 +206,103 @@ pub fn restore_backup(backup_path: String, project_path: String) -> Result<Strin
 }
 
 /// Whether cleanup may delete `path`: a plain file (no `..` tricks) that
-/// looks like a backup and that the last scan actually listed as one.
+/// looks like a backup and that the last scan actually listed as one. Names
+/// with quotes, backslashes or control characters are refused outright:
+/// nothing legitimate needs them, and they're what breaks out of a quoted
+/// string in a script.
 fn may_trash(path: &Path, listed: impl Fn(&Path) -> bool) -> bool {
-    !path.components().any(|c| matches!(c, std::path::Component::ParentDir))
+    let name_ok = path
+        .file_name()
+        .map(|n| n.to_string_lossy())
+        .is_some_and(|n| !n.chars().any(|c| c == '"' || c == '\\' || c.is_control()));
+    name_ok
+        && !path.components().any(|c| matches!(c, std::path::Component::ParentDir))
         && daws::is_backup_file(path)
         && listed(path)
         && fs::symlink_metadata(path).is_ok_and(|m| m.is_file())
 }
 
-/// Send backups to the Recycle Bin (recoverable). Refuses anything the last
-/// scan didn't list as a backup, so a bad call can't touch real projects.
+/// Whether deleting on this path's drive may skip the Recycle Bin / Trash:
+/// Windows deletes permanently on removable and network drives, macOS has
+/// no Trash on network volumes. Unknown counts as risky.
+#[cfg(windows)]
+pub fn may_delete_permanently(path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::{Component, Prefix};
+    // GetDriveTypeW results (WindowsProgramming): fixed disks are the safe ones.
+    const DRIVE_FIXED: u32 = 3;
+    let root = match path.components().next() {
+        Some(Component::Prefix(p)) => match p.kind() {
+            Prefix::Disk(d) | Prefix::VerbatimDisk(d) => format!("{}:\\", d as char),
+            _ => return true, // UNC and device paths: network or unknown
+        },
+        _ => return true,
+    };
+    let wide: Vec<u16> = std::ffi::OsStr::new(&root).encode_wide().chain(Some(0)).collect();
+    unsafe { windows_sys::Win32::Storage::FileSystem::GetDriveTypeW(wide.as_ptr()) != DRIVE_FIXED }
+}
+
+#[cfg(target_os = "macos")]
+pub fn may_delete_permanently(path: &Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    let Ok(c) = std::ffi::CString::new(path.as_os_str().as_bytes()) else { return true };
+    let mut st: libc::statfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statfs(c.as_ptr(), &mut st) } != 0 {
+        return true;
+    }
+    // External drives keep their own .Trashes; network volumes have none.
+    (st.f_flags & libc::MNT_LOCAL as u32) == 0
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+pub fn may_delete_permanently(_path: &Path) -> bool {
+    false
+}
+
+/// The backups among `paths` whose deletion may be permanent (removable or
+/// network drive), so the UI can say so before anything is deleted.
 #[tauri::command]
-pub async fn trash_backups(paths: Vec<String>) -> Result<u32, String> {
-    if let Some(p) = paths.iter().find(|p| !may_trash(Path::new(p), crate::scanner::is_listed_backup)) {
+pub fn backups_on_risky_volumes(paths: Vec<String>) -> Vec<String> {
+    paths.into_iter().filter(|p| may_delete_permanently(Path::new(p))).collect()
+}
+
+/// Every path must be a listed backup; ones on a drive without a Recycle Bin
+/// only with the user's explicit OK.
+fn check_cleanup(paths: &[String], allow_permanent: bool, listed: impl Fn(&Path) -> bool, risky: impl Fn(&Path) -> bool) -> Result<(), String> {
+    if let Some(p) = paths.iter().find(|p| !may_trash(Path::new(p), &listed)) {
         return Err(format!("refusing to delete non-backup file: {p}"));
     }
+    if !allow_permanent {
+        if let Some(p) = paths.iter().find(|p| risky(Path::new(p))) {
+            return Err(format!("{p} is on a removable or network drive, where it would be deleted permanently"));
+        }
+    }
+    Ok(())
+}
+
+/// Send backups to the Recycle Bin / Trash (recoverable). Refuses anything
+/// the last scan didn't list as a backup, so a bad call can't touch real
+/// projects; refuses backups on drives without a Recycle Bin unless
+/// `allow_permanent` (the user confirmed a permanent delete).
+#[tauri::command]
+pub async fn trash_backups(paths: Vec<String>, allow_permanent: Option<bool>) -> Result<u32, String> {
+    check_cleanup(&paths, allow_permanent.unwrap_or(false), crate::scanner::is_listed_backup, may_delete_permanently)?;
     let count = paths.len() as u32;
-    tauri::async_runtime::spawn_blocking(move || trash::delete_all(&paths))
-        .await
-        .map_err(|e| format!("cleanup failed: {e}"))?
-        .map_err(|e| format!("could not move backups to the Recycle Bin: {e}"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        #[allow(unused_mut)]
+        let mut ctx = trash::TrashContext::default();
+        // NSFileManager, not Finder via AppleScript: no script built from
+        // file names, and no Finder automation permission prompt.
+        #[cfg(target_os = "macos")]
+        {
+            use trash::macos::{DeleteMethod, TrashContextExtMacos};
+            ctx.set_delete_method(DeleteMethod::NsFileManager);
+        }
+        ctx.delete_all(&paths)
+    })
+    .await
+    .map_err(|e| format!("cleanup failed: {e}"))?
+    .map_err(|e| format!("could not move backups to the Recycle Bin: {e}"))?;
     Ok(count)
 }
 
@@ -287,12 +364,12 @@ mod tests {
     #[test]
     fn trash_refuses_real_projects() {
         for p in ["D:\\Projects\\Envy\\Envy.flp", "/m/Wave Project/Wave.als", "/m/Tide/Tide.rpp", "/m/Fade/Fade.cpr", "/m/Envy/Backup/cover.png"] {
-            let result = tauri::async_runtime::block_on(trash_backups(vec![p.to_string()]));
+            let result = tauri::async_runtime::block_on(trash_backups(vec![p.to_string()], None));
             assert!(result.is_err(), "{p}");
         }
         // One real project in the batch refuses the whole batch.
         let mixed = vec!["/m/Tide/Tide.rpp-bak".to_string(), "/m/Tide/Tide.rpp".to_string()];
-        assert!(tauri::async_runtime::block_on(trash_backups(mixed)).is_err());
+        assert!(tauri::async_runtime::block_on(trash_backups(mixed, None)).is_err());
     }
 
     #[test]
@@ -319,7 +396,7 @@ mod tests {
         assert!(!may_trash(&folder, anything));
         // Never-scanned paths are refused by the real command.
         let b = backup.to_string_lossy().to_string();
-        assert!(tauri::async_runtime::block_on(trash_backups(vec![b])).is_err());
+        assert!(tauri::async_runtime::block_on(trash_backups(vec![b], Some(true))).is_err());
         assert_eq!(fs::read(&backup).unwrap(), b"old");
         let _ = fs::remove_dir_all(&dir);
     }
@@ -392,6 +469,51 @@ mod tests {
         assert!(restored.ends_with("Fade - restored.cpr"), "{restored}");
 
         assert_eq!(fs::read(&wave).unwrap(), b"current");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn trash_refuses_names_that_could_break_out_of_a_script() {
+        let dir = std::env::temp_dir().join(format!("flsm-trash-names-{}", std::process::id()));
+        let backup_dir = dir.join("Envy").join("Backup");
+        fs::create_dir_all(&backup_dir).unwrap();
+        let anything = |_: &Path| true;
+        let normal = backup_dir.join("Envy (overwritten at 16h12).flp");
+        fs::write(&normal, b"x").unwrap();
+        assert!(may_trash(&normal, anything));
+        for name in [
+            "x\" & (do shell script \"touch /tmp/pwned\") & \".flp",
+            "Envy\\(overwritten at 16h12).flp",
+            "Envy (overwritten\nat 16h12).flp",
+        ] {
+            let p = backup_dir.join(name);
+            // Some of these names can't exist on every filesystem; the guard refuses them regardless.
+            let _ = fs::write(&p, b"x");
+            assert!(!may_trash(&p, anything), "{name:?}");
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn backups_on_a_removable_or_network_drive_need_an_explicit_ok() {
+        let listed = |_: &Path| true;
+        // Real files; the volume rule is mocked (the "USB" folder is a drive
+        // without a Recycle Bin).
+        let dir = std::env::temp_dir().join(format!("flsm-trash-volume-{}", std::process::id()));
+        let usb = dir.join("USB").join("Envy").join("Backup").join("Envy (overwritten at 16h12).flp");
+        let local = dir.join("Local").join("Tide").join("Tide.rpp-bak");
+        for f in [&usb, &local] {
+            fs::create_dir_all(f.parent().unwrap()).unwrap();
+            fs::write(f, b"x").unwrap();
+        }
+        let both = vec![usb.to_string_lossy().to_string(), local.to_string_lossy().to_string()];
+        let on_usb = |p: &Path| p.starts_with(dir.join("USB"));
+        assert!(check_cleanup(&both, false, listed, on_usb).unwrap_err().contains("permanently"));
+        assert!(check_cleanup(&both, true, listed, on_usb).is_ok());
+        assert!(check_cleanup(&both[1..], false, listed, on_usb).is_ok());
+        // The temp folder is on a local disk: the real detector agrees.
+        assert!(!may_delete_permanently(&local));
+        assert!(backups_on_risky_volumes(vec![local.to_string_lossy().to_string()]).is_empty());
         let _ = fs::remove_dir_all(&dir);
     }
 }
