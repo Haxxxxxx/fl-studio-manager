@@ -18,6 +18,7 @@ Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend
 ## Commands
 - `npm ci && npm run tauri dev`: run the app. Setup per OS: [SETUP.md](SETUP.md).
 - `npm run build`: tsc + vite (must stay clean).
+- `npm test`: Vitest unit tests for the pure modules in `src/lib` (`*.test.ts`).
 - `cd src-tauri && cargo test`: Rust tests.
 - `supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor` then `supabase test db`: database tests. Sign-in emails land in Mailpit (http://127.0.0.1:54324).
 - `cd web && npm ci && npm run dev`: web dashboard on port 5175.
