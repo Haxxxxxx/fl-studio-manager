@@ -14,6 +14,16 @@ export interface StemsInfo {
 
 export type DawId = "fl-studio" | "ableton" | "reaper" | "studio-one" | "pro-tools" | "cubase" | "bitwig";
 
+/** A DAW's default projects folder found on this computer (Settings → Auto-detect DAWs). */
+export interface DetectedFolder {
+  daw: string;
+  path: string;
+  /** Projects found inside (up to 999). */
+  projects: number;
+  /** Already linked. */
+  linked: boolean;
+}
+
 export interface ProjectInfo {
   path: string;
   /** Why nothing could be read from inside the project (damaged, oversized
