@@ -41,7 +41,7 @@ export function NewProjectModal() {
     setStatus(draft.status);
     setAlbumId(draft.albumId ?? "");
     let cancelled = false;
-    Promise.all([api.listTemplates(settings.flStudioPath), api.defaultTemplate(settings.flStudioPath)])
+    Promise.all([api.listTemplates(), api.defaultTemplate()])
       .then(([list, fallback]) => {
         if (cancelled) return;
         setFactory(list);

@@ -405,8 +405,9 @@ pub fn export_clips(src: &Path, clips: &[Snippet], out_dir: &Path) -> Result<Vec
 }
 
 #[tauri::command]
-pub async fn analyze_audio(path: String, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
-    tauri::async_runtime::spawn_blocking(move || analyze(Path::new(&path), bpm))
+pub async fn analyze_audio(app: tauri::AppHandle, path: String, bpm: Option<f64>) -> Result<AudioAnalysis, String> {
+    let path = crate::scope::Scope::load(&app)?.audio(&path)?;
+    tauri::async_runtime::spawn_blocking(move || analyze(&path, bpm))
         .await
         .map_err(|e| format!("analysis failed: {e}"))?
 }
@@ -422,6 +423,33 @@ pub struct KitFile {
 /// the kit's own files only; anything else in the folder (cover art) stays.
 #[tauri::command]
 pub async fn export_launch_kit(
+    app: tauri::AppHandle,
+    folder_name: String,
+    files: Vec<KitFile>,
+    master: Option<String>,
+    master_name: String,
+    clips: Vec<Snippet>,
+) -> Result<String, String> {
+    let scope = crate::scope::Scope::load(&app)?;
+    let output_folder = scope.output()?.to_string_lossy().to_string();
+    let master = master.map(|m| scope.audio(&m).map(|p| p.to_string_lossy().to_string())).transpose()?;
+    check_kit_files(&files)?;
+    write_launch_kit(output_folder, folder_name, files, master, master_name, clips).await
+}
+
+/// What a kit's text files may be called: the kit's own text formats only.
+fn check_kit_files(files: &[KitFile]) -> Result<(), String> {
+    for f in files {
+        let name = safe_name(&f.name);
+        let ext = Path::new(&name).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+        if !matches!(ext.as_str(), "txt" | "json" | "csv" | "md") {
+            return Err(format!("a Launch Kit file can't be called {}", f.name));
+        }
+    }
+    Ok(())
+}
+
+async fn write_launch_kit(
     output_folder: String,
     folder_name: String,
     files: Vec<KitFile>,
@@ -644,5 +672,14 @@ mod tests {
         let err = decode(&wav, |_, _, _| panic!("decoder bug")).unwrap_err();
         assert!(err.contains("couldn't be decoded"), "{err}");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn launch_kit_text_files_keep_their_formats() {
+        let file = |name: &str| KitFile { name: name.to_string(), content: "x".to_string() };
+        assert!(check_kit_files(&[file("metadata.json"), file("captions.txt"), file("sheet.csv"), file("brief.md")]).is_ok());
+        for bad in ["p.plist", "run.bat", "x.command", "evil.sh", "noext", "a.txt.exe"] {
+            assert!(check_kit_files(&[file(bad)]).is_err(), "{bad}");
+        }
     }
 }

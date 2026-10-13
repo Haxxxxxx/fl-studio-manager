@@ -113,11 +113,19 @@ interface AppState {
   setView: (view: View) => void;
   setSearch: (search: string) => void;
   init: () => Promise<void>;
-  updateSettings: (patch: Partial<Settings>) => Promise<void>;
+/** Preferences only: paths go through the pickers below (Rust owns them). */
+  updateSettings: (patch: Partial<Omit<Settings, "watchedFolders" | "flStudioPath" | "outputFolder" | "ffmpegPath">>) => Promise<void>;
+  /** Native picker (in Rust); links the folder and scans it. */
   addWatchedFolder: () => Promise<void>;
-  /** Link a known folder (e.g. the suggested one) and scan it. */
-  linkFolder: (folder: string) => Promise<void>;
+  /** Link the detected default projects folder (the first-run suggestion) and scan it. */
+  linkSuggestedFolder: () => Promise<void>;
   removeWatchedFolder: (folder: string) => Promise<void>;
+  pickOutputFolder: () => Promise<void>;
+  pickFlStudio: () => Promise<void>;
+  /** Fill in the FL Studio found on this machine; false if none was found. */
+  detectFlStudio: () => Promise<boolean>;
+  pickFfmpeg: () => Promise<void>;
+  clearPathSetting: (which: "flStudio" | "ffmpeg" | "outputFolder") => Promise<void>;
   rescan: () => Promise<void>;
   toggleSelected: (path: string) => void;
   selectAll: (paths: string[]) => void;
@@ -256,6 +264,27 @@ export const useAppStore = create<AppState>((set, get) => {
 
   /** Rescan after a folder change; a failure shows in the error banner
    * (these run from buttons, so nobody else would catch it). */
+  /** Take the path settings Rust saved; keep this session's other preferences
+   * (sample-data favorites stay in memory). */
+  function keepPaths(saved: Settings) {
+    const { watchedFolders, flStudioPath, outputFolder, ffmpegPath } = saved;
+    set((s) => ({ settings: { ...s.settings, watchedFolders, flStudioPath, outputFolder, ffmpegPath } }));
+  }
+
+  /** A folder was linked: leave sample data if needed, then scan. */
+  async function linked(saved: Settings) {
+    // Leaving sample data: drop its fake albums/people before anything
+    // can be saved over the real workspace.
+    if (get().demoMode) {
+      set({ demoMode: false, projects: [], selected: new Set(), detailPath: null, openAlbumId: null });
+      restoreRealFavorites();
+      await loadWorkspace();
+    }
+    set({ suggestedFolder: null });
+    keepPaths(saved);
+    await scanOrReport();
+  }
+
   function scanOrReport() {
     return get()
       .rescan()
@@ -343,8 +372,7 @@ export const useAppStore = create<AppState>((set, get) => {
       }
       // First run on a machine with FL installed: fill the path in for them.
       if (!settings.flStudioPath) {
-        settings.flStudioPath = await api.detectFlStudio().catch(() => null);
-        if (settings.flStudioPath) await api.saveSettings(settings).catch(() => {});
+        settings = await api.useDetectedFlStudio().catch(() => settings);
       }
       set({ settings });
       await loadWorkspace();
@@ -380,39 +408,47 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ settings: merged });
       // Sample-data stars never reach settings.json.
       await api.saveSettings(realFavorites ? { ...merged, favorites: realFavorites } : merged);
-      if ("outputFolder" in patch) await get().rescan();
     },
 
     addWatchedFolder: async () => {
-      const folder = await api.pickFolder();
-      if (folder) await get().linkFolder(folder);
+      const before = get().settings.watchedFolders;
+      const next = await api.pickWatchedFolder();
+      if (next.watchedFolders.length !== before.length) await linked(next);
     },
 
-    linkFolder: async (folder) => {
-      const current = get().settings;
-      if (current.watchedFolders.includes(folder)) return;
-      // Leaving sample data: drop its fake albums/people before anything
-      // can be saved over the real workspace.
-      if (get().demoMode) {
-        set({ demoMode: false, projects: [], selected: new Set(), detailPath: null, openAlbumId: null });
-        restoreRealFavorites();
-        await loadWorkspace();
-      }
-      set({ suggestedFolder: null });
-      await get().updateSettings({
-        watchedFolders: [...current.watchedFolders, folder],
-      });
-      await scanOrReport();
+    linkSuggestedFolder: async () => {
+      await linked(await api.linkDetectedProjectsFolder());
     },
 
     removeWatchedFolder: async (folder) => {
-      const current = get().settings;
-      const remaining = current.watchedFolders.filter((f) => f !== folder);
-      await get().updateSettings({ watchedFolders: remaining });
+      const next = await api.removeWatchedFolder(folder);
+      keepPaths(next);
       await scanOrReport();
-      if (remaining.length === 0) {
+      if (next.watchedFolders.length === 0) {
         set({ suggestedFolder: await api.detectProjectsFolder().catch(() => null) });
       }
+    },
+
+    pickOutputFolder: async () => {
+      const before = get().settings.outputFolder;
+      const next = await api.pickOutputFolder();
+      keepPaths(next);
+      if (next.outputFolder !== before) await get().rescan();
+    },
+
+    pickFlStudio: async () => keepPaths(await api.pickFlStudio()),
+
+    detectFlStudio: async () => {
+      const next = await api.useDetectedFlStudio().catch(() => null);
+      if (next) keepPaths(next);
+      return !!next?.flStudioPath;
+    },
+
+    pickFfmpeg: async () => keepPaths(await api.pickFfmpeg()),
+
+    clearPathSetting: async (which) => {
+      keepPaths(await api.clearPathSetting(which));
+      if (which === "outputFolder") await get().rescan();
     },
 
     rescan: async () => {
@@ -427,7 +463,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const id = ++scanSeq;
       set({ scanning: true });
       try {
-        const projects = await api.scanProjects(folders, get().settings.outputFolder);
+        const projects = await api.scanProjects();
         if (id === scanSeq && !get().demoMode) {
           // Renamed/moved .flp files keep their stage, tags, notes, credits,
           // crew share and album slot (lib/relink.ts). Only on the real,
@@ -485,10 +521,6 @@ export const useAppStore = create<AppState>((set, get) => {
         throw new Error(`Rendering from Hivo works with FL Studio projects. Export this one from ${daw.label}: ${daw.exportTip}`);
       }
 
-      const sep = settings.outputFolder.includes("\\") ? "\\" : "/";
-      const outputFolder = options?.subfolder
-        ? `${settings.outputFolder}${sep}${options.subfolder.replace(/[/\\:*?"<>|]/g, "_")}`
-        : settings.outputFolder;
 
       const seedJobs = new Map(get().renderJobs);
       for (const path of projectPaths) {
@@ -501,13 +533,8 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ renderJobs: seedJobs, rendering: true });
 
       try {
-        await api.renderProjects({
-          projectPaths,
-          outputFolder,
-          flStudioPath: settings.flStudioPath,
-          format: settings.renderFormat,
-          outputNames,
-        });
+        // FL Studio, the format and the export folder are read from Settings in Rust.
+        await api.renderProjects({ projectPaths, subfolder: options?.subfolder, outputNames });
       } catch (e) {
         // Failed before (or while) FL Studio reported progress: mark the rows
         // that never finished, so the panel doesn't read "complete".
@@ -608,14 +635,13 @@ export const useAppStore = create<AppState>((set, get) => {
       if (!packagePlan || packaging || !settings.outputFolder) return;
       const { plans, subfolder, skipped: skippedResults } = packagePlan;
       const paths = plans.map((p) => p.projectPath);
-      const sep = settings.outputFolder.includes("\\") ? "\\" : "/";
       set({ packaging: true, packageResults: skippedResults, packagePlan: null });
       // Results stream in per song so the panel can show progress.
       const unlisten = await api.onPackageProgress((r) =>
         set((s) => ({ packageResults: [...(s.packageResults ?? []), r] })),
       );
       try {
-        await api.packageProjects({ projectPaths: paths, outputFolder: `${settings.outputFolder}${sep}Packages`, subfolder, approved });
+        await api.packageProjects({ projectPaths: paths, subfolder, approved });
       } finally {
         unlisten();
         set({ packaging: false });

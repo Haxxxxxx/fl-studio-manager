@@ -521,7 +521,7 @@ function BulkSelect({
 /** First run: no folder linked. Offers FL's default folder when it exists. */
 export function EmptyLibrary() {
   const suggested = useAppStore((s) => s.suggestedFolder);
-  const linkFolder = useAppStore((s) => s.linkFolder);
+  const linkSuggestedFolder = useAppStore((s) => s.linkSuggestedFolder);
   const addWatchedFolder = useAppStore((s) => s.addWatchedFolder);
   const loadDemoData = useAppStore((s) => s.loadDemoData);
   const [error, setError] = useState<string | null>(null);
@@ -551,7 +551,7 @@ export function EmptyLibrary() {
       )}
       <div className="mt-2 flex gap-2">
         {suggested && (
-          <button onClick={run(() => linkFolder(suggested))} className={btnPrimary}>
+          <button onClick={run(linkSuggestedFolder)} className={btnPrimary}>
             Use this folder
           </button>
         )}
