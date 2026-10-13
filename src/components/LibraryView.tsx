@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowUpDown,
-  CheckCircle2,
   CheckSquare,
   Download,
   FolderSearch,
@@ -32,11 +31,11 @@ import {
   hasProblems,
   missingPlugins,
   missingSamples,
-  renderFreshness,
   songLabel,
 } from "../lib/songs";
 import type { ProjectInfo, SongStatus } from "../types";
 import { StatusDot, StatusSelect, btn, btnPrimary } from "./ui";
+import { Chip, MixdownBadge, Toggle } from "../ui";
 
 const STATUS_ORDER: Record<string, number> = Object.fromEntries(STATUSES.map((s, i) => [s.id, i + 1]));
 
@@ -469,48 +468,6 @@ function ProblemIcon({ project }: { project: ProjectInfo }) {
     <span title={lines.join("\n")} className="shrink-0 text-red-400" aria-label={lines.join(". ")}>
       <AlertTriangle size={12} />
     </span>
-  );
-}
-
-export function MixdownBadge({ project }: { project: ProjectInfo }) {
-  const f = renderFreshness(project);
-  if (f === "none") return <span className="text-xs text-white/20">—</span>;
-  if (f === "fresh")
-    return (
-      <span className="flex items-center gap-1 text-xs text-emerald-400/90" title="Mixdown is newer than the last save">
-        <CheckCircle2 size={12} /> Current
-      </span>
-    );
-  return (
-    <span className="flex items-center gap-1 text-xs text-amber-400/90" title="Project was saved after the last mixdown">
-      <AlertTriangle size={12} /> Outdated
-    </span>
-  );
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
-        active ? "bg-white/15 text-white" : "text-white/50 hover:bg-white/5"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Toggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm ${
-        active ? "border-orange-400/50 bg-orange-500/15 text-orange-300" : "border-white/10 text-white/60 hover:bg-white/5"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

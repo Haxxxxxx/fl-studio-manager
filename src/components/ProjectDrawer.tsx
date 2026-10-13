@@ -28,6 +28,7 @@ import { SongCredits, SongPitches } from "./SongPeople";
 import { ShareToggle } from "./CrewPanel";
 import { FilesPanel } from "./FilesPanel";
 import { ConfirmButton, StatusSelect, TagEditor, btn, input, sectionLabel } from "./ui";
+import { Fact, Section } from "../ui";
 
 const KEEP_BACKUPS = 5;
 
@@ -463,23 +464,5 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
         )}
       </Section>
     </>
-  );
-}
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-5">
-      <div className={`${sectionLabel} mb-2`}>{label}</div>
-      {children}
-    </section>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-white/35">{label}</dt>
-      <dd className="mt-0.5 text-white/80">{value}</dd>
-    </div>
   );
 }
