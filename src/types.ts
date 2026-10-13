@@ -249,6 +249,8 @@ export interface AudioAnalysis {
   /** Loudness per window, loudest = 1. */
   energy: number[];
   snippets: Snippet[];
+  /** Estimated from the audio (Krumhansl–Schmuckler); missing for sample data. */
+  key?: { key: string; confidence: number } | null;
   /** Missing for sample data. */
   master?: MasterSpec;
 }
