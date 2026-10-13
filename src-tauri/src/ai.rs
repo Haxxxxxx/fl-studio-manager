@@ -130,11 +130,112 @@ fn explain_error(status: u16, v: &Value, model: &str) -> String {
         400 if msg.to_lowercase().contains("api key") => "The Gemini API key was rejected. Check it in Settings → AI.".to_string(),
         401 | 403 => "This Gemini API key isn't allowed to use the API. Check it in Settings → AI.".to_string(),
         404 => format!("Gemini model \"{model}\" wasn't found. Pick another one in Settings → AI."),
-        429 => "Free-tier limit reached. Wait a minute (daily limits reset at midnight Pacific) and try again.".to_string(),
-        500..=599 => format!("Gemini is having trouble right now ({status}). Try again in a moment."),
+        429 => "Free-tier limit reached, even after waiting. Try again in a minute (daily limits reset at midnight Pacific).".to_string(),
+        500..=599 => format!(
+            "Gemini is overloaded right now ({status}), even after several retries and the backup model {FALLBACK_MODEL}. This is on Google's side: try again in a few minutes."
+        ),
         _ if !msg.is_empty() => format!("Gemini error: {msg}"),
         _ => format!("Gemini error (HTTP {status})."),
     }
+}
+
+/// Tried once when the chosen model stays overloaded after its retries.
+pub const FALLBACK_MODEL: &str = "gemini-3.5-flash-lite";
+/// Retries after the first attempt (Google's own SDKs default to 4).
+const MAX_RETRIES: u32 = 4;
+const FALLBACK_RETRIES: u32 = 2;
+/// Longest server-suggested wait we sit through; longer (daily quota) fails fast.
+const MAX_WAIT: Duration = Duration::from_secs(20);
+
+/// Transient per Google's guidance: rate limits, timeouts, server errors.
+fn retryable(status: u16) -> bool {
+    matches!(status, 408 | 429 | 500..=599)
+}
+
+/// Exponential backoff with jitter: ~1 s, 2 s, 4 s, 8 s, plus 0–400 ms so
+/// many clients don't retry in lockstep.
+fn backoff(attempt: u32) -> Duration {
+    let jitter = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_millis() as u64 % (BACKOFF_BASE_MS * 2 / 5))
+        .unwrap_or(0);
+    Duration::from_millis(BACKOFF_BASE_MS * 2u64.pow(attempt.min(5)) + jitter)
+}
+
+/// Milliseconds before the first retry (tiny in tests so they stay fast).
+const BACKOFF_BASE_MS: u64 = if cfg!(test) { 10 } else { 1000 };
+
+/// Google's own hint in an error body (`"retryDelay": "17s"`), if any.
+fn retry_delay_hint(v: &Value) -> Option<Duration> {
+    v.pointer("/error/details")?
+        .as_array()?
+        .iter()
+        .find_map(|d| d.get("retryDelay")?.as_str())
+        .and_then(|s| s.trim().trim_end_matches('s').parse::<f64>().ok())
+        .filter(|s| s.is_finite() && *s >= 0.0)
+        .map(Duration::from_secs_f64)
+}
+
+enum Failure {
+    Http(u16, Value),
+    Other(String),
+}
+
+/// One model, retrying transient failures with backoff.
+async fn generate(client: &reqwest::Client, endpoint: &str, key: &str, model: &str, body: &Value, retries: u32) -> Result<Value, Failure> {
+    let mut attempt = 0;
+    loop {
+        let sent = client
+            .post(format!("{endpoint}/{model}:generateContent"))
+            .header("x-goog-api-key", key)
+            .json(body)
+            .send()
+            .await;
+        let (status, v) = match sent {
+            Ok(res) => {
+                let status = res.status().as_u16();
+                (status, res.json().await.unwrap_or(Value::Null))
+            }
+            Err(e) if e.is_timeout() => return Err(Failure::Other("Gemini took too long to answer. Try again.".to_string())),
+            Err(e) if e.is_connect() && attempt < retries => {
+                tokio::time::sleep(backoff(attempt)).await;
+                attempt += 1;
+                continue;
+            }
+            Err(e) => return Err(Failure::Other(format!("Couldn't reach Gemini. Are you online? ({e})"))),
+        };
+        if (200..300).contains(&status) {
+            return Ok(v);
+        }
+        if retryable(status) && attempt < retries {
+            let wait = retry_delay_hint(&v).unwrap_or_else(|| backoff(attempt));
+            if wait <= MAX_WAIT {
+                tokio::time::sleep(wait).await;
+                attempt += 1;
+                continue;
+            }
+        }
+        return Err(Failure::Http(status, v));
+    }
+}
+
+/// The chosen model with retries; if it stays overloaded (5xx), one go on
+/// the other free model. Returns the model that answered.
+async fn generate_with_fallback(client: &reqwest::Client, endpoint: &str, key: &str, model: &str, body: &Value) -> (String, Result<Value, Failure>) {
+    let result = generate(client, endpoint, key, model, body, MAX_RETRIES).await;
+    if matches!(&result, Err(Failure::Http(s, _)) if *s >= 500) && model != FALLBACK_MODEL {
+        if let ok @ Ok(_) = generate(client, endpoint, key, FALLBACK_MODEL, body, FALLBACK_RETRIES).await {
+            return (FALLBACK_MODEL.to_string(), ok);
+        }
+    }
+    (model.to_string(), result)
+}
+
+#[derive(Serialize)]
+pub struct AiAnswer {
+    /// The model that actually answered (the fallback, if it had to be).
+    pub model: String,
+    pub data: Value,
 }
 
 /// One structured call: system + prompt in, JSON matching `schema` out.
@@ -146,7 +247,7 @@ pub async fn ai_generate_json(
     prompt: String,
     schema: Value,
     temperature: Option<f32>,
-) -> Result<Value, String> {
+) -> Result<AiAnswer, String> {
     let (key, _) = api_key(&app).ok_or("No Gemini API key yet. Add a free one in Settings → AI.")?;
     let model = model.map(|m| m.trim().to_string()).filter(|m| !m.is_empty()).unwrap_or_else(|| DEFAULT_MODEL.to_string());
     if !valid_model(&model) {
@@ -165,20 +266,15 @@ pub async fn ai_generate_json(
         .timeout(Duration::from_secs(90))
         .build()
         .map_err(|e| format!("could not start the HTTP client: {e}"))?;
-    let res = client
-        .post(format!("{ENDPOINT}/{model}:generateContent"))
-        .header("x-goog-api-key", key)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| if e.is_timeout() { "Gemini took too long to answer. Try again.".to_string() } else { format!("Couldn't reach Gemini. Are you online? ({e})") })?;
-    let status = res.status().as_u16();
-    let v: Value = res.json().await.unwrap_or(Value::Null);
-    if !(200..300).contains(&status) {
-        return Err(explain_error(status, &v, &model));
-    }
+
+    let (used, result) = generate_with_fallback(&client, ENDPOINT, &key, &model, &body).await;
+    let v = result.map_err(|f| match f {
+        Failure::Http(status, v) => explain_error(status, &v, &model),
+        Failure::Other(message) => message,
+    })?;
     let text = extract_text(&v).ok_or_else(|| empty_reason(&v))?;
-    serde_json::from_str(&text).map_err(|e| format!("Gemini's answer wasn't valid JSON ({e}). Try again."))
+    let data = serde_json::from_str(&text).map_err(|e| format!("Gemini's answer wasn't valid JSON ({e}). Try again."))?;
+    Ok(AiAnswer { model: used, data })
 }
 
 #[cfg(test)]
@@ -209,6 +305,120 @@ mod tests {
         assert!(explain_error(429, &Value::Null, "m").contains("Free-tier limit"));
         assert!(explain_error(404, &Value::Null, "gemini-x").contains("gemini-x"));
         assert!(explain_error(503, &Value::Null, "m").contains("503"));
+    }
+
+    #[test]
+    fn retries_only_transient_errors() {
+        for s in [408, 429, 500, 502, 503, 504] {
+            assert!(retryable(s), "{s} should be retried");
+        }
+        for s in [400, 401, 403, 404] {
+            assert!(!retryable(s), "{s} should not be retried");
+        }
+    }
+
+    #[test]
+    fn backoff_grows_exponentially() {
+        let base = BACKOFF_BASE_MS as u128;
+        for a in 0..4 {
+            let m = backoff(a).as_millis();
+            let floor = base * 2u128.pow(a);
+            assert!((floor..floor + base * 2 / 5).contains(&m), "attempt {a}: {m} ms");
+        }
+    }
+
+    /// A local HTTP server that answers each request with the next canned
+    /// response and counts requests per model.
+    fn mock_gemini(responses: Vec<(u16, Value)>) -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let log = seen.clone();
+        std::thread::spawn(move || {
+            for (status, body) in responses {
+                let Ok((mut stream, _)) = listener.accept() else { return };
+                let mut buf = Vec::new();
+                let mut chunk = [0u8; 4096];
+                // Read headers, then the body by Content-Length.
+                let (head_end, length) = loop {
+                    let n = stream.read(&mut chunk).unwrap();
+                    buf.extend_from_slice(&chunk[..n]);
+                    if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                        let head = String::from_utf8_lossy(&buf[..i]).to_lowercase();
+                        let len = head
+                            .lines()
+                            .find_map(|l| l.strip_prefix("content-length:").map(|v| v.trim().parse::<usize>().unwrap()))
+                            .unwrap_or(0);
+                        break (i + 4, len);
+                    }
+                };
+                while buf.len() < head_end + length {
+                    let n = stream.read(&mut chunk).unwrap();
+                    buf.extend_from_slice(&chunk[..n]);
+                }
+                let request_line = String::from_utf8_lossy(&buf).lines().next().unwrap_or("").to_string();
+                log.lock().unwrap().push(request_line);
+                let body = body.to_string();
+                let reply = format!(
+                    "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                stream.write_all(reply.as_bytes()).unwrap();
+            }
+        });
+        (base, seen)
+    }
+
+    fn answer(text: &str) -> Value {
+        json!({ "candidates": [{ "content": { "parts": [{ "text": text }] } }] })
+    }
+
+    #[test]
+    fn retries_503_until_it_works() {
+        let busy = json!({ "error": { "code": 503, "message": "The model is overloaded." } });
+        let (base, seen) = mock_gemini(vec![(503, busy.clone()), (503, busy), (200, answer("{\"ok\":true}"))]);
+        let client = reqwest::Client::new();
+        let (model, result) = tauri::async_runtime::block_on(generate_with_fallback(&client, &base, "k", DEFAULT_MODEL, &json!({})));
+        assert!(result.is_ok(), "should succeed on the third try");
+        assert_eq!(model, DEFAULT_MODEL);
+        assert_eq!(seen.lock().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn does_not_retry_a_bad_key() {
+        let bad = json!({ "error": { "code": 400, "message": "API key not valid." } });
+        let (base, seen) = mock_gemini(vec![(400, bad)]);
+        let client = reqwest::Client::new();
+        let (_, result) = tauri::async_runtime::block_on(generate_with_fallback(&client, &base, "k", DEFAULT_MODEL, &json!({})));
+        assert!(matches!(result, Err(Failure::Http(400, _))));
+        assert_eq!(seen.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn falls_back_when_the_model_stays_overloaded() {
+        let busy = json!({ "error": { "code": 503 } });
+        // 1 try + 4 retries on the default model, then the fallback answers.
+        let mut responses = vec![(503, busy); 1 + MAX_RETRIES as usize];
+        responses.push((200, answer("{\"ok\":true}")));
+        let (base, seen) = mock_gemini(responses);
+        let client = reqwest::Client::new();
+        let (model, result) = tauri::async_runtime::block_on(generate_with_fallback(&client, &base, "k", DEFAULT_MODEL, &json!({})));
+        assert!(result.is_ok());
+        assert_eq!(model, FALLBACK_MODEL);
+        let seen = seen.lock().unwrap();
+        assert!(seen.last().unwrap().contains(FALLBACK_MODEL), "last call: {}", seen.last().unwrap());
+        assert_eq!(seen.len(), 2 + MAX_RETRIES as usize);
+    }
+
+    #[test]
+    fn reads_googles_retry_hint() {
+        let v = json!({ "error": { "code": 429, "details": [
+            { "@type": "type.googleapis.com/google.rpc.QuotaFailure" },
+            { "@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "17s" }
+        ] } });
+        assert_eq!(retry_delay_hint(&v), Some(Duration::from_secs(17)));
+        assert_eq!(retry_delay_hint(&json!({ "error": {} })), None);
     }
 
     #[test]

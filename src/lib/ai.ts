@@ -70,7 +70,8 @@ function fieldValues(fields: KitField[]) {
 /** AI-written captions and cover brief, in the kit's text format. */
 export async function draftCopy(input: KitInput, fields: KitField[], settings: Settings) {
   const prompt = `CONTEXT:\n${JSON.stringify(kitContext(input), null, 1)}\n\nFIELDS:\n${JSON.stringify(fieldValues(fields), null, 1)}`;
-  const d = (await call(settings, draftSystem(settings.aiLanguage || "English"), prompt, DRAFT_SCHEMA, 0.8)) as Record<string, unknown>;
+  const answer = await call(settings, draftSystem(settings.aiLanguage || "English"), prompt, DRAFT_SCHEMA, 0.8);
+  const d = (answer.data ?? {}) as Record<string, unknown>;
   const s = (k: string) => (typeof d[k] === "string" ? (d[k] as string).trim() : "");
   if (!s("announce") || !s("concept")) throw new Error("Gemini's draft came back incomplete. Try again.");
   const value = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
@@ -85,7 +86,7 @@ export async function draftCopy(input: KitInput, fields: KitField[], settings: S
     `Avoid: ${s("avoid")}`,
   ].join("\n");
   const basis = { title: value("title"), artists: value("artists"), releaseDate: value("releaseDate") };
-  return { captions, coverBrief, basis };
+  return { captions, coverBrief, basis, model: answer.model };
 }
 
 // ---- Verification ----
@@ -156,8 +157,8 @@ export function sanitizeReview(raw: unknown, fields: KitField[]): Partial<Record
 export async function reviewKit(input: KitInput, fields: KitField[], settings: Settings) {
   const values = Object.fromEntries(fields.map((f) => [f.id, f.value]));
   const prompt = `CONTEXT:\n${JSON.stringify(kitContext(input), null, 1)}\n\nFIELDS:\n${JSON.stringify(values, null, 1)}`;
-  const raw = await call(settings, REVIEW_SYSTEM, prompt, reviewSchema(fields.map((f) => f.id)), 0.1);
-  const review = sanitizeReview(raw, fields);
+  const answer = await call(settings, REVIEW_SYSTEM, prompt, reviewSchema(fields.map((f) => f.id)), 0.1);
+  const review = sanitizeReview(answer.data, fields);
   if (Object.keys(review).length === 0) throw new Error("Gemini's check came back empty. Try again.");
-  return review;
+  return { review, model: answer.model };
 }
