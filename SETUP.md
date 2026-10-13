@@ -87,7 +87,14 @@ Sign-up is closed: the crew admin adds each member's email first (below). Then s
 
 Crew sharing sends facts only: title (the cleaned-up file name, or the one you type under **Crew sees it as**), stage, key, BPM, tags, credits (names, roles, splits), release date, whether there's a mixdown, whether the Launch Kit is accepted, and when the project was last saved. Crewmates also see your crew and display names; your email stays with the sign-in service. Audio, file paths, samples, notes and track names never leave your computer through sharing (the optional AI features are the only thing that sends more, see above). Data is stored by Supabase in Ireland (eu-west-1). Stop sharing a song and it's deleted from the crew board.
 
-**Adding a crew member (admin):** in the Supabase dashboard, open the project, then **Authentication → Users → Add user → Create new user**. Enter their email, any long random password (password logins are blocked anyway; they always sign in by code), and tick **Auto Confirm User**. They can now sign in by code in the app or on the website, and join with an invite code.
+**Adding a crew member (admin checklist).** Sign-up is closed, so it's two steps: you add the email, they redeem an invite.
+
+1. Supabase dashboard → the project → **Authentication → Users → Add user → Create new user**: their email, any long random password (password logins are blocked; they always sign in by code), tick **Auto Confirm User**.
+2. In Hivo, **Settings → Crew → New invite code** (crew owner): make an invite code and send it to them with the website link.
+3. They sign in with their email (app or website), type the 6-digit code from the email, then enter the invite code. The app tells them what to do at each step, in French or English.
+4. Check they show up under **Settings → Crew** members.
+
+If they see "not on your crew's list", step 1 was missed or the email has a typo. "Invite code didn't work" means it's wrong, expired, used up or revoked: make a new one.
 
 **Removing a crew member:** the crew owner removes them in **Settings → Crew**. That also revokes the crew's open invite codes; make a new one for the next person.
 

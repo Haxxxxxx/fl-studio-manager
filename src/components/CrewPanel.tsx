@@ -5,6 +5,7 @@ import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
 import { orphanedShares, shareElsewhere, sharedHere, sharedTitle } from "../lib/crewSync";
 import { btn, btnPrimary, ConfirmButton, input } from "../ui";
+import { crewText } from "../lib/crewMessages";
 
 const field = input;
 const primary = `${btnPrimary} shrink-0 justify-center py-2`;
@@ -90,6 +91,9 @@ function SignIn() {
             {busy ? "Sending…" : "Send code"}
           </button>
         </form>
+      ) : null}
+      {!sentTo ? (
+        <div className="text-[11px] text-engrave">{crewText("signInHint")}</div>
       ) : (
         <form
           onSubmit={(e) => {
@@ -147,8 +151,9 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
   return (
     <div className="flex flex-col gap-3">
       {!another && (
-        <div className="text-xs text-engrave">
-          Signed in as {email}. Join your crew with the invite code someone sent you, or create the crew and invite them.
+        <div className="flex flex-col gap-1 text-xs text-engrave" role="status">
+          <span className="text-body">{crewText("noCrew", undefined, { email: email ?? "" })}</span>
+          <span>{crewText("noInviteYet")}</span>
         </div>
       )}
       <label className="text-xs text-engrave">
