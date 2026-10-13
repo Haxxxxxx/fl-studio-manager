@@ -417,3 +417,15 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Production (EU, eu-west-1). Overrides the local values above on `supabase config push`.
+[remotes.production]
+project_id = "chrbpaoljulntuvousnz"
+
+[remotes.production.auth]
+site_url = "https://fl-manager-crew.vercel.app"
+additional_redirect_urls = ["https://fl-manager-crew.vercel.app"]
+
+[remotes.production.auth.email]
+# One code per address per minute (local uses 1s for tests).
+max_frequency = "1m0s"
