@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { CrewSongRow, ProjectInfo, Workspace } from "../types";
-import { localStageMoves, orphanedShares, remoteStageMoves, sharedHere, sharedPayloads, staleShareIds } from "./crewSync";
+import {
+  localStageMoves,
+  orphanedShares,
+  remoteStageMoves,
+  shareElsewhere,
+  sharedCredits,
+  sharedHere,
+  sharedPayloads,
+  sharedTags,
+  sharedTitle,
+  staleShareIds,
+} from "./crewSync";
 
 // Regression tests for the crew-sync review (data loss and rewound moves).
 
@@ -85,6 +96,72 @@ describe("stage moves", () => {
   it("my newer local move is sent", () => {
     const local = ws({ "/a.flp": { shared: true, shareId: "s1", status: "release", stageUpdatedAtMs: Date.parse("2026-10-13T00:00:00Z") } });
     expect(localStageMoves([row("s1", { stage: "prep" })], local, scope)).toEqual([{ id: "s1", stage: "release" }]);
+  });
+});
+
+describe("payload always passes the database checks", () => {
+  const bytes = (s: string) => new TextEncoder().encode(s).length;
+  // Same estimates as pg_column_size, rounded up: text[] and jsonb.
+  const tagsSize = (tags: string[]) => 24 + tags.reduce((n, t) => n + 4 + Math.ceil(bytes(t) / 4) * 4, 0);
+  const creditsSize = (c: { name: string; role: string }[]) => 16 + c.reduce((n, x) => n + 64 + bytes(x.name) + bytes(x.role), 0);
+
+  it("a whitespace-only or empty title falls back to a real one", () => {
+    expect(sharedTitle("   ")).toBe("Untitled");
+    expect(sharedTitle("")).toBe("Untitled");
+    expect(sharedTitle("  My Song  ")).toBe("My Song");
+  });
+
+  it("a long title is cut to 200 characters without splitting an emoji", () => {
+    const t = sharedTitle("🔥".repeat(300));
+    expect(Array.from(t)).toHaveLength(200);
+    expect(t).toBe("🔥".repeat(200));
+  });
+
+  it("multi-byte tags stay under the 2048-byte column cap", () => {
+    const tags = sharedTags(Array.from({ length: 30 }, () => "音".repeat(40)));
+    expect(tags.length).toBeGreaterThan(0);
+    expect(tags.length).toBeLessThan(30);
+    expect(tagsSize(tags)).toBeLessThanOrEqual(2048);
+  });
+
+  it("drops blank tags and caps count and length", () => {
+    const tags = sharedTags(["  ", "trap", "x".repeat(100), ...Array.from({ length: 40 }, (_, i) => `t${i}`)]);
+    expect(tags[0]).toBe("trap");
+    expect(tags[1]).toHaveLength(40);
+    expect(tags).toHaveLength(30);
+  });
+
+  it("long roles are capped and credits stay under the 8192-byte column cap", () => {
+    const credits = sharedCredits(Array.from({ length: 30 }, () => ({ name: "名".repeat(80), role: "役".repeat(500), split: 3 })));
+    expect(credits.every((c) => Array.from(c.role).length <= 40 && Array.from(c.name).length <= 60)).toBe(true);
+    expect(credits.length).toBeLessThanOrEqual(30);
+    expect(creditsSize(credits)).toBeLessThanOrEqual(8192);
+  });
+
+  it("a non-finite split is sent as null", () => {
+    expect(sharedCredits([{ name: "Producer", role: "beat", split: Number.NaN }])).toEqual([{ name: "Producer", role: "beat", split: null }]);
+  });
+
+  it("an impossible release date is left out", () => {
+    const local = ws({ "/a.flp": { shared: true, shareId: "s1", launchKit: { edits: { releaseDate: "2026-02-30" } } } as Workspace["songs"][string] });
+    expect(sharedPayloads([project("/a.flp")], local, scope)[0].release_date).toBeNull();
+  });
+});
+
+describe("shareElsewhere (re-sharing in another crew)", () => {
+  it("nothing to move for a song shared here, legacy-unscoped, or never shared", () => {
+    expect(shareElsewhere({ shared: true, shareId: "s", shareCrewId: CREW, shareUserId: ME }, scope)).toBeNull();
+    expect(shareElsewhere({ shared: true, shareId: "s" }, scope)).toBeNull();
+    expect(shareElsewhere({}, scope)).toBeNull();
+  });
+
+  it("flags a song shared, or waiting to be unshared, in another crew", () => {
+    expect(shareElsewhere({ shared: true, shareId: "s", shareCrewId: "crew-b", shareUserId: ME }, scope)).toEqual({ crewId: "crew-b", mine: true, shared: true });
+    expect(shareElsewhere({ shared: false, shareId: "s", shareCrewId: "crew-b", shareUserId: ME }, scope)).toEqual({ crewId: "crew-b", mine: true, shared: false });
+  });
+
+  it("knows when the share belongs to another account on this machine", () => {
+    expect(shareElsewhere({ shared: true, shareId: "s", shareCrewId: CREW, shareUserId: "other" }, scope)?.mine).toBe(false);
   });
 });
 

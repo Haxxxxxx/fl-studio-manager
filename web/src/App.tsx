@@ -33,13 +33,14 @@ function useAction() {
 }
 
 export function App() {
-  const { ready, userId, crews, init, error } = useWeb();
+  const { ready, userId, crews, init, error, loadError } = useWeb();
   useEffect(() => {
     void init();
   }, [init]);
 
   if (!ready) return <Centered>Loading…</Centered>;
   if (!userId) return <Landing signIn={<SignIn />} />;
+  if (crews.length === 0 && loadError) return <Shell><LoadFailed message={loadError} /></Shell>;
   if (crews.length === 0) return <Shell><Join /></Shell>;
   return <Dashboard topError={error} />;
 }
@@ -127,17 +128,55 @@ function SignIn() {
   );
 }
 
-function Join() {
-  const { joinCrew, createCrew, email, signOut } = useWeb();
-  const [displayName, setDisplayName] = useState("");
-  const [code, setCode] = useState("");
-  const [crewName, setCrewName] = useState("");
+/** Loading the crew list failed: say so (an empty list isn't "no crews"). */
+function LoadFailed({ message }: { message: string }) {
+  const { loadCrews, signOut } = useWeb();
   const { busy, error, run } = useAction();
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Join your crew</h1>
-      <p className="text-sm text-engrave">Signed in as {email}. Enter the invite code from your crew.</p>
-      <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name in the crew (artist name)" className={input} />
+      <h1 className="text-xl font-semibold">Couldn't load your crews</h1>
+      <p className="text-sm text-red-300">{error ?? message}</p>
+      <button onClick={() => void run(loadCrews)} disabled={busy} className={primary}>
+        {busy ? "Trying…" : "Try again"}
+      </button>
+      <button onClick={() => void signOut()} className="self-start text-xs text-engrave hover:text-cream">
+        Sign out
+      </button>
+    </div>
+  );
+}
+
+/** Same limits as the database checks (crews.name, crew_members.display_name). */
+const CREW_NAME_MAX = 80;
+const DISPLAY_NAME_MAX = 60;
+/** create_crew / join_crew refuse an 11th crew. */
+const MAX_CREWS = 10;
+
+/** First crew, or (`another`) one more next to the crews I'm already in. */
+function Join({ another = false, onDone }: { another?: boolean; onDone?: () => void }) {
+  const { joinCrew, createCrew, email, signOut } = useWeb();
+  const lastName = useWeb((s) => s.crews.find((c) => c.id === s.activeCrewId)?.displayName ?? "");
+  const [displayName, setDisplayName] = useState(another ? lastName : "");
+  const [code, setCode] = useState("");
+  const [crewName, setCrewName] = useState("");
+  const { busy, error, run } = useAction();
+  const done = (ok: boolean) => ok && onDone?.();
+  return (
+    <div className="flex flex-col gap-4">
+      {!another && (
+        <>
+          <h1 className="text-xl font-semibold">Join your crew</h1>
+          <p className="text-sm text-engrave">Signed in as {email}. Enter the invite code from your crew.</p>
+        </>
+      )}
+      <input
+        value={displayName}
+        onChange={(e) => setDisplayName(e.target.value)}
+        maxLength={DISPLAY_NAME_MAX}
+        placeholder="Your name in the crew (artist name)"
+        aria-label="Your name in the crew"
+        className={input}
+      />
       <input
         value={code}
         onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
@@ -145,22 +184,24 @@ function Join() {
         aria-label="Invite code"
         className={`${input} text-center font-mono tracking-widest`}
       />
-      <button onClick={() => void run(() => joinCrew(code, displayName))} disabled={busy || code.length !== 8 || !displayName.trim()} className={primary}>
+      <button onClick={() => void run(() => joinCrew(code, displayName)).then(done)} disabled={busy || code.length !== 8 || !displayName.trim()} className={primary}>
         Join crew
       </button>
       <details className="text-sm text-engrave">
         <summary className="cursor-pointer text-body">Starting a new crew instead?</summary>
         <div className="mt-3 flex flex-col gap-3">
-          <input value={crewName} onChange={(e) => setCrewName(e.target.value)} placeholder="Crew name" aria-label="Crew name" className={input} />
-          <button onClick={() => void run(() => createCrew(crewName, displayName))} disabled={busy || !crewName.trim() || !displayName.trim()} className="rounded-lg border border-rule-strong px-4 py-2.5 text-sm text-cream hover:bg-raised disabled:opacity-40">
+          <input value={crewName} onChange={(e) => setCrewName(e.target.value)} maxLength={CREW_NAME_MAX} placeholder="Crew name" aria-label="Crew name" className={input} />
+          <button onClick={() => void run(() => createCrew(crewName, displayName)).then(done)} disabled={busy || !crewName.trim() || !displayName.trim()} className="rounded-lg border border-rule-strong px-4 py-2.5 text-sm text-cream hover:bg-raised disabled:opacity-40">
             Create crew
           </button>
         </div>
       </details>
       {error && <p className="text-sm text-red-300">{error}</p>}
-      <button onClick={() => void signOut()} className="self-start text-xs text-engrave hover:text-cream">
-        Sign out
-      </button>
+      {!another && (
+        <button onClick={() => void signOut()} className="self-start text-xs text-engrave hover:text-cream">
+          Sign out
+        </button>
+      )}
     </div>
   );
 }
@@ -383,32 +424,55 @@ function Calendar() {
 }
 
 function Crew() {
-  const { members, songs, userId } = useWeb();
+  const { members, songs, userId, crews } = useWeb();
+  const [adding, setAdding] = useState(false);
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-3 p-4 sm:grid-cols-2 sm:p-6">
-      {members.map((m) => {
-        const theirs = songs.filter((s) => s.owner_id === m.user_id);
-        const active = theirs.filter((s) => s.stage === "creation" || s.stage === "production").length;
-        const last = Math.max(0, ...theirs.map((s) => (s.last_saved_at ? Date.parse(s.last_saved_at) : 0)));
-        return (
-          <div key={m.user_id} className="rounded-xl border border-rule bg-panel p-4">
-            <div className="flex items-baseline gap-2">
-              <span className="font-medium">{m.display_name}</span>
-              {m.role === "owner" && <span className="text-xs text-engrave">owner</span>}
-              {m.user_id === userId && <span className="text-xs text-engrave">you</span>}
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {members.map((m) => {
+          const theirs = songs.filter((s) => s.owner_id === m.user_id);
+          const active = theirs.filter((s) => s.stage === "creation" || s.stage === "production").length;
+          const last = Math.max(0, ...theirs.map((s) => (s.last_saved_at ? Date.parse(s.last_saved_at) : 0)));
+          return (
+            <div key={m.user_id} className="rounded-xl border border-rule bg-panel p-4">
+              <div className="flex items-baseline gap-2">
+                <span className="font-medium">{m.display_name}</span>
+                {m.role === "owner" && <span className="text-xs text-engrave">owner</span>}
+                {m.user_id === userId && <span className="text-xs text-engrave">you</span>}
+              </div>
+              <div className="mt-1 text-xs text-body">
+                {theirs.length} shared · {active} being made · {last ? `last session ${formatRelative(last)}` : "no sessions yet"}
+              </div>
+              <div className="mt-3 flex h-1.5 gap-px overflow-hidden rounded-full bg-raised">
+                {COLUMNS.map((c) => {
+                  const n = theirs.filter((s) => (s.stage ?? undefined) === c.id).length;
+                  return n ? <span key={c.label} style={{ flexGrow: n, background: c.color }} title={`${c.label}: ${n}`} /> : null;
+                })}
+              </div>
             </div>
-            <div className="mt-1 text-xs text-body">
-              {theirs.length} shared · {active} being made · {last ? `last session ${formatRelative(last)}` : "no sessions yet"}
-            </div>
-            <div className="mt-3 flex h-1.5 gap-px overflow-hidden rounded-full bg-raised">
-              {COLUMNS.map((c) => {
-                const n = theirs.filter((s) => (s.stage ?? undefined) === c.id).length;
-                return n ? <span key={c.label} style={{ flexGrow: n, background: c.color }} title={`${c.label}: ${n}`} /> : null;
-              })}
-            </div>
+          );
+        })}
+      </div>
+      {adding ? (
+        <div className="max-w-md rounded-xl border border-rule p-4">
+          <div className="mb-3 flex items-center text-sm font-medium text-cream">
+            Join or create another crew
+            <button onClick={() => setAdding(false)} className="ml-auto text-xs text-engrave hover:text-cream">
+              Cancel
+            </button>
           </div>
-        );
-      })}
+          <Join another onDone={() => setAdding(false)} />
+        </div>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          disabled={crews.length >= MAX_CREWS}
+          title={crews.length >= MAX_CREWS ? "You're in 10 crews, the most allowed. Leave one first." : undefined}
+          className="self-start text-sm text-body hover:text-cream disabled:opacity-40"
+        >
+          + Join or create another crew
+        </button>
+      )}
     </div>
   );
 }

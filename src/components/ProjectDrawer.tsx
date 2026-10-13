@@ -110,7 +110,11 @@ export function ProjectDrawer() {
 
       <div className="flex-1 overflow-auto px-5 py-4">
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => openInFlStudio(project.path)} disabled={demoMode} className={btnPrimary}>
+          <button
+            onClick={() => openInFlStudio(project.path).catch((e) => setMessage({ kind: "error", text: `Couldn't open it: ${e instanceof Error ? e.message : String(e)}` }))}
+            disabled={demoMode}
+            className={btnPrimary}
+          >
             <PlayCircle size={14} /> Open in {dawOf(project).short === "FL" ? "FL" : dawOf(project).label}
           </button>
           <button onClick={() => revealInFileManager(project.path)} disabled={demoMode} className={btn}>
@@ -120,7 +124,7 @@ export function ProjectDrawer() {
             <Rocket size={14} /> Launch Kit
           </button>
           <button
-            onClick={() => run(async () => (await startRender([project.path]), ""), () => "Render started")}
+            onClick={() => run(async () => (await startRender([project.path]), ""), () => "Render finished: see the panel at the bottom.")}
             disabled={demoMode || rendering || !canRenderInApp(project)}
             title={canRenderInApp(project) ? "Render a mixdown with FL Studio" : `Rendering from the app works with FL Studio. ${dawOf(project).exportTip}`}
             className={btn}
@@ -129,7 +133,7 @@ export function ProjectDrawer() {
           </button>
           <button
             title="Zip the project with every sample it uses — FL opens it directly. For sharing, collabs or archiving."
-            onClick={() => run(async () => (await startPackage([project.path]), ""), () => "Package created — see the panel at the bottom.")}
+            onClick={() => run(async () => (await startPackage([project.path]), ""), () => "Packaging finished: see the panel at the bottom.")}
             disabled={demoMode || packaging || !canRenderInApp(project)}
             className={btn}
           >

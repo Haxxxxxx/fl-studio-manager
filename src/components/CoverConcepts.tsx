@@ -105,7 +105,8 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
     if (!c?.image) return;
     update(path, (s) => ({ ...s, picked: i }));
     setMessage(null);
-    setKitCover(path, { seed: c.seed, prompt: c.prompt, variant: c.variant });
+    // Keep the record of a saved cover: picking isn't saving.
+    setKitCover(path, { ...saved, seed: c.seed, prompt: c.prompt, variant: c.variant });
   }
 
   async function save() {
