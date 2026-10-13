@@ -215,7 +215,14 @@ export function LaunchKitView() {
                 onMove={(label, start) => setSnippetStart(project.path, label, start)}
               />
             </Card>
-            <ShortsPanel key={`shorts:${project.path}`} project={project} fields={fields} snippets={snippets} />
+            <ShortsPanel
+              key={`shorts:${project.path}`}
+              project={project}
+              fields={fields}
+              snippets={snippets}
+              analysisLoading={loading}
+              analysisError={analysisError}
+            />
             <Card title="Cover art brief">
               <FieldRow field={byId("coverBrief")} onChange={(v) => setKitEdit(project.path, "coverBrief", v)} bare />
               <CoverConcepts key={project.path} path={project.path} title={byId("title").value || project.name} artists={byId("artists").value} brief={byId("coverBrief").value} />
