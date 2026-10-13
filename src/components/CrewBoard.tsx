@@ -49,9 +49,12 @@ export function CrewBoard() {
               key={key}
               onDragOver={(e) => {
                 e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
                 setDragOver(key);
               }}
-              onDragLeave={() => setDragOver((k) => (k === key ? null : k))}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver((k) => (k === key ? null : k));
+              }}
               onDrop={(e) => {
                 e.preventDefault();
                 setDragOver(null);
@@ -78,7 +81,10 @@ export function CrewBoard() {
                     <div
                       key={s.id}
                       draggable
-                      onDragStart={(e) => e.dataTransfer.setData("application/x-crew-song", s.id)}
+                      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("application/x-crew-song", s.id);
+      }}
                       onClick={() => path && openDetail(path)}
                       title={mine ? "Your song" : `${nameOf.get(s.owner_id) ?? "A crewmate"}'s song`}
                       className={`cursor-grab rounded-md border px-3 py-2 active:cursor-grabbing ${mine ? "border-orange-400/20 bg-raised" : "border-rule bg-raised"} hover:border-rule-strong`}

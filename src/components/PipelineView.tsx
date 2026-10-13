@@ -79,9 +79,12 @@ export function PipelineView() {
               key={key}
               onDragOver={(e) => {
                 e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
                 setDragOver(key);
               }}
-              onDragLeave={() => setDragOver((k) => (k === key ? null : k))}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver((k) => (k === key ? null : k));
+              }}
               onDrop={(e) => {
                 e.preventDefault();
                 setDragOver(null);
@@ -116,7 +119,10 @@ export function PipelineView() {
                     <div
                       key={p.path}
                       draggable
-                      onDragStart={(e) => e.dataTransfer.setData("text/plain", p.path)}
+                      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", p.path);
+      }}
                       onClick={() => openDetail(detailPath === p.path ? null : p.path)}
                       className={`cursor-grab rounded-md border px-3 py-2 active:cursor-grabbing ${
                         detailPath === p.path
