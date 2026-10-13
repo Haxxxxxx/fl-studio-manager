@@ -83,9 +83,13 @@ Concepts are drafts at 1024 × 1024 px. Distributors need 3000 × 3000, so a des
 
 ## Optional: the crew (shared board, EU servers)
 
-Sign in with an emailed code, create a crew or join one with an 8-letter invite code, then tick **Share with <your crew>** in a song's drawer (or use **Crew** in the Library for several songs). Everyone in the crew sees shared songs on **Pipeline → Crew** and on the web dashboard, and can move their stage. Moves sync live.
+Sign-up is closed: the crew admin adds each member's email first (below). Then sign in with an emailed code, create a crew or join one with an 8-letter invite code, then tick **Share with <your crew>** in a song's drawer (or use **Crew** in the Library for several songs). Everyone in the crew sees shared songs on **Pipeline → Crew** and on the web dashboard, and can move their stage. Moves sync live.
 
 Crew sharing sends facts only: title (the cleaned-up file name, or the one you type under **Crew sees it as**), stage, key, BPM, tags, credits (names, roles, splits), release date, whether there's a mixdown, whether the Launch Kit is accepted, and when the project was last saved. Crewmates also see your crew and display names; your email stays with the sign-in service. Audio, file paths, samples, notes and track names never leave your computer through sharing (the optional AI features are the only thing that sends more, see above). Data is stored by Supabase in Ireland (eu-west-1). Stop sharing a song and it's deleted from the crew board.
+
+**Adding a crew member (admin):** in the Supabase dashboard, open the project, then **Authentication → Users → Add user → Create new user**. Enter their email, any long random password (password logins are blocked anyway; they always sign in by code), and tick **Auto Confirm User**. They can now sign in by code in the app or on the website, and join with an invite code.
+
+**Removing a crew member:** the crew owner removes them in **Settings → Crew**. That also revokes the crew's open invite codes; make a new one for the next person.
 
 Builds made for the crew already include the server address. If you run from source, copy `.env.example` to `.env.local` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the public anon key, never the service_role key). Without them the Crew section says sharing isn't set up and everything else works as before.
 
