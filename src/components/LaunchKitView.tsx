@@ -10,6 +10,9 @@ import {
   formatDuration,
   kitChecks,
   kitFiles,
+  kitGuide,
+  type KitGuide,
+  type KitLang,
   kitSnippets,
   SNIPPET_LENGTHS,
   DISTRIBUTION_FIELDS,
@@ -96,6 +99,8 @@ export function LaunchKitView() {
   const project = songs.find((p) => p.path === launchPath) ?? ordered[0];
   const { analysis, error: analysisError, loading } = useAnalysis(project, demoMode);
   const [exportState, setExportState] = useState<{ status: "idle" | "running" } | { status: "done"; dir: string } | { status: "error"; message: string }>({ status: "idle" });
+  /** The "what's in your kit" popup, shown once after each export. */
+  const [guide, setGuide] = useState<{ guide: KitGuide; lang: KitLang; dir: string } | null>(null);
 
   if (!project) {
     return (
@@ -149,14 +154,17 @@ export function LaunchKitView() {
     const title = byId("title").value || project.name;
     setExportState({ status: "running" });
     try {
+      const lang = kitLang(settings.aiLanguage);
+      const masterExt = project.renders[0]?.path.split(".").pop()?.toLowerCase() ?? null;
       const dir = await api.exportLaunchKit({
         folderName: title,
-        files: kitFiles(fields, snippets, extra),
+        files: kitFiles(fields, snippets, extra, lang, masterExt),
         master: project.renders[0]?.path ?? null,
         masterName: masterBaseName(fields, project.name),
         clips: snippets,
       });
       setExportState({ status: "done", dir });
+      setGuide({ guide: kitGuide(lang, { title, master: masterExt ? `${masterBaseName(fields, project.name)}.${masterExt}` : null, snippets: snippets.map((s) => s.label) }), lang, dir });
     } catch (e) {
       setExportState({ status: "error", message: String(e) });
     }
@@ -208,6 +216,7 @@ export function LaunchKitView() {
             </button>
           </div>
         )}
+        {guide && <KitExportedDialog {...guide} onClose={() => setGuide(null)} />}
         {exportState.status === "error" && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">{exportState.message}</div>
         )}
@@ -680,5 +689,69 @@ function TimeInput({ value, onCommit }: { value: number; onCommit: (seconds: num
       aria-label="Start time"
       className="w-14 rounded border border-rule-strong bg-chassis px-1.5 py-0.5 font-mono tabular-nums text-cream focus:border-hot focus:outline-none"
     />
+  );
+}
+
+/** README language: the kit's language (French or English). */
+function kitLang(language: string | null): KitLang {
+  return language === "French" ? "fr" : "en";
+}
+
+/** After an export: what's in the kit and what to do with it (same text as README.md). */
+function KitExportedDialog({ guide, lang, dir, onClose }: { guide: KitGuide; lang: KitLang; dir: string; onClose: () => void }) {
+  const fr = lang === "fr";
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    close.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="kit-exported-title"
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg border border-rule bg-raised shadow-2xl"
+      >
+        <div className="border-b border-rule px-5 py-4">
+          <h2 id="kit-exported-title" className="font-display text-xl uppercase tracking-tight text-cream">
+            {fr ? "Kit exporté" : "Kit exported"}
+          </h2>
+          <p className="mt-1 text-sm text-body">{guide.intro}</p>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto px-5 py-4 text-sm">
+          <ul className="flex flex-col gap-2.5">
+            {guide.items.map((i) => (
+              <li key={i.file}>
+                <span className="font-mono text-xs text-cream">{i.file}</span>
+                <div className="text-body">
+                  {i.what} <span className="text-engrave">{i.todo}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wider text-engrave">{fr ? "Dans l'ordre" : "In order"}</h3>
+          <ol className="mt-2 list-decimal pl-5 text-body">
+            {guide.steps.map((s) => (
+              <li key={s} className="py-0.5">
+                {s}
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-xs text-engrave">{fr ? "Le même texte est dans README.md, dans le dossier du kit." : "The same text is in README.md, in the kit folder."}</p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-rule px-5 py-3">
+          <button onClick={() => void api.revealInFileManager(dir)} className={btn}>
+            <FolderOpen size={14} /> {fr ? "Ouvrir le dossier" : "Show folder"}
+          </button>
+          <button ref={close} onClick={onClose} className={btnPrimary}>
+            {fr ? "Compris" : "Got it"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

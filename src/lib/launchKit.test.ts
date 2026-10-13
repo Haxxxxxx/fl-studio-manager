@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Album, Person, ProjectInfo, SongMeta } from "../types";
-import { artistLine, buildKit, kitFiles, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
+import { artistLine, buildKit, kitFiles, kitGuide, kitReadme, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
 
 const today = new Date(2026, 9, 13); // Tue 13 Oct 2026
 const people: Person[] = [
@@ -168,5 +168,27 @@ describe("kitSnippets", () => {
     // 110 + 30 would run past 2:00: pulled back to end at the last second.
     expect(s[0]).toMatchObject({ label: "Hook 30s", key: "Hook 15s", startSec: 90, lengthSec: 30 });
     expect(s[1]).toMatchObject({ label: "Teaser 30s", startSec: 32 });
+  });
+});
+
+describe("README in every kit", () => {
+  const snippets = [{ label: "Hook 15s", startSec: 42, lengthSec: 15 }];
+  it("is written first, in the kit's language, naming the real master file", () => {
+    const en = kitFiles(buildKit(input()), snippets, [], "en", "mp3");
+    expect(en[0].name).toBe("README.md");
+    expect(en[0].content).toContain("# Launch kit: Night Run");
+    expect(en[0].content).toContain("**distributor-sheet.md**");
+    expect(en[0].content).toContain(".mp3**");
+    expect(en[0].content).toContain("Hook 15s");
+    const fr = kitFiles(buildKit(input()), snippets, [], "fr", null)[0].content;
+    expect(fr).toContain("# Kit de sortie : Night Run");
+    expect(fr).toContain("## Dans l'ordre");
+    expect(fr).not.toContain("mixdown final");
+  });
+
+  it("the popup and the README list the same files", () => {
+    const g = kitGuide("en", { title: "X", master: "X.wav", snippets: [] });
+    const readme = kitReadme(g, "en");
+    for (const item of g.items) expect(readme).toContain(item.file);
   });
 });
