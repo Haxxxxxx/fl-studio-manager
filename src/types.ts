@@ -27,6 +27,9 @@ export interface ProjectInfo {
   renders: FileEntry[];
   recordingsCount: number;
   recordingsBytes: number;
+  /** Title and comment from FL Studio's project info (File → Project info). */
+  flpTitle?: string | null;
+  comment?: string | null;
   plugins: PluginInfo[];
   samples: SampleInfo[];
   /** Named mixer tracks + recorded-take labels ("Lead Voices - Nova"). */
@@ -126,7 +129,18 @@ export type KitFieldId =
   | "explicit"
   | "releaseDate"
   | "coverBrief"
-  | "captions";
+  | "captions"
+  // Distribution (what DistroKid, TuneCore, CD Baby, Amuse… ask for)
+  | "featuring"
+  | "songwriters"
+  | "label"
+  | "copyright"
+  | "language"
+  | "isrc"
+  | "upc"
+  | "releaseTitle"
+  | "releaseType"
+  | "trackNumber";
 
 /** The user's side of a launch kit. Everything else is regenerated from the
  * project each time, so the .flp stays the source of truth. */

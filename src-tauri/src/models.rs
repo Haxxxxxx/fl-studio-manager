@@ -38,6 +38,9 @@ pub struct ProjectInfo {
     /// `<project>_<date>_<track>.wav`).
     pub recordings_count: u32,
     pub recordings_bytes: u64,
+    /// Title and comment from FL Studio's project info, if filled in.
+    pub flp_title: Option<String>,
+    pub comment: Option<String>,
     pub plugins: Vec<PluginInfo>,
     pub samples: Vec<SampleInfo>,
     /// Named mixer tracks and recorded-take labels ("Lead Voices - Nova"),

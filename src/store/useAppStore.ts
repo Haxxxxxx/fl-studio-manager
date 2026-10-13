@@ -129,6 +129,8 @@ interface AppState {
   openLaunchKit: (path: string | null) => void;
   /** undefined resets the field to its generated value. */
   setKitEdit: (path: string, id: KitFieldId, value: string | undefined) => void;
+  /** Several fields at once; null clears every edit (back to generated). */
+  setKitEdits: (path: string, edits: Partial<Record<KitFieldId, string>> | null) => void;
   setSnippetStart: (path: string, label: string, startSec: number | undefined) => void;
   acceptKit: (path: string) => void;
   /** Merge AI drafts/review into a song's kit. */
@@ -502,6 +504,11 @@ export const useAppStore = create<AppState>((set, get) => {
       if (startSec === undefined) delete snippetStarts[label];
       else snippetStarts[label] = startSec;
       get().updateSong(path, { launchKit: { ...kit, snippetStarts, acceptedAtMs: undefined } });
+    },
+
+    setKitEdits: (path, edits) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      get().updateSong(path, { launchKit: { ...kit, edits: edits === null ? {} : { ...kit.edits, ...edits }, acceptedAtMs: undefined } });
     },
 
     acceptKit: (path) => {

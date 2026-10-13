@@ -223,6 +223,8 @@ fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
                 renders: Vec::new(),
                 recordings_count: 0,
                 recordings_bytes: 0,
+                flp_title: non_empty(flp.title.clone()),
+                comment: non_empty(flp.comment.clone()),
                 plugins: resolver.plugins(&flp.plugins),
                 samples: resolver.samples(&flp.samples, path),
                 track_names: {
