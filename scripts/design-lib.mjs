@@ -44,7 +44,7 @@ writeFileSync(
       name: "fl-manager-ui",
       version: "0.1.0",
       private: true,
-      description: "FL Manager's UI library (src/ui), packaged for the Claude Design sync",
+      description: "Hivo's UI library (src/ui), packaged for the Claude Design sync",
       module: "index.ts",
       types: "types/ui/index.d.ts",
       style: "styles.css",

@@ -1,10 +1,10 @@
 # Setup guide
 
-Two ways to get FL Manager running: **install a build** someone shared with you (5 minutes, no tools needed), or **run from source** (for whoever works on the code).
+Two ways to get Hivo running: **install a build** someone shared with you (5 minutes, no tools needed), or **run from source** (for whoever works on the code).
 
 ## Option A — install a shared build
 
-**Easiest:** download the latest installer from the repo's **Releases** page on GitHub: `FL Manager_<version>_x64-setup.exe` for Windows, the `.dmg` for macOS (universal: Apple Silicon and Intel). They're built in the cloud by `.github/workflows/release.yml` and already point at the crew server.
+**Easiest:** download the latest installer from the repo's **Releases** page on GitHub: `Hivo_<version>_x64-setup.exe` for Windows, the `.dmg` for macOS (universal: Apple Silicon and Intel). They're built in the cloud by `.github/workflows/release.yml` and already point at the crew server.
 
 To publish a new one: push a version tag (`git tag v0.2.0 && git push origin v0.2.0`) or run **Actions → Release builds → Run workflow**, then open **Releases**, check the draft and **Publish**. The crew server settings come from the repo variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Settings → Secrets and variables → Actions → Variables).
 
@@ -12,12 +12,12 @@ Local builds are made with `npm run tauri build` (see below) and end up in `src-
 
 | OS | File to share |
 |---|---|
-| macOS | `dmg/FL Manager_<version>_<arch>.dmg` |
-| Windows | `nsis/FL Manager_<version>_x64-setup.exe` (or the `.msi`) |
+| macOS | `dmg/Hivo_<version>_<arch>.dmg` |
+| Windows | `nsis/Hivo_<version>_x64-setup.exe` (or the `.msi`) |
 
 The builds aren't code-signed, so the OS warns the first time:
 
-- **macOS** — "FL Manager can't be opened" / "is damaged": right-click the app in Applications → **Open** → **Open**. If it still refuses, run `xattr -cr "/Applications/FL Manager.app"` once in Terminal.
+- **macOS** — "Hivo can't be opened" / "is damaged": right-click the app in Applications → **Open** → **Open**. If it still refuses, run `xattr -cr "/Applications/Hivo.app"` once in Terminal.
 - **Windows** — SmartScreen "Windows protected your PC": **More info** → **Run anyway**.
 
 A macOS build only runs on the architecture it was built on (Apple Silicon vs Intel) unless built as universal: `npm run tauri build -- --target universal-apple-darwin` (needs `rustup target add x86_64-apple-darwin aarch64-apple-darwin`).
@@ -91,7 +91,7 @@ Builds made for the crew already include the server address. If you run from sou
 
 ## Where your data lives
 
-Stages, tags, notes, releases, people and settings are FL Manager's own data. FL Studio doesn't store them. They live in the app config folder:
+Stages, tags, notes, releases, people and settings are Hivo's own data. FL Studio doesn't store them. They live in the app config folder:
 
 - macOS: `~/Library/Application Support/com.theiaweb.flstudiomanager/`
 - Windows: `%APPDATA%\com.theiaweb.flstudiomanager\`

@@ -1,6 +1,6 @@
 # Crew architecture (Phase 1a: shared dashboard)
 
-How FL Manager goes from a personal monitor to a crew tool, with **all crew data stored in the EU**.
+How Hivo goes from a personal monitor to a crew tool, with **all crew data stored in the EU**.
 
 ## The pieces
 

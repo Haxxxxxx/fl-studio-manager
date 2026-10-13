@@ -63,13 +63,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
-          releaseName: "FL Manager ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"
+          releaseName: "Hivo ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"
           releaseBody: |
-            Desktop builds of FL Manager.
+            Desktop builds of Hivo.
 
             **Windows:** download the `_x64-setup.exe` and run it. If Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
 
-            **macOS:** download the `.dmg`, drag FL Manager to Applications. The app isn't notarized yet: the first time, right-click it → **Open** → **Open**. If macOS says it's "damaged", run `xattr -cr "/Applications/FL Manager.app"` in Terminal once.
+            **macOS:** download the `.dmg`, drag Hivo to Applications. The app isn't notarized yet: the first time, right-click it → **Open** → **Open**. If macOS says it's "damaged", run `xattr -cr "/Applications/Hivo.app"` in Terminal once.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

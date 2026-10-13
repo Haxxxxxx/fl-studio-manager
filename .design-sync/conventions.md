@@ -1,6 +1,6 @@
-# FL Manager UI: conventions
+# Hivo UI: conventions
 
-FL Manager is a desktop app for a rap crew's music projects: songs move through stages (Creation → Production → Prep → Release → Promotion), get mixdowns, stems and a Launch Kit for release. The look is **System 02, "built like a rack unit"**: hardware panels, engraved labels and LED status for structure; loud condensed type and one orange for attitude. Dark, dense, music-first.
+Hivo is a desktop app for a rap crew's music projects: songs move through stages (Creation → Production → Prep → Release → Promotion), get mixdowns, stems and a Launch Kit for release. The look is **System 02, "built like a rack unit"**: hardware panels, engraved labels and LED status for structure; loud condensed type and one orange for attitude. Dark, dense, music-first.
 
 ## Wrap everything in `Theme`
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "FL Manager",
+  "productName": "Hivo",
   "version": "0.1.0",
   "identifier": "com.theiaweb.flstudiomanager",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "FL Manager",
+        "title": "Hivo",
         "width": 1200,
         "height": 800,
         "minWidth": 900,

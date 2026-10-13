@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LogoMark } from "./LogoMark";
+import { Wordmark } from "./LogoMark";
 import { CalendarDays, CheckCircle2, Disc3, KanbanSquare, LogOut, Users } from "lucide-react";
 import { STATUSES, UNSORTED, statusInfo } from "@shared/lib/songs";
 import { formatRelative } from "@shared/lib/format";
@@ -51,12 +51,9 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 function Logo() {
   return (
-    <div className="flex items-center gap-2.5">
-      <LogoMark size={32} />
-      <div className="leading-none">
-        <div className="font-display text-xl font-bold uppercase text-cream">Manager</div>
-        <div className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-engrave">Crew</div>
-      </div>
+    <div className="flex items-end gap-2.5">
+      <Wordmark size={26} />
+      <div className="pb-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-engrave">Crew</div>
     </div>
   );
 }
@@ -278,7 +275,7 @@ function Board() {
   }, [songs]);
 
   if (songs.length === 0) {
-    return <div className="p-8 text-center text-sm text-body">Nothing shared yet. Songs appear here when the crew shares them from FL Manager.</div>;
+    return <div className="p-8 text-center text-sm text-body">Nothing shared yet. Songs appear here when the crew shares them from Hivo.</div>;
   }
   const card = (s: CrewSongRow) => <SongCard key={s.id} s={s} you={s.owner_id === userId} owner={names.get(s.owner_id)} mover={s.stage_updated_by ? (s.stage_updated_by === userId ? "you" : names.get(s.stage_updated_by)) : undefined} onMove={(st) => void moveSong(s.id, st).catch(() => {})} />;
   const empty = COLUMNS.filter((c) => !(byStage.get(c.id ?? "") ?? []).length);
