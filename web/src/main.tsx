@@ -2,6 +2,10 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
+import { applyPageLang } from "./lang";
+
+// /fr and /en pin the language (page text and crew messages) before the first render.
+applyPageLang();
 
 /** The faces the hero uses (preloaded from index.html, see vite.config.ts). */
 const HERO_FONTS = [
