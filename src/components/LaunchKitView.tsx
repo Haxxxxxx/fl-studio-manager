@@ -18,6 +18,7 @@ import {
 } from "../lib/launchKit";
 import { draftCopy, reviewKit } from "../lib/ai";
 import { formatRelative } from "../lib/format";
+import { stageRank } from "../lib/songs";
 import type { AiFieldReview, AudioAnalysis, ProjectInfo, Snippet } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { SongPicker } from "./SongPicker";
@@ -83,11 +84,11 @@ export function LaunchKitView() {
   const setSnippetStart = useAppStore((s) => s.setSnippetStart);
   const acceptKit = useAppStore((s) => s.acceptKit);
 
-  // Songs closest to release first: ones with a mixdown, then Done,
-  // Mastering, Mixing, then the rest by last save.
+  // Songs closest to release first: ones with a mixdown, then by stage
+  // (Promotion … Creation), then by last save.
   const ordered = useMemo(() => {
-    const stage = (p: ProjectInfo) => ({ done: 0, mastering: 1, mixing: 2 })[workspace.songs[p.path]?.status as string] ?? 3;
-    const rank = (p: ProjectInfo) => (p.renders.length ? 0 : 4) + stage(p);
+    const stage = (p: ProjectInfo) => stageRank(workspace.songs[p.path]?.status);
+    const rank = (p: ProjectInfo) => (p.renders.length ? 0 : 10) + stage(p);
     return [...songs].sort((a, b) => rank(a) - rank(b) || b.modifiedAtMs - a.modifiedAtMs);
   }, [songs, workspace.songs]);
   const project = songs.find((p) => p.path === launchPath) ?? ordered[0];

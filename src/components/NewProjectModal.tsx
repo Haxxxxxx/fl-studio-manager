@@ -19,7 +19,7 @@ export function NewProjectModal() {
   const [factory, setFactory] = useState<TemplateInfo[]>([]);
   const [templatePath, setTemplatePath] = useState("");
   const [parentFolder, setParentFolder] = useState(settings.watchedFolders[0] ?? "");
-  const [status, setStatus] = useState<SongStatus>(draft?.status ?? "idea");
+  const [status, setStatus] = useState<SongStatus>(draft?.status ?? "creation");
   const [albumId, setAlbumId] = useState<string>(draft?.albumId ?? "");
   const [openAfter, setOpenAfter] = useState(true);
   const [busy, setBusy] = useState(false);

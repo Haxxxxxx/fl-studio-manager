@@ -1,25 +1,59 @@
 import type { Album, ProjectInfo, RenderFreshness, SongStatus, Workspace } from "../types";
 
-// Pipeline stages are ordinal, so they share one hue stepped dark → light
+// The song lifecycle from docs/ROADMAP.md: every track is in exactly one
+// stage. Stages are ordinal, so they share one hue stepped dark → light
 // (validated with validate_palette.js --ordinal against the #16161b surface).
 // Songs nobody has triaged yet sit in neutral gray, outside the ramp.
-export const STATUSES: { id: SongStatus; label: string; color: string }[] = [
-  { id: "idea", label: "Idea", color: "#1c5cab" },
-  { id: "wip", label: "In progress", color: "#2a78d6" },
-  { id: "mixing", label: "Mixing", color: "#5598e7" },
-  { id: "mastering", label: "Mastering", color: "#86b6ef" },
-  { id: "done", label: "Done", color: "#b7d3f6" },
+export const STATUSES: { id: SongStatus; label: string; color: string; hint: string }[] = [
+  { id: "creation", label: "Creation", color: "#1c5cab", hint: "Beat and lyrics exist, still rough" },
+  { id: "production", label: "Production", color: "#2a78d6", hint: "Recording, mixing, mastering until final" },
+  { id: "prep", label: "Prep", color: "#5598e7", hint: "Cover, metadata, release date, distributor" },
+  { id: "release", label: "Release", color: "#86b6ef", hint: "Release day" },
+  { id: "promotion", label: "Promotion", color: "#b7d3f6", hint: "Posts, reels, stories, follow-up" },
 ];
-export const UNSORTED = { label: "Unsorted", color: "#5b5b63" };
+export const UNSORTED = { label: "Unsorted", color: "#5b5b63", hint: "Not placed in a stage yet" };
 
 export function statusInfo(status: SongStatus | undefined) {
   return STATUSES.find((s) => s.id === status) ?? { id: undefined, ...UNSORTED };
 }
 
+/** The music itself is final: Prep, Release or Promotion. */
+export function isFinished(status: SongStatus | undefined): boolean {
+  return status === "prep" || status === "release" || status === "promotion";
+}
+
+/** For "closest to release first" ordering: Promotion 0 … Creation 4, unsorted 5. */
+export function stageRank(status: SongStatus | undefined): number {
+  const i = STATUSES.findIndex((s) => s.id === status);
+  return i < 0 ? STATUSES.length : STATUSES.length - 1 - i;
+}
+
+/** The app's first stages (version 1) → the roadmap lifecycle (version 2). */
+const LEGACY_STAGES: Record<string, SongStatus> = {
+  idea: "creation",
+  wip: "creation",
+  mixing: "production",
+  mastering: "production",
+  done: "prep",
+};
+
+/** Upgrades a stored workspace to the current version. Each migrated song
+ * keeps its old stage in `legacyStatus`, so nothing is lost. */
+export function migrateWorkspace(stored: Workspace | { version?: number }): { workspace: Workspace; changed: boolean } {
+  const ws = { ...EMPTY_WORKSPACE, ...(stored as Workspace) };
+  if (ws.version === 2) return { workspace: ws, changed: false };
+  const songs: Workspace["songs"] = {};
+  for (const [path, meta] of Object.entries(ws.songs ?? {})) {
+    const old = meta.status as string | undefined;
+    songs[path] = old && LEGACY_STAGES[old] ? { ...meta, status: LEGACY_STAGES[old], legacyStatus: old } : meta;
+  }
+  return { workspace: { ...ws, version: 2, songs }, changed: true };
+}
+
 // Album cover colors — the dark categorical slots, in fixed order.
 export const ALBUM_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#9085e9", "#e66767"];
 
-export const EMPTY_WORKSPACE: Workspace = { version: 1, songs: {}, albums: [], people: [] };
+export const EMPTY_WORKSPACE: Workspace = { version: 2, songs: {}, albums: [], people: [] };
 
 export function renderFreshness(p: ProjectInfo): RenderFreshness {
   const latest = p.renders[0];

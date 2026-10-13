@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Disc3, Search, Sparkles } from "lucide-react";
 import { formatRelative } from "../lib/format";
-import { formatBpm, renderFreshness, songLabel, statusInfo } from "../lib/songs";
+import { formatBpm, renderFreshness, songLabel, stageRank, statusInfo } from "../lib/songs";
 import type { ProjectInfo, Workspace } from "../types";
 import { StatusDot } from "./ui";
 
@@ -14,7 +14,7 @@ const GROUPS = [
   { id: "none", label: "No mixdown yet", hint: "Render one to get snippets and a master" },
 ] as const;
 
-const STAGE_RANK: Record<string, number> = { done: 0, mastering: 1, mixing: 2, wip: 3, idea: 4 };
+
 
 function MixdownState({ song }: { song: ProjectInfo }) {
   const f = renderFreshness(song);
@@ -81,7 +81,7 @@ export function SongPicker({
       const meta = workspace.songs[s.path];
       return [s.name, statusInfo(meta?.status).label, meta?.key ?? "", ...(meta?.tags ?? [])].some((t) => t.toLowerCase().includes(q));
     });
-    const rank = (s: ProjectInfo) => STAGE_RANK[workspace.songs[s.path]?.status ?? ""] ?? 5;
+    const rank = (s: ProjectInfo) => stageRank(workspace.songs[s.path]?.status);
     return GROUPS.map((g) => ({
       ...g,
       songs: matches.filter((s) => renderFreshness(s) === g.id).sort((a, b) => rank(a) - rank(b) || b.modifiedAtMs - a.modifiedAtMs),
