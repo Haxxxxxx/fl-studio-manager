@@ -29,6 +29,18 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     fs::write(&path, raw).map_err(|e| format!("could not write settings: {e}"))
 }
 
+/// FL's default projects folder, `<Documents>/Image-Line/FL Studio/Projects`
+/// on both Windows and macOS, if it exists on this machine. Offered as a
+/// one-click suggestion on first run; the user can link any folder instead.
+#[tauri::command]
+pub fn detect_projects_folder(app: AppHandle) -> Option<String> {
+    let docs = app.path().document_dir().ok()?;
+    let projects = docs.join("Image-Line").join("FL Studio").join("Projects");
+    projects
+        .is_dir()
+        .then(|| projects.to_string_lossy().to_string())
+}
+
 /// Best-effort auto-detection of the FL Studio executable. This covers the
 /// common install locations; the user can always override it manually since
 /// FL Studio's install path/version varies a lot machine to machine.

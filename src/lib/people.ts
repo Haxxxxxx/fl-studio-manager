@@ -2,7 +2,7 @@ import type { Person, ProjectInfo, Workspace } from "../types";
 
 // ---- Collaborators, from mixer track / recorded take names ----
 // FL names recordings after the mixer track, and people name tracks after
-// who's on them: "Lead Voices - Brea-Q", "Voice 1 BQ", "Lead Voice Chouls".
+// who's on them: "Lead Voices - Nova", "Voice 1 NV", "Lead Voice Kairo".
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -42,10 +42,10 @@ const STOP = new Set(
 );
 
 function candidateFrom(track: string): string | null {
-  // "Lead Voices - Brea-Q" → "Brea-Q"
+  // "Lead Voices - Nova" → "Nova"
   const dash = track.lastIndexOf(" - ");
   let tail = dash >= 0 ? track.slice(dash + 3) : "";
-  // "Lead Voice Chouls" / "Voice 1 BQ" / "Lead voice Soul Arc" → the words
+  // "Lead Voice Kairo" / "Voice 1 NV" / "Lead voice Lil Ember" → the words
   // after the voice word, minus take numbers.
   if (!tail) {
     const words = track.split(/\s+/);

@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
-import { formatBytes, formatDateTime } from "../lib/format";
+import { TRASH_NAME, formatBytes, formatDateTime } from "../lib/format";
 import { audioSrc, openInFlStudio, revealInFileManager } from "../lib/tauri";
 import { KEYS, albumsOf, backupsBytes, formatBpm, missingPlugins, renderFreshness } from "../lib/songs";
 import type { ProjectInfo } from "../types";
@@ -363,8 +363,8 @@ export function ProjectDrawer() {
                   <Trash2 size={13} /> Clean up {oldBackups.length} older backups ({formatBytes(backupsBytes({ ...project, backups: oldBackups }))})
                 </>
               }
-              confirmLabel={`Move ${oldBackups.length} to Recycle Bin? Click again`}
-              onConfirm={() => run(() => trashBackups(oldBackups.map((b) => b.path)), (n) => `Moved ${n} backups to the Recycle Bin`)}
+              confirmLabel={`Move ${oldBackups.length} to ${TRASH_NAME}? Click again`}
+              onConfirm={() => run(() => trashBackups(oldBackups.map((b) => b.path)), (n) => `Moved ${n} backups to the ${TRASH_NAME}`)}
               className={`${btn} mt-3 text-xs`}
             />
           )}
@@ -393,7 +393,7 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
         {missingP.length > 0 && (
           <div className="mb-2 flex items-start gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-200">
             <AlertTriangle size={13} className="mt-px shrink-0" />
-            Not installed on this PC: {missingP.map((p) => p.name).join(", ")}
+            Not installed on this computer: {missingP.map((p) => p.name).join(", ")}
           </div>
         )}
         <div className="flex flex-wrap gap-1">

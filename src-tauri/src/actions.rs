@@ -35,13 +35,35 @@ fn copy_file(from: &Path, to: &Path) -> Result<(), String> {
         .map_err(|e| format!("could not copy {} → {}: {e}", from.display(), to.display()))
 }
 
-/// FL's factory templates: `<install>/Data/Templates/<category>/<name>/<name>.flp`.
+/// Where FL keeps its factory templates. Windows: `<install>/Data/Templates`.
+/// macOS: somewhere inside the `.app` bundle (the exe is in
+/// `Contents/MacOS`), so look for a `Data/Templates` folder in the bundle
+/// rather than hardcoding a layout that varies between FL versions.
+fn factory_templates_dir(fl_studio_path: &str) -> Option<PathBuf> {
+    let exe = Path::new(fl_studio_path);
+    let windows_layout = exe.parent()?.join("Data").join("Templates");
+    if windows_layout.is_dir() {
+        return Some(windows_layout);
+    }
+    let bundle = exe.ancestors().find(|a| a.extension().is_some_and(|x| x.eq_ignore_ascii_case("app")))?;
+    walkdir::WalkDir::new(bundle.join("Contents"))
+        .max_depth(5)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .find(|e| {
+            e.file_type().is_dir()
+                && e.file_name() == "Templates"
+                && e.path().parent().and_then(Path::file_name).is_some_and(|n| n == "Data")
+        })
+        .map(|e| e.path().to_path_buf())
+}
+
+/// FL's factory templates: `<templates>/<category>/<name>/<name>.flp`.
 #[tauri::command]
 pub fn list_templates(fl_studio_path: Option<String>) -> Vec<TemplateInfo> {
-    let Some(install_dir) = fl_studio_path.as_deref().and_then(|p| Path::new(p).parent()) else {
+    let Some(base) = fl_studio_path.as_deref().and_then(factory_templates_dir) else {
         return Vec::new();
     };
-    let base = install_dir.join("Data").join("Templates");
     let mut templates: Vec<TemplateInfo> = walkdir::WalkDir::new(&base)
         .max_depth(3)
         .into_iter()

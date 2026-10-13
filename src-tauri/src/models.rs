@@ -40,7 +40,7 @@ pub struct ProjectInfo {
     pub recordings_bytes: u64,
     pub plugins: Vec<PluginInfo>,
     pub samples: Vec<SampleInfo>,
-    /// Named mixer tracks and recorded-take labels ("Lead Voices - Brea-Q"),
+    /// Named mixer tracks and recorded-take labels ("Lead Voices - Nova"),
     /// minus generic ones. Collaborator names usually live here.
     pub track_names: Vec<String>,
 }

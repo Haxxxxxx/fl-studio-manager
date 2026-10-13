@@ -29,7 +29,7 @@ export interface ProjectInfo {
   recordingsBytes: number;
   plugins: PluginInfo[];
   samples: SampleInfo[];
-  /** Named mixer tracks + recorded-take labels ("Lead Voices - Brea-Q"). */
+  /** Named mixer tracks + recorded-take labels ("Lead Voices - Nova"). */
   trackNames: string[];
 }
 
@@ -92,7 +92,7 @@ export interface SongMeta {
 }
 
 /** A collaborator or contact. Aliases are how they appear in track names
- * ("BQ", "Breaq" for Brea-Q). */
+ * ("NV", "Novah" for Nova). */
 export interface Person {
   id: string;
   name: string;
