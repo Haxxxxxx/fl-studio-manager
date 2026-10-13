@@ -1,20 +1,21 @@
 # Hivo (formerly FL Manager): Roadmap and status
 
-> Status as of **13 October 2026**. This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
+> Status as of **13 October 2026, evening**. This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
 
 ---
 
 ## 1. Where we are, in one minute
 
 - **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion. It comes with a web dashboard for the crew.
-- **The name.** The app is being renamed from **FL Manager** to **Hivo**, with a new hive-cell logo. The rename is done in code and waits in **pull request #25**.
+- **The name.** The app is now **Hivo** (formerly FL Manager), with a hive-cell logo. The rename is merged, the website shows it, and so do the sign-in emails.
+- **Installers.** Mac and Windows installers exist: built locally and saved in the private repo's GitHub releases (latest: `desktop-0.1.0-r2`). The automatic cloud build is still blocked.
 - **Phase 0 (stabilize, demo-ready).** Done, except two things: the crew pitch, and cleaning the git history before the repo can go public.
 - **Phase 1 (crew dashboard, Launch Kit, design identity).** Built and merged.
 - **Phase 2 (plugins, hardware, social publishing, distributor integrations).** Not started; ideas only.
 - **Biggest blockers today:**
-  - downloadable installers are stuck behind a GitHub billing issue;
   - reliable sign-in emails need a mail provider and a domain;
-  - the repo can't go public until the history scrub.
+  - the repo can't go public until the history scrub;
+  - automatic installer builds are stuck behind a GitHub billing issue. Installers can still be built by hand on a Mac.
 
 ---
 
@@ -26,13 +27,14 @@
   - web dashboard: Vite on Vercel;
   - crew backend: Supabase in the EU (Ireland).
 - **Tests:**
-  - 59 unit tests for the app logic;
-  - 90 Rust tests for scanning, files and audio;
+  - 61 unit tests for the app logic;
+  - 97 Rust tests for scanning, files, audio and the AI connection;
   - 57 database tests covering crew rules, privacy and limits.
   - Both builds are clean.
-- **Pull requests:** 23 merged since the start (#1 to #24). One is open: **#25, the Hivo rename**.
+- **Pull requests:** 26 merged since the start (#1 to #27). None open.
 - **Live:**
-  - crew website: https://fl-manager-crew.vercel.app (still shows the FL Manager name until #25 merges);
+  - crew website: https://fl-manager-crew.vercel.app (Hivo);
+  - installers: GitHub releases in the private repo (`desktop-0.1.0-r2`: Mac universal .dmg and Windows setup .exe);
   - Claude Design project "fl-Manager": holds the 28 synced components, already in the Hivo / System 02 look.
 - **Quality pass done:** a three-part audit (Rust↔app bridge, app wiring, crew backend) found and fixed every broken link between features (PR #24).
 - **Free stack, by choice:**
@@ -82,13 +84,15 @@
 - Every field shows where it came from: Detected, Suggested, AI draft, Edited, or Needs you.
 - Checks the master against distributor specs (WAV, 44.1 kHz, no clipping).
 - Suggests a release date: the first Friday at least 28 days out that doesn't clash with the crew's other drops.
-- Finds the strongest moments in the mixdown, and cuts snippets for reels and stories.
+- Finds the hook in the mixdown (the part that comes back most, not just the loudest) and cuts snippets for reels and stories: the hook, a 30 s teaser that builds into it, and an alternate cut. Each says why it was picked ("comes back 3 times").
+- Snippet editor: drag a snippet on the waveform, click to place it, type a start time, pick a length (7, 15, 30 or 60 seconds), with a playhead while it plays.
 - Renders 9:16 shorts locally with ffmpeg, free, no upload.
 - Writes a cover art brief and generates cover concepts with FLUX (free tier).
 - **AI layer (optional, Gemini free tier):**
   - drafts captions;
   - reviews every field with a verdict and a confidence score.
   - It never overrides measured values like BPM or duration.
+  - Built to stay inside the free tier: when one Gemini model hits its limit, it switches to the backup model; a used-up daily quota is skipped; calls are spaced out; and it doesn't re-check a kit that hasn't changed.
 - Accept all, edit any field, reset, or do it all by hand.
 - Exports a ready folder: metadata (JSON and CSV), a sheet to paste into your distributor, the cover brief, captions, a checklist, the snippets, the shorts and the chosen cover.
 
@@ -109,16 +113,22 @@
 - Designed in Claude Design and applied across the app and the website.
 - The component library is synced back to Claude Design, so new designs there use the real components.
 
+**Brand and installers**
+- Hivo name and hive-cell logo everywhere: the app, its icons, the website, the link preview, the sign-in emails.
+- Mac (universal) and Windows installers, built locally and kept as private GitHub releases. They're unsigned, so expect a one-time warning on first launch.
+
 ### In progress
 
-- **The Hivo rename (PR #25).** App name, hive-cell logo and wordmark, app icons, favicons and link preview, plus the Claude Design re-sync inputs. Once merged: redeploy the website.
-- **Live sign-in email template** still says "FL Manager". It needs a `supabase config push` or a quick edit in the Supabase dashboard after the rename.
+- **Testing on real songs and a real PC.**
+  - The new hook detection was tested on synthetic audio, not yet on the crew's tracks.
+  - The Windows installer was cross-built on a Mac and hasn't been run on a Windows PC yet.
 
 ### Blocked
 
-- **Downloadable installers.**
-  - The cloud build (Windows .exe/.msi and Mac .dmg) is written and ready.
+- **Automatic installer builds.**
+  - The cloud build (Windows .exe/.msi and Mac .dmg on every version tag) is written and ready.
   - GitHub refuses to run it: "recent account payments have failed or your spending limit needs to be increased".
+  - **Workaround in use:** build both installers by hand on the Mac.
   - **Unblock:** fix GitHub billing, or make the repo public (which needs the history scrub first).
 - **Going public with the repo.** Old commits still contain artist names and a personal email. **Unblock:** rewrite the git history.
 - **Sign-in emails at crew scale.** Supabase's built-in email sender is heavily rate-limited. **Unblock:** pick a domain for Hivo, then connect a free mail provider (Brevo was the plan).
@@ -205,11 +215,11 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 
 ## 8. Suggested next steps
 
-1. Merge the Hivo rename (#25), redeploy the website, update the sign-in email template.
+1. Try the Launch Kit on a few real songs whose hook you know, and run the Windows installer on a PC.
 2. Pick a Hivo domain; set up the mail provider so crew sign-in is reliable.
-3. Fix GitHub billing (or scrub history and go public) to get real installers for the crew.
+3. Decide crash safety (abort vs unwind) before handing installers to the crew.
 4. Prepare and give the crew pitch with the demo.
-5. Decide crash safety (abort vs unwind) before handing installers out.
+5. Fix GitHub billing (or scrub history and go public) so installers build automatically.
 6. Then choose the first Phase 2 slice. Social publishing from the Launch Kit is the natural next "magic" moment.
 
 ## 9. Notes for Claude Code
