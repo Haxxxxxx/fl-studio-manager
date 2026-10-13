@@ -1,3 +1,4 @@
+import { statusInfo } from "../lib/songs";
 import { useEffect, useState } from "react";
 import { Check, ClipboardCopy, LogOut, RefreshCw, Users } from "lucide-react";
 import { useCrewStore } from "../store/useCrewStore";
@@ -485,5 +486,33 @@ export function ShareToggle({ path }: { path: string }) {
         </label>
       )}
       </div>
+  );
+}
+
+/** A crewmate moved this song on the crew board while this computer's move
+ * was waiting to be sent: the owner picks which one stands. */
+export function StageConflictBanner({ path }: { path: string }) {
+  const conflict = useAppStore((s) => s.workspace.songs[path]?.stageConflict);
+  const members = useCrewStore((s) => s.members);
+  const resolve = useCrewStore((s) => s.resolveStageConflict);
+  if (!conflict) return null;
+  const who = members.find((m) => m.user_id === conflict.by)?.display_name ?? "A crewmate";
+  const theirs = statusInfo(conflict.theirs ?? undefined).label;
+  const mine = statusInfo(conflict.mine ?? undefined).label;
+  return (
+    <div role="alert" className="mt-3 flex flex-col gap-2 rounded-md border border-amber-400/30 bg-amber-500/[0.07] px-3 py-2 text-xs text-amber-100">
+      <span>
+        <b className="font-semibold">{who}</b> moved this song to <b className="font-semibold">{theirs}</b> on the crew board while your move
+        to <b className="font-semibold">{mine}</b> was waiting to be sent. Which one stands?
+      </span>
+      <div className="flex gap-2">
+        <button onClick={() => resolve(path, "theirs")} className="rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised">
+          Keep {theirs}
+        </button>
+        <button onClick={() => resolve(path, "mine")} className="rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised">
+          Keep {mine}
+        </button>
+      </div>
+    </div>
   );
 }

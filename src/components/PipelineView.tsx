@@ -130,7 +130,16 @@ export function PipelineView() {
                           : "border-rule bg-raised hover:border-rule-strong"
                       }`}
                     >
-                      <div className="truncate text-sm font-medium text-cream">{p.name}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-medium text-cream">{p.name}</span>
+                        {workspace.songs[p.path]?.stageConflict && (
+                          <span
+                            title="A crewmate moved this song on the crew board too: open it to choose"
+                            aria-label="Stage conflict"
+                            className="h-2 w-2 shrink-0 rounded-full bg-amber-400"
+                          />
+                        )}
+                      </div>
                       <div className="mt-1 flex items-center gap-2 text-[11px] text-engrave">
                         <span>{formatRelative(p.modifiedAtMs)}</span>
                         {p.tempoBpm && <span>· {formatBpm(p.tempoBpm)} BPM</span>}
