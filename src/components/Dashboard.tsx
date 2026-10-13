@@ -20,7 +20,6 @@ import {
   UNSORTED,
   backupsBytes,
   hasProblems,
-  renderFreshness,
   songLabel,
   rendersBytes,
   saveTimestamps,
@@ -28,6 +27,8 @@ import {
 } from "../lib/songs";
 import { EmptyLibrary, useVisibleSongs } from "./LibraryView";
 import { CrewCards } from "./CrewCards";
+import { AttentionCarousel } from "./AttentionCarousel";
+import { attentionItems } from "../lib/attention";
 import { useCrewStore } from "../store/useCrewStore";
 import { crewStats, RECENT_DAYS } from "../lib/crewStats";
 import { STALLED_DAYS } from "../lib/crew";
@@ -86,12 +87,7 @@ function MyDashboard() {
     [songs, workspace.songs],
   );
 
-  const outdated = useMemo(() => songs.filter((p) => renderFreshness(p) === "stale"), [songs]);
-  const doneNoMix = useMemo(
-    () => songs.filter((p) => isFinished(statusOf(p.path)) && renderFreshness(p) === "none"),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [songs, workspace.songs],
-  );
+  const attention = useMemo(() => attentionItems(songs, workspace), [songs, workspace]);
 
   const storage = useMemo(() => {
     const sum = (f: (p: (typeof songs)[number]) => number) => songs.reduce((t, p) => t + f(p), 0);
@@ -266,7 +262,11 @@ function MyDashboard() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <Card title="Needs attention">
+          <AttentionCarousel items={attention} label={(i) => songLabel(i.song, songs)} onOpen={openDetail} />
+        </Card>
+
+        <div>
           <Card title={`Storage — ${formatBytes(storageTotal)}`}>
             <div className="flex h-4 gap-[2px]">
               {storage.map((s, i) =>
@@ -290,22 +290,6 @@ function MyDashboard() {
               ))}
             </div>
             <BackupHogs />
-          </Card>
-
-          <Card title="Needs attention">
-            <AttentionList
-              icon={<AlertTriangle size={13} className="text-amber-400" />}
-              title={`${outdated.length} mixdown${outdated.length === 1 ? "" : "s"} older than the project`}
-              items={outdated}
-            />
-            <AttentionList
-              icon={<Disc3 size={13} className="text-engrave" />}
-              title={`${doneNoMix.length} finished song${doneNoMix.length === 1 ? "" : "s"} without a mixdown`}
-              items={doneNoMix}
-            />
-            {outdated.length === 0 && doneNoMix.length === 0 && (
-              <div className="text-xs text-engrave">All mixdowns are current.</div>
-            )}
           </Card>
         </div>
 
@@ -339,29 +323,6 @@ function MyDashboard() {
     </div>
   );
 
-  function AttentionList({ icon, title, items }: { icon: React.ReactNode; title: string; items: typeof songs }) {
-    if (!items.length) return null;
-    return (
-      <div className="mb-3">
-        <div className="flex items-center gap-1.5 text-xs text-body">
-          {icon} {title}
-        </div>
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {items.slice(0, 8).map((p) => (
-            <button
-              key={p.path}
-              title={p.path}
-              onClick={() => openDetail(p.path)}
-              className="rounded bg-raised px-2 py-0.5 text-[11px] text-body hover:bg-rule hover:text-cream"
-            >
-              {songLabel(p, songs)}
-            </button>
-          ))}
-          {items.length > 8 && <span className="px-1 text-[11px] text-engrave">+{items.length - 8}</span>}
-        </div>
-      </div>
-    );
-  }
 
   function BackupHogs() {
     const top = [...songs].sort((a, b) => backupsBytes(b) - backupsBytes(a)).slice(0, 3).filter((p) => p.backups.length > 5);
