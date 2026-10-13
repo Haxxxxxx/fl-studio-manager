@@ -11,7 +11,7 @@ import { SettingsView } from "./components/SettingsView";
 import { LaunchKitView } from "./components/LaunchKitView";
 import { CalendarView } from "./components/CalendarView";
 import { RenderPanel } from "./components/RenderPanel";
-import { PackagePanel } from "./components/PackagePanel";
+import { PackageConfirm, PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
@@ -104,6 +104,7 @@ export default function App() {
       <NewProjectModal />
       <RenderPanel />
       <PackagePanel />
+      <PackageConfirm />
       {!isTauri() && (
         <div className="absolute bottom-3 left-1/2 z-40 max-w-xl -translate-x-1/2 rounded-md border border-amber-400/40 bg-[#2a2112] px-4 py-2 text-xs text-amber-100 shadow-xl">
           This is the app's UI in a browser tab, so nothing can load or save here (no folders, settings or AI key). Run{" "}
