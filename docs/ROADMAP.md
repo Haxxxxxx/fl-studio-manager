@@ -110,10 +110,10 @@ Goal: from personal monitor to crew tool, and build the deal-breaker.
 
 **1a. Shared crew dashboard**
 - [ ] Multi-user: each crew member's FL Studio projects visible to the group
-- [ ] Board view of all tracks by lifecycle stage (Creation → Promotion)
-- [ ] Who's working on what, last activity per project, stalled tracks
+- [x] Board view of all tracks by lifecycle stage (Creation → Promotion) _(local: your own projects; shared once multi-user lands)_
+- [x] Who's working on what, last activity per project, stalled tracks _(dashboard: Crew + Stalled cards)_
 - [ ] Decide which stats matter **to the group** vs. only to me, and surface the group ones
-- [ ] Release calendar (planned and past release dates)
+- [x] Release calendar (planned and past release dates)
 - [ ] Clear view of **where each track's files live** (project, stems, bounces, artwork)
 
 **1b. Launch Kit MVP**

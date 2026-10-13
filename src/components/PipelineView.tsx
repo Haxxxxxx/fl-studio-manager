@@ -7,7 +7,7 @@ import type { ProjectInfo, SongStatus } from "../types";
 import { EmptyLibrary, MixdownBadge, useVisibleSongs } from "./LibraryView";
 import { StatusDot } from "./ui";
 
-const COLUMNS: { id: SongStatus | undefined; label: string; color: string }[] = [
+const COLUMNS: { id: SongStatus | undefined; label: string; color: string; hint: string }[] = [
   { id: undefined, ...UNSORTED },
   ...STATUSES,
 ];
@@ -38,7 +38,7 @@ export function PipelineView() {
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-3">
         <div>
           <h1 className="text-sm font-semibold text-white/90">Pipeline</h1>
-          <p className="text-xs text-white/40">Drag songs between stages. Unsorted songs haven't been triaged yet.</p>
+          <p className="text-xs text-white/40">Every song is in one stage, from Creation to Promotion. Drag songs between stages.</p>
         </div>
       </div>
       <div className="flex flex-1 gap-3 overflow-x-auto p-4">
@@ -59,23 +59,24 @@ export function PipelineView() {
                 const path = e.dataTransfer.getData("text/plain");
                 if (path) setStatus([path], col.id);
               }}
-              className={`flex w-60 shrink-0 flex-col rounded-lg border ${
+              className={`flex min-w-[190px] flex-1 basis-0 flex-col rounded-lg border ${
                 dragOver === key ? "border-orange-400/50 bg-orange-500/[0.05]" : "border-white/5 bg-white/[0.02]"
               }`}
             >
-              <div className="flex items-center gap-2 px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-2 px-3 pb-2 pt-2.5">
                 <StatusDot color={col.color} />
                 <span className="text-xs font-medium text-white/80">{col.label}</span>
                 <span className="text-xs text-white/30">{items.length}</span>
-                {col.id === "idea" && (
+                {col.id === "creation" && (
                   <button
-                    onClick={() => openNewProject({ status: "idea" })}
+                    onClick={() => openNewProject({ status: "creation" })}
                     title="New song"
                     className="ml-auto rounded p-0.5 text-white/35 hover:bg-white/10 hover:text-white"
                   >
                     <Plus size={14} />
                   </button>
                 )}
+                <span className="basis-full pt-0.5 text-[10px] leading-snug text-white/30">{col.hint}</span>
               </div>
               <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto px-2 pb-2">
                 {items.map((p) => {

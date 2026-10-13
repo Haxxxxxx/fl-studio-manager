@@ -17,6 +17,7 @@ import { formatBytes, formatRelative } from "../lib/format";
 import { openInFlStudio } from "../lib/tauri";
 import {
   STATUSES,
+  isFinished,
   UNSORTED,
   backupsBytes,
   hasProblems,
@@ -27,6 +28,7 @@ import {
   statusInfo,
 } from "../lib/songs";
 import { EmptyLibrary, useVisibleSongs } from "./LibraryView";
+import { CrewCards } from "./CrewCards";
 import { ProgressBar } from "./AlbumsView";
 import { StatusDot, btn, btnPrimary } from "./ui";
 
@@ -71,19 +73,19 @@ export function Dashboard() {
 
   const inProgress = songs.filter((p) => {
     const s = statusOf(p.path);
-    return s && s !== "done";
+    return s && !isFinished(s);
   }).length;
-  const finished = pipeline.find((s) => s.id === "done")?.count ?? 0;
+  const finished = pipeline.filter((s) => isFinished(s.id)).reduce((t, s) => t + s.count, 0);
 
   const continueWith = useMemo(
-    () => songs.filter((p) => statusOf(p.path) !== "done").slice(0, 4),
+    () => songs.filter((p) => !isFinished(statusOf(p.path))).slice(0, 4),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [songs, workspace.songs],
   );
 
   const outdated = useMemo(() => songs.filter((p) => renderFreshness(p) === "stale"), [songs]);
   const doneNoMix = useMemo(
-    () => songs.filter((p) => statusOf(p.path) === "done" && renderFreshness(p) === "none"),
+    () => songs.filter((p) => isFinished(statusOf(p.path)) && renderFreshness(p) === "none"),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [songs, workspace.songs],
   );
@@ -201,6 +203,8 @@ export function Dashboard() {
           </div>
         </Card>
 
+        <CrewCards songs={songs} />
+
         <Card title={`Studio activity — saves per day, last 12 months`}>
           <ActivityHeatmap />
         </Card>
@@ -315,7 +319,7 @@ export function Dashboard() {
           <Card title="Releases">
             <div className="flex flex-col gap-3">
               {workspace.albums.map((a) => {
-                const done = a.trackPaths.filter((p) => statusOf(p) === "done").length;
+                const done = a.trackPaths.filter((p) => isFinished(statusOf(p))).length;
                 return (
                   <button key={a.id} onClick={() => openAlbum(a.id)} className="flex items-center gap-3 text-left">
                     <span className="h-8 w-8 shrink-0 rounded" style={{ background: a.color }} />

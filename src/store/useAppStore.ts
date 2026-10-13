@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import * as api from "../lib/tauri";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
-import { ALBUM_COLORS, EMPTY_WORKSPACE, newId } from "../lib/songs";
+import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
 import type {
   PackageResult,
   Person,
@@ -32,7 +32,7 @@ const DEFAULT_SETTINGS: Settings = {
   ffmpegPath: null,
 };
 
-export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "settings";
+export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "calendar" | "settings";
 export type SortKey = "modified" | "name" | "status" | "tempo" | "key" | "versions";
 export type SortDir = "asc" | "desc";
 /** "unsorted" = songs with no status yet. */
@@ -207,7 +207,10 @@ export const useAppStore = create<AppState>((set, get) => {
   async function loadWorkspace() {
     try {
       const stored = await api.getWorkspace();
-      set({ workspace: stored ? { ...EMPTY_WORKSPACE, ...stored } : EMPTY_WORKSPACE, workspaceWritable: true });
+      const { workspace, changed } = stored ? migrateWorkspace(stored) : { workspace: EMPTY_WORKSPACE, changed: false };
+      set({ workspace, workspaceWritable: true });
+      // Save the upgraded shape once, so the migration doesn't rerun.
+      if (changed) await api.saveWorkspace(workspace).catch((e) => console.error("saving migrated workspace failed", e));
     } catch (e) {
       // Never save over a workspace we couldn't read — that would wipe the
       // user's albums and statuses. Edits stay in memory until it's fixed.
@@ -528,7 +531,7 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ coverStatus });
     },
     openNewProject: (draft) =>
-      set({ newProject: { albumId: null, status: "idea", ...draft } }),
+      set({ newProject: { albumId: null, status: "creation", ...draft } }),
     closeNewProject: () => set({ newProject: null }),
 
     updateSong: (path, patch) =>

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, Disc3, Download, Package, Plus, Search, Trash2, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
-import { ALBUM_COLORS, STATUSES, UNSORTED, formatBpm, renderFreshness, statusInfo } from "../lib/songs";
+import { ALBUM_COLORS, STATUSES, UNSORTED, formatBpm, isFinished, renderFreshness, statusInfo } from "../lib/songs";
 import type { Album, AlbumKind, ProjectInfo, Workspace } from "../types";
 import { MixdownBadge } from "./LibraryView";
 import { ConfirmButton, Modal, StatusDot, StatusSelect, btn, btnPrimary, input, sectionLabel } from "./ui";
@@ -101,7 +101,7 @@ function AlbumCard({
   onOpen: () => void;
 }) {
   const tracks = tracksOf(album, projects);
-  const done = album.trackPaths.filter((p) => workspace.songs[p]?.status === "done").length;
+  const done = album.trackPaths.filter((p) => isFinished(workspace.songs[p]?.status)).length;
   return (
     <button onClick={onOpen} className="group rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left hover:border-white/20">
       <Cover album={album} />
@@ -177,7 +177,7 @@ function AlbumDetail({ album }: { album: Album }) {
 
   const tracks = tracksOf(album, projects);
   const present = tracks.filter((t): t is ProjectInfo => t !== null);
-  const done = album.trackPaths.filter((p) => workspace.songs[p]?.status === "done").length;
+  const done = album.trackPaths.filter((p) => isFinished(workspace.songs[p]?.status)).length;
   const mixed = present.filter((t) => renderFreshness(t) === "fresh").length;
   const bpms = present.map((t) => t.tempoBpm).filter((b): b is number => b != null);
   const releaseMs = album.releaseDate ? new Date(album.releaseDate).getTime() : null;
@@ -288,7 +288,7 @@ function AlbumDetail({ album }: { album: Album }) {
             <button onClick={() => setPicking(true)} className={btn}>
               <Plus size={14} /> Add songs
             </button>
-            <button onClick={() => openNewProject({ albumId: album.id, status: "idea" })} className={btn}>
+            <button onClick={() => openNewProject({ albumId: album.id, status: "creation" })} className={btn}>
               <Plus size={14} /> New song for this release
             </button>
             <button

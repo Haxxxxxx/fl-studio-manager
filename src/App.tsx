@@ -8,6 +8,7 @@ import { AlbumsView } from "./components/AlbumsView";
 import { PeopleView } from "./components/PeopleView";
 import { SettingsView } from "./components/SettingsView";
 import { LaunchKitView } from "./components/LaunchKitView";
+import { CalendarView } from "./components/CalendarView";
 import { RenderPanel } from "./components/RenderPanel";
 import { PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
@@ -55,6 +56,7 @@ export default function App() {
       {view === "albums" && <AlbumsView />}
       {view === "people" && <PeopleView />}
       {view === "launch" && <LaunchKitView />}
+      {view === "calendar" && <CalendarView />}
       {view === "settings" && <SettingsView />}
       {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
       {view !== "settings" && view !== "launch" && <ProjectDrawer key={detailPath ?? ""} />}
