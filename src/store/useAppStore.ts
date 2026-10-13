@@ -13,6 +13,8 @@ import type {
   Settings,
   SongMeta,
   AiStatus,
+  CoverStatus,
+  KitCoverMeta,
   KitAiMeta,
   KitFieldId,
   SongStatus,
@@ -134,6 +136,11 @@ interface AppState {
   /** null until loaded; whether a Gemini key is set. */
   aiStatus: AiStatus | null;
   refreshAiStatus: () => Promise<void>;
+  /** Set or clear the picked cover concept (metadata only). */
+  setKitCover: (path: string, cover: KitCoverMeta | undefined) => void;
+  /** null until loaded; whether Cloudflare credentials are set. */
+  coverStatus: CoverStatus | null;
+  refreshCoverStatus: () => Promise<void>;
   openNewProject: (draft?: Partial<NewProjectDraft>) => void;
   closeNewProject: () => void;
 
@@ -264,6 +271,7 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ settings });
       await loadWorkspace();
       get().refreshAiStatus();
+      get().refreshCoverStatus();
       set({ settingsLoaded: true });
 
       if (!get().unlisten) {
@@ -509,6 +517,15 @@ export const useAppStore = create<AppState>((set, get) => {
     refreshAiStatus: async () => {
       const aiStatus = await api.aiStatus().catch(() => null);
       set({ aiStatus });
+    },
+    setKitCover: (path, cover) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      get().updateSong(path, { launchKit: { ...kit, cover } });
+    },
+    coverStatus: null,
+    refreshCoverStatus: async () => {
+      const coverStatus = await api.coverStatus().catch(() => null);
+      set({ coverStatus });
     },
     openNewProject: (draft) =>
       set({ newProject: { albumId: null, status: "idea", ...draft } }),

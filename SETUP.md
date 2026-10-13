@@ -64,6 +64,19 @@ The Launch Kit turns each snippet into a 1080×1920 MP4 (H.264 + AAC, 30 fps), t
 2. The app finds it automatically, including Homebrew's folder, which apps opened from Finder can't see on the PATH. If it doesn't, set the path in **Settings → Shorts**, or set `FFMPEG_PATH`.
 3. Launch Kit → **Render 3 shorts**. They're saved in `<export folder>/Launch Kits/<song>/shorts/` and play right in the app.
 
+## Optional: free cover concepts (Cloudflare)
+
+The Launch Kit can paint four cover concepts from the cover art brief with FLUX.1 [schnell] on Cloudflare Workers AI. The free allowance is 10,000 neurons a day (resets at 00:00 UTC). One 1024 px concept costs about 58, so that's roughly 170 images a day, with no card needed.
+
+1. Create a free Cloudflare account at [dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up), or sign in.
+2. Open the Workers AI page: [dash.cloudflare.com/?to=/:account/ai/workers-ai](https://dash.cloudflare.com/?to=/:account/ai/workers-ai). Pick **Use REST API**.
+3. Copy the **Account ID** (32 characters).
+4. Click **Create a Workers AI API Token**, check the prefilled values, then **Create API Token** and copy it. If you'd rather make a custom token, give it **Workers AI: Read** and **Workers AI: Edit**.
+5. In the app: **Settings → Cover art**, paste both, **Save**. Developers can set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` instead. When both are set they take precedence.
+6. In a Launch Kit, under **Cover art brief**, click **Generate 4 concepts**. Click one to pick it, then **More like this** (four more from the same prompt) or **Save to kit** (writes `cover-concept.jpg` into `<export folder>/Launch Kits/<song>/`).
+
+Concepts are drafts at 1024 × 1024 px. Distributors need 3000 × 3000, so a designer (or an upscaler) makes the final from the pick and adds the title. FLUX is told to leave text out because it spells badly. The credentials stay on that computer (`cover.json` in the app config folder, owner-only on macOS) and the UI never shows them again. Only the image prompt goes to Cloudflare. It's built from the brief, without the song title, artist names or notes.
+
 ## Where your data lives
 
 Stages, tags, notes, releases, people and settings are FL Manager's own data. FL Studio doesn't store them. They live in the app config folder:
