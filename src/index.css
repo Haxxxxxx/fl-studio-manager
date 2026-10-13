@@ -36,6 +36,36 @@ body {
   overflow: hidden;
 }
 
+/* "Needs you" jump (Launch Kit): one bounce, then a ring that stays while
+   the field has focus. Reduced motion: the ring only. */
+@keyframes kit-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-6px);
+  }
+  60% {
+    transform: translateY(2px);
+  }
+}
+
+.kit-attention {
+  outline: 2px solid var(--color-hot);
+  outline-offset: 6px;
+}
+
+.kit-attention.kit-bounce {
+  animation: kit-bounce 450ms ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kit-attention.kit-bounce {
+    animation: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
