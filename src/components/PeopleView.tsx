@@ -8,6 +8,7 @@ import type { Person, ProjectInfo } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { OUTCOMES } from "./SongPeople";
 import { ConfirmButton, StatusDot, TagEditor, btn, btnPrimary, input, sectionLabel } from "./ui";
+import { Avatar } from "../ui";
 
 export function PeopleView() {
   const openPersonId = useAppStore((s) => s.openPersonId);
@@ -141,22 +142,6 @@ function PeopleList() {
         )}
       </div>
     </div>
-  );
-}
-
-function Avatar({ name, size = 36 }: { name: string; size?: number }) {
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join("");
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-white/10 font-semibold text-white/80"
-      style={{ width: size, height: size, fontSize: size * 0.36 }}
-    >
-      {initials}
-    </span>
   );
 }
 

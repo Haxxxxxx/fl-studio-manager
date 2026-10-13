@@ -4,6 +4,7 @@ import { useAppStore } from "../store/useAppStore";
 import { buildCalendar, monthLabel, type CalendarEntry } from "../lib/calendar";
 import { formatRelative } from "../lib/format";
 import { btn, btnPrimary } from "./ui";
+import { Meter } from "../ui";
 
 const KIND_LABEL = { album: "Album", ep: "EP", single: "Single", mixtape: "Mixtape" } as const;
 
@@ -133,22 +134,5 @@ function Row({ entry: e, onOpen, past = false }: { entry: CalendarEntry; onOpen:
         )}
       </div>
     </button>
-  );
-}
-
-function Meter({ label, value, total }: { label: string; value: number; total: number }) {
-  const pct = total ? (value / total) * 100 : 0;
-  return (
-    <div>
-      <div className="flex justify-between text-white/50">
-        <span>{label}</span>
-        <span className="tabular-nums text-white/70">
-          {value}/{total}
-        </span>
-      </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: value === total ? "#199e70" : "#3987e5" }} />
-      </div>
-    </div>
   );
 }

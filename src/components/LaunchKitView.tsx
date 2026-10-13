@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, ClipboardCopy, FolderOpen, Minus, Pause, Play, Plus, Rocket, RotateCcw, Sparkles } from "lucide-react";
+import { Check, CheckCircle2, FolderOpen, Minus, Pause, Play, Plus, Rocket, RotateCcw, Sparkles } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { useCrewStore } from "../store/useCrewStore";
 import * as api from "../lib/tauri";
@@ -13,7 +13,6 @@ import {
   kitSnippets,
   DISTRIBUTION_FIELDS,
   artistLine,
-  LOW_CONFIDENCE,
   masterBaseName,
   METADATA_FIELDS,
   type Check as KitCheck,
@@ -23,23 +22,17 @@ import {
 import { draftCopy, reviewKit } from "../lib/ai";
 import { formatRelative } from "../lib/format";
 import { stageRank } from "../lib/songs";
-import type { AiFieldReview, AudioAnalysis, ProjectInfo, Snippet } from "../types";
+import type { AudioAnalysis, ProjectInfo, Snippet } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { SongPicker } from "./SongPicker";
 import { ShortsPanel } from "./ShortsPanel";
 import { CoverConcepts } from "./CoverConcepts";
-import { btn, btnPrimary, input } from "./ui";
+import { btn, btnPrimary } from "./ui";
+import { Card, CheckLine, FieldRow, KitStatus } from "../ui";
 
 // Snippet colors: the dark categorical slots, in fixed order (as elsewhere).
 const SNIPPET_COLORS = ["#3987e5", "#d95926", "#199e70"];
 
-const SOURCE_STYLE: Record<KitField["source"], { label: string; className: string }> = {
-  detected: { label: "Detected", className: "bg-emerald-500/15 text-emerald-300" },
-  suggested: { label: "Suggested", className: "bg-sky-500/15 text-sky-300" },
-  ai: { label: "AI draft", className: "bg-violet-500/15 text-violet-300" },
-  edited: { label: "Edited", className: "bg-orange-500/15 text-orange-300" },
-  missing: { label: "Needs you", className: "bg-red-500/15 text-red-300" },
-};
 
 /** Keyed by mixdown path + mtime + tempo: re-analyze when the mixdown
  * changes, or the tempo does (snippets snap to its bar grid). */
@@ -304,131 +297,6 @@ export function LaunchKitView() {
   );
 }
 
-function KitStatus({ missing, warnings, accepted, aiVerified }: { missing: number; warnings: number; accepted: boolean; aiVerified: boolean }) {
-  if (missing) {
-    return (
-      <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs text-red-200">
-        {missing} need{missing === 1 ? "s" : ""} you{warnings ? ` · ${warnings} to check` : ""}
-      </span>
-    );
-  }
-  return (
-    <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${accepted ? "bg-emerald-500/15 text-emerald-200" : "bg-white/10 text-white/70"}`}>
-      <CheckCircle2 size={12} /> {accepted ? "Reviewed, ready to export" : "Ready to review"}
-      {aiVerified && " · AI-verified"}
-      {warnings ? ` · ${warnings} to check` : ""}
-    </span>
-  );
-}
-
-function CheckLine({ check }: { check: KitCheck }) {
-  const color = check.level === "missing" ? "text-red-300" : "text-amber-300";
-  return (
-    <div className={`flex items-start gap-1.5 text-xs ${color}`}>
-      <AlertTriangle size={12} className="mt-px shrink-0" />
-      <span>{check.message}</span>
-    </div>
-  );
-}
-
-function FieldRow({ field, onChange, bare = false }: { field: KitField; onChange: (v: string | undefined) => void; bare?: boolean }) {
-  const source = SOURCE_STYLE[field.source];
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className={`flex flex-col gap-1.5 ${bare ? "" : "py-3 first:pt-0 last:pb-0"}`}>
-      <div className="flex items-center gap-2">
-        {!bare && <span className="text-xs font-medium text-white/70">{field.label}</span>}
-        <span className={`rounded px-1.5 py-px text-[10px] font-medium ${source.className}`}>{source.label}</span>
-        <span className="min-w-0 flex-1 truncate text-[11px] text-white/35" title={field.note}>
-          {field.note}
-        </span>
-        {field.source === "edited" && (
-          <button onClick={() => onChange(undefined)} title="Back to the generated value" className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white">
-            <RotateCcw size={11} /> Reset
-          </button>
-        )}
-        {field.kind === "multiline" && (
-          <button
-            onClick={() => {
-              navigator.clipboard?.writeText(field.value).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1200);
-              });
-            }}
-            className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white"
-          >
-            <ClipboardCopy size={11} /> {copied ? "Copied" : "Copy"}
-          </button>
-        )}
-      </div>
-      {field.kind === "choice" ? (
-        <div className="flex gap-1.5">
-          {field.options!.map((o) => (
-            <button
-              key={o}
-              onClick={() => onChange(o)}
-              className={`rounded-md border px-3 py-1 text-sm ${field.value === o ? "border-orange-400/60 bg-orange-500/15 text-orange-200" : "border-white/10 text-white/60 hover:bg-white/5"}`}
-            >
-              {o}
-            </button>
-          ))}
-        </div>
-      ) : field.kind === "multiline" ? (
-        <textarea value={field.value} onChange={(e) => onChange(e.target.value)} rows={field.id === "captions" ? 10 : 11} className={`${input} resize-y font-mono text-xs leading-relaxed`} />
-      ) : (
-        <input
-          type={field.kind === "date" ? "date" : "text"}
-          value={field.value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.source === "missing" ? "Type it once" : undefined}
-          className={`${input} [color-scheme:dark]`}
-        />
-      )}
-      {field.check && <CheckLine check={field.check} />}
-      {field.review && <AiLine review={field.review} onUse={(v) => onChange(v)} />}
-    </div>
-  );
-}
-
-const VERDICT_LABEL: Record<AiFieldReview["verdict"], string> = {
-  ok: "AI: looks right",
-  check: "AI: worth a look",
-  wrong: "AI: looks wrong",
-};
-
-function AiLine({ review, onUse }: { review: AiFieldReview & { stale: boolean }; onUse: (v: string) => void }) {
-  const low = review.confidence < LOW_CONFIDENCE;
-  const tone = review.stale
-    ? "text-white/30"
-    : review.verdict === "wrong"
-      ? "text-red-300"
-      : review.verdict === "check" || low
-        ? "text-amber-300"
-        : "text-emerald-300/80";
-  return (
-    <div className="flex flex-col gap-1">
-      <div className={`flex items-start gap-1.5 text-xs ${tone}`}>
-        <Sparkles size={12} className="mt-px shrink-0" />
-        <span>
-          <span className="font-medium">{VERDICT_LABEL[review.verdict]}</span> · {Math.round(review.confidence * 100)}% sure
-          {low && !review.stale && <span className="ml-1 rounded bg-amber-500/15 px-1 text-[10px]">low confidence</span>}
-          {review.reason && ` · ${review.reason}`}
-          {review.stale && " (checked an earlier value)"}
-        </span>
-      </div>
-      {review.suggestion && !review.stale && (
-        <div className="ml-[18px] flex items-center gap-2 text-xs text-white/55">
-          <span className="min-w-0 truncate" title={review.suggestion}>
-            Suggests: <span className="text-white/80">{review.suggestion}</span>
-          </span>
-          <button onClick={() => onUse(review.suggestion!)} className="shrink-0 rounded bg-white/10 px-2 py-0.5 text-white/80 hover:bg-white/15">
-            Use
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /** Draft copy with Gemini, then check every field. Off without a key. */
 function AiPanel({ path, input, fields }: { path: string; input: KitInput; fields: KitField[] }) {
@@ -657,15 +525,6 @@ function Snippets({
       </div>
       {!demoMode && <audio ref={audio} src={api.audioSrc(render.path)} preload="none" />}
       <div className="text-[11px] text-white/35">Clips are cut on export, with short fades, into snippets/ in the kit.</div>
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-3 text-[11px] font-medium uppercase tracking-wide text-white/40">{title}</div>
-      {children}
     </div>
   );
 }
