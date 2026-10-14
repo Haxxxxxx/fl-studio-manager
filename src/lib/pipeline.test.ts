@@ -150,4 +150,15 @@ describe("pipeline model", () => {
   it("default ids match the stages, so an untouched workspace needs no stored config", () => {
     expect(defaultPipeline().columns.map((c) => c.id)).toEqual(["unsorted", "creation", "production", "prep", "release", "promotion"]);
   });
+
+  it("default column names follow the language; renamed ones stay", async () => {
+    const { applyLang } = await import("../i18n");
+    const w = ws({}, { columns: [{ id: "a", name: "Création", stage: "creation" }, { id: "b", name: "Studio", stage: "production" }], order: {} });
+    applyLang("en");
+    expect(resolvePipeline(w).columns.find((c) => c.id === "a")!.name).toBe("Creation");
+    expect(resolvePipeline(w).columns.find((c) => c.id === "b")!.name).toBe("Studio");
+    applyLang("fr");
+    expect(resolvePipeline(w).columns.find((c) => c.id === "a")!.name).toBe("Création");
+    applyLang("en");
+  });
 });

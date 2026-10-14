@@ -4,7 +4,13 @@ import { useCrewStore, useInCrew } from "../store/useCrewStore";
 import { engrave } from "../ui";
 import { StatusDot } from "./ui";
 import { LeaveCrewButton } from "./CrewPanel";
-import { useIsCrewOwner } from "./CrewViews";
+import { T_CREW_PAGES, useIsCrewOwner } from "./CrewViews";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  { activeCrew: "Active crew", syncProblem: "Sync problem", synced: "Synced", notSynced: "Not synced yet" },
+  { activeCrew: "Crew actif", syncProblem: "Problème de synchro", synced: "Synchronisé", notSynced: "Pas encore synchronisé" },
+);
 
 // The crew's own part of the menu, under the main one: everything about the
 // crew interface lives here. The owner manages (members, invites, settings);
@@ -23,13 +29,16 @@ export function CrewSection() {
   const active = crews.find((c) => c.id === activeCrewId)!;
   const light = sync === "error" ? "var(--color-missing)" : sync === "synced" ? "var(--color-ok)" : "var(--color-engrave)";
 
+  const t = tr(T);
+  const pages = tr(T_CREW_PAGES);
+
   const items: { id: View; label: string; icon: typeof KanbanSquare }[] = [
-    { id: "crewBoard", label: "Crew board", icon: KanbanSquare },
-    { id: "crewReleases", label: "Crew releases", icon: Disc3 },
+    { id: "crewBoard", label: pages.board, icon: KanbanSquare },
+    { id: "crewReleases", label: pages.releases, icon: Disc3 },
     ...(owner
       ? [
-          { id: "crewMembers" as const, label: "Members & invites", icon: UserPlus },
-          { id: "crewSettings" as const, label: "Crew settings", icon: Settings2 },
+          { id: "crewMembers" as const, label: pages.members, icon: UserPlus },
+          { id: "crewSettings" as const, label: pages.settings, icon: Settings2 },
         ]
       : []),
   ];
@@ -42,7 +51,7 @@ export function CrewSection() {
           <select
             value={active.id}
             onChange={(e) => void selectCrew(e.target.value)}
-            aria-label="Active crew"
+            aria-label={t.activeCrew}
             className="min-w-0 flex-1 truncate rounded border border-rule bg-chassis px-1.5 py-0.5 text-xs text-cream"
           >
             {crews.map((c) => (
@@ -54,7 +63,7 @@ export function CrewSection() {
         ) : (
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-cream">{active.name}</span>
         )}
-        <span title={sync === "error" ? "Sync problem" : sync === "synced" ? "Synced" : "Not synced yet"}>
+        <span title={sync === "error" ? t.syncProblem : sync === "synced" ? t.synced : t.notSynced}>
           <StatusDot color={light} size={7} />
         </span>
       </div>

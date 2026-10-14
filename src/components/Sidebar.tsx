@@ -3,6 +3,36 @@ import { useAppStore } from "../store/useAppStore";
 import { btnPrimary, engrave, Wordmark } from "../ui";
 import { CrewSection } from "./CrewSection";
 import { useInCrew } from "../store/useCrewStore";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  {
+    dashboard: "Dashboard",
+    library: "Library",
+    pipeline: "Pipeline",
+    releases: "Releases",
+    calendar: "Calendar",
+    people: "People",
+    settings: "Settings",
+    sampleData: "Sample data",
+    tagline: "Session → release",
+    newSong: "New song",
+    peopleCredits: "People & credits",
+  },
+  {
+    dashboard: "Tableau de bord",
+    library: "Bibliothèque",
+    pipeline: "Pipeline",
+    releases: "Sorties",
+    calendar: "Calendrier",
+    people: "Personnes",
+    settings: "Réglages",
+    sampleData: "Données d'exemple",
+    tagline: "Session → sortie",
+    newSong: "Nouveau son",
+    peopleCredits: "Personnes et crédits",
+  },
+);
 
 export function Sidebar() {
   const view = useAppStore((s) => s.view);
@@ -16,24 +46,25 @@ export function Sidebar() {
   const openPerson = useAppStore((s) => s.openPerson);
   const peopleCount = useAppStore((s) => s.workspace.people.length);
   const inCrew = useInCrew();
+  const t = tr(T);
 
   const items = [
-    { id: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
-    { id: "library" as const, label: "Library", icon: Library, badge: songCount },
-    { id: "pipeline" as const, label: "Pipeline", icon: KanbanSquare },
-    { id: "albums" as const, label: "Releases", icon: Disc3, badge: albums.length },
-    { id: "calendar" as const, label: "Calendar", icon: CalendarDays },
+    { id: "dashboard" as const, label: t.dashboard, icon: LayoutDashboard },
+    { id: "library" as const, label: t.library, icon: Library, badge: songCount },
+    { id: "pipeline" as const, label: t.pipeline, icon: KanbanSquare },
+    { id: "albums" as const, label: t.releases, icon: Disc3, badge: albums.length },
+    { id: "calendar" as const, label: t.calendar, icon: CalendarDays },
     // Solo: People (credits, collaborators) moves down the list, see below.
-    ...(inCrew ? [{ id: "people" as const, label: "People", icon: Users, badge: peopleCount }] : []),
+    ...(inCrew ? [{ id: "people" as const, label: t.people, icon: Users, badge: peopleCount }] : []),
     { id: "launch" as const, label: "Launch Kit", icon: Rocket },
-    { id: "settings" as const, label: "Settings", icon: SettingsIcon },
+    { id: "settings" as const, label: t.settings, icon: SettingsIcon },
   ];
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-rule bg-panel">
       <div className="flex flex-col gap-1.5 px-4 py-4">
         <Wordmark size={30} />
-        <div className={`${engrave} text-[9.5px]`}>{demoMode ? "Sample data" : "Session → release"}</div>
+        <div className={`${engrave} text-[9.5px]`}>{demoMode ? t.sampleData : t.tagline}</div>
       </div>
 
       <div className="px-3 pb-2">
@@ -41,7 +72,7 @@ export function Sidebar() {
           onClick={() => openNewProject()}
           className={`${btnPrimary} w-full justify-center py-2`}
         >
-          <Plus size={15} /> New song
+          <Plus size={15} /> {t.newSong}
         </button>
       </div>
 
@@ -76,7 +107,7 @@ export function Sidebar() {
               view === "people" ? "bg-cream font-medium text-chassis" : "text-engrave hover:bg-raised hover:text-cream"
             }`}
           >
-            <Users size={13} strokeWidth={2} /> People &amp; credits
+            <Users size={13} strokeWidth={2} /> {t.peopleCredits}
           </button>
         )}
       </nav>
@@ -85,7 +116,7 @@ export function Sidebar() {
 
       {albums.length > 0 && (
         <div className="mt-2 flex min-h-0 flex-col px-2">
-          <div className={`px-3 pb-1.5 ${engrave}`}>Releases</div>
+          <div className={`px-3 pb-1.5 ${engrave}`}>{t.releases}</div>
           <div className="overflow-auto">
             {albums.map((a) => (
               <button

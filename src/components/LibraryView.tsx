@@ -23,6 +23,7 @@ import { useCanShare } from "./CrewPanel";
 import { detectKey } from "../lib/people";
 import { dawOf } from "../lib/daws";
 import { formatDate } from "../lib/format";
+import { dict, tr } from "../i18n";
 import {
   KEYS,
   STATUSES,
@@ -38,18 +39,123 @@ import type { ProjectInfo, SongStatus } from "../types";
 import { StatusDot, StatusSelect, btn, btnPrimary } from "./ui";
 import { Chip, MixdownBadge, Toggle } from "../ui";
 
+const T = dict(
+  {
+    colSong: "Song",
+    colStatus: "Status",
+    colBpm: "BPM",
+    colKey: "Key",
+    colLastSaved: "Last saved",
+    colBackups: "Backups",
+    colMixdown: "Mixdown",
+    colAlbum: "Album",
+    searchPlaceholder: "Search songs, tags, notes, plugins, samples…",
+    rescan: "Rescan folders",
+    favorites: "Favorites",
+    issues: (n: number) => `Issues (${n})`,
+    archived: (n: number) => `Archived (${n})`,
+    templates: (n: number) => `Templates (${n})`,
+    all: "All",
+    selected: (n: number) => `${n} selected`,
+    setStatus: "Set status",
+    addToRelease: "Add to release",
+    crew: "Crew",
+    shareWith: (crew: string | null) => `Share with ${crew}`,
+    stopSharing: "Stop sharing",
+    sharedElsewhere: (n: number) =>
+      `${n} song${n === 1 ? " is" : "s are"} shared with another crew: move ${n === 1 ? "it" : "them"} from the song panel.`,
+    archive: "Archive",
+    archiveSelected: "Archive selected",
+    unarchiveSelected: "Unarchive selected",
+    packageTitle: "Zip each selected song with its samples",
+    packageN: (n: number) => `Package ${n}`,
+    rendering: "Rendering…",
+    exportN: (n: number) => `Export ${n}`,
+    demoBanner: "Sample data — changes aren't saved and export is disabled until you link a real project folder.",
+    scanning: "Scanning your project folders…",
+    noMatch: "No songs match",
+    removeFavorite: "Remove from favorites",
+    addFavorite: "Add to favorites",
+    template: "template",
+    keyFromTrack: "Found in a mixer track name — set it in the song panel",
+    pluginsMissing: (names: string) => `Plugins not installed: ${names}`,
+    samplesMissing: (n: number) => `${n} missing sample${n === 1 ? "" : "s"}`,
+    noFolder: "No project folder linked yet",
+    foundFolders: "Found these DAW folders on this computer. Link the ones you use:",
+    pointAt:
+      "Point Hivo at the folder where your projects live: FL Studio, Ableton Live, REAPER, Studio One, Pro Tools, Cubase or Bitwig. You can link several.",
+    anotherFolder: "Another folder…",
+    linkFolder: "Link a project folder",
+    loadSample: "Load sample data",
+  },
+  {
+    colSong: "Son",
+    colStatus: "Étape",
+    colBpm: "BPM",
+    colKey: "Tonalité",
+    colLastSaved: "Dernière sauvegarde",
+    colBackups: "Sauvegardes",
+    colMixdown: "Mixdown",
+    colAlbum: "Album",
+    searchPlaceholder: "Cherche des sons, tags, notes, plugins, samples…",
+    rescan: "Rescanner les dossiers",
+    favorites: "Favoris",
+    issues: (n: number) => `Problèmes (${n})`,
+    archived: (n: number) => `Archivés (${n})`,
+    templates: (n: number) => `Templates (${n})`,
+    all: "Tous",
+    selected: (n: number) => `${n} sélectionné${n === 1 ? "" : "s"}`,
+    setStatus: "Changer l'étape",
+    addToRelease: "Ajouter à une sortie",
+    crew: "Crew",
+    shareWith: (crew: string | null) => `Partager avec ${crew}`,
+    stopSharing: "Ne plus partager",
+    sharedElsewhere: (n: number) =>
+      n === 1
+        ? "1 son est partagé avec un autre crew : change-le depuis le panneau du son."
+        : `${n} sons sont partagés avec un autre crew : change-les depuis le panneau du son.`,
+    archive: "Archiver",
+    archiveSelected: "Archiver la sélection",
+    unarchiveSelected: "Désarchiver la sélection",
+    packageTitle: "Zipper chaque son sélectionné avec ses samples",
+    packageN: (n: number) => `Pack zip (${n})`,
+    rendering: "Rendu en cours…",
+    exportN: (n: number) => `Exporter ${n}`,
+    demoBanner:
+      "Données d'exemple — rien n'est sauvegardé et l'export est désactivé tant que tu n'as pas lié un vrai dossier de projets.",
+    scanning: "Scan de tes dossiers de projets…",
+    noMatch: "Aucun son ne correspond",
+    removeFavorite: "Retirer des favoris",
+    addFavorite: "Ajouter aux favoris",
+    template: "template",
+    keyFromTrack: "Trouvée dans un nom de piste du mixer — règle-la dans le panneau du son",
+    pluginsMissing: (names: string) => `Plugins pas installés : ${names}`,
+    samplesMissing: (n: number) => `${n} sample${n === 1 ? " manquant" : "s manquants"}`,
+    noFolder: "Aucun dossier de projets lié pour l'instant",
+    foundFolders: "On a trouvé ces dossiers de DAW sur cet ordi. Lie ceux que tu utilises :",
+    pointAt:
+      "Indique à Hivo le dossier où vivent tes projets : FL Studio, Ableton Live, REAPER, Studio One, Pro Tools, Cubase ou Bitwig. Tu peux en lier plusieurs.",
+    anotherFolder: "Un autre dossier…",
+    linkFolder: "Lier un dossier de projets",
+    loadSample: "Charger les données d'exemple",
+  },
+);
+
 const STATUS_ORDER: Record<string, number> = Object.fromEntries(STATUSES.map((s, i) => [s.id, i + 1]));
 
-const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
-  { key: "name", label: "Song" },
-  { key: "status", label: "Status" },
-  { key: "tempo", label: "BPM" },
-  { key: "key", label: "Key" },
-  { key: "modified", label: "Last saved" },
-  { key: "versions", label: "Backups" },
-  { key: null, label: "Mixdown" },
-  { key: null, label: "Album" },
-];
+function columns(): { key: SortKey | null; label: string; className?: string }[] {
+  const t = tr(T);
+  return [
+    { key: "name", label: t.colSong },
+    { key: "status", label: t.colStatus },
+    { key: "tempo", label: t.colBpm },
+    { key: "key", label: t.colKey },
+    { key: "modified", label: t.colLastSaved },
+    { key: "versions", label: t.colBackups },
+    { key: null, label: t.colMixdown },
+    { key: null, label: t.colAlbum },
+  ];
+}
 
 /** Songs shown in the library, board and stats. Templates only when their
  * toggle is on; archived songs never — except in the library's Archived
@@ -205,6 +311,7 @@ export function LibraryView() {
     return <EmptyLibrary />;
   }
 
+  const t = tr(T);
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-rule px-6 py-3 [&_button]:whitespace-nowrap">
@@ -213,29 +320,29 @@ export function LibraryView() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search songs, tags, notes, plugins, samples…"
+            placeholder={t.searchPlaceholder}
             className="w-full rounded-md border border-rule bg-raised py-2 pl-9 pr-3 text-sm text-cream placeholder:text-engrave focus:border-orange-400/50 focus:outline-none"
           />
         </div>
-        <button onClick={() => rescan()} disabled={scanning || demoMode} className={btn} title="Rescan folders">
+        <button onClick={() => rescan()} disabled={scanning || demoMode} className={btn} title={t.rescan}>
           <RefreshCw size={14} className={scanning ? "animate-spin" : ""} />
         </button>
         <Toggle active={favoritesOnly} onClick={() => setFavoritesOnly(!favoritesOnly)}>
-          <Star size={14} /> Favorites
+          <Star size={14} /> {t.favorites}
         </Toggle>
         {(problemCount > 0 || problemsOnly) && (
           <Toggle active={problemsOnly} onClick={() => setProblemsOnly(!problemsOnly)}>
-            <AlertTriangle size={14} /> Issues ({problemCount})
+            <AlertTriangle size={14} /> {t.issues(problemCount)}
           </Toggle>
         )}
         {(archivedCount > 0 || showArchived) && (
           <Toggle active={showArchived} onClick={() => setShowArchived(!showArchived)}>
-            <Archive size={14} /> Archived ({archivedCount})
+            <Archive size={14} /> {t.archived(archivedCount)}
           </Toggle>
         )}
         {templateCount > 0 && (
           <Toggle active={showTemplates} onClick={() => setShowTemplates(!showTemplates)}>
-            <LayoutTemplate size={14} /> Templates ({templateCount})
+            <LayoutTemplate size={14} /> {t.templates(templateCount)}
           </Toggle>
         )}
 
@@ -243,7 +350,7 @@ export function LibraryView() {
 
       <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-6 py-2">
         <Chip active={statusFilter === null} onClick={() => setStatusFilter(null)}>
-          All <span className="text-engrave">{songs.length}</span>
+          {t.all} <span className="text-engrave">{songs.length}</span>
         </Chip>
         {[{ id: "unsorted" as const, ...UNSORTED }, ...STATUSES].map((s) => {
           const count = statusCounts.get(s.id) ?? 0;
@@ -274,33 +381,29 @@ export function LibraryView() {
 
       {selected.size > 0 && (
         <div className="flex items-center gap-2 border-b border-orange-400/20 bg-orange-500/[0.06] px-6 py-2 text-sm">
-          <span className="text-orange-200">{selected.size} selected</span>
+          <span className="text-orange-200">{t.selected(selected.size)}</span>
           <BulkSelect
-            label="Set status"
+            label={t.setStatus}
             options={[{ value: "", label: UNSORTED.label }, ...STATUSES.map((s) => ({ value: s.id, label: s.label }))]}
             onPick={(v) => setStatus(selectedPaths, (v || undefined) as SongStatus | undefined)}
           />
           {workspace.albums.length > 0 && (
             <BulkSelect
-              label="Add to release"
+              label={t.addToRelease}
               options={workspace.albums.map((a) => ({ value: a.id, label: a.title }))}
               onPick={(id) => addTracks(id, selectedPaths)}
             />
           )}
           {canShare && (
             <BulkSelect
-              label="Crew"
+              label={t.crew}
               options={[
-                { value: "share", label: `Share with ${crewName}` },
-                { value: "unshare", label: "Stop sharing" },
+                { value: "share", label: t.shareWith(crewName) },
+                { value: "unshare", label: t.stopSharing },
               ]}
               onPick={(v) => {
                 const skipped = setShared(selectedPaths, v === "share");
-                setShareNote(
-                  skipped
-                    ? `${skipped} song${skipped === 1 ? " is" : "s are"} shared with another crew: move ${skipped === 1 ? "it" : "them"} from the song panel.`
-                    : null,
-                );
+                setShareNote(skipped ? t.sharedElsewhere(skipped) : null);
               }}
             />
           )}
@@ -310,10 +413,10 @@ export function LibraryView() {
             </span>
           )}
           <BulkSelect
-            label="Archive"
+            label={t.archive}
             options={[
-              { value: "archive", label: "Archive selected" },
-              { value: "unarchive", label: "Unarchive selected" },
+              { value: "archive", label: t.archiveSelected },
+              { value: "unarchive", label: t.unarchiveSelected },
             ]}
             onPick={(v) => {
               for (const p of selectedPaths) updateSong(p, { archived: v === "archive" });
@@ -324,13 +427,13 @@ export function LibraryView() {
             onClick={() => startPackage(selectedPaths).catch((e) => setError(e instanceof Error ? e.message : String(e)))}
             disabled={packaging || demoMode}
             className={`${btn} ml-auto py-1 text-xs`}
-            title="Zip each selected song with its samples"
+            title={t.packageTitle}
           >
-            <Package size={13} /> Package {selected.size}
+            <Package size={13} /> {t.packageN(selected.size)}
           </button>
           <button onClick={handleRender} disabled={rendering || demoMode} className={btnPrimary}>
             <Download size={14} />
-            {rendering ? "Rendering…" : `Export ${selected.size}`}
+            {rendering ? t.rendering : t.exportN(selected.size)}
           </button>
           <button onClick={clearSelection} className="rounded p-1 text-engrave hover:text-cream">
             <X size={15} />
@@ -340,7 +443,7 @@ export function LibraryView() {
 
       {demoMode && (
         <div className="mx-6 mt-3 rounded-md border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-200">
-          Sample data — changes aren't saved and export is disabled until you link a real project folder.
+          {t.demoBanner}
         </div>
       )}
       {error && (
@@ -353,7 +456,7 @@ export function LibraryView() {
         {filtered.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-engrave">
             <Music2 size={28} />
-            <div className="text-sm">{scanning ? "Scanning your project folders…" : "No songs match"}</div>
+            <div className="text-sm">{scanning ? t.scanning : t.noMatch}</div>
           </div>
         ) : (
           <table className="w-full border-separate border-spacing-y-0.5 text-sm">
@@ -368,7 +471,7 @@ export function LibraryView() {
                   </button>
                 </th>
                 <th className="w-6 px-1 py-2" />
-                {COLUMNS.map((col) => (
+                {columns().map((col) => (
                   <th key={col.label} className="whitespace-nowrap px-2 py-2 font-medium">
                     {col.key ? (
                       <button
@@ -408,7 +511,7 @@ export function LibraryView() {
                     <td className="px-1 py-2" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => toggleFavorite(project.path)}
-                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        aria-label={isFavorite ? t.removeFavorite : t.addFavorite}
                         className="flex text-engrave hover:text-orange-300"
                       >
                         <Star size={13} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-orange-400" : ""} />
@@ -426,7 +529,7 @@ export function LibraryView() {
                         </span>
                         {hasProblems(project) && <ProblemIcon project={project} />}
                         {project.isTemplate && (
-                          <span className="rounded bg-rule px-1.5 text-[10px]  text-engrave">template</span>
+                          <span className="rounded bg-rule px-1.5 text-[10px]  text-engrave">{t.template}</span>
                         )}
                       </div>
                       {meta?.tags && meta.tags.length > 0 && (
@@ -442,7 +545,7 @@ export function LibraryView() {
                     <td className="px-2 py-2 font-mono text-[13px] text-body">
                       {meta?.key ??
                         (detectKey(project.trackNames) ? (
-                          <span className="italic text-engrave" title="Found in a mixer track name — set it in the song panel">
+                          <span className="italic text-engrave" title={t.keyFromTrack}>
                             {detectKey(project.trackNames)}?
                           </span>
                         ) : (
@@ -479,8 +582,8 @@ function ProblemIcon({ project }: { project: ProjectInfo }) {
   const plugins = missingPlugins(project).map((p) => p.name);
   const samples = missingSamples(project).length;
   const lines = [
-    plugins.length ? `Plugins not installed: ${plugins.join(", ")}` : "",
-    samples ? `${samples} missing sample${samples === 1 ? "" : "s"}` : "",
+    plugins.length ? tr(T).pluginsMissing(plugins.join(", ")) : "",
+    samples ? tr(T).samplesMissing(samples) : "",
   ].filter(Boolean);
   return (
     <span title={lines.join("\n")} className="shrink-0 text-red-400" aria-label={lines.join(". ")}>
@@ -531,31 +634,31 @@ export function EmptyLibrary() {
     fn().catch((e) => setError(e instanceof Error ? e.message : String(e)));
   };
 
+  const t = tr(T);
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-raised text-engrave">
         <FolderSearch size={28} />
       </div>
-      <div className="text-base font-medium text-cream">No project folder linked yet</div>
+      <div className="text-base font-medium text-cream">{t.noFolder}</div>
       {suggested ? (
         <div className="w-full max-w-xl text-sm text-engrave">
-          Found these DAW folders on this computer. Link the ones you use:
+          {t.foundFolders}
           <div className="mt-3">
             <DetectedFolders compact />
           </div>
         </div>
       ) : (
         <div className="max-w-sm text-sm text-engrave">
-          Point Hivo at the folder where your projects live: FL Studio, Ableton Live, REAPER, Studio One, Pro Tools,
-          Cubase or Bitwig. You can link several.
+          {t.pointAt}
         </div>
       )}
       <div className="mt-2 flex gap-2">
         <button onClick={run(addWatchedFolder)} className={suggested ? btn : btnPrimary}>
-          {suggested ? "Another folder…" : "Link a project folder"}
+          {suggested ? t.anotherFolder : t.linkFolder}
         </button>
         <button onClick={loadDemoData} className={btn}>
-          Load sample data
+          {t.loadSample}
         </button>
       </div>
       {error && <div className="max-w-md text-xs text-red-300">{error}</div>}

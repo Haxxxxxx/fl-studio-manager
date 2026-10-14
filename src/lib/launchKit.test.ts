@@ -181,7 +181,7 @@ describe("README in every kit", () => {
     expect(en[0].content).toContain(".mp3**");
     expect(en[0].content).toContain("Hook 15s");
     const fr = kitFiles(buildKit(input()), snippets, [], "fr", null)[0].content;
-    expect(fr).toContain("# Kit de sortie : Night Run");
+    expect(fr).toContain("# Kit de sortie\u202f: Night Run");
     expect(fr).toContain("## Dans l'ordre");
     expect(fr).not.toContain("mixdown final");
   });

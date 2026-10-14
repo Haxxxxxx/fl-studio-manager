@@ -41,11 +41,11 @@ const TEXT = {
   },
   emailFailed: {
     en: "The sign-in email couldn't be sent. Try again in a few minutes. If it keeps failing, tell whoever runs Hivo: the email sender needs checking.",
-    fr: "L'email de connexion n'a pas pu être envoyé. Réessaie dans quelques minutes. Si ça bloque encore, préviens la personne qui gère Hivo : l'envoi d'emails est à vérifier.",
+    fr: "L'email de connexion n'a pas pu être envoyé. Réessaie dans quelques minutes. Si ça bloque encore, préviens la personne qui gère Hivo : l'envoi d'emails est à vérifier.",
   },
   invalidInvite: {
     en: "That invite code didn't work: it's wrong, expired, used up or revoked (or you're already in 10 crews). Ask your crew for a new one.",
-    fr: "Ce code d'invitation ne marche pas : il est faux, expiré, déjà utilisé ou révoqué (ou tu es déjà dans 10 crews). Demande un nouveau code à ton crew.",
+    fr: "Ce code d'invitation ne marche pas : il est faux, expiré, déjà utilisé ou révoqué (ou tu es déjà dans 10 crews). Demande un nouveau code à ton crew.",
   },
   tooManyInvites: {
     en: "Too many wrong invite codes. Wait 10 minutes and try again.",
@@ -69,15 +69,15 @@ const TEXT = {
   },
   offline: {
     en: "Can't reach the crew server. Are you online?",
-    fr: "Impossible de joindre le serveur du crew. Tu es bien connecté à internet ?",
+    fr: "Impossible de joindre le serveur du crew. Tu es bien connecté à internet ?",
   },
   noCrew: {
     en: "You're signed in as {email}, but not in a crew yet. Enter the invite code your crew sent you (8 letters and numbers).",
     fr: "Tu es connecté en tant que {email}, mais tu n'es pas encore dans un crew. Entre le code d'invitation que ton crew t'a envoyé (8 lettres et chiffres).",
   },
   noInviteYet: {
-    en: "No code yet? Ask your crew's owner to make one in Hivo (Settings → Crew → New invite code).",
-    fr: "Pas encore de code ? Demande au propriétaire du crew d'en créer un dans Hivo (Settings → Crew → New invite code).",
+    en: "No code yet? Ask your crew's owner to make one in Hivo (Crew → Members & invites → New invite code).",
+    fr: "Pas encore de code ? Demande au propriétaire du crew d'en créer un dans Hivo (Crew → Membres et invitations → Nouveau code d'invitation).",
   },
   movedMeanwhile: {
     en: "{who} moved it to {stage} just before you. Move it again if you still want to.",

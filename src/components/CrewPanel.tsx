@@ -8,37 +8,219 @@ import { orphanedShares, releaseSharedHere, shareElsewhere, sharedHere, sharedTi
 import { btn, btnPrimary, ConfirmButton, input } from "../ui";
 import { crewText } from "../lib/crewMessages";
 import { cleanCode, isCodeComplete } from "../lib/signInCode";
+import { dict, locale, tr } from "../i18n";
 
 const field = input;
 const primary = `${btnPrimary} shrink-0 justify-center py-2`;
 const secondary = `${btn} shrink-0 justify-center py-2`;
 
+const plural = (n: number) => (n === 1 ? "" : "s");
+
+const T = dict(
+  {
+    privacy:
+      'Share chosen songs with your crew: everyone sees them on the crew board, the calendar and in "who\'s on what". For each shared song the crew sees its title, stage, BPM, key, tags, credits, release date, whether it has a mixdown, whether its Launch Kit is accepted, and when the project was last saved. They also see your crew and display names (not your email, which only the sign-in service keeps). Never audio, file paths, samples, notes or track names. Stored in the EU (Ireland).',
+    notConfigured: "Crew sharing isn't set up in this build (no crew server configured).",
+    loading: "Loading…",
+    loadFailed: (error: string) => `Couldn't load your crews: ${error}`,
+    tryAgain: "Try again",
+    yourEmail: "Your email",
+    sending: "Sending…",
+    sendCode: "Send code",
+    sentTo: "We sent a sign-in code to",
+    expiresIn: ". It expires in 10 minutes.",
+    codeLabel: "Sign-in code",
+    checking: "Checking…",
+    signIn: "Sign in",
+    otherEmail: "Use another email",
+    yourName: "Your name in the crew (your artist name)",
+    namePlaceholder: "e.g. Milo",
+    joinTitle: "Join a crew",
+    invitePlaceholder: "INVITE CODE",
+    inviteLabel: "Invite code",
+    join: "Join",
+    createTitle: "Create a crew",
+    crewName: "Crew name",
+    create: "Create",
+    signOut: "Sign out",
+    syncing: "Syncing…",
+    justNow: "just now",
+    synced: (when: string) => `Synced ${when}`,
+    refused: (n: number) => ` · ${n} song${plural(n)} refused by the server`,
+    notSynced: "Not synced yet",
+    owner: "Owner",
+    member: "Member",
+    syncNow: "Sync now",
+    youShare: "You share",
+    songsShared: (n: number) => ` song${plural(n)}. Share songs from their panel, or select several in the Library.`,
+    orphans: (n: number) =>
+      `${n} shared song${n === 1 ? " isn't" : "s aren't"} in your library right now (renamed, moved or on an unplugged drive), so ${n === 1 ? "its" : "their"} crew card is frozen.`,
+    stopSharingThem: (n: number) => `Stop sharing ${n === 1 ? "it" : "them"}`,
+    members: (n: number) => `Members · ${n}`,
+    ownerTag: "· owner",
+    youTag: "· you",
+    remove: "Remove",
+    removeConfirm: (name: string) => `Remove ${name}?`,
+    removeNote: "Removing someone takes their shared songs off the crew board.",
+    openInvites: (n: number) => `Open invite codes · ${n}`,
+    used: (uses: number, max: number) => `${uses}/${max} used`,
+    expires: (date: string) => `expires ${date}`,
+    revoke: "Revoke",
+    revokeConfirm: "Revoke code?",
+    newInvite: "New invite code",
+    copied: "Copied",
+    copy: "Copy",
+    inviteValid: "Valid 7 days, up to 10 people.",
+    becomesOwner: (name: string) => ` ${name} becomes the owner.`,
+    lastMember: " You're the last member, so the crew is deleted.",
+    leaveConfirm: (crew: string, note: string) => `Leave ${crew}? Your shared songs leave the crew board with you.${note}`,
+    leaveCrew: "Leave crew",
+    another: "Join or create another crew",
+    cancel: "Cancel",
+    maxCrews: "You're in 10 crews, the most allowed. Leave one first.",
+    tracksElsewhere: (n: number) =>
+      `${n} track${n === 1 ? " is" : "s are"} shared with another crew, so ${n === 1 ? "it stays" : "they stay"} there.`,
+    releaseElsewhere: "Shared with another crew or account.",
+    releaseShared: (crew: string, shared: number, total: number) => `Shared with ${crew} · ${shared}/${total} tracks`,
+    shareOthers: (n: number) => `Share the ${n} other track${plural(n)}`,
+    stopSharing: "Stop sharing",
+    stopRelease: "Stop sharing the release?",
+    releaseLeft: "The release leaves the crew's list. Its tracks stay shared.",
+    shareWith: "Share with",
+    sharesRelease: (n: number) => `Shares the release and its ${n} track${plural(n)}.`,
+    otherAccount: "Shared from another account on this computer. Sign in with it to change this.",
+    sharedWith: "Shared with",
+    formerCrew: "a crew you're no longer in",
+    moveTo: ". Move it to",
+    question: "?",
+    moveHere: "Move here",
+    takeOff: (crew: string) => `Take it off ${crew}?`,
+    moveIt: "Move it?",
+    onBoard: "On the crew board",
+    onlyYou: "Only you see it",
+    seesAs: "Crew sees it as",
+    titleLabel: "Title the crew sees",
+    movedTo: " moved this song to ",
+    whileYours: " on the crew board while your move to ",
+    whichStands: " was waiting to be sent. Which one stands?",
+    keep: (stage: string) => `Keep ${stage}`,
+  },
+  {
+    privacy:
+      "Partage les sons de ton choix avec ton crew : tout le monde les voit sur le tableau du crew, dans le calendrier et dans « qui bosse sur quoi ». Pour chaque son partagé, le crew voit son titre, son étape, son BPM, sa tonalité, ses tags, ses crédits, sa date de sortie, s'il a un mixdown, si son Launch Kit est validé, et quand le projet a été enregistré pour la dernière fois. Il voit aussi le nom du crew et ton nom affiché (pas ton email, que seul le service de connexion garde). Jamais d'audio, de chemins de fichiers, de samples, de notes ni de noms de pistes. Stocké dans l'UE (Irlande).",
+    notConfigured: "Le partage en crew n'est pas activé dans cette version (aucun serveur de crew configuré).",
+    loading: "Chargement…",
+    loadFailed: (error: string) => `Impossible de charger tes crews : ${error}`,
+    tryAgain: "Réessayer",
+    yourEmail: "Ton email",
+    sending: "Envoi…",
+    sendCode: "Envoyer le code",
+    sentTo: "On a envoyé un code de connexion à",
+    expiresIn: ". Il expire dans 10 minutes.",
+    codeLabel: "Code de connexion",
+    checking: "Vérification…",
+    signIn: "Se connecter",
+    otherEmail: "Utiliser un autre email",
+    yourName: "Ton nom dans le crew (ton nom d'artiste)",
+    namePlaceholder: "ex. Milo",
+    joinTitle: "Rejoindre un crew",
+    invitePlaceholder: "CODE D'INVITATION",
+    inviteLabel: "Code d'invitation",
+    join: "Rejoindre",
+    createTitle: "Créer un crew",
+    crewName: "Nom du crew",
+    create: "Créer",
+    signOut: "Se déconnecter",
+    syncing: "Synchro…",
+    justNow: "à l'instant",
+    synced: (when: string) => `Synchronisé ${when}`,
+    refused: (n: number) => ` · ${n} son${plural(n)} refusé${plural(n)} par le serveur`,
+    notSynced: "Pas encore synchronisé",
+    owner: "Propriétaire",
+    member: "Membre",
+    syncNow: "Synchroniser maintenant",
+    youShare: "Tu partages",
+    songsShared: (n: number) => ` son${plural(n)}. Partage des sons depuis leur panneau, ou sélectionnes-en plusieurs dans la Bibliothèque.`,
+    orphans: (n: number) =>
+      n === 1
+        ? "1 son partagé n'est pas dans ta bibliothèque en ce moment (renommé, déplacé ou sur un disque débranché), donc sa carte dans le crew est figée."
+        : `${n} sons partagés ne sont pas dans ta bibliothèque en ce moment (renommés, déplacés ou sur un disque débranché), donc leurs cartes dans le crew sont figées.`,
+    stopSharingThem: (n: number) => (n === 1 ? "Ne plus le partager" : "Ne plus les partager"),
+    members: (n: number) => `Membres · ${n}`,
+    ownerTag: "· propriétaire",
+    youTag: "· toi",
+    remove: "Retirer",
+    removeConfirm: (name: string) => `Retirer ${name} ?`,
+    removeNote: "Retirer quelqu'un enlève ses sons partagés du tableau du crew.",
+    openInvites: (n: number) => `Codes d'invitation actifs · ${n}`,
+    used: (uses: number, max: number) => `${uses}/${max} utilisé${plural(uses)}`,
+    expires: (date: string) => `expire le ${date}`,
+    revoke: "Révoquer",
+    revokeConfirm: "Révoquer le code ?",
+    newInvite: "Nouveau code d'invitation",
+    copied: "Copié",
+    copy: "Copier",
+    inviteValid: "Valable 7 jours, jusqu'à 10 personnes.",
+    becomesOwner: (name: string) => ` ${name} devient propriétaire.`,
+    lastMember: " Tu es le dernier membre, donc le crew sera supprimé.",
+    leaveConfirm: (crew: string, note: string) => `Quitter ${crew} ? Tes sons partagés quittent le tableau du crew avec toi.${note}`,
+    leaveCrew: "Quitter le crew",
+    another: "Rejoindre ou créer un autre crew",
+    cancel: "Annuler",
+    maxCrews: "Tu es dans 10 crews, le maximum. Quittes-en un d'abord.",
+    tracksElsewhere: (n: number) =>
+      n === 1
+        ? "1 morceau est partagé avec un autre crew, donc il y reste."
+        : `${n} morceaux sont partagés avec un autre crew, donc ils y restent.`,
+    releaseElsewhere: "Partagée avec un autre crew ou un autre compte.",
+    releaseShared: (crew: string, shared: number, total: number) => `Partagée avec ${crew} · ${shared}/${total} morceaux`,
+    shareOthers: (n: number) => (n === 1 ? "Partager le morceau restant" : `Partager les ${n} autres morceaux`),
+    stopSharing: "Ne plus partager",
+    stopRelease: "Ne plus partager la sortie ?",
+    releaseLeft: "La sortie quitte la liste du crew. Ses morceaux restent partagés.",
+    shareWith: "Partager avec",
+    sharesRelease: (n: number) => (n === 1 ? "Partage la sortie et son morceau." : `Partage la sortie et ses ${n} morceaux.`),
+    otherAccount: "Partagé depuis un autre compte sur cet ordi. Connecte-toi avec ce compte pour changer ça.",
+    sharedWith: "Partagé avec",
+    formerCrew: "un crew dont tu ne fais plus partie",
+    moveTo: ". Le déplacer vers",
+    question: " ?",
+    moveHere: "Déplacer ici",
+    takeOff: (crew: string) => `Le retirer de ${crew} ?`,
+    moveIt: "Le déplacer ?",
+    onBoard: "Sur le tableau du crew",
+    onlyYou: "Toi seul le vois",
+    seesAs: "Le crew le voit comme",
+    titleLabel: "Titre que voit le crew",
+    movedTo: " a déplacé ce son dans ",
+    whileYours: " sur le tableau du crew pendant que ton déplacement vers ",
+    whichStands: " attendait d'être envoyé. Lequel on garde ?",
+    keep: (stage: string) => `Garder ${stage}`,
+  },
+);
+
 /** Settings → Crew: sign in, create or join a crew, invite, sync. */
 export function CrewPanel() {
   const crew = useCrewStore();
+  const t = tr(T);
   return (
     <section>
       <h2 className="flex items-center gap-2 text-sm font-semibold text-cream">
         <Users size={15} /> Crew
       </h2>
-      <p className="mt-1 text-xs text-engrave">
-        Share chosen songs with your crew: everyone sees them on the crew board, the calendar and in "who's on what". For each shared
-        song the crew sees its title, stage, BPM, key, tags, credits, release date, whether it has a mixdown, whether its Launch Kit is
-        accepted, and when the project was last saved. They also see your crew and display names (not your email, which only the
-        sign-in service keeps). Never audio, file paths, samples, notes or track names. Stored in the EU (Ireland).
-      </p>
+      <p className="mt-1 text-xs text-engrave">{t.privacy}</p>
       <div className="mt-3">
         {!crew.enabled ? (
-          <div className="text-xs text-body">Crew sharing isn't set up in this build (no crew server configured).</div>
+          <div className="text-xs text-body">{t.notConfigured}</div>
         ) : !crew.ready ? (
-          <div className="text-xs text-body">Loading…</div>
+          <div className="text-xs text-body">{t.loading}</div>
         ) : !crew.userId ? (
           <SignIn />
         ) : crew.crews.length === 0 && crew.loadError ? (
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-red-300">Couldn't load your crews: {crew.loadError}</span>
+            <span className="text-red-300">{t.loadFailed(crew.loadError)}</span>
             <button onClick={() => void crew.loadCrews().catch(() => {})} className={secondary}>
-              Try again
+              {t.tryAgain}
             </button>
           </div>
         ) : crew.crews.length === 0 ? (
@@ -77,6 +259,7 @@ function SignIn() {
   const [code, setCode] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const { busy, error, run } = useAction();
+  const t = tr(T);
 
   return (
     <div className="flex flex-col gap-2">
@@ -88,9 +271,9 @@ function SignIn() {
           }}
           className="flex gap-2"
         >
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your email" autoComplete="email" className={field} />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.yourEmail} autoComplete="email" className={field} />
           <button type="submit" disabled={busy || !/^\S+@\S+\.\S+$/.test(email.trim())} className={primary}>
-            {busy ? "Sending…" : "Send code"}
+            {busy ? t.sending : t.sendCode}
           </button>
         </form>
       ) : null}
@@ -105,7 +288,8 @@ function SignIn() {
           className="flex flex-col gap-2"
         >
           <div className="text-xs text-engrave">
-            We sent a sign-in code to <b className="text-cream">{sentTo}</b>. It expires in 10 minutes.
+            {t.sentTo} <b className="text-cream">{sentTo}</b>
+            {t.expiresIn}
           </div>
           <div className="flex gap-2">
             <input
@@ -114,15 +298,15 @@ function SignIn() {
               placeholder="123456"
               inputMode="numeric"
               autoComplete="one-time-code"
-              aria-label="Sign-in code"
+              aria-label={t.codeLabel}
               className={`${field} font-mono tracking-[0.3em]`}
             />
             <button type="submit" disabled={busy || !isCodeComplete(code)} className={primary}>
-              {busy ? "Checking…" : "Sign in"}
+              {busy ? t.checking : t.signIn}
             </button>
           </div>
           <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="self-start text-xs text-engrave hover:text-cream">
-            Use another email
+            {t.otherEmail}
           </button>
         </form>
       )}
@@ -149,6 +333,7 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
   const [code, setCode] = useState("");
   const { busy, error, run } = useAction();
   const done = (ok: boolean) => ok && onDone?.();
+  const t = tr(T);
 
   return (
     <div className="flex flex-col gap-3">
@@ -159,12 +344,12 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
         </div>
       )}
       <label className="text-xs text-engrave">
-        Your name in the crew (your artist name)
+        {t.yourName}
         <input
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           maxLength={DISPLAY_NAME_MAX}
-          placeholder="e.g. Milo"
+          placeholder={t.namePlaceholder}
           className={`${field} mt-1`}
         />
       </label>
@@ -176,16 +361,16 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
           }}
           className="flex flex-col gap-2 rounded-md border border-rule p-3"
         >
-          <span className="text-xs font-medium text-body">Join a crew</span>
+          <span className="text-xs font-medium text-body">{t.joinTitle}</span>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
-            placeholder="INVITE CODE"
-            aria-label="Invite code"
+            placeholder={t.invitePlaceholder}
+            aria-label={t.inviteLabel}
             className={`${field} font-mono tracking-widest`}
           />
           <button type="submit" disabled={busy || code.length !== 8 || !displayName.trim()} className={primary}>
-            Join
+            {t.join}
           </button>
         </form>
         <form
@@ -195,17 +380,17 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
           }}
           className="flex flex-col gap-2 rounded-md border border-rule p-3"
         >
-          <span className="text-xs font-medium text-body">Create a crew</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={CREW_NAME_MAX} placeholder="Crew name" aria-label="Crew name" className={field} />
+          <span className="text-xs font-medium text-body">{t.createTitle}</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={CREW_NAME_MAX} placeholder={t.crewName} aria-label={t.crewName} className={field} />
           <button type="submit" disabled={busy || !name.trim() || !displayName.trim()} className={secondary}>
-            Create
+            {t.create}
           </button>
         </form>
       </div>
       {error && <div className="text-xs text-red-300">{error}</div>}
       {!another && (
         <button onClick={() => void signOut()} className="self-start text-xs text-engrave hover:text-cream">
-          Sign out
+          {t.signOut}
         </button>
       )}
     </div>
@@ -248,16 +433,18 @@ export function CrewStatus() {
   const active = useActiveCrew();
   const { busy, error, run } = useAction();
   if (!active) return null;
+  const t = tr(T);
 
+  // Within the day, formatRelative says "today" (in the app's language): say "just now".
   const syncLine =
     crew.sync.kind === "syncing"
-      ? "Syncing…"
+      ? t.syncing
       : crew.sync.kind === "synced"
-        ? `Synced ${formatRelative(crew.sync.atMs) === "today" ? "just now" : formatRelative(crew.sync.atMs)}` +
-          (crew.sync.skipped ? ` · ${crew.sync.skipped} song${crew.sync.skipped === 1 ? "" : "s"} refused by the server` : "")
+        ? t.synced(formatRelative(crew.sync.atMs) === formatRelative(Date.now()) ? t.justNow : formatRelative(crew.sync.atMs)) +
+          (crew.sync.skipped ? t.refused(crew.sync.skipped) : "")
         : crew.sync.kind === "error"
           ? crew.sync.message
-          : "Not synced yet";
+          : t.notSynced;
 
   return (
     <div className="flex flex-col gap-3">
@@ -273,9 +460,9 @@ export function CrewStatus() {
         ) : (
           <span className="text-sm font-medium text-cream">{active.name}</span>
         )}
-        <span className="rounded bg-rule px-1.5 py-px text-[10px] text-engrave">{active.role === "owner" ? "Owner" : "Member"}</span>
+        <span className="rounded bg-rule px-1.5 py-px text-[10px] text-engrave">{active.role === "owner" ? t.owner : t.member}</span>
         <span className={`ml-auto text-xs ${crew.sync.kind === "error" ? "text-red-300" : "text-body"}`}>{syncLine}</span>
-        <button onClick={() => void run(crew.syncNow)} disabled={busy || demoMode} title="Sync now" className="rounded p-1 text-body hover:bg-rule hover:text-cream disabled:opacity-40">
+        <button onClick={() => void run(crew.syncNow)} disabled={busy || demoMode} title={t.syncNow} className="rounded p-1 text-body hover:bg-rule hover:text-cream disabled:opacity-40">
           <RefreshCw size={13} className={crew.sync.kind === "syncing" ? "animate-spin" : ""} />
         </button>
       </div>
@@ -285,17 +472,14 @@ export function CrewStatus() {
         </div>
       )}
       <div className="text-xs text-engrave">
-        You share <b className="text-cream">{sharedCount}</b> song{sharedCount === 1 ? "" : "s"}. Share songs from their panel, or select
-        several in the Library.
+        {t.youShare} <b className="text-cream">{sharedCount}</b>
+        {t.songsShared(sharedCount)}
       </div>
       {orphans.length > 0 && (
         <div className="flex items-center gap-3 rounded-md border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-          <span className="flex-1">
-            {orphans.length} shared song{orphans.length === 1 ? " isn't" : "s aren't"} in your library right now (renamed, moved or on an
-            unplugged drive), so {orphans.length === 1 ? "its" : "their"} crew card is frozen.
-          </span>
+          <span className="flex-1">{t.orphans(orphans.length)}</span>
           <button onClick={() => crew.setShared(orphans, false)} className="shrink-0 underline hover:text-cream">
-            Stop sharing {orphans.length === 1 ? "it" : "them"}
+            {t.stopSharingThem(orphans.length)}
           </button>
         </div>
       )}
@@ -311,19 +495,20 @@ export function CrewMembers() {
   const { busy, error, run } = useAction();
   if (!active) return null;
   const isOwner = active.role === "owner";
+  const t = tr(T);
   return (
     <div>
-      <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">Members · {crew.members.length}</div>
+      <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">{t.members(crew.members.length)}</div>
       <div className="flex flex-wrap gap-1.5">
         {crew.members.map((m) => (
           <span key={m.user_id} className="flex items-center rounded-full bg-raised px-2.5 py-1 text-xs text-body">
             {m.display_name}
-            {m.role === "owner" && <span className="ml-1 text-engrave">· owner</span>}
-            {m.user_id === crew.userId && <span className="ml-1 text-engrave">· you</span>}
+            {m.role === "owner" && <span className="ml-1 text-engrave">{t.ownerTag}</span>}
+            {m.user_id === crew.userId && <span className="ml-1 text-engrave">{t.youTag}</span>}
             {isOwner && m.user_id !== crew.userId && (
               <ConfirmButton
-                label="Remove"
-                confirmLabel={`Remove ${m.display_name}?`}
+                label={t.remove}
+                confirmLabel={t.removeConfirm(m.display_name)}
                 onConfirm={() => void run(() => crew.removeMember(m.user_id))}
                 disabled={busy}
                 className="ml-2 rounded-full border border-transparent px-1.5 text-[11px] text-engrave hover:text-cream disabled:opacity-40"
@@ -332,9 +517,7 @@ export function CrewMembers() {
           </span>
         ))}
       </div>
-      {isOwner && crew.members.length > 1 && (
-        <div className="mt-1 text-[11px] text-engrave">Removing someone takes their shared songs off the crew board.</div>
-      )}
+      {isOwner && crew.members.length > 1 && <div className="mt-1 text-[11px] text-engrave">{t.removeNote}</div>}
       {error && <div className="mt-1 text-xs text-red-300">{error}</div>}
     </div>
   );
@@ -352,22 +535,21 @@ export function CrewInvites() {
     if (isOwner) void loadInvites().catch(() => {});
   }, [isOwner, active?.id, loadInvites]);
   if (!active || !isOwner) return null;
+  const t = tr(T);
   return (
     <div className="flex flex-col gap-3">
       {crew.invites.length > 0 && (
         <div>
-          <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">Open invite codes · {crew.invites.length}</div>
+          <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">{t.openInvites(crew.invites.length)}</div>
           <div className="flex flex-col gap-1">
             {crew.invites.map((i) => (
               <div key={i.code} className="flex items-center gap-3 text-xs text-body">
                 <code className="font-mono tracking-widest text-cream">{i.code}</code>
-                <span>
-                  {i.uses}/{i.max_uses} used
-                </span>
-                <span>expires {new Date(i.expires_at).toLocaleDateString()}</span>
+                <span>{t.used(i.uses, i.max_uses)}</span>
+                <span>{t.expires(new Date(i.expires_at).toLocaleDateString(locale()))}</span>
                 <ConfirmButton
-                  label="Revoke"
-                  confirmLabel="Revoke code?"
+                  label={t.revoke}
+                  confirmLabel={t.revokeConfirm}
                   onConfirm={() => void run(() => crew.revokeInvite(i.code))}
                   disabled={busy}
                   className="ml-auto rounded border border-transparent px-1.5 py-0.5 text-engrave hover:text-cream disabled:opacity-40"
@@ -379,7 +561,7 @@ export function CrewInvites() {
       )}
       <div className="flex items-center gap-2">
         <button onClick={() => void run(crew.createInvite)} disabled={busy} className={secondary}>
-          New invite code
+          {t.newInvite}
         </button>
         {crew.invite && (
           <>
@@ -388,9 +570,9 @@ export function CrewInvites() {
               onClick={() => void navigator.clipboard?.writeText(crew.invite!).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1200)))}
               className="flex items-center gap-1 text-xs text-engrave hover:text-cream"
             >
-              {copied ? <Check size={12} /> : <ClipboardCopy size={12} />} {copied ? "Copied" : "Copy"}
+              {copied ? <Check size={12} /> : <ClipboardCopy size={12} />} {copied ? t.copied : t.copy}
             </button>
-            <span className="text-[11px] text-engrave">Valid 7 days, up to 10 people.</span>
+            <span className="text-[11px] text-engrave">{t.inviteValid}</span>
           </>
         )}
       </div>
@@ -405,21 +587,22 @@ export function LeaveCrewButton({ className = "hover:text-cream" }: { className?
   const active = useActiveCrew();
   const { run } = useAction();
   if (!active) return null;
+  const t = tr(T);
   return (
     <button
       onClick={() => {
         const others = crew.members.filter((m) => m.user_id !== crew.userId);
         const note =
           active.role === "owner" && others.length
-            ? ` ${others[0].display_name} becomes the owner.`
+            ? t.becomesOwner(others[0].display_name)
             : !others.length
-              ? " You're the last member, so the crew is deleted."
+              ? t.lastMember
               : "";
-        if (window.confirm(`Leave ${active.name}? Your shared songs leave the crew board with you.${note}`)) void run(crew.leaveCrew);
+        if (window.confirm(t.leaveConfirm(active.name, note))) void run(crew.leaveCrew);
       }}
       className={className}
     >
-      Leave crew
+      {t.leaveCrew}
     </button>
   );
 }
@@ -428,14 +611,15 @@ export function LeaveCrewButton({ className = "hover:text-cream" }: { className?
 export function CrewAccount() {
   const crew = useCrewStore();
   const [adding, setAdding] = useState(false);
+  const t = tr(T);
   return (
     <div className="flex flex-col gap-3">
       {adding ? (
         <div className="rounded-md border border-rule p-3">
           <div className="mb-2 flex items-center text-xs font-medium text-body">
-            Join or create another crew
+            {t.another}
             <button onClick={() => setAdding(false)} className="ml-auto text-engrave hover:text-cream">
-              Cancel
+              {t.cancel}
             </button>
           </div>
           <CreateOrJoin another onDone={() => setAdding(false)} />
@@ -444,17 +628,17 @@ export function CrewAccount() {
         <button
           onClick={() => setAdding(true)}
           disabled={crew.crews.length >= MAX_CREWS}
-          title={crew.crews.length >= MAX_CREWS ? "You're in 10 crews, the most allowed. Leave one first." : undefined}
+          title={crew.crews.length >= MAX_CREWS ? t.maxCrews : undefined}
           className="self-start text-xs text-engrave hover:text-cream disabled:opacity-40"
         >
-          + Join or create another crew
+          + {t.another}
         </button>
       )}
       <div className="flex gap-3 text-xs text-engrave">
         <span>{crew.email}</span>
         <LeaveCrewButton />
         <button onClick={() => void crew.signOut()} className="flex items-center gap-1 hover:text-cream">
-          <LogOut size={11} /> Sign out
+          <LogOut size={11} /> {t.signOut}
         </button>
       </div>
     </div>
@@ -482,40 +666,40 @@ export function ReleaseShare({ albumId }: { albumId: string }) {
   const [note, setNote] = useState<string | null>(null);
   const album = workspace.albums.find((a) => a.id === albumId);
   if (!can || !crewId || !userId || !album) return null;
+  const t = tr(T);
   const scope = { crewId, userId };
   const here = releaseSharedHere(album, scope);
   const elsewhere = !!album.shared && !!album.shareId && !here;
   const missing = unsharedTracks(album, workspace, scope);
-  const say = (skipped: number) =>
-    setNote(skipped ? `${skipped} track${skipped === 1 ? " is" : "s are"} shared with another crew, so ${skipped === 1 ? "it stays" : "they stay"} there.` : null);
+  const say = (skipped: number) => setNote(skipped ? t.tracksElsewhere(skipped) : null);
 
-  if (elsewhere) return <div className="mt-3 text-xs text-engrave">Shared with another crew or account.</div>;
+  if (elsewhere) return <div className="mt-3 text-xs text-engrave">{t.releaseElsewhere}</div>;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
       {here ? (
         <>
           <span className="flex items-center gap-1.5 text-body">
             <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
-            Shared with {crewName} · {album.trackPaths.length - missing.length}/{album.trackPaths.length} tracks
+            {t.releaseShared(crewName ?? "", album.trackPaths.length - missing.length, album.trackPaths.length)}
           </span>
           {missing.length > 0 && (
             <button onClick={() => say(setShared(missing, true))} className="underline hover:text-cream">
-              Share the {missing.length} other track{missing.length === 1 ? "" : "s"}
+              {t.shareOthers(missing.length)}
             </button>
           )}
           <ConfirmButton
-            label="Stop sharing"
-            confirmLabel="Stop sharing the release?"
-            onConfirm={() => (shareRelease(album.id, false), setNote("The release leaves the crew's list. Its tracks stay shared."))}
+            label={t.stopSharing}
+            confirmLabel={t.stopRelease}
+            onConfirm={() => (shareRelease(album.id, false), setNote(t.releaseLeft))}
             className="rounded border border-transparent px-1 text-engrave hover:text-cream"
           />
         </>
       ) : (
         <button onClick={() => say(shareRelease(album.id, true))} className={secondary}>
-          Share with {crewName}
+          {t.shareWith} {crewName}
         </button>
       )}
-      {!here && album.trackPaths.length > 0 && <span className="text-engrave">Shares the release and its {album.trackPaths.length} track{album.trackPaths.length === 1 ? "" : "s"}.</span>}
+      {!here && album.trackPaths.length > 0 && <span className="text-engrave">{t.sharesRelease(album.trackPaths.length)}</span>}
       {note && <span className="basis-full text-engrave">{note}</span>}
     </div>
   );
@@ -534,6 +718,7 @@ export function ShareToggle({ path }: { path: string }) {
   const moveShares = useCrewStore((s) => s.moveShares);
   const { busy, error, run } = useAction();
   if (!can || !crewId || !userId) return null;
+  const t = tr(T);
   const scope = { crewId, userId };
   const shared = sharedHere(meta, scope);
   const elsewhere = shareElsewhere(meta, scope);
@@ -548,18 +733,19 @@ export function ShareToggle({ path }: { path: string }) {
           <Users size={13} className="text-body" />
           <span className="flex-1 text-body">
             {!elsewhere.mine ? (
-              "Shared from another account on this computer. Sign in with it to change this."
+              t.otherAccount
             ) : (
               <>
-                Shared with <b className="font-medium text-cream">{other ?? "a crew you're no longer in"}</b>. Move it to{" "}
-                <b className="font-medium text-cream">{crewName}</b>?
+                {t.sharedWith} <b className="font-medium text-cream">{other ?? t.formerCrew}</b>
+                {t.moveTo} <b className="font-medium text-cream">{crewName}</b>
+                {t.question}
               </>
             )}
           </span>
           {elsewhere.mine && (
             <ConfirmButton
-              label="Move here"
-              confirmLabel={other ? `Take it off ${other}?` : "Move it?"}
+              label={t.moveHere}
+              confirmLabel={other ? t.takeOff(other) : t.moveIt}
               onConfirm={() => void run(() => moveShares([path]))}
               disabled={busy}
               className="shrink-0 rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised disabled:opacity-40"
@@ -585,19 +771,19 @@ export function ShareToggle({ path }: { path: string }) {
         />
         <Users size={13} className="text-body" />
         <span className="flex-1 text-body">
-          Share with <b className="font-medium text-cream">{crewName}</b>
+          {t.shareWith} <b className="font-medium text-cream">{crewName}</b>
         </span>
-        <span className={error ? "text-red-300" : "text-engrave"}>{error ?? (shared ? "On the crew board" : "Only you see it")}</span>
+        <span className={error ? "text-red-300" : "text-engrave"}>{error ?? (shared ? t.onBoard : t.onlyYou)}</span>
       </label>
       {shared && (
         <label className="flex items-center gap-2 border-t border-rule px-3 py-2 text-engrave">
-          <span className="shrink-0">Crew sees it as</span>
+          <span className="shrink-0">{t.seesAs}</span>
           <input
             key={meta?.shareTitle ?? ""}
             defaultValue={meta?.shareTitle ?? ""}
             placeholder={sharedTitle(projectName)}
             maxLength={200}
-            aria-label="Title the crew sees"
+            aria-label={t.titleLabel}
             onBlur={(e) => {
               const v = e.target.value.trim();
               if (v !== (meta?.shareTitle ?? "")) updateSong(path, { shareTitle: v || undefined });
@@ -618,21 +804,26 @@ export function StageConflictBanner({ path }: { path: string }) {
   const members = useCrewStore((s) => s.members);
   const resolve = useCrewStore((s) => s.resolveStageConflict);
   if (!conflict) return null;
-  const who = members.find((m) => m.user_id === conflict.by)?.display_name ?? "A crewmate";
+  const t = tr(T);
+  const who = members.find((m) => m.user_id === conflict.by)?.display_name ?? crewText("someone");
   const theirs = statusInfo(conflict.theirs ?? undefined).label;
   const mine = statusInfo(conflict.mine ?? undefined).label;
   return (
     <div role="alert" className="mt-3 flex flex-col gap-2 rounded-md border border-amber-400/30 bg-amber-500/[0.07] px-3 py-2 text-xs text-amber-100">
       <span>
-        <b className="font-semibold">{who}</b> moved this song to <b className="font-semibold">{theirs}</b> on the crew board while your move
-        to <b className="font-semibold">{mine}</b> was waiting to be sent. Which one stands?
+        <b className="font-semibold">{who}</b>
+        {t.movedTo}
+        <b className="font-semibold">{theirs}</b>
+        {t.whileYours}
+        <b className="font-semibold">{mine}</b>
+        {t.whichStands}
       </span>
       <div className="flex gap-2">
         <button onClick={() => resolve(path, "theirs")} className="rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised">
-          Keep {theirs}
+          {t.keep(theirs)}
         </button>
         <button onClick={() => resolve(path, "mine")} className="rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised">
-          Keep {mine}
+          {t.keep(mine)}
         </button>
       </div>
     </div>

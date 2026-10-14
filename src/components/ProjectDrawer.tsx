@@ -30,8 +30,168 @@ import { FilesPanel } from "./FilesPanel";
 import { canRenderInApp, dawOf } from "../lib/daws";
 import { ConfirmButton, StatusSelect, TagEditor, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { Fact, Section } from "../ui";
+import { dict, tr } from "../i18n";
 
 const KEEP_BACKUPS = 5;
+
+const T = dict(
+  {
+    couldntOpen: (err: string) => `Couldn't open it: ${err}`,
+    openIn: (daw: string) => `Open in ${daw}`,
+    reveal: "Reveal",
+    launchKitTitle: "Metadata, snippets, release date, captions",
+    renderDone: "Render finished: see the panel at the bottom.",
+    renderTitle: "Render a mixdown with FL Studio",
+    renderFlOnly: (tip: string) => `Rendering from the app works with FL Studio. ${tip}`,
+    render: "Render",
+    packageTitle: "Zip the project with every sample it uses — FL opens it directly. For sharing, collabs or archiving.",
+    packageNext: "Check the files to include in the panel at the bottom, then write the package.",
+    package: "Package",
+    archiveTitle: "Hide from the library, board and stats. Nothing on disk changes.",
+    archive: "Archive",
+    readError: (err: string) =>
+      `Couldn't read inside this project: ${err}. It's still tracked; tempo, samples and plugins are missing.`,
+    archivedNote: "Archived — hidden from the library, board and stats.",
+    unarchive: "Unarchive",
+    stage: "Stage",
+    key: "Key",
+    notSet: "Not set",
+    keyFromTrack: "Found in a mixer track name",
+    useKey: (k: string) => `Use ${k}?`,
+    releases: "Releases",
+    addToRelease: "Add to release",
+    noReleases: "No releases yet",
+    tags: "Tags",
+    notes: "Notes",
+    notesPlaceholder: "Ideas, lyrics, what's left to do…",
+    project: "Project",
+    tempo: "Tempo",
+    timeSig: "Time sig",
+    lastSaved: "Last saved",
+    dawVersion: (daw: string) => `${daw} version`,
+    recordings: "Recordings",
+    none: "none",
+    projectFile: "Project file",
+    credits: "Credits",
+    sentTo: (n: number) => `Sent to · ${n}`,
+    files: "Files",
+    mixdown: "Mixdown",
+    upToDate: "Up to date",
+    olderThanProject: "Older than project",
+    rendered: (when: string, size: string) => `Rendered ${when} · ${size}`,
+    otherBounces: (n: number) => `+${n} other bounce${n > 1 ? "s" : ""} in the folder`,
+    noMixdown: "No mixdown yet — render it, or bounce it from FL next to the project.",
+    versions: (n: number, size: string) => `Versions · ${n} backups · ${size}`,
+    saveVersion: "Save as new version",
+    created: (name: string) => `Created ${name}`,
+    create: "Create",
+    restoreTitle: "Restore as a new file next to the project (the current version is untouched)",
+    restoredAs: (name: string) => `Restored as ${name}`,
+    restore: "Restore",
+    showAll: (n: number) => `Show all ${n}`,
+    cleanUp: (n: number, size: string) => `Clean up ${n} older backups (${size})`,
+    confirmTrash: (n: number, trash: string) => `Move ${n} to ${trash}? Click again`,
+    nothingDeleted: "Nothing deleted yet: read the warning below.",
+    movedToTrash: (n: number, trash: string) => `Moved ${n} backups to the ${trash}`,
+    riskyAll: "These backups are",
+    riskySome: (n: number) => `${n} of these backups are`,
+    riskyRest: (trash: string) => ` on a removable or network drive, which has no ${trash}: they would be `,
+    deletedPermanently: "deleted permanently",
+    deleted: (n: number) => `Deleted ${n} backups`,
+    deletePermanently: "Delete permanently",
+    keepThem: "Keep them",
+    keepsRecent: (n: number) => `Keeps the ${n} most recent.`,
+    plugins: (n: number) => `Plugins · ${n}`,
+    notInstalled: (names: string) => `Not installed on this computer: ${names}`,
+    noneFound: "None found",
+    samples: (n: number) => `Samples · ${n}`,
+    found: (n: number) => `${n} found`,
+    movedTitle:
+      "Not at the stored path, but a file with the same name is in this song's folder — the project was moved. FL can usually find these.",
+    moved: (n: number) => `${n} moved`,
+    missing: (n: number) => `${n} missing`,
+    toggleProblems: (open: boolean, n: number) => `${open ? "Hide" : "Show"} ${n} not at their stored path`,
+  },
+  {
+    couldntOpen: (err: string) => `Impossible de l'ouvrir : ${err}`,
+    openIn: (daw: string) => `Ouvrir dans ${daw}`,
+    reveal: "Afficher",
+    launchKitTitle: "Métadonnées, extraits, date de sortie, textes",
+    renderDone: "Rendu terminé : regarde le panneau en bas.",
+    renderTitle: "Faire le rendu d'un mixdown avec FL Studio",
+    renderFlOnly: (tip: string) => `Le rendu depuis l'app marche avec FL Studio. ${tip}`,
+    render: "Faire le rendu",
+    packageTitle:
+      "Zippe le projet avec tous les samples qu'il utilise — FL l'ouvre direct. Pour partager, collaborer ou archiver.",
+    packageNext: "Vérifie les fichiers à inclure dans le panneau en bas, puis écris le pack zip.",
+    package: "Pack zip",
+    archiveTitle: "Cacher de la bibliothèque, du tableau et des stats. Rien ne change sur le disque.",
+    archive: "Archiver",
+    readError: (err: string) =>
+      `Impossible de lire l'intérieur de ce projet : ${err}. Il reste suivi ; il manque le tempo, les samples et les plugins.`,
+    archivedNote: "Archivé — caché de la bibliothèque, du tableau et des stats.",
+    unarchive: "Désarchiver",
+    stage: "Étape",
+    key: "Tonalité",
+    notSet: "Pas définie",
+    keyFromTrack: "Trouvée dans un nom de piste du mixer",
+    useKey: (k: string) => `Utiliser ${k} ?`,
+    releases: "Sorties",
+    addToRelease: "Ajouter à une sortie",
+    noReleases: "Pas encore de sortie",
+    tags: "Tags",
+    notes: "Notes",
+    notesPlaceholder: "Idées, paroles, ce qu'il reste à faire…",
+    project: "Projet",
+    tempo: "Tempo",
+    timeSig: "Signature",
+    lastSaved: "Dernière sauvegarde",
+    dawVersion: (daw: string) => `Version de ${daw}`,
+    recordings: "Enregistrements",
+    none: "aucun",
+    projectFile: "Fichier projet",
+    credits: "Crédits",
+    sentTo: (n: number) => `Envoyé à · ${n}`,
+    files: "Fichiers",
+    mixdown: "Mixdown",
+    upToDate: "À jour",
+    olderThanProject: "Plus ancien que le projet",
+    rendered: (when: string, size: string) => `Rendu le ${when} · ${size}`,
+    otherBounces: (n: number) => `+${n} autre${n > 1 ? "s" : ""} bounce${n > 1 ? "s" : ""} dans le dossier`,
+    noMixdown: "Pas encore de mixdown — fais le rendu, ou bounce-le depuis FL à côté du projet.",
+    versions: (n: number, size: string) => `Versions · ${n} sauvegardes · ${size}`,
+    saveVersion: "Enregistrer une nouvelle version",
+    created: (name: string) => `${name} créé`,
+    create: "Créer",
+    restoreTitle: "Restaurer dans un nouveau fichier à côté du projet (la version actuelle ne bouge pas)",
+    restoredAs: (name: string) => `Restauré sous ${name}`,
+    restore: "Restaurer",
+    showAll: (n: number) => `Tout afficher (${n})`,
+    cleanUp: (n: number, size: string) => `Nettoyer ${n} anciennes sauvegardes (${size})`,
+    confirmTrash: (n: number, trash: string) => `Mettre ${n} à la ${trash} ? Clique encore`,
+    nothingDeleted: "Rien n'est supprimé pour l'instant : lis l'avertissement en dessous.",
+    movedToTrash: (n: number, trash: string) => `${n} sauvegardes mises à la ${trash}`,
+    riskyAll: "Ces sauvegardes sont",
+    riskySome: (n: number) => `${n} de ces sauvegardes sont`,
+    riskyRest: (trash: string) => ` sur un disque amovible ou réseau, qui n'a pas de ${trash} : elles seraient `,
+    deletedPermanently: "supprimées définitivement",
+    deleted: (n: number) => `${n} sauvegardes supprimées`,
+    deletePermanently: "Supprimer définitivement",
+    keepThem: "Les garder",
+    keepsRecent: (n: number) => `Garde les ${n} plus récentes.`,
+    plugins: (n: number) => `Plugins · ${n}`,
+    notInstalled: (names: string) => `Pas installés sur cet ordi : ${names}`,
+    noneFound: "Aucun trouvé",
+    samples: (n: number) => `Samples · ${n}`,
+    found: (n: number) => `${n} trouvé${n > 1 ? "s" : ""}`,
+    movedTitle:
+      "Pas au chemin enregistré, mais un fichier du même nom est dans le dossier de ce son — le projet a été déplacé. FL les retrouve en général.",
+    moved: (n: number) => `${n} déplacé${n > 1 ? "s" : ""}`,
+    missing: (n: number) => `${n} manquant${n > 1 ? "s" : ""}`,
+    toggleProblems: (open: boolean, n: number) =>
+      `${open ? "Masquer" : "Afficher"} les ${n} qui ne sont pas à leur chemin enregistré`,
+  },
+);
 
 export function ProjectDrawer() {
   const detailPath = useAppStore((s) => s.detailPath);
@@ -90,6 +250,7 @@ export function ProjectDrawer() {
   }
 
   const fileName = (p: string) => p.split(/[/\\]/).pop() ?? p;
+  const t = tr(T);
 
   return (
     <aside className="flex w-[380px] shrink-0 flex-col border-l border-rule bg-panel">
@@ -113,44 +274,44 @@ export function ProjectDrawer() {
       <div className="flex-1 overflow-auto px-5 py-4">
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => openInFlStudio(project.path).catch((e) => setMessage({ kind: "error", text: `Couldn't open it: ${e instanceof Error ? e.message : String(e)}` }))}
+            onClick={() => openInFlStudio(project.path).catch((e) => setMessage({ kind: "error", text: t.couldntOpen(e instanceof Error ? e.message : String(e)) }))}
             disabled={demoMode}
             className={btnPrimary}
           >
-            <PlayCircle size={14} /> Open in {dawOf(project).short === "FL" ? "FL" : dawOf(project).label}
+            <PlayCircle size={14} /> {t.openIn(dawOf(project).short === "FL" ? "FL" : dawOf(project).label)}
           </button>
           <button onClick={() => revealInFileManager(project.path)} disabled={demoMode} className={btn}>
-            <FolderOpen size={14} /> Reveal
+            <FolderOpen size={14} /> {t.reveal}
           </button>
-          <button onClick={() => openLaunchKit(project.path)} className={btn} title="Metadata, snippets, release date, captions">
+          <button onClick={() => openLaunchKit(project.path)} className={btn} title={t.launchKitTitle}>
             <Rocket size={14} /> Launch Kit
           </button>
           <button
-            onClick={() => run(async () => (await startRender([project.path]), ""), () => "Render finished: see the panel at the bottom.")}
+            onClick={() => run(async () => (await startRender([project.path]), ""), () => t.renderDone)}
             disabled={demoMode || rendering || !canRenderInApp(project)}
-            title={canRenderInApp(project) ? "Render a mixdown with FL Studio" : `Rendering from the app works with FL Studio. ${dawOf(project).exportTip}`}
+            title={canRenderInApp(project) ? t.renderTitle : t.renderFlOnly(dawOf(project).exportTip)}
             className={btn}
           >
-            <Download size={14} /> Render
+            <Download size={14} /> {t.render}
           </button>
           <button
-            title="Zip the project with every sample it uses — FL opens it directly. For sharing, collabs or archiving."
-            onClick={() => run(async () => (await startPackage([project.path]), ""), () => "Check the files to include in the panel at the bottom, then write the package.")}
+            title={t.packageTitle}
+            onClick={() => run(async () => (await startPackage([project.path]), ""), () => t.packageNext)}
             disabled={demoMode || packaging || !canRenderInApp(project)}
             className={btn}
           >
-            <Package size={14} /> Package
+            <Package size={14} /> {t.package}
           </button>
           {!meta.archived && (
             <button
-              title="Hide from the library, board and stats. Nothing on disk changes."
+              title={t.archiveTitle}
               onClick={() => {
                 updateSong(project.path, { archived: true });
                 openDetail(null);
               }}
               className={btn}
             >
-              <Archive size={14} /> Archive
+              <Archive size={14} /> {t.archive}
             </button>
           )}
         </div>
@@ -158,7 +319,7 @@ export function ProjectDrawer() {
         <StageConflictBanner path={project.path} />
         {project.readError && (
           <div className="mt-3 rounded-md border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-200/80">
-            Couldn't read inside this project: {project.readError}. It's still tracked; tempo, samples and plugins are missing.
+            {t.readError(project.readError)}
           </div>
         )}
 
@@ -176,27 +337,27 @@ export function ProjectDrawer() {
 
         {meta.archived && (
           <div className="mt-3 flex items-center justify-between rounded-md border border-rule bg-panel px-3 py-2 text-xs text-body">
-            Archived — hidden from the library, board and stats.
+            {t.archivedNote}
             <button onClick={() => updateSong(project.path, { archived: false })} className="text-cream hover:underline">
-              Unarchive
+              {t.unarchive}
             </button>
           </div>
         )}
 
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div>
-            <div className={`${sectionLabel} mb-2`}>Stage</div>
+            <div className={`${sectionLabel} mb-2`}>{t.stage}</div>
             <StatusSelect value={meta.status} onChange={(status) => updateSong(project.path, { status })} />
           </div>
           <div>
-            <div className={`${sectionLabel} mb-2`}>Key</div>
+            <div className={`${sectionLabel} mb-2`}>{t.key}</div>
             <select
               value={meta.key ?? ""}
               onChange={(e) => updateSong(project.path, { key: e.target.value || undefined })}
               className="rounded-full border border-rule bg-panel px-2.5 py-1 text-xs text-body hover:bg-raised"
             >
               <option value="" className="bg-raised">
-                Not set
+                {t.notSet}
               </option>
               {KEYS.map((k) => (
                 <option key={k} value={k} className="bg-raised">
@@ -207,16 +368,16 @@ export function ProjectDrawer() {
             {!meta.key && detectedKey && (
               <button
                 onClick={() => updateSong(project.path, { key: detectedKey })}
-                title="Found in a mixer track name"
+                title={t.keyFromTrack}
                 className="ml-1.5 rounded-full border border-dashed border-rule-strong px-2 py-0.5 text-[11px] text-body hover:text-cream"
               >
-                Use {detectedKey}?
+                {t.useKey(detectedKey)}
               </button>
             )}
           </div>
         </div>
 
-        <Section label="Releases">
+        <Section label={t.releases}>
           <div className="flex flex-wrap items-center gap-1.5">
             {albums.map((a) => (
               <span key={a.id} className="flex items-center gap-1.5 rounded-full bg-raised py-0.5 pl-1 pr-2 text-xs text-cream">
@@ -231,7 +392,7 @@ export function ProjectDrawer() {
             ))}
             {otherAlbums.length > 0 && (
               <label className="relative flex cursor-pointer items-center gap-1 rounded-full border border-dashed border-rule-strong px-2 py-0.5 text-[11px] text-engrave hover:text-body">
-                <Plus size={11} /> Add to release
+                <Plus size={11} /> {t.addToRelease}
                 <select
                   value=""
                   onChange={(e) => e.target.value && addTracks(e.target.value, [project.path])}
@@ -246,11 +407,11 @@ export function ProjectDrawer() {
                 </select>
               </label>
             )}
-            {workspace.albums.length === 0 && <span className="text-xs text-engrave">No releases yet</span>}
+            {workspace.albums.length === 0 && <span className="text-xs text-engrave">{t.noReleases}</span>}
           </div>
         </Section>
 
-        <Section label="Tags">
+        <Section label={t.tags}>
           <TagEditor
             tags={meta.tags ?? []}
             suggestions={allTags}
@@ -258,51 +419,51 @@ export function ProjectDrawer() {
           />
         </Section>
 
-        <Section label="Notes">
+        <Section label={t.notes}>
           <textarea
             value={meta.notes ?? ""}
             onChange={(e) => updateSong(project.path, { notes: e.target.value })}
-            placeholder="Ideas, lyrics, what's left to do…"
+            placeholder={t.notesPlaceholder}
             rows={4}
             className={`${input} resize-y text-xs leading-relaxed`}
           />
         </Section>
 
-        <Section label="Project">
+        <Section label={t.project}>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-            <Fact label="Tempo" value={project.tempoBpm ? `${formatBpm(project.tempoBpm)} BPM` : "—"} />
+            <Fact label={t.tempo} value={project.tempoBpm ? `${formatBpm(project.tempoBpm)} BPM` : "—"} />
             <Fact
-              label="Time sig"
+              label={t.timeSig}
               value={project.timeSigNum ? `${project.timeSigNum}/${project.timeSigDenom}` : "—"}
             />
-            <Fact label="Last saved" value={formatDateTime(project.modifiedAtMs)} />
+            <Fact label={t.lastSaved} value={formatDateTime(project.modifiedAtMs)} />
             <Fact
-              label={`${dawOf(project).label} version`}
+              label={t.dawVersion(dawOf(project).label)}
               value={(project.flVersion?.split(".").slice(0, 3).join(".") ?? project.dawVersion?.replace(/^(Ableton Live|Studio One|REAPER)\s*/i, "")) || "—"}
             />
             <Fact
-              label="Recordings"
-              value={project.recordingsCount ? `${project.recordingsCount} · ${formatBytes(project.recordingsBytes)}` : "none"}
+              label={t.recordings}
+              value={project.recordingsCount ? `${project.recordingsCount} · ${formatBytes(project.recordingsBytes)}` : t.none}
             />
-            <Fact label="Project file" value={formatBytes(project.sizeBytes)} />
+            <Fact label={t.projectFile} value={formatBytes(project.sizeBytes)} />
           </dl>
         </Section>
 
-        <Section label="Credits">
+        <Section label={t.credits}>
           <SongCredits project={project} />
         </Section>
 
-        <Section label={`Sent to · ${meta.pitches?.length ?? 0}`}>
+        <Section label={t.sentTo(meta.pitches?.length ?? 0)}>
           <SongPitches project={project} />
         </Section>
 
         <PluginsAndSamples project={project} />
 
-        <Section label="Files">
+        <Section label={t.files}>
           <FilesPanel project={project} />
         </Section>
 
-        <Section label="Mixdown">
+        <Section label={t.mixdown}>
           {latestRender ? (
             <div className="rounded-lg border border-rule bg-panel p-3">
               <div className="flex items-center gap-2 text-xs">
@@ -310,35 +471,35 @@ export function ProjectDrawer() {
                 <span className="min-w-0 flex-1 truncate text-cream">{fileName(latestRender.path)}</span>
                 {freshness === "fresh" ? (
                   <span className="flex items-center gap-1 text-emerald-400">
-                    <CheckCircle2 size={12} /> Up to date
+                    <CheckCircle2 size={12} /> {t.upToDate}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-amber-400">
-                    <AlertTriangle size={12} /> Older than project
+                    <AlertTriangle size={12} /> {t.olderThanProject}
                   </span>
                 )}
               </div>
               <div className="mt-1 text-[11px] text-engrave">
-                Rendered {formatDateTime(latestRender.modifiedAtMs)} · {formatBytes(latestRender.sizeBytes)}
+                {t.rendered(formatDateTime(latestRender.modifiedAtMs), formatBytes(latestRender.sizeBytes))}
               </div>
               {!demoMode && (
                 <audio controls preload="none" src={audioSrc(latestRender.path)} className="mt-2 h-8 w-full" />
               )}
               {project.renders.length > 1 && (
                 <div className="mt-2 text-[11px] text-engrave">
-                  +{project.renders.length - 1} other bounce{project.renders.length > 2 ? "s" : ""} in the folder
+                  {t.otherBounces(project.renders.length - 1)}
                 </div>
               )}
             </div>
           ) : (
-            <div className="text-xs text-engrave">No mixdown yet — render it, or bounce it from FL next to the project.</div>
+            <div className="text-xs text-engrave">{t.noMixdown}</div>
           )}
         </Section>
 
-        <Section label={`Versions · ${project.backups.length} backups · ${formatBytes(backupsBytes(project))}`}>
+        <Section label={t.versions(project.backups.length, formatBytes(backupsBytes(project)))}>
           {versionName === null ? (
             <button onClick={() => setVersionName(`${project.name} v2`)} disabled={demoMode} className={btn}>
-              <Copy size={14} /> Save as new version
+              <Copy size={14} /> {t.saveVersion}
             </button>
           ) : (
             <form
@@ -347,12 +508,12 @@ export function ProjectDrawer() {
                 e.preventDefault();
                 const name = versionName;
                 setVersionName(null);
-                run(() => duplicateProject(project.path, name), (p) => `Created ${fileName(String(p))}`);
+                run(() => duplicateProject(project.path, name), (p) => t.created(fileName(String(p))));
               }}
             >
               <input autoFocus value={versionName} onChange={(e) => setVersionName(e.target.value)} className={`${input} py-1.5`} />
               <button type="submit" className={btn}>
-                Create
+                {t.create}
               </button>
               <button type="button" onClick={() => setVersionName(null)} className="text-engrave hover:text-cream">
                 <X size={14} />
@@ -369,12 +530,12 @@ export function ProjectDrawer() {
                   <span className="flex-1 text-body">{formatDateTime(b.modifiedAtMs)}</span>
                   <span className="text-body">{formatBytes(b.sizeBytes)}</span>
                   <button
-                    title="Restore as a new file next to the project (the current version is untouched)"
+                    title={t.restoreTitle}
                     disabled={demoMode}
-                    onClick={() => run(() => restoreBackup(b.path, project.path), (p) => `Restored as ${fileName(String(p))}`)}
+                    onClick={() => run(() => restoreBackup(b.path, project.path), (p) => t.restoredAs(fileName(String(p))))}
                     className="flex items-center gap-1 rounded px-1.5 py-0.5 text-engrave opacity-0 hover:bg-rule hover:text-cream group-hover:opacity-100"
                   >
-                    <RotateCcw size={11} /> Restore
+                    <RotateCcw size={11} /> {t.restore}
                   </button>
                 </li>
               ))}
@@ -382,7 +543,7 @@ export function ProjectDrawer() {
           )}
           {project.backups.length > visibleBackups.length && (
             <button onClick={() => setShowAllBackups(true)} className="mt-1 text-[11px] text-engrave hover:text-body">
-              Show all {project.backups.length}
+              {t.showAll(project.backups.length)}
             </button>
           )}
           {oldBackups.length > 0 && (
@@ -390,10 +551,10 @@ export function ProjectDrawer() {
               disabled={demoMode}
               label={
                 <>
-                  <Trash2 size={13} /> Clean up {oldBackups.length} older backups ({formatBytes(backupsBytes({ ...project, backups: oldBackups }))})
+                  <Trash2 size={13} /> {t.cleanUp(oldBackups.length, formatBytes(backupsBytes({ ...project, backups: oldBackups })))}
                 </>
               }
-              confirmLabel={`Move ${oldBackups.length} to ${trashName()}? Click again`}
+              confirmLabel={t.confirmTrash(oldBackups.length, trashName())}
               onConfirm={() =>
                 run(
                   async () => {
@@ -406,7 +567,7 @@ export function ProjectDrawer() {
                     }
                     return trashBackups(paths);
                   },
-                  (n) => (n === -1 ? "Nothing deleted yet: read the warning below." : `Moved ${n} backups to the ${trashName()}`),
+                  (n) => (n === -1 ? t.nothingDeleted : t.movedToTrash(Number(n), trashName())),
                 )
               }
               className={`${btn} mt-3 text-xs`}
@@ -414,27 +575,28 @@ export function ProjectDrawer() {
           )}
           {permanent && permanent.project === project.path && (
             <div className="mt-2 rounded-md border border-red-400/30 bg-red-500/[0.06] px-3 py-2 text-xs text-red-200/90">
-              {permanent.risky === permanent.paths.length ? "These backups are" : `${permanent.risky} of these backups are`} on a removable or
-              network drive, which has no {trashName()}: they would be <b className="font-semibold">deleted permanently</b>.
+              {permanent.risky === permanent.paths.length ? t.riskyAll : t.riskySome(permanent.risky)}
+              {t.riskyRest(trashName())}
+              <b className="font-semibold">{t.deletedPermanently}</b>.
               <div className="mt-2 flex gap-2">
                 <button
                   onClick={() => {
                     const paths = permanent.paths;
                     setPermanent(null);
-                    void run(() => trashBackups(paths, true), (n) => `Deleted ${n} backups`);
+                    void run(() => trashBackups(paths, true), (n) => t.deleted(Number(n)));
                   }}
                   className="rounded border border-red-400/40 px-2 py-1 text-red-200 hover:bg-red-500/10"
                 >
-                  Delete permanently
+                  {t.deletePermanently}
                 </button>
                 <button onClick={() => setPermanent(null)} className="rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised">
-                  Keep them
+                  {t.keepThem}
                 </button>
               </div>
             </div>
           )}
           {oldBackups.length > 0 && (
-            <div className="mt-1 text-[11px] text-engrave">Keeps the {KEEP_BACKUPS} most recent.</div>
+            <div className="mt-1 text-[11px] text-engrave">{t.keepsRecent(KEEP_BACKUPS)}</div>
           )}
         </Section>
       </div>
@@ -451,14 +613,15 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
   for (const s of project.samples) counts[s.status]++;
   const problemSamples = project.samples.filter((s) => s.status !== "ok");
   const fileName = (p: string) => p.split(/[/\\]/).pop() ?? p;
+  const t = tr(T);
 
   return (
     <>
-      <Section label={`Plugins · ${project.plugins.length}`}>
+      <Section label={t.plugins(project.plugins.length)}>
         {missingP.length > 0 && (
           <div className="mb-2 flex items-start gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-200">
             <AlertTriangle size={13} className="mt-px shrink-0" />
-            Not installed on this computer: {missingP.map((p) => p.name).join(", ")}
+            {t.notInstalled(missingP.map((p) => p.name).join(", "))}
           </div>
         )}
         <div className="flex flex-wrap gap-1">
@@ -478,30 +641,30 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
               {p.name}
             </span>
           ))}
-          {project.plugins.length === 0 && <span className="text-xs text-engrave">None found</span>}
+          {project.plugins.length === 0 && <span className="text-xs text-engrave">{t.noneFound}</span>}
         </div>
       </Section>
 
-      <Section label={`Samples · ${project.samples.length}`}>
+      <Section label={t.samples(project.samples.length)}>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
           <span className="flex items-center gap-1 text-body">
-            <CheckCircle2 size={12} className="text-emerald-400" /> {counts.ok} found
+            <CheckCircle2 size={12} className="text-emerald-400" /> {t.found(counts.ok)}
           </span>
           {counts.relocated > 0 && (
-            <span className="flex items-center gap-1 text-body" title="Not at the stored path, but a file with the same name is in this song's folder — the project was moved. FL can usually find these.">
-              <FolderInput size={12} className="text-sky-400" /> {counts.relocated} moved
+            <span className="flex items-center gap-1 text-body" title={t.movedTitle}>
+              <FolderInput size={12} className="text-sky-400" /> {t.moved(counts.relocated)}
             </span>
           )}
           {counts.missing > 0 && (
             <span className="flex items-center gap-1 text-red-300">
-              <AlertTriangle size={12} /> {counts.missing} missing
+              <AlertTriangle size={12} /> {t.missing(counts.missing)}
             </span>
           )}
         </div>
         {problemSamples.length > 0 && (
           <>
             <button onClick={() => setShowSamples(!showSamples)} className="mt-1.5 text-[11px] text-engrave hover:text-body">
-              {showSamples ? "Hide" : "Show"} {problemSamples.length} not at their stored path
+              {t.toggleProblems(showSamples, problemSamples.length)}
             </button>
             {showSamples && (
               <ul className="mt-1.5 max-h-48 space-y-0.5 overflow-auto text-[11px]">
