@@ -224,7 +224,7 @@ function AlbumDetail({ album }: { album: Album }) {
               <select
                 value={album.kind}
                 onChange={(e) => updateAlbum(album.id, { kind: e.target.value as AlbumKind })}
-                className="rounded border border-rule bg-transparent px-1.5 py-0.5 text-[12px] font-semibold text-engrave"
+                className="rounded border border-rule bg-panel px-1.5 py-0.5 text-[12px] font-semibold text-engrave hover:text-cream"
               >
                 {KINDS.map((k) => (
                   <option key={k.id} value={k.id} className="bg-raised">

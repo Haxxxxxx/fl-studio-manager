@@ -20,6 +20,14 @@ h3 {
   font-family: var(--font-sans);
 }
 
+/* Native drop-down lists: Windows draws them with the select's background,
+   so a transparent one opens white. Same rule as the desktop app. */
+select option,
+select optgroup {
+  background-color: var(--color-raised);
+  color: var(--color-cream);
+}
+
 body {
   margin: 0;
   background: var(--color-chassis);

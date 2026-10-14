@@ -15,6 +15,15 @@
   color-scheme: dark;
 }
 
+/* Native drop-down lists. Windows draws them with the select's own
+   background, so a transparent select (or an invisible one laid over a pill)
+   opens a white list under light text. Give the options their own colours. */
+select option,
+select optgroup {
+  background-color: var(--color-raised);
+  color: var(--color-cream);
+}
+
 h1,
 h2,
 h3 {
