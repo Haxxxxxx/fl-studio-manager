@@ -427,8 +427,8 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 project_id = "chrbpaoljulntuvousnz"
 
 [remotes.production.auth]
-site_url = "https://fl-manager-crew.vercel.app"
-additional_redirect_urls = ["https://fl-manager-crew.vercel.app"]
+site_url = "https://www.hi-vo.fr"
+additional_redirect_urls = ["https://www.hi-vo.fr", "https://hi-vo.fr", "https://fl-manager-crew.vercel.app"]
 
 [remotes.production.auth.email]
 # One code per address per minute (local uses 1s for tests).

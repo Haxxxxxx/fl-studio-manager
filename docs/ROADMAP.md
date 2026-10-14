@@ -8,7 +8,7 @@
 
 - **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion. It comes with a web dashboard for the crew.
 - **The name.** The app is now **Hivo** (formerly FL Manager), with a hive-cell logo. The rename is merged, the website shows it, and so do the sign-in emails.
-- **Installers.** **v0.2.1** is the latest GitHub release (private repo): Mac universal .dmg (signed ad-hoc: opens with "Open Anyway") and Windows setup .exe. Built automatically on the Mac (self-hosted GitHub runner) when a version tag is pushed.
+- **Installers.** **v0.2.1** is the latest GitHub release: Mac universal .dmg (signed ad-hoc: opens with "Open Anyway") and Windows setup .exe. Built automatically on the Mac (self-hosted GitHub runner) when a version tag is pushed.
 - **Phase 0 (stabilize, demo-ready).** Done, except two things: the crew pitch, and cleaning the git history before the repo can go public.
 - **Phase 1 (crew dashboard, Launch Kit, design identity).** Built and merged. Batch 2 (feedback from the first real artist) is merged too: pipeline board/list/table with editable columns, crew menu, solo mode.
 - **Phase 2 (plugins, hardware, distributor integrations).** Not started; ideas only.
@@ -33,8 +33,8 @@
   - Both builds are clean.
 - **Pull requests:** 61 merged since the start. None open.
 - **Live:**
-  - crew website: https://fl-manager-crew.vercel.app (Hivo);
-  - installers: GitHub releases in the private repo (latest `v0.2.1`: Mac universal .dmg and Windows setup .exe);
+  - crew website: https://www.hi-vo.fr (also still at fl-manager-crew.vercel.app);
+  - installers: GitHub releases (public repo; latest `v0.2.1`: Mac universal .dmg and Windows setup .exe);
   - sign-in emails: sent through Brevo from the hi-vo.fr domain (Supabase custom SMTP);
   - Claude Design project "fl-Manager": holds the 28 synced components, already in the Hivo / System 02 look.
 - **Quality pass done:** a three-part audit (Rust↔app bridge, app wiring, crew backend) found and fixed every broken link between features (PR #24).
@@ -131,12 +131,11 @@
 
 ### Blocked
 
-- **Going public with the repo.** Old commits still contain artist names and a personal email. **Unblock:** rewrite the git history (needs your OK: it rewrites every commit).
+- **Old commits in the now-public repo** still contain artist names and a personal email. **Fix:** rewrite the git history (needs your OK: it rewrites every commit and force-pushes `main`).
 - **The crew pitch (Phase 0).** Waiting on you: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
 
 ### Decisions waiting on you
 
-- **Website address.** hi-vo.fr is bought (it already sends the sign-in emails). Pointing the website at it needs a DNS record at the registrar.
 - **Apple notarization** (removes the Mac warning entirely) needs a paid Apple Developer account. Not done: free stack.
 
 ### Thought about, not built
@@ -218,7 +217,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 1. Test the crew flow end to end yourself with v0.2.1 (two accounts, Mac + PC). Until it passes, nothing new on the crew side.
 2. Try the Launch Kit on a few real songs whose hook you know, and run the Windows installer on a PC.
 3. Prepare and give the crew pitch with the demo (November milestone: prove the crew lives in the board).
-4. Decide whether to scrub the history and make the repo public.
+4. Decide whether to scrub the old commits (the repo is public).
 5. Then, and only then, pick the next slice, inside the guardrails.
 
 ## 9. Notes for Claude Code
