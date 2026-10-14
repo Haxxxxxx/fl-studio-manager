@@ -131,29 +131,51 @@ export function flatRows(groups: PipelineGroup[]): PipelineRow[] {
   return groups.flatMap((g) => g.songs.map((song) => ({ song, column: g.column, boardIndex: i++ })));
 }
 
+/** What the table sorts on, for any kind of row (your songs, crew songs). */
+export interface SortFields {
+  name: string;
+  /** Last save, ms (0 = unknown). */
+  saved: number;
+  bpm: number | null;
+  key: string;
+  /** Position on the board. */
+  boardIndex: number;
+}
+
 /** A view's own sort. Never written back: sorting the table doesn't touch the board. */
-export function sortRows(rows: PipelineRow[], key: SortKey, dir: 1 | -1, ws: Workspace): PipelineRow[] {
+export function sortBy<T>(rows: T[], fields: (r: T) => SortFields, key: SortKey, dir: 1 | -1): T[] {
   if (key === "board") return dir === 1 ? rows : [...rows].reverse();
-  const val = (r: PipelineRow): number | string => {
+  const val = (r: T): number | string => {
+    const f = fields(r);
     switch (key) {
       case "name":
-        return r.song.name.toLowerCase();
+        return f.name.toLowerCase();
       case "column":
-        return r.boardIndex;
+        return f.boardIndex;
       case "saved":
-        return lastSaveMs(r.song);
+        return f.saved;
       case "bpm":
-        return r.song.tempoBpm ?? -1;
+        return f.bpm ?? -1;
       case "key":
-        return (ws.songs[r.song.path]?.key ?? "").toLowerCase();
+        return f.key.toLowerCase();
     }
   };
   return [...rows].sort((a, b) => {
     const va = val(a);
     const vb = val(b);
     const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
-    return c * dir || a.boardIndex - b.boardIndex;
+    return c * dir || fields(a).boardIndex - fields(b).boardIndex;
   });
+}
+
+/** `sortBy` for your songs. */
+export function sortRows(rows: PipelineRow[], key: SortKey, dir: 1 | -1, ws: Workspace): PipelineRow[] {
+  return sortBy(
+    rows,
+    (r) => ({ name: r.song.name, saved: lastSaveMs(r.song), bpm: r.song.tempoBpm, key: ws.songs[r.song.path]?.key ?? "", boardIndex: r.boardIndex }),
+    key,
+    dir,
+  );
 }
 
 // ---- Edits (pure: workspace in, workspace out) ----

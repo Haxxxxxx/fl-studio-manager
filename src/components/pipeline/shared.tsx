@@ -1,36 +1,71 @@
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { createContext, useContext, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
-import { useAppStore } from "../../store/useAppStore";
-import { usePipelineView, type PipelineViewKind } from "../../store/usePipelineView";
-import { canRemoveColumn, filterSongs, groupSongs, resolvePipeline, stageColor, stageLabel, STAGE_ORDER, NAME_MAX } from "../../lib/pipeline";
-import { formatRelative } from "../../lib/format";
-import { albumsOf, formatBpm, lastSaveMs } from "../../lib/songs";
-import type { PipelineColumn, ProjectInfo, SongStatus } from "../../types";
-import { useVisibleSongs } from "../LibraryView";
-import { MixdownBadge } from "../../ui";
+import { usePipelineView, type PipelineScope, type PipelineViewKind } from "../../store/usePipelineView";
+import { stageColor, stageLabel, STAGE_ORDER, NAME_MAX } from "../../lib/pipeline";
+import type { PipelineColumn, SongStatus } from "../../types";
 import { ConfirmButton, StatusDot } from "../ui";
 
-// Pieces shared by the board, list and table: the model hook, the column
-// header (rename / collapse / remove / drag to reorder), the add-column form,
-// the stage-conflict marker and the drag rules. One place, so the three views
-// can't drift apart.
+// Pieces shared by the board, list and table, for any pipeline: yours
+// (src/components/pipeline/mine.tsx) or the crew's (crew.tsx). A pipeline is
+// a `PipelineSource`: its columns with their items, and what you may do.
+// One place, so the views (and the two pipelines) can't drift apart.
 
-/** The pipeline model every view renders: one source of truth. */
-export function usePipelineModel() {
-  const songs = useVisibleSongs();
-  const workspace = useAppStore((s) => s.workspace);
-  const query = usePipelineView((s) => s.query);
-  return useMemo(() => {
-    const cfg = resolvePipeline(workspace);
-    const shown = filterSongs(songs, workspace, query);
-    return { songs, workspace, cfg, query, groups: groupSongs(shown, workspace, cfg) };
-  }, [songs, workspace, query]);
+/** One song on a pipeline, whatever it is underneath. */
+export interface PipelineItem {
+  /** Your song's .flp path, or the crew song's id. */
+  key: string;
+  title: string;
+  /** Last save, ms (0 = unknown). */
+  savedMs: number;
+  bpm: number | null;
+  musicalKey: string;
+  tags: string[];
+  /** A crewmate moved it while your move was waiting. */
+  conflict?: boolean;
+  /** The board card's body (under the title). */
+  card: ReactNode;
+  /** The list row's last cell (mixdown badge, who). */
+  extra?: ReactNode;
+  open?: () => void;
+  selected?: boolean;
+}
+
+export interface PipelineGroup {
+  column: PipelineColumn;
+  items: PipelineItem[];
+}
+
+export interface PipelineSource {
+  scope: PipelineScope;
+  groups: PipelineGroup[];
+  query: string;
+  /** Columns can be renamed, added, removed, reordered here. */
+  editable: boolean;
+  canRemove: (columnId: string) => boolean;
+  rename: (columnId: string, name: string) => void;
+  add: (name: string, stage: SongStatus | null) => void;
+  remove: (columnId: string) => void;
+  moveColumn: (columnId: string, toIndex: number) => void;
+  /** Put a song in a column, before another (or at the end). */
+  moveCard: (key: string, columnId: string, beforeKey: string | null) => void;
+  /** "New song" on the Creation column (your pipeline only). */
+  newSong?: () => void;
+  /** Shown above the views (a refused move, a failed save). */
+  error?: string | null;
+}
+
+const SourceContext = createContext<PipelineSource | null>(null);
+export const PipelineSourceProvider = SourceContext.Provider;
+export function useSource(): PipelineSource {
+  const s = useContext(SourceContext);
+  if (!s) throw new Error("pipeline views need a PipelineSourceProvider");
+  return s;
 }
 
 // ---- Drag rules (HTML5 drag and drop; Tauri's own file drop is off) ----
 
 const COLUMN_TYPE = "application/x-hivo-column";
-/** Songs travel as text/plain (their path), like before. */
+/** Songs travel as text/plain (their key). */
 const SONG_TYPE = "text/plain";
 
 export function dragKind(e: DragEvent): "song" | "column" | null {
@@ -40,9 +75,9 @@ export function dragKind(e: DragEvent): "song" | "column" | null {
   return null;
 }
 
-export function startSongDrag(e: DragEvent, path: string) {
+export function startSongDrag(e: DragEvent, key: string) {
   e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData(SONG_TYPE, path);
+  e.dataTransfer.setData(SONG_TYPE, key);
 }
 
 export function startColumnDrag(e: DragEvent, id: string) {
@@ -50,47 +85,43 @@ export function startColumnDrag(e: DragEvent, id: string) {
   e.dataTransfer.setData(COLUMN_TYPE, id);
 }
 
-export const draggedSong = (e: DragEvent) => e.dataTransfer.getData(SONG_TYPE);
-export const draggedColumn = (e: DragEvent) => e.dataTransfer.getData(COLUMN_TYPE);
-
 /** Dropping on a card or row: before it (top half) or before the next one. */
-export function beforePathFor(e: DragEvent, list: ProjectInfo[], index: number): string | null {
+export function beforeKeyFor(e: DragEvent, list: PipelineItem[], index: number): string | null {
   const r = e.currentTarget.getBoundingClientRect();
   const upper = e.clientY < r.top + r.height / 2;
-  return upper ? list[index].path : (list[index + 1]?.path ?? null);
+  return upper ? list[index].key : (list[index + 1]?.key ?? null);
 }
 
 /** Where a dragged song would land (for the drop line). */
 export interface DropSpot {
   columnId: string;
-  beforePath: string | null;
+  beforeKey: string | null;
 }
 
 /** Drop handling for songs and columns, shared by the board and the list. */
-export function usePipelineDrop(songs: ProjectInfo[]) {
-  const movePipelineCard = useAppStore((s) => s.movePipelineCard);
-  const movePipelineColumn = useAppStore((s) => s.movePipelineColumn);
+export function usePipelineDrop() {
+  const source = useSource();
   const [spot, setSpotState] = useState<DropSpot | null>(null);
   const [columnOver, setColumnOver] = useState<string | null>(null);
   // The drop reads the latest spot from a ref: state can lag a render behind
   // the last dragover, which would land the card one slot off.
   const spotRef = useRef<DropSpot | null>(null);
   const setSpot = (next: DropSpot | null) => {
-    if (spotRef.current?.columnId === next?.columnId && spotRef.current?.beforePath === next?.beforePath) return;
+    if (spotRef.current?.columnId === next?.columnId && spotRef.current?.beforeKey === next?.beforeKey) return;
     spotRef.current = next;
     setSpotState(next);
   };
   return {
     spot,
     columnOver,
-    /** dragover on a column (or a card in it, with its before-path). */
-    over(e: DragEvent, columnId: string, beforePath: string | null) {
+    /** dragover on a column (or a card in it, with its before-key). */
+    over(e: DragEvent, columnId: string, beforeKey: string | null) {
       const kind = dragKind(e);
-      if (!kind) return;
+      if (!kind || (kind === "column" && !source.editable)) return;
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = "move";
-      if (kind === "song") setSpot({ columnId, beforePath });
+      if (kind === "song") setSpot({ columnId, beforeKey });
       else setColumnOver(columnId);
     },
     leave(e: DragEvent) {
@@ -104,17 +135,17 @@ export function usePipelineDrop(songs: ProjectInfo[]) {
       e.stopPropagation();
       const kind = dragKind(e);
       const latest = spotRef.current;
-      const target = latest?.columnId === columnId ? latest.beforePath : null;
+      const target = latest?.columnId === columnId ? latest.beforeKey : null;
       setSpot(null);
       setColumnOver(null);
       if (kind === "column") {
-        const id = draggedColumn(e);
-        if (id && id !== columnId) movePipelineColumn(id, columnIndex);
+        const id = e.dataTransfer.getData(COLUMN_TYPE);
+        if (source.editable && id && id !== columnId) source.moveColumn(id, columnIndex);
         return;
       }
-      // Only your songs: dragged text or links aren't songs.
-      const path = draggedSong(e);
-      if (songs.some((p) => p.path === path)) movePipelineCard(songs, path, columnId, target);
+      // Only songs of this pipeline: dragged text or links aren't songs.
+      const key = e.dataTransfer.getData(SONG_TYPE);
+      if (source.groups.some((g) => g.items.some((i) => i.key === key))) source.moveCard(key, columnId, target);
     },
     end() {
       setSpot(null);
@@ -138,33 +169,31 @@ export function ColumnHeader({
   collapsed: boolean;
   className?: string;
 }) {
-  const workspace = useAppStore((s) => s.workspace);
-  const rename = useAppStore((s) => s.renamePipelineColumn);
-  const remove = useAppStore((s) => s.removePipelineColumn);
-  const openNewProject = useAppStore((s) => s.openNewProject);
+  const source = useSource();
   const toggleCollapsed = usePipelineView((s) => s.toggleCollapsed);
   const [editing, setEditing] = useState(false);
   const cancelled = useRef(false);
   const startEditing = () => {
+    if (!source.editable) return;
     cancelled.current = false;
     setEditing(true);
   };
-  const move = useAppStore((s) => s.movePipelineColumn);
-  const index = resolvePipeline(workspace).columns.findIndex((c) => c.id === column.id);
-  const total = resolvePipeline(workspace).columns.length;
-  const removable = canRemoveColumn(resolvePipeline(workspace), column.id);
+  const columns = source.groups.map((g) => g.column);
+  const index = columns.findIndex((c) => c.id === column.id);
+  const removable = source.canRemove(column.id);
   const renamed = column.name.toLowerCase() !== stageLabel(column.stage).toLowerCase();
+  const hasActions = source.editable || (column.stage === "creation" && !!source.newSong);
 
   return (
     <div
-      draggable={!editing}
+      draggable={source.editable && !editing}
       onDragStart={(e) => startColumnDrag(e, column.id)}
-      title={editing ? undefined : "Drag to reorder columns"}
-      className={`group/col relative min-w-0 cursor-grab active:cursor-grabbing ${className}`}
+      title={source.editable && !editing ? "Drag to reorder columns" : undefined}
+      className={`group/col relative min-w-0 ${source.editable ? "cursor-grab active:cursor-grabbing" : ""} ${className}`}
     >
       <div className="flex min-w-0 items-center gap-1.5">
         <button
-          onClick={() => toggleCollapsed(view, column.id)}
+          onClick={() => toggleCollapsed(source.scope, view, column.id)}
           aria-label={collapsed ? `Expand ${column.name}` : `Collapse ${column.name}`}
           aria-expanded={!collapsed}
           className="shrink-0 rounded text-engrave hover:text-cream"
@@ -186,7 +215,7 @@ export function ColumnHeader({
               }
             }}
             onBlur={(e) => {
-              if (!cancelled.current) rename(column.id, e.currentTarget.value);
+              if (!cancelled.current) source.rename(column.id, e.currentTarget.value);
               cancelled.current = false;
               setEditing(false);
             }}
@@ -195,8 +224,8 @@ export function ColumnHeader({
         ) : (
           <button
             onDoubleClick={startEditing}
-            onKeyDown={(e) => (e.key === "Enter" || e.key === "F2") && (e.preventDefault(), startEditing())}
-            title="Double-click (or Enter) to rename"
+            onKeyDown={(e) => source.editable && (e.key === "Enter" || e.key === "F2") && (e.preventDefault(), startEditing())}
+            title={source.editable ? "Double-click (or Enter) to rename" : undefined}
             className="min-w-0 truncate text-left text-xs font-medium text-cream"
           >
             {column.name}
@@ -210,31 +239,35 @@ export function ColumnHeader({
         </div>
       )}
       {/* Actions float over the header on hover/focus, so they never squeeze the name. */}
-      {!editing && (
+      {!editing && hasActions && (
         <span className="absolute right-0 top-0 flex items-center gap-0.5 rounded bg-panel pl-1 opacity-0 focus-within:opacity-100 group-hover/col:opacity-100">
-          {column.stage === "creation" && (
-            <button onClick={() => openNewProject({ status: "creation" })} title="New song" aria-label="New song" className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
+          {column.stage === "creation" && source.newSong && (
+            <button onClick={source.newSong} title="New song" aria-label="New song" className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
               <Plus size={13} />
             </button>
           )}
-          <button onClick={() => move(column.id, index - 1)} disabled={index <= 0} title="Move left" aria-label={`Move ${column.name} earlier`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
-            <ArrowLeft size={12} />
-          </button>
-          <button onClick={() => move(column.id, index + 1)} disabled={index >= total - 1} title="Move right" aria-label={`Move ${column.name} later`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
-            <ArrowRight size={12} />
-          </button>
-          <button onClick={startEditing} title="Rename" aria-label={`Rename ${column.name}`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
-            <Pencil size={12} />
-          </button>
-          <span title={removable ? `Remove (songs move to the other ${stageLabel(column.stage)} column)` : `Every stage keeps one column. Rename it, or collapse it.`}>
-            <ConfirmButton
-              disabled={!removable}
-              label={<Trash2 size={12} aria-label={`Remove ${column.name}`} />}
-              confirmLabel="Remove?"
-              onConfirm={() => remove(column.id)}
-              className="rounded border border-transparent p-0.5 text-[10px] text-engrave hover:bg-rule hover:text-cream disabled:opacity-30"
-            />
-          </span>
+          {source.editable && (
+            <>
+              <button onClick={() => source.moveColumn(column.id, index - 1)} disabled={index <= 0} title="Move left" aria-label={`Move ${column.name} earlier`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
+                <ArrowLeft size={12} />
+              </button>
+              <button onClick={() => source.moveColumn(column.id, index + 1)} disabled={index >= columns.length - 1} title="Move right" aria-label={`Move ${column.name} later`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
+                <ArrowRight size={12} />
+              </button>
+              <button onClick={startEditing} title="Rename" aria-label={`Rename ${column.name}`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
+                <Pencil size={12} />
+              </button>
+              <span title={removable ? `Remove (songs move to the other ${stageLabel(column.stage)} column)` : `Every stage keeps one column. Rename it, or collapse it.`}>
+                <ConfirmButton
+                  disabled={!removable}
+                  label={<Trash2 size={12} aria-label={`Remove ${column.name}`} />}
+                  confirmLabel="Remove?"
+                  onConfirm={() => source.remove(column.id)}
+                  className="rounded border border-transparent p-0.5 text-[10px] text-engrave hover:bg-rule hover:text-cream disabled:opacity-30"
+                />
+              </span>
+            </>
+          )}
         </span>
       )}
     </div>
@@ -244,10 +277,11 @@ export function ColumnHeader({
 // ---- Add a column ----
 
 export function AddColumn({ compact = false }: { compact?: boolean }) {
-  const add = useAppStore((s) => s.addPipelineColumn);
+  const source = useSource();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [stage, setStage] = useState<SongStatus | null>("production");
+  if (!source.editable || source.query) return null;
   if (!open) {
     return (
       <button
@@ -260,7 +294,7 @@ export function AddColumn({ compact = false }: { compact?: boolean }) {
   }
   const submit = () => {
     if (!name.trim()) return;
-    add(name, stage);
+    source.add(name, stage);
     setName("");
     setOpen(false);
   };
@@ -308,11 +342,10 @@ export function AddColumn({ compact = false }: { compact?: boolean }) {
   );
 }
 
-// ---- Song bits ----
+// ---- Bits ----
 
-export function ConflictDot({ path }: { path: string }) {
-  const conflict = useAppStore((s) => !!s.workspace.songs[path]?.stageConflict);
-  if (!conflict) return null;
+export function ConflictDot({ on }: { on?: boolean }) {
+  if (!on) return null;
   return (
     <span
       title="A crewmate moved this song on the crew board too: open it to choose"
@@ -322,41 +355,14 @@ export function ConflictDot({ path }: { path: string }) {
   );
 }
 
-export function SongCard({ song, selected, onOpen }: { song: ProjectInfo; selected: boolean; onOpen: () => void }) {
-  const workspace = useAppStore((s) => s.workspace);
-  const albums = albumsOf(workspace, song.path);
-  const tags = workspace.songs[song.path]?.tags ?? [];
-  return (
-    <div
-      draggable
-      onDragStart={(e) => startSongDrag(e, song.path)}
-      onClick={onOpen}
-      className={`cursor-grab rounded-md border px-3 py-2 active:cursor-grabbing ${
-        selected ? "border-orange-400/40 bg-raised" : "border-rule bg-raised hover:border-rule-strong"
-      }`}
-    >
-      <div className="flex items-center gap-1.5">
-        <span className="truncate text-sm font-medium text-cream">{song.name}</span>
-        <ConflictDot path={song.path} />
-      </div>
-      <div className="mt-1 flex items-center gap-2 text-[11px] text-engrave">
-        <span>{formatRelative(lastSaveMs(song))}</span>
-        {song.tempoBpm && <span>· {formatBpm(song.tempoBpm)} BPM</span>}
-      </div>
-      {(albums.length > 0 || tags.length > 0 || song.renders.length > 0) && (
-        <div className="mt-1.5 flex items-center gap-1.5">
-          {albums.map((a) => (
-            <span key={a.id} title={a.title} className="h-2.5 w-2.5 rounded-sm" style={{ background: a.color }} />
-          ))}
-          <span className="min-w-0 flex-1 truncate text-[11px] text-engrave">{tags.map((t) => `#${t}`).join(" ")}</span>
-          {song.renders.length > 0 && <MixdownBadge project={song} compact />}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** The orange line where a dragged song will land. */
 export function DropLine() {
   return <div className="h-0.5 rounded-full bg-hot" aria-hidden />;
+}
+
+/** A source's error, above the views. */
+export function SourceError() {
+  const { error } = useSource();
+  if (!error) return null;
+  return <div className="mx-4 mt-3 rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{error}</div>;
 }
