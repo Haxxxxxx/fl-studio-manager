@@ -6,6 +6,7 @@ import { ALBUM_COLORS, STATUSES, UNSORTED, formatBpm, isFinished, renderFreshnes
 import type { Album, AlbumKind, ProjectInfo, Workspace } from "../types";
 import { ConfirmButton, Modal, StatusDot, StatusSelect, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { MixdownBadge, Stat } from "../ui";
+import { ReleaseShare } from "./CrewPanel";
 
 const KINDS: { id: AlbumKind; label: string }[] = [
   { id: "album", label: "Album" },
@@ -254,6 +255,7 @@ function AlbumDetail({ album }: { album: Album }) {
                 </span>
               )}
             </div>
+            <ReleaseShare albumId={album.id} />
 
             <div className="mt-4 grid grid-cols-4 gap-2">
               <Stat label="Tracks" value={String(album.trackPaths.length)} />

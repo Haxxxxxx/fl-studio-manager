@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CrewSongRow, ProjectInfo, Workspace } from "../types";
+import type { CrewReleaseRow, CrewSongRow, ProjectInfo, Workspace } from "../types";
 import {
   orphanedShares,
   shareElsewhere,
@@ -11,6 +11,11 @@ import {
   staleShareIds,
   stageSync,
   syncNote,
+  releasePayloads,
+  releaseTracks,
+  sortCrewReleases,
+  staleReleaseIds,
+  unsharedTracks,
 } from "./crewSync";
 
 // Regression tests for the crew-sync review (data loss and rewound moves).
@@ -267,3 +272,57 @@ describe("why nothing syncs (crew panel note)", () => {
     expect(syncNote({ ...ok, sharedCount: 0 })).toMatch(/stay private until you share them/);
   });
 });
+
+describe("shared releases", () => {
+  const sc = { crewId: "crew1", userId: "me" };
+  const album = (over = {}) =>
+    ({ id: "a1", title: " Night Tape ", kind: "ep", color: "#c98500", releaseDate: "2026-12-11", notes: "secret", trackPaths: ["/p/A.flp", "/p/B.flp", "/p/C.flp"], createdAtMs: 1, shared: true, shareId: "r1", ...over }) as Workspace["albums"][number];
+  const ws = (albums: Workspace["albums"], extra: Partial<Workspace> = {}): Workspace => ({
+    version: 2,
+    albums,
+    people: [],
+    songs: {
+      "/p/A.flp": { shared: true, shareId: "s-a" },
+      "/p/B.flp": { shared: false, shareId: "s-b" },
+      "/p/C.flp": { shared: true, shareId: "s-c", shareCrewId: "other" },
+    },
+    ...extra,
+  });
+
+  it("sends title, type, colour, date and only the tracks shared in this crew", () => {
+    expect(releasePayloads(ws([album()]), sc)).toEqual([
+      { id: "r1", crew_id: "crew1", title: "Night Tape", kind: "ep", color: "#c98500", release_date: "2026-12-11", song_ids: ["s-a"] },
+    ]);
+    expect(releasePayloads(ws([album({ shared: false })]), sc)).toEqual([]);
+    expect(releasePayloads(ws([album({ shareCrewId: "other" })]), sc)).toEqual([]);
+    expect(JSON.stringify(releasePayloads(ws([album()]), sc))).not.toMatch(/secret|\/p\//);
+  });
+
+  it("lists the tracks still to share", () => {
+    expect(unsharedTracks(album(), ws([album()]), sc)).toEqual(["/p/B.flp", "/p/C.flp"]);
+  });
+
+  it("deletes a crew release only when unshared or deleted here, never because it's unknown here", () => {
+    const rows = [
+      { id: "r1", crew_id: "crew1", owner_id: "me" },
+      { id: "r2", crew_id: "crew1", owner_id: "me" },
+      { id: "r3", crew_id: "crew1", owner_id: "me" },
+      { id: "r4", crew_id: "crew1", owner_id: "someone" },
+    ] as CrewReleaseRow[];
+    const w = ws([album({ shared: false })], { deletedReleaseShares: [{ id: "r2", crewId: "crew1", userId: "me" }, { id: "r4", crewId: "crew1", userId: "me" }] });
+    expect(staleReleaseIds(rows, w, sc)).toEqual(["r1", "r2"]);
+  });
+});
+
+describe("crew releases on screen", () => {
+  const r = (id: string, release_date: string | null, song_ids: string[] = []) => ({ id, title: id, release_date, song_ids }) as CrewReleaseRow;
+  it("upcoming soonest first, then undated, then past latest first", () => {
+    const rows = [r("past1", "2026-01-01"), r("soon", "2026-10-20"), r("later", "2026-12-01"), r("nodate", null), r("past2", "2026-09-01")];
+    expect(sortCrewReleases(rows, "2026-10-14").map((x) => x.id)).toEqual(["soon", "later", "nodate", "past2", "past1"]);
+  });
+  it("tracks in tracklist order, unshared ones left out", () => {
+    const songs = [{ id: "b" }, { id: "a" }] as CrewSongRow[];
+    expect(releaseTracks(r("x", null, ["a", "gone", "b"]), songs).map((s) => s.id)).toEqual(["a", "b"]);
+  });
+});
+

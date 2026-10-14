@@ -375,6 +375,13 @@ export interface Album {
   /** Ordered tracklist, by .flp path. */
   trackPaths: string[];
   createdAtMs: number;
+  /** Shared with the crew (the release and its shared tracks). */
+  shared?: boolean;
+  /** Its id in the crew database, set on first share; kept after unsharing
+   * (with `shared: false`) so the next sync deletes the row. */
+  shareId?: string;
+  shareCrewId?: string;
+  shareUserId?: string;
 }
 
 export interface Workspace {
@@ -386,6 +393,8 @@ export interface Workspace {
   people: Person[];
   /** The user's pipeline columns. Missing = one column per stage. */
   pipeline?: PipelineConfig;
+  /** Shared releases deleted here: their crew rows are deleted on the next sync. */
+  deletedReleaseShares?: { id: string; crewId: string; userId: string }[];
 }
 
 /** A pipeline column. Columns sit on the fixed lifecycle stages: putting a
@@ -437,6 +446,20 @@ export interface CrewSongRow {
   column_id?: string | null;
   /** Hand-placed position in its column (null: not placed by hand). */
   board_order?: number | null;
+  updated_at?: string;
+}
+
+/** A release shared with the crew (releases). Only its owner edits it. */
+export interface CrewReleaseRow {
+  id: string;
+  crew_id: string;
+  owner_id: string;
+  title: string;
+  kind: AlbumKind;
+  color: string | null;
+  release_date: string | null;
+  /** Crew song ids, in tracklist order. */
+  song_ids: string[];
   updated_at?: string;
 }
 
