@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
-import { TRASH_NAME, formatBytes, formatDateTime } from "../lib/format";
+import { formatBytes, formatDateTime, trashName } from "../lib/format";
 import { audioSrc, backupsOnRiskyVolumes, openInFlStudio, revealInFileManager } from "../lib/tauri";
 import { KEYS, albumsOf, backupsBytes, formatBpm, missingPlugins, renderFreshness } from "../lib/songs";
 import type { ProjectInfo } from "../types";
@@ -393,7 +393,7 @@ export function ProjectDrawer() {
                   <Trash2 size={13} /> Clean up {oldBackups.length} older backups ({formatBytes(backupsBytes({ ...project, backups: oldBackups }))})
                 </>
               }
-              confirmLabel={`Move ${oldBackups.length} to ${TRASH_NAME}? Click again`}
+              confirmLabel={`Move ${oldBackups.length} to ${trashName()}? Click again`}
               onConfirm={() =>
                 run(
                   async () => {
@@ -406,7 +406,7 @@ export function ProjectDrawer() {
                     }
                     return trashBackups(paths);
                   },
-                  (n) => (n === -1 ? "Nothing deleted yet: read the warning below." : `Moved ${n} backups to the ${TRASH_NAME}`),
+                  (n) => (n === -1 ? "Nothing deleted yet: read the warning below." : `Moved ${n} backups to the ${trashName()}`),
                 )
               }
               className={`${btn} mt-3 text-xs`}
@@ -415,7 +415,7 @@ export function ProjectDrawer() {
           {permanent && permanent.project === project.path && (
             <div className="mt-2 rounded-md border border-red-400/30 bg-red-500/[0.06] px-3 py-2 text-xs text-red-200/90">
               {permanent.risky === permanent.paths.length ? "These backups are" : `${permanent.risky} of these backups are`} on a removable or
-              network drive, which has no {TRASH_NAME}: they would be <b className="font-semibold">deleted permanently</b>.
+              network drive, which has no {trashName()}: they would be <b className="font-semibold">deleted permanently</b>.
               <div className="mt-2 flex gap-2">
                 <button
                   onClick={() => {

@@ -1,3 +1,4 @@
+import { applyLang, resolveLang } from "./i18n";
 import { CrewBoardView, CrewMembersView, CrewReleasesView, CrewSettingsView } from "./components/CrewViews";
 import { useEffect } from "react";
 import { isTauri } from "@tauri-apps/api/core";
@@ -55,6 +56,10 @@ export default function App() {
   const startupError = useAppStore((s) => s.startupError);
   const saveError = useAppStore((s) => s.saveError);
   const dismissErrors = useAppStore((s) => s.dismissErrors);
+  // The app's language. Set before rendering; the root is keyed on it, so a
+  // change remounts every screen in the new language (src/i18n).
+  const lang = resolveLang(useAppStore((s) => s.settings.uiLanguage));
+  applyLang(lang);
 
   useEffect(() => {
     init();
@@ -90,7 +95,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative flex h-screen bg-chassis text-cream">
+    <div key={lang} className="relative flex h-screen bg-chassis text-cream">
       <Sidebar />
       {view === "dashboard" && <Dashboard />}
       {view === "library" && <LibraryView />}
