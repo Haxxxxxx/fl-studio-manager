@@ -23,7 +23,9 @@ import {
   type Check as KitCheck,
   type KitField,
   type KitInput,
+  inEnglish,
 } from "../lib/launchKit";
+import { dict, tr } from "../i18n";
 import { aiDisclosure, draftCopy, reviewKit } from "../lib/ai";
 import { formatRelative } from "../lib/format";
 import { stageRank } from "../lib/songs";
@@ -37,6 +39,164 @@ import { Card, CheckLine, FieldRow, KitStatus } from "../ui";
 
 // Snippet colors: the dark categorical slots, in fixed order (as elsewhere).
 const SNIPPET_COLORS = ["#ff5a1f", "#f2efe8", "#3ddc84"];
+
+const plural = (n: number) => (n === 1 ? "" : "s");
+
+const T = dict(
+  {
+    empty: "Link a project folder (or load sample data) to build a launch kit.",
+    needExportFolder: "Set an export folder in Settings first.",
+    exportConfirm: (missing: number, flagged: number) => {
+      const what = [missing && `${missing} field${plural(missing)} still need${missing === 1 ? "s" : ""} you`, flagged && `the AI flagged ${flagged}`]
+        .filter(Boolean)
+        .join(" and ");
+      return `${what[0].toUpperCase()}${what.slice(1)}. Export anyway? Open items go in checklist.md and the distributor sheet.`;
+    },
+    answerFirst: "Answer the fields marked “Needs you” first",
+    markReviewed: "Mark every pre-filled value as reviewed",
+    accepted: "Accepted",
+    acceptAll: "Accept all",
+    exportOffDemo: "Export is off for sample data",
+    exportWhere: "Writes the kit to <export folder>/Launch Kits/",
+    exporting: "Exporting…",
+    exportKit: "Export kit",
+    exported: (open: number) => `Kit exported${open ? `, with ${open} open item(s) listed in checklist.md` : ""}.`,
+    showFolder: "Show folder",
+    useSuggestions: (n: number) => `Use all ${n} AI suggestion${plural(n)}`,
+    resetConfirm: "Undo every change you made in this kit?",
+    resetAll: "Reset all edits",
+    blankConfirm: "Clear every pre-filled value so you can fill the kit in by hand? (Reset all edits brings them back.)",
+    startBlank: "Start blank",
+    metadata: "Metadata",
+    releaseTiming: "Release timing",
+    distribution: "Distribution: what the upload form asks",
+    snippetsCard: "Snippets for reels and stories",
+    coverBrief: "Cover art brief",
+    captions: "Captions",
+    // AI panel
+    aiOff: "AI drafts and checks are off. They need a free Gemini API key.",
+    addKey: "Add a key",
+    notChecked: "Not checked yet.",
+    changedSince: "Some values changed since the last check.",
+    allRight: "Every field looks right.",
+    toLookAt: (n: number) => `${n} field${plural(n)} to look at.`,
+    notCheckedN: (n: number) => `${n} field${plural(n)} not checked. Re-check.`,
+    noProblems: "No problems found.",
+    aiLayer: "AI layer",
+    writing: "Writing…",
+    writeCopy: "Write captions & brief",
+    upToDate: "Already checked, and nothing changed since: no need to spend free AI quota",
+    checkingAll: "Checking every field…",
+    checkKit: "Check kit",
+    checked: "Checked",
+    recheck: "Re-check",
+    backToTemplate: "Back to the template text",
+    discardDrafts: "Discard AI drafts",
+    checkedAgo: (when: string) => ` · checked ${when}`,
+    retries: "If Gemini is busy this retries on its own; it gives up after 2 minutes.",
+    backup: (model: string, backup: string) => `${model} was overloaded, so ${backup} (the backup free model) answered.`,
+    // Snippets
+    renderForSnippets: "Render a mixdown to get snippets.",
+    listening: "Listening to the mixdown…",
+    noAnalysis: "No analysis",
+    tooShort: "The mixdown is shorter than 15 seconds.",
+    stripHelp: "Drag a snippet to move it, or click to put the selected one there",
+    loudness: "Loudness of the mixdown over time",
+    snippetStart: (label: string) => `${label} start`,
+    dragToMove: (label: string) => `${label}: drag to move`,
+    snippetLength: (label: string) => `${label} length`,
+    editedByYou: "edited by you",
+    barEarlier: "1 bar earlier",
+    secEarlier: "1 s earlier",
+    barLater: "1 bar later",
+    secLater: "1 s later",
+    backToDetected: "Back to the detected spot and length",
+    noAudioDemo: "No audio in sample data",
+    playSnippet: "Play this snippet",
+    snippetsHelp:
+      "Drag a snippet on the waveform, click to drop the selected one there, or type a start time. Clips are cut on export, with short fades, into snippets/ in the kit.",
+    startTime: "Start time",
+    // Caption language
+    captionLanguage: "Caption language",
+    captionsIn: "Captions in",
+    forThisKit: "for this kit",
+    fromSettings: "(from Settings)",
+  },
+  {
+    empty: "Relie un dossier de projets (ou charge les données d'exemple) pour monter un Launch Kit.",
+    needExportFolder: "Choisis d'abord un dossier d'export dans les Réglages.",
+    exportConfirm: (missing: number, flagged: number) => {
+      const what = [missing && `${missing} champ${plural(missing)} à compléter`, flagged && `l'IA en a signalé ${flagged}`].filter(Boolean).join(" et ");
+      return `${what[0].toUpperCase()}${what.slice(1)}. Exporter quand même ? Ce qui reste ouvert va dans checklist.md et la fiche distributeur.`;
+    },
+    answerFirst: "Réponds d'abord aux champs marqués « À compléter »",
+    markReviewed: "Marque toutes les valeurs pré-remplies comme relues",
+    accepted: "Accepté",
+    acceptAll: "Tout accepter",
+    exportOffDemo: "Pas d'export avec les données d'exemple",
+    exportWhere: "Écrit le kit dans <dossier d'export>/Launch Kits/",
+    exporting: "Export…",
+    exportKit: "Exporter le kit",
+    exported: (open: number) => `Kit exporté${open ? `, avec ${open} point${plural(open)} ouvert${plural(open)} dans checklist.md` : ""}.`,
+    showFolder: "Ouvrir le dossier",
+    useSuggestions: (n: number) => (n === 1 ? "Utiliser la suggestion de l'IA" : `Utiliser les ${n} suggestions de l'IA`),
+    resetConfirm: "Annuler tous tes changements dans ce kit ?",
+    resetAll: "Annuler toutes les modifs",
+    blankConfirm: "Vider toutes les valeurs pré-remplies pour remplir le kit à la main ? (« Annuler toutes les modifs » les remet.)",
+    startBlank: "Partir de zéro",
+    metadata: "Métadonnées",
+    releaseTiming: "Quand ça sort",
+    distribution: "Distribution : ce que demande le formulaire d'upload",
+    snippetsCard: "Extraits pour les reels et stories",
+    coverBrief: "Brief de la cover",
+    captions: "Textes",
+    aiOff: "Les brouillons et vérifs IA sont coupés. Il faut une clé API Gemini gratuite.",
+    addKey: "Ajouter une clé",
+    notChecked: "Pas encore vérifié.",
+    changedSince: "Des valeurs ont changé depuis la dernière vérif.",
+    allRight: "Tous les champs ont l'air bons.",
+    toLookAt: (n: number) => `${n} champ${plural(n)} à regarder.`,
+    notCheckedN: (n: number) => `${n} champ${plural(n)} pas vérifié${plural(n)}. Revérifie.`,
+    noProblems: "Aucun problème trouvé.",
+    aiLayer: "Couche IA",
+    writing: "Écriture…",
+    writeCopy: "Écrire textes et brief",
+    upToDate: "Déjà vérifié, et rien n'a changé depuis : pas besoin de griller le quota IA gratuit",
+    checkingAll: "Vérif de chaque champ…",
+    checkKit: "Vérifier le kit",
+    checked: "Vérifié",
+    recheck: "Revérifier",
+    backToTemplate: "Revenir au texte modèle",
+    discardDrafts: "Jeter les brouillons IA",
+    checkedAgo: (when: string) => ` · vérifié ${when}`,
+    retries: "Si Gemini est occupé, ça réessaie tout seul ; ça abandonne au bout de 2 minutes.",
+    backup: (model: string, backup: string) => `${model} était surchargé, donc ${backup} (le modèle gratuit de secours) a répondu.`,
+    renderForSnippets: "Fais le rendu d'un mixdown pour avoir des extraits.",
+    listening: "Écoute du mixdown…",
+    noAnalysis: "Pas d'analyse",
+    tooShort: "Le mixdown fait moins de 15 secondes.",
+    stripHelp: "Glisse un extrait pour le déplacer, ou clique pour y placer celui sélectionné",
+    loudness: "Volume du mixdown dans le temps",
+    snippetStart: (label: string) => `Début de ${label}`,
+    dragToMove: (label: string) => `${label} : glisse pour déplacer`,
+    snippetLength: (label: string) => `Durée de ${label}`,
+    editedByYou: "modifié par toi",
+    barEarlier: "1 mesure plus tôt",
+    secEarlier: "1 s plus tôt",
+    barLater: "1 mesure plus tard",
+    secLater: "1 s plus tard",
+    backToDetected: "Revenir à la position et à la durée détectées",
+    noAudioDemo: "Pas d'audio dans les données d'exemple",
+    playSnippet: "Écouter cet extrait",
+    snippetsHelp:
+      "Glisse un extrait sur la forme d'onde, clique pour y poser celui sélectionné, ou tape un début. Les extraits sont coupés à l'export, avec de courts fondus, dans snippets/ du kit.",
+    startTime: "Début",
+    captionLanguage: "Langue des textes",
+    captionsIn: "Textes en",
+    forThisKit: "pour ce kit",
+    fromSettings: "(depuis les Réglages)",
+  },
+);
 
 
 /** Keyed by mixdown path + mtime + tempo: re-analyze when the mixdown
@@ -106,12 +266,9 @@ export function LaunchKitView() {
   /** The "what's in your kit" popup, shown once after each export. */
   const [guide, setGuide] = useState<{ guide: KitGuide; lang: KitLang; dir: string } | null>(null);
 
+  const t = tr(T);
   if (!project) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-engrave">
-        Link a project folder (or load sample data) to build a launch kit.
-      </div>
-    );
+    return <div className="flex flex-1 items-center justify-center text-sm text-engrave">{t.empty}</div>;
   }
 
   const meta = workspace.songs[project.path] ?? {};
@@ -162,13 +319,8 @@ export function LaunchKitView() {
 
   async function handleExport() {
     if (!project) return;
-    if (!settings.outputFolder) return setExportState({ status: "error", message: "Set an export folder in Settings first." });
-    if (missing + ai.flagged > 0) {
-      const what = [missing && `${missing} field${missing === 1 ? "" : "s"} still need${missing === 1 ? "s" : ""} you`, ai.flagged && `the AI flagged ${ai.flagged}`]
-        .filter(Boolean)
-        .join(" and ");
-      if (!window.confirm(`${what[0].toUpperCase()}${what.slice(1)}. Export anyway? Open items go in checklist.md and the distributor sheet.`)) return;
-    }
+    if (!settings.outputFolder) return setExportState({ status: "error", message: t.needExportFolder });
+    if (missing + ai.flagged > 0 && !window.confirm(t.exportConfirm(missing, ai.flagged))) return;
     const title = byId("title").value || project.name;
     setExportState({ status: "running" });
     try {
@@ -176,7 +328,8 @@ export function LaunchKitView() {
       const masterExt = project.renders[0]?.path.split(".").pop()?.toLowerCase() ?? null;
       const dir = await api.exportLaunchKit({
         folderName: title,
-        files: kitFiles(fields, snippets, extra, lang, masterExt),
+        // The files don't follow the app's language (distributor sheet, checklist).
+        files: inEnglish(() => kitFiles(buildKit(kitInput), snippets, kitChecks(project, analysis), lang, masterExt)),
         master: project.renders[0]?.path ?? null,
         masterName: masterBaseName(fields, project.name),
         clips: snippets,
@@ -210,27 +363,27 @@ export function LaunchKitView() {
             <button
               onClick={() => acceptKit(project.path)}
               disabled={missing > 0 || !!accepted}
-              title={missing > 0 ? "Answer the fields marked “Needs you” first" : "Mark every pre-filled value as reviewed"}
+              title={missing > 0 ? t.answerFirst : t.markReviewed}
               className={btn}
             >
-              <Check size={14} /> {accepted ? "Accepted" : "Accept all"}
+              <Check size={14} /> {accepted ? t.accepted : t.acceptAll}
             </button>
             <button
               onClick={handleExport}
               disabled={demoMode || exportState.status === "running"}
-              title={demoMode ? "Export is off for sample data" : `Writes the kit to <export folder>/Launch Kits/`}
+              title={demoMode ? t.exportOffDemo : t.exportWhere}
               className={btnPrimary}
             >
-              <Rocket size={14} /> {exportState.status === "running" ? "Exporting…" : "Export kit"}
+              <Rocket size={14} /> {exportState.status === "running" ? t.exporting : t.exportKit}
             </button>
           </div>
         </header>
 
         {exportState.status === "done" && (
           <div className="flex items-center gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200">
-            <CheckCircle2 size={16} /> Kit exported{missing + warnings ? `, with ${missing + warnings} open item(s) listed in checklist.md` : ""}.
+            <CheckCircle2 size={16} /> {t.exported(missing + warnings)}
             <button onClick={() => api.revealInFileManager(exportState.dir)} className="ml-auto flex items-center gap-1 text-xs underline">
-              <FolderOpen size={13} /> Show folder
+              <FolderOpen size={13} /> {t.showFolder}
             </button>
           </div>
         )}
@@ -249,41 +402,41 @@ export function LaunchKitView() {
               onClick={() => setKitEdits(project.path, Object.fromEntries(suggestions.map((f) => [f.id, f.review!.suggestion!])))}
               className="rounded border border-dashed border-engrave px-2 py-1 text-cream hover:bg-raised"
             >
-              Use all {suggestions.length} AI suggestion{suggestions.length === 1 ? "" : "s"}
+              {t.useSuggestions(suggestions.length)}
             </button>
           )}
           {Object.keys(edits).length > 0 && (
             <button
-              onClick={() => window.confirm("Undo every change you made in this kit?") && setKitEdits(project.path, null)}
+              onClick={() => window.confirm(t.resetConfirm) && setKitEdits(project.path, null)}
               className="hover:text-cream"
             >
-              Reset all edits
+              {t.resetAll}
             </button>
           )}
           <button
             onClick={() =>
-              window.confirm("Clear every pre-filled value so you can fill the kit in by hand? (Reset all edits brings them back.)") &&
+              window.confirm(t.blankConfirm) &&
               setKitEdits(project.path, Object.fromEntries(fields.filter((f) => f.kind !== "multiline").map((f) => [f.id, ""])))
             }
             className="hover:text-cream"
           >
-            Start blank
+            {t.startBlank}
           </button>
         </div>
 
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-5">
           <div className="flex flex-col gap-5">
-            <Card title="Metadata">
+            <Card title={t.metadata}>
               <div className="flex flex-col divide-y divide-rule">
                 {METADATA_FIELDS.map((id) => (
                   <FieldRow key={id} field={byId(id)} onChange={(v) => setKitEdit(project.path, id, v)} />
                 ))}
               </div>
             </Card>
-            <Card title="Release timing">
+            <Card title={t.releaseTiming}>
               <FieldRow field={byId("releaseDate")} onChange={(v) => setKitEdit(project.path, "releaseDate", v)} />
             </Card>
-            <Card title="Distribution: what the upload form asks">
+            <Card title={t.distribution}>
               <div className="flex flex-col divide-y divide-rule">
                 {DISTRIBUTION_FIELDS.map((id) => (
                   <FieldRow key={id} field={byId(id)} onChange={(v) => setKitEdit(project.path, id, v)} />
@@ -294,7 +447,7 @@ export function LaunchKitView() {
 
           <div className="flex flex-col gap-5">
             <AiPanel key={`ai:${project.path}`} path={project.path} input={kitInput} fields={fields} />
-            <Card title="Snippets for reels and stories">
+            <Card title={t.snippetsCard}>
               <Snippets
                 project={project}
                 analysis={analysis}
@@ -314,11 +467,11 @@ export function LaunchKitView() {
               analysisLoading={loading}
               analysisError={analysisError}
             />
-            <Card title="Cover art brief">
+            <Card title={t.coverBrief}>
               <FieldRow field={byId("coverBrief")} onChange={(v) => setKitEdit(project.path, "coverBrief", v)} bare />
               <CoverConcepts key={project.path} path={project.path} title={byId("title").value || project.name} artists={artistLine(byId("artists").value, byId("featuring").value)} brief={byId("coverBrief").value} />
             </Card>
-            <Card title="Captions">
+            <Card title={t.captions}>
               <CaptionLanguage
                 value={kitInput.captionLanguage ?? "fr"}
                 own={!!meta.launchKit?.captionLanguage}
@@ -344,13 +497,14 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
   const [running, setRunning] = useState<"draft" | "review" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const t = tr(T);
   if (!aiStatus?.configured) {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-dashed border-rule-strong bg-panel p-4 text-sm">
         <Sparkles size={16} className="shrink-0 text-body" />
-        <span className="flex-1 text-body">AI drafts and checks are off. They need a free Gemini API key.</span>
+        <span className="flex-1 text-body">{t.aiOff}</span>
         <button onClick={() => setView("settings")} className={btn}>
-          Add a key
+          {t.addKey}
         </button>
       </div>
     );
@@ -401,52 +555,46 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
 
   const line =
     summary.state === "unchecked"
-      ? "Not checked yet."
+      ? t.notChecked
       : summary.state === "stale"
-        ? "Some values changed since the last check."
+        ? t.changedSince
         : summary.verified
-          ? "Every field looks right."
-          : [
-              summary.flagged && `${summary.flagged} field${summary.flagged === 1 ? "" : "s"} to look at.`,
-              summary.skipped && `${summary.skipped} field${summary.skipped === 1 ? "" : "s"} not checked. Re-check.`,
-            ]
-              .filter(Boolean)
-              .join(" ") || "No problems found.";
+          ? t.allRight
+          : [summary.flagged && t.toLookAt(summary.flagged), summary.skipped && t.notCheckedN(summary.skipped)].filter(Boolean).join(" ") ||
+            t.noProblems;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-dashed border-rule-strong bg-panel p-4">
       <div className="flex items-center gap-2">
         <Sparkles size={15} className="text-body" />
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">AI layer · {model}</span>
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">
+          {t.aiLayer} · {model}
+        </span>
       </div>
       <div className="flex flex-wrap gap-2">
         <button onClick={() => run(true)} disabled={!!running} className={btnPrimary}>
-          <Sparkles size={14} /> {running === "draft" ? "Writing…" : "Write captions & brief"}
+          <Sparkles size={14} /> {running === "draft" ? t.writing : t.writeCopy}
         </button>
         <button
           onClick={() => run(false)}
           disabled={!!running || upToDate}
-          title={upToDate ? "Already checked, and nothing changed since: no need to spend free AI quota" : undefined}
+          title={upToDate ? t.upToDate : undefined}
           className={btn}
         >
-          <Check size={14} /> {running === "review" ? "Checking every field…" : summary.state === "unchecked" ? "Check kit" : upToDate ? "Checked" : "Re-check"}
+          <Check size={14} /> {running === "review" ? t.checkingAll : summary.state === "unchecked" ? t.checkKit : upToDate ? t.checked : t.recheck}
         </button>
         {drafts && !running && (
-          <button onClick={() => setKitAi(path, { drafts: undefined })} className="text-xs text-engrave hover:text-cream" title="Back to the template text">
-            Discard AI drafts
+          <button onClick={() => setKitAi(path, { drafts: undefined })} className="text-xs text-engrave hover:text-cream" title={t.backToTemplate}>
+            {t.discardDrafts}
           </button>
         )}
       </div>
       <div className={`text-xs ${summary.verified ? "text-emerald-300" : summary.state === "checked" ? "text-amber-300" : "text-engrave"}`}>
         {line}
-        {reviewedAt && <span className="text-engrave"> · checked {formatRelative(reviewedAt)}</span>}
+        {reviewedAt && <span className="text-engrave">{t.checkedAgo(formatRelative(reviewedAt))}</span>}
       </div>
-      {running && (
-        <div className="text-[11px] text-engrave">If Gemini is busy this retries on its own; it gives up after 2 minutes.</div>
-      )}
-      {backupUsed && !running && (
-        <div className="text-[11px] text-engrave">{model} was overloaded, so {backupUsed} (the backup free model) answered.</div>
-      )}
+      {running && <div className="text-[11px] text-engrave">{t.retries}</div>}
+      {backupUsed && !running && <div className="text-[11px] text-engrave">{t.backup(model, backupUsed)}</div>}
       {error && <div className="text-xs text-red-300">{error}</div>}
       <div className="text-[11px] leading-relaxed text-engrave">
         {aiDisclosure(!!settings.aiIncludeNotes)}
@@ -485,10 +633,11 @@ function Snippets({
 
   useEffect(() => () => audio.current?.pause(), [render?.path]);
 
-  if (!render) return <div className="py-6 text-center text-xs text-engrave">Render a mixdown to get snippets.</div>;
-  if (loading) return <div className="py-6 text-center text-xs text-engrave">Listening to the mixdown…</div>;
-  if (error || !analysis) return <div className="py-6 text-center text-xs text-red-300">{error ?? "No analysis"}</div>;
-  if (!snippets.length) return <div className="py-6 text-center text-xs text-engrave">The mixdown is shorter than 15 seconds.</div>;
+  const t = tr(T);
+  if (!render) return <div className="py-6 text-center text-xs text-engrave">{t.renderForSnippets}</div>;
+  if (loading) return <div className="py-6 text-center text-xs text-engrave">{t.listening}</div>;
+  if (error || !analysis) return <div className="py-6 text-center text-xs text-red-300">{error ?? t.noAnalysis}</div>;
+  if (!snippets.length) return <div className="py-6 text-center text-xs text-engrave">{t.tooShort}</div>;
 
   const duration = analysis.durationSec;
   const bar = project.tempoBpm ? 240 / project.tempoBpm : 1;
@@ -559,9 +708,9 @@ function Snippets({
         onPointerMove={move}
         onPointerUp={up}
         onPointerCancel={() => setDrag(null)}
-        title="Drag a snippet to move it, or click to put the selected one there"
+        title={t.stripHelp}
       >
-        <svg viewBox={`0 0 ${bars.length} 100`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-label="Loudness of the mixdown over time">
+        <svg viewBox={`0 0 ${bars.length} 100`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-label={t.loudness}>
           {bars.map((e, i) => (
             <rect key={i} x={i + 0.15} y={100 - e * 100} width={0.7} height={e * 100} fill="rgba(255,255,255,0.22)" />
           ))}
@@ -573,7 +722,7 @@ function Snippets({
             <div
               key={keyOf(s)}
               role="slider"
-              aria-label={`${s.label} start`}
+              aria-label={t.snippetStart(s.label)}
               aria-valuemin={0}
               aria-valuemax={Math.round(duration - s.lengthSec)}
               aria-valuenow={Math.round(s.startSec)}
@@ -590,7 +739,7 @@ function Snippets({
                   onMove(keyOf(s), clampStart(s.startSec + d, s.lengthSec));
                 }
               }}
-              title={`${s.label}: drag to move`}
+              title={t.dragToMove(s.label)}
               className={`absolute bottom-0 top-0 cursor-grab rounded-sm border-x-2 active:cursor-grabbing ${isActive ? "z-10" : ""}`}
               style={{
                 left: `${(s.startSec / duration) * 100}%`,
@@ -639,7 +788,7 @@ function Snippets({
                   onLength(key, len === detected?.lengthSec ? undefined : len);
                   if (s.startSec + len > duration) onMove(key, clampStart(s.startSec, len));
                 }}
-                aria-label={`${s.label} length`}
+                aria-label={t.snippetLength(s.label)}
                 className="rounded border border-rule-strong bg-chassis px-1.5 py-0.5 text-cream"
               >
                 {[...new Set([...SNIPPET_LENGTHS, detected?.lengthSec ?? 15])]
@@ -651,11 +800,11 @@ function Snippets({
                     </option>
                   ))}
               </select>
-              <span className="min-w-0 flex-1 truncate text-[11px] text-engrave">{moved ? "edited by you" : (s.reason ?? "")}</span>
-              <button onClick={() => nudge(-bar)} title={project.tempoBpm ? "1 bar earlier" : "1 s earlier"} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
+              <span className="min-w-0 flex-1 truncate text-[11px] text-engrave">{moved ? t.editedByYou : (s.reason ?? "")}</span>
+              <button onClick={() => nudge(-bar)} title={project.tempoBpm ? t.barEarlier : t.secEarlier} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
                 <Minus size={12} />
               </button>
-              <button onClick={() => nudge(bar)} title={project.tempoBpm ? "1 bar later" : "1 s later"} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
+              <button onClick={() => nudge(bar)} title={project.tempoBpm ? t.barLater : t.secLater} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
                 <Plus size={12} />
               </button>
               {moved && (
@@ -664,7 +813,7 @@ function Snippets({
                     onMove(key, undefined);
                     onLength(key, undefined);
                   }}
-                  title="Back to the detected spot and length"
+                  title={t.backToDetected}
                   className="rounded p-1 text-engrave hover:bg-rule hover:text-cream"
                 >
                   <RotateCcw size={12} />
@@ -673,7 +822,7 @@ function Snippets({
               <button
                 onClick={() => play(s)}
                 disabled={demoMode}
-                title={demoMode ? "No audio in sample data" : "Play this snippet"}
+                title={demoMode ? t.noAudioDemo : t.playSnippet}
                 className="flex items-center gap-1 rounded bg-rule px-2 py-1 text-cream hover:bg-rule-strong disabled:opacity-40"
               >
                 {playing === key ? <Pause size={12} /> : <Play size={12} />}
@@ -683,10 +832,7 @@ function Snippets({
         })}
       </div>
       {!demoMode && <audio ref={audio} src={api.audioSrc(render.path)} preload="none" />}
-      <div className="text-[11px] text-engrave">
-        Drag a snippet on the waveform, click to drop the selected one there, or type a start time. Clips are cut on export, with short fades, into
-        snippets/ in the kit.
-      </div>
+      <div className="text-[11px] text-engrave">{t.snippetsHelp}</div>
     </div>
   );
 }
@@ -711,7 +857,7 @@ function TimeInput({ value, onCommit }: { value: number; onCommit: (seconds: num
         if (e.key === "Escape") setText(null);
       }}
       onClick={(e) => e.stopPropagation()}
-      aria-label="Start time"
+      aria-label={tr(T).startTime}
       className="w-14 rounded border border-rule-strong bg-chassis px-1.5 py-0.5 font-mono tabular-nums text-cream focus:border-hot focus:outline-none"
     />
   );
@@ -780,9 +926,10 @@ function KitExportedDialog({ guide, lang, dir, onClose }: { guide: KitGuide; lan
 /** This kit's caption language; changing it rewrites the template captions
  * (AI drafts are flagged for a rewrite). */
 function CaptionLanguage({ value, own, onChange }: { value: KitLang; own: boolean; onChange: (lang: KitLang) => void }) {
+  const t = tr(T);
   return (
-    <div className="mb-2 flex items-center gap-2 text-xs text-engrave" role="group" aria-label="Caption language">
-      <span>Captions in</span>
+    <div className="mb-2 flex items-center gap-2 text-xs text-engrave" role="group" aria-label={t.captionLanguage}>
+      <span>{t.captionsIn}</span>
       {(["fr", "en"] as const).map((l) => (
         <button
           key={l}
@@ -793,7 +940,7 @@ function CaptionLanguage({ value, own, onChange }: { value: KitLang; own: boolea
           {l === "fr" ? "Français" : "English"}
         </button>
       ))}
-      <span>{own ? "for this kit" : "(from Settings)"}</span>
+      <span>{own ? t.forThisKit : t.fromSettings}</span>
     </div>
   );
 }
