@@ -212,7 +212,8 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
   );
 }
 
-function CrewHome() {
+/** The crew you're in: members, role, invites, leave, sync. Also the sidebar's crew menu. */
+export function CrewHome() {
   const crew = useCrewStore();
   const scope = crew.activeCrewId && crew.userId ? { crewId: crew.activeCrewId, userId: crew.userId } : null;
   const projects = useAppStore((s) => s.projects);
