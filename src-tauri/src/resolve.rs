@@ -78,12 +78,23 @@ pub fn factory_data_dir(fl_exe: &Path) -> Option<PathBuf> {
 fn rerooted(path: &str, user_data: Option<&Path>, factory_data: Option<&Path>) -> Vec<PathBuf> {
     let norm = path.replace('\\', "/");
     let low = norm.to_ascii_lowercase();
+    // What follows the marker must stay inside the local folder: no leading
+    // separator (join would replace the base), no `..`, no drive letter.
+    let inside = |rest: &str| -> Option<String> {
+        let rest = rest.trim_start_matches('/');
+        let ok = !rest.is_empty() && !rest.contains(':') && !rest.split('/').any(|c| c == "..");
+        ok.then(|| rest.to_string())
+    };
     let mut out = Vec::new();
     if let (Some(ud), Some(i)) = (user_data, low.find("/image-line/fl studio/")) {
-        out.push(ud.join(&norm[i + "/image-line/fl studio/".len()..]));
+        if let Some(rest) = inside(&norm[i + "/image-line/fl studio/".len()..]) {
+            out.push(ud.join(rest));
+        }
     }
     if let (Some(fd), Some(i)) = (factory_data, low.find("/data/patches/")) {
-        out.push(fd.join(&norm[i + 1..]));
+        if let Some(rest) = inside(&norm[i + 1..]) {
+            out.push(fd.join(rest));
+        }
     }
     out
 }
@@ -293,6 +304,11 @@ mod tests {
             vec![fd.join("Data/Patches/Packs/Drums/Kick.wav")]
         );
         assert!(rerooted("/Users/me/Samples/kick.wav", Some(ud), Some(fd)).is_empty());
+        // A crafted path can't leave the local folders.
+        assert!(rerooted("x/Image-Line/FL Studio//etc/passwd.wav", Some(ud), None) == vec![ud.join("etc/passwd.wav")]);
+        assert!(rerooted("x/Image-Line/FL Studio/../../secret.wav", Some(ud), None).is_empty());
+        assert!(rerooted(r"x\Data\Patches\..\..\k.wav", None, Some(fd)).is_empty());
+        assert!(rerooted("x/Image-Line/FL Studio/C:/k.wav", Some(ud), None).is_empty());
     }
 
     #[test]
