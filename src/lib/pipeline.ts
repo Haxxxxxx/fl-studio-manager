@@ -232,12 +232,19 @@ export function moveCard(
   const at = beforePath ? current.indexOf(beforePath) : -1;
   current.splice(at < 0 ? current.length : at, 0, path);
 
-  const order: Record<string, string[]> = {};
-  for (const [id, list] of Object.entries(cfg.order)) order[id] = list.filter((p) => p !== path);
-  order[to.id] = current;
-
   const stageChanged = (meta.status ?? null) !== to.stage;
   const nextMeta: SongMeta = { ...meta, column: to.id };
   if (stageChanged) Object.assign(nextMeta, { status: to.stage ?? undefined, stageUpdatedAtMs: now, stagePending: true });
-  return { ...ws, songs: { ...ws.songs, [path]: nextMeta }, pipeline: { ...cfg, order } };
+  const nextSongs = { ...ws.songs, [path]: nextMeta };
+
+  // Keep each hand-sorted list to the songs actually in that column now, so
+  // a song that left (moved elsewhere, archived, deleted) doesn't come back
+  // to an old slot and the lists don't grow forever.
+  const order: Record<string, string[]> = {};
+  for (const [id, list] of Object.entries(cfg.order)) {
+    const kept = list.filter((p) => p !== path && songs.some((s) => s.path === p) && columnOf(nextSongs[p], cfg).id === id);
+    if (kept.length) order[id] = kept;
+  }
+  order[to.id] = current;
+  return { ...ws, songs: nextSongs, pipeline: { ...cfg, order } };
 }

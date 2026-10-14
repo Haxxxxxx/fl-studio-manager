@@ -744,8 +744,10 @@ export const useAppStore = create<AppState>((set, get) => {
         // A local stage change waits to be sent to the crew (crew sync
         // sends it with the version it was made on). Crew moves applied here
         // carry their own sync fields.
-        const stamped =
-          "status" in patch && patch.stagePending === undefined ? { ...patch, stageUpdatedAtMs: Date.now(), stagePending: true } : patch;
+        const stamped: Partial<SongMeta> =
+          "status" in patch && patch.stagePending === undefined ? { ...patch, stageUpdatedAtMs: Date.now(), stagePending: true } : { ...patch };
+        // A new stage from anywhere but the board drops the column pin.
+        if ("status" in patch && !("column" in patch) && patch.status !== ws.songs[path]?.status) stamped.column = undefined;
         return { ...ws, songs: { ...ws.songs, [path]: { ...ws.songs[path], ...stamped } } };
       }),
 
@@ -759,7 +761,7 @@ export const useAppStore = create<AppState>((set, get) => {
       mutateWorkspace((ws) => {
         const songs = { ...ws.songs };
         const now = Date.now();
-        for (const p of paths) songs[p] = { ...songs[p], status, stageUpdatedAtMs: now, stagePending: true };
+        for (const p of paths) songs[p] = { ...songs[p], status, column: songs[p]?.column && songs[p]?.status === status ? songs[p].column : undefined, stageUpdatedAtMs: now, stagePending: true };
         return { ...ws, songs };
       }),
 

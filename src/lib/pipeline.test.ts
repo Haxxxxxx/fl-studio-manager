@@ -117,6 +117,19 @@ describe("pipeline model", () => {
     expect(resolvePipeline(after).order.mix).toBeUndefined();
   });
 
+  it("hand-sorted lists only keep songs still in that column", () => {
+    let w = ws({ "/p/A.flp": { status: "creation" }, "/p/B.flp": { status: "creation" } });
+    w = moveCard(w, all, "/p/B.flp", "creation", "/p/A.flp");
+    expect(resolvePipeline(w).order.creation).toEqual(["/p/B.flp", "/p/A.flp"]);
+    // B moves to Prep elsewhere (drawer, crewmate); the next board edit drops it from Creation's list.
+    w = { ...w, songs: { ...w.songs, "/p/B.flp": { status: "prep" } } };
+    w = moveCard(w, all, "/p/C.flp", "prep", null);
+    expect(resolvePipeline(w).order.creation).toEqual(["/p/A.flp"]);
+    // A song no longer on the board (archived, deleted) is dropped too.
+    w = moveCard(w, [B, C], "/p/C.flp", "prep", "/p/B.flp");
+    expect(resolvePipeline(w).order.creation).toBeUndefined();
+  });
+
   it("columns can be reordered", () => {
     const w = moveColumn(ws(), "promotion", 0);
     expect(resolvePipeline(w).columns[0].id).toBe("promotion");

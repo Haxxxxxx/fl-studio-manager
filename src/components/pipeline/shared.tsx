@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type DragEvent } from "react";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { usePipelineView, type PipelineViewKind } from "../../store/usePipelineView";
 import { canRemoveColumn, filterSongs, groupSongs, resolvePipeline, stageColor, stageLabel, STAGE_ORDER, NAME_MAX } from "../../lib/pipeline";
@@ -144,6 +144,14 @@ export function ColumnHeader({
   const openNewProject = useAppStore((s) => s.openNewProject);
   const toggleCollapsed = usePipelineView((s) => s.toggleCollapsed);
   const [editing, setEditing] = useState(false);
+  const cancelled = useRef(false);
+  const startEditing = () => {
+    cancelled.current = false;
+    setEditing(true);
+  };
+  const move = useAppStore((s) => s.movePipelineColumn);
+  const index = resolvePipeline(workspace).columns.findIndex((c) => c.id === column.id);
+  const total = resolvePipeline(workspace).columns.length;
   const removable = canRemoveColumn(resolvePipeline(workspace), column.id);
   const renamed = column.name.toLowerCase() !== stageLabel(column.stage).toLowerCase();
 
@@ -172,18 +180,23 @@ export function ColumnHeader({
             aria-label="Column name"
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") setEditing(false);
+              if (e.key === "Escape") {
+                cancelled.current = true;
+                setEditing(false);
+              }
             }}
             onBlur={(e) => {
-              rename(column.id, e.currentTarget.value);
+              if (!cancelled.current) rename(column.id, e.currentTarget.value);
+              cancelled.current = false;
               setEditing(false);
             }}
             className="min-w-0 flex-1 rounded border border-hot bg-chassis px-1 py-0 text-xs font-medium text-cream focus:outline-none"
           />
         ) : (
           <button
-            onDoubleClick={() => setEditing(true)}
-            title="Double-click to rename"
+            onDoubleClick={startEditing}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === "F2") && (e.preventDefault(), startEditing())}
+            title="Double-click (or Enter) to rename"
             className="min-w-0 truncate text-left text-xs font-medium text-cream"
           >
             {column.name}
@@ -204,7 +217,13 @@ export function ColumnHeader({
               <Plus size={13} />
             </button>
           )}
-          <button onClick={() => setEditing(true)} title="Rename" aria-label={`Rename ${column.name}`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
+          <button onClick={() => move(column.id, index - 1)} disabled={index <= 0} title="Move left" aria-label={`Move ${column.name} earlier`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
+            <ArrowLeft size={12} />
+          </button>
+          <button onClick={() => move(column.id, index + 1)} disabled={index >= total - 1} title="Move right" aria-label={`Move ${column.name} later`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
+            <ArrowRight size={12} />
+          </button>
+          <button onClick={startEditing} title="Rename" aria-label={`Rename ${column.name}`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
             <Pencil size={12} />
           </button>
           <span title={removable ? `Remove (songs move to the other ${stageLabel(column.stage)} column)` : `Every stage keeps one column. Rename it, or collapse it.`}>
