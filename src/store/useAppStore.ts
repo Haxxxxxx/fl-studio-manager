@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { dict, tr } from "../i18n";
 import * as api from "../lib/tauri";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
@@ -250,6 +251,11 @@ let savingNow: Promise<void> | null = null;
 let realFavorites: string[] | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let scanSeq = 0;
+
+const STORE_TEXT = dict(
+  { renderFlOnly: (daw: string, tip: string) => `Rendering from Hivo works with FL Studio projects. Export this one from ${daw}: ${tip}` },
+  { renderFlOnly: (daw: string, tip: string) => `Le rendu depuis Hivo marche avec les projets FL Studio. Exporte celui-ci depuis ${daw} : ${tip}` },
+);
 
 export const useAppStore = create<AppState>((set, get) => {
   /** Apply a change to the workspace and persist it (debounced, so typing
@@ -551,7 +557,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const { paths: projectPaths, names: outputNames, skipped } = splitRenderable(requested, byPath, options?.names);
       if (projectPaths.length === 0) {
         const daw = dawOf(byPath.get(requested[0]) ?? {});
-        throw new Error(`Rendering from Hivo works with FL Studio projects. Export this one from ${daw.label}: ${daw.exportTip}`);
+        throw new Error(tr(STORE_TEXT).renderFlOnly(daw.label, daw.exportTip));
       }
 
 

@@ -3,7 +3,8 @@ import { ChevronRight } from "lucide-react";
 import { useCollapsed, usePipelineView } from "../../store/usePipelineView";
 import { stageColor } from "../../lib/pipeline";
 import { StatusDot } from "../ui";
-import { AddColumn, beforeKeyFor, ColumnHeader, ConflictDot, DropLine, SourceError, startSongDrag, usePipelineDrop, useSource } from "./shared";
+import { AddColumn, beforeKeyFor, ColumnHeader, ConflictDot, DropLine, SourceError, startSongDrag, T_PIPELINE, usePipelineDrop, useSource } from "./shared";
+import { tr } from "../../i18n";
 
 /** Kanban: one column per pipeline column. Drag cards between and within
  * columns; where columns are editable, drag a header to reorder them. */
@@ -35,7 +36,7 @@ export function PipelineBoard() {
               {isCollapsed ? (
                 <button
                   onClick={() => toggleCollapsed(scope, "board", column.id)}
-                  aria-label={`Expand ${column.name}`}
+                  aria-label={tr(T_PIPELINE).expand(column.name)}
                   aria-expanded={false}
                   className="flex flex-1 flex-col items-center gap-2 py-2.5 text-engrave hover:text-cream"
                 >

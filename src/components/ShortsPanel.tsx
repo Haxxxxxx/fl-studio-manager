@@ -6,6 +6,60 @@ import { drawShortLayout } from "../lib/shorts";
 import { artistLine, type KitField } from "../lib/launchKit";
 import type { ProjectInfo, Snippet } from "../types";
 import { btn, btnPrimary } from "./ui";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  {
+    demo: "Sample data has no audio. Link your real project folder to render shorts.",
+    noMixdown: "This song has no mixdown yet. Export a WAV or MP3 from your DAW next to the project (or into your export folder), then come back.",
+    listening: "Listening to the mixdown to find the snippets…",
+    unreadable: (error: string) => `Couldn't read the mixdown: ${error}`,
+    tooShort: "The mixdown is shorter than 15 seconds, so there's nothing to cut.",
+    chooseFolderHint: "Choose where shorts get saved (your export folder).",
+    chooseFolder: "Choose export folder",
+    needFfmpeg: "ffmpeg is needed (free, one install). See the steps below.",
+    checkAgain: "Check again",
+    heading: "Shorts for Reels, TikTok and YouTube Shorts",
+    previewAlt: "9:16 layout preview",
+    waveformHint: "The waveform animates in the dark band",
+    intro: (list: string) => `One 1080×1920 MP4 per snippet (${list || "none yet"}) with your real audio, made on this computer. Free, no upload.`,
+    ready: (encoder: string) => `ffmpeg ready (${encoder})`,
+    notFound: "ffmpeg not found",
+    installOnce: "Install it once (free): ",
+    onMac: " on Mac, ",
+    onWindows: " on Windows. Then restart the app, or ",
+    setPath: "set its path in Settings",
+    looking: "Looking for ffmpeg…",
+    rendering: (n: number) => `Rendering ${n} shorts…`,
+    render: (n: number) => `Render ${n} short${n === 1 ? "" : "s"}`,
+    showInFolder: "Show in folder",
+  },
+  {
+    demo: "Les données d'exemple n'ont pas d'audio. Relie ton vrai dossier de projets pour faire le rendu des shorts.",
+    noMixdown: "Ce son n'a pas encore de mixdown. Exporte un WAV ou un MP3 depuis ton DAW à côté du projet (ou dans ton dossier d'export), puis reviens.",
+    listening: "Écoute du mixdown pour trouver les extraits…",
+    unreadable: (error: string) => `Impossible de lire le mixdown : ${error}`,
+    tooShort: "Le mixdown fait moins de 15 secondes, il n'y a rien à couper.",
+    chooseFolderHint: "Choisis où enregistrer les shorts (ton dossier d'export).",
+    chooseFolder: "Choisir le dossier d'export",
+    needFfmpeg: "Il faut ffmpeg (gratuit, une seule install). Les étapes sont juste en dessous.",
+    checkAgain: "Revérifier",
+    heading: "Shorts pour Reels, TikTok et YouTube Shorts",
+    previewAlt: "Aperçu de la mise en page 9:16",
+    waveformHint: "La forme d'onde s'anime dans la bande sombre",
+    intro: (list: string) => `Un MP4 1080×1920 par extrait (${list || "aucun pour l'instant"}) avec ton vrai audio, fait sur cet ordi. Gratuit, sans upload.`,
+    ready: (encoder: string) => `ffmpeg prêt (${encoder})`,
+    notFound: "ffmpeg introuvable",
+    installOnce: "Installe-le une fois (gratuit) : ",
+    onMac: " sur Mac, ",
+    onWindows: " sur Windows. Puis redémarre l'appli, ou ",
+    setPath: "indique son chemin dans les Réglages",
+    looking: "Recherche de ffmpeg…",
+    rendering: (n: number) => `Rendu de ${n} shorts…`,
+    render: (n: number) => `Faire le rendu de ${n} short${n === 1 ? "" : "s"}`,
+    showInFolder: "Afficher dans le dossier",
+  },
+);
 
 /** 9:16 shorts from the snippets, rendered locally with ffmpeg (free). */
 export function ShortsPanel({
@@ -60,20 +114,21 @@ export function ShortsPanel({
 
   // What stops a render, in the order the user should fix it, each with a
   // one-click fix where there is one.
+  const t = tr(T);
   const blocker: { message: string; action?: { label: string; run: () => void } } | null = demoMode
-    ? { message: "Sample data has no audio. Link your real project folder to render shorts." }
+    ? { message: t.demo }
     : !project.renders[0]
-      ? { message: "This song has no mixdown yet. Export a WAV or MP3 from your DAW next to the project (or into your export folder), then come back." }
+      ? { message: t.noMixdown }
       : analysisLoading
-        ? { message: "Listening to the mixdown to find the snippets…" }
+        ? { message: t.listening }
         : analysisError
-          ? { message: `Couldn't read the mixdown: ${analysisError}` }
+          ? { message: t.unreadable(analysisError) }
           : !snippets.length
-            ? { message: "The mixdown is shorter than 15 seconds, so there's nothing to cut." }
+            ? { message: t.tooShort }
             : !settings.outputFolder
-              ? { message: "Choose where shorts get saved (your export folder).", action: { label: "Choose export folder", run: chooseExportFolder } }
+              ? { message: t.chooseFolderHint, action: { label: t.chooseFolder, run: chooseExportFolder } }
               : status && !status.encoder
-                ? { message: "ffmpeg is needed (free, one install). See the steps below.", action: { label: "Check again", run: recheck } }
+                ? { message: t.needFfmpeg, action: { label: t.checkAgain, run: recheck } }
                 : null;
 
   async function render() {
@@ -94,40 +149,40 @@ export function ShortsPanel({
   return (
     <div className="rounded-lg border border-rule bg-panel p-4">
       <div className="mb-3 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">
-        <Clapperboard size={13} /> Shorts for Reels, TikTok and YouTube Shorts
+        <Clapperboard size={13} /> {t.heading}
       </div>
       <div className="flex gap-4">
         <div className="shrink-0">
-          <img src={preview} alt="9:16 layout preview" className="h-[284px] w-[160px] rounded-md border border-rule object-cover" />
-          <div className="mt-1 text-center text-[10px] text-engrave">The waveform animates in the dark band</div>
+          <img src={preview} alt={t.previewAlt} className="h-[284px] w-[160px] rounded-md border border-rule object-cover" />
+          <div className="mt-1 text-center text-[10px] text-engrave">{t.waveformHint}</div>
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2.5 text-xs text-body">
-          <p>
-            One 1080×1920 MP4 per snippet ({snippets.map((s) => s.label).join(", ") || "none yet"}) with your real audio, made on this computer.
-            Free, no upload.
-          </p>
+          <p>{t.intro(snippets.map((s) => s.label).join(", "))}</p>
           {status?.encoder ? (
-            <div className="text-emerald-300/80">ffmpeg ready ({status.encoder})</div>
+            <div className="text-emerald-300/80">{t.ready(status.encoder)}</div>
           ) : status ? (
             <div className="rounded-md border border-amber-400/20 bg-amber-500/[0.06] p-2.5 text-amber-100/80">
               <div className="flex items-center gap-1.5 font-medium">
-                <AlertTriangle size={12} /> {status.error ?? "ffmpeg not found"}
+                <AlertTriangle size={12} /> {status.error ?? t.notFound}
               </div>
               <div className="mt-1 text-engrave">
-                Install it once (free): <code className="rounded bg-black/30 px-1">brew install ffmpeg</code> on Mac,{" "}
-                <code className="rounded bg-black/30 px-1">winget install Gyan.FFmpeg</code> on Windows. Then restart the app, or{" "}
+                {t.installOnce}
+                <code className="rounded bg-black/30 px-1">brew install ffmpeg</code>
+                {t.onMac}
+                <code className="rounded bg-black/30 px-1">winget install Gyan.FFmpeg</code>
+                {t.onWindows}
                 <button onClick={() => setView("settings")} className="underline">
-                  set its path in Settings
+                  {t.setPath}
                 </button>
                 .
               </div>
             </div>
           ) : (
-            <div className="text-engrave">Looking for ffmpeg…</div>
+            <div className="text-engrave">{t.looking}</div>
           )}
           <div>
             <button onClick={render} disabled={!!blocker || state.kind === "running"} title={blocker?.message} className={btnPrimary}>
-              <Clapperboard size={14} /> {state.kind === "running" ? `Rendering ${snippets.length} shorts…` : `Render ${snippets.length} short${snippets.length === 1 ? "" : "s"}`}
+              <Clapperboard size={14} /> {state.kind === "running" ? t.rendering(snippets.length) : t.render(snippets.length)}
             </button>
             {blocker && (
               <div className="mt-2 flex items-center gap-2 rounded-md border border-amber-400/25 bg-amber-500/[0.07] px-2.5 py-2 text-[12px] text-amber-100/90">
@@ -160,7 +215,7 @@ export function ShortsPanel({
           )}
           {state.results.some((r) => r.path) && (
             <button onClick={() => api.revealInFileManager(state.results.find((r) => r.path)!.path!)} className={`${btn} self-end`}>
-              <FolderOpen size={14} /> Show in folder
+              <FolderOpen size={14} /> {t.showInFolder}
             </button>
           )}
         </div>

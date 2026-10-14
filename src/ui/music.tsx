@@ -6,19 +6,115 @@ import { renderFreshness } from "../lib/songs";
 import { LOW_CONFIDENCE, type Check as KitCheck, type KitField } from "../lib/launchKit";
 import type { AiFieldReview, ProjectInfo } from "../types";
 import { engrave, input, StatusDot } from "./base";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  {
+    freshShort: "Current",
+    freshLabel: "Mix current",
+    freshTitle: "Mixdown is newer than the last save",
+    staleShort: "Outdated",
+    staleLabel: "Mix outdated",
+    staleTitle: "Project was saved after the last mixdown",
+    noneShort: "None",
+    noneLabel: "No mixdown",
+    noneTitle: "No mixdown found for this song",
+    showInFolder: "Show in folder",
+    detected: "Detected",
+    suggested: "Suggested",
+    ai: "AI draft",
+    edited: "Edited",
+    missing: "Needs you",
+    ok: "AI: looks right",
+    check: "AI: worth a look",
+    wrong: "AI: looks wrong",
+    needYou: (missing: number, warnings: number) =>
+      `${missing} need${missing === 1 ? "s" : ""} you${warnings ? ` · ${warnings} to check` : ""}`,
+    nextField: "Go to the next field that needs you",
+    readyToExport: "Ready to export",
+    readyToReview: "Ready to review",
+    aiVerified: " · AI-verified",
+    toCheck: (n: number) => ` · ${n} to check`,
+    aiReview: "AI review",
+    use: "Use",
+    sure: (pct: number) => `${pct}% sure`,
+    lowConfidence: "low confidence",
+    staleReview: " (checked an earlier value)",
+    resetTitle: "Back to the generated value",
+    reset: "Reset",
+    copied: "Copied",
+    choiceYes: "Yes",
+    choiceNo: "No",
+    copy: "Copy",
+    typeOnce: "Type it once",
+  },
+  {
+    freshShort: "À jour",
+    freshLabel: "Mix à jour",
+    freshTitle: "Le mixdown est plus récent que la dernière sauvegarde",
+    staleShort: "Dépassé",
+    staleLabel: "Mix dépassé",
+    staleTitle: "Le projet a été sauvegardé après le dernier mixdown",
+    noneShort: "Aucun",
+    noneLabel: "Pas de mixdown",
+    noneTitle: "Aucun mixdown trouvé pour ce son",
+    showInFolder: "Afficher dans le dossier",
+    detected: "Détecté",
+    suggested: "Suggéré",
+    ai: "Brouillon IA",
+    edited: "Modifié",
+    missing: "À compléter",
+    ok: "IA : ça a l'air bon",
+    check: "IA : à vérifier",
+    wrong: "IA : ça a l'air faux",
+    needYou: (missing: number, warnings: number) =>
+      `${missing} à compléter${warnings ? ` · ${warnings} à vérifier` : ""}`,
+    nextField: "Aller au prochain champ à compléter",
+    readyToExport: "Prêt à exporter",
+    readyToReview: "Prêt à relire",
+    aiVerified: " · vérifié par l'IA",
+    toCheck: (n: number) => ` · ${n} à vérifier`,
+    aiReview: "Relecture IA",
+    use: "Utiliser",
+    sure: (pct: number) => `sûr à ${pct} %`,
+    lowConfidence: "confiance faible",
+    staleReview: " (a vérifié une valeur précédente)",
+    resetTitle: "Revenir à la valeur générée",
+    reset: "Réinitialiser",
+    copied: "Copié",
+    choiceYes: "Oui",
+    choiceNo: "Non",
+    copy: "Copier",
+    typeOnce: "Tape-le une fois",
+  },
+);
 
 const MIX_STATE = {
-  fresh: { color: "#3ddc84", short: "Current", label: "Mix current", title: "Mixdown is newer than the last save" },
-  stale: { color: "#ffc233", short: "Outdated", label: "Mix outdated", title: "Project was saved after the last mixdown" },
-  none: { color: "#ff4040", short: "None", label: "No mixdown", title: "No mixdown found for this song" },
+  fresh: { color: "#3ddc84", key: "fresh" },
+  stale: { color: "#ffc233", key: "stale" },
+  none: { color: "#ff4040", key: "none" },
 } as const;
+
+/** Read-only properties that look up the current language each time. */
+function live<K extends string>(keys: Record<K, () => string>): Record<K, string> {
+  const out = {} as Record<K, string>;
+  for (const k of Object.keys(keys) as K[]) Object.defineProperty(out, k, { enumerable: true, get: keys[k] });
+  return out;
+}
+
+/** `rest` plus a `label` that follows the language. */
+function labelled<R extends object>(label: () => string, rest: R): R & { label: string } {
+  return Object.defineProperty(rest, "label", { enumerable: true, get: label }) as R & { label: string };
+}
 
 /** Whether the newest mixdown is current, outdated, or missing: an LED and
  * a word. `short` uses one word (under a Mixdown column header); `compact`
  * keeps just the LED (the word moves to the tooltip). */
 export function MixdownBadge({ project, compact = false, short = false }: { project: ProjectInfo; compact?: boolean; short?: boolean }) {
   const f = renderFreshness(project);
-  const state = MIX_STATE[f === "fresh" ? "fresh" : f === "none" ? "none" : "stale"];
+  const m = MIX_STATE[f === "fresh" ? "fresh" : f === "none" ? "none" : "stale"];
+  const t = tr(T);
+  const state = { color: m.color, short: t[`${m.key}Short`], label: t[`${m.key}Label`], title: t[`${m.key}Title`] };
   return (
     <span
       className="flex items-center gap-2 whitespace-nowrap font-mono text-[11px] uppercase tracking-[0.08em] text-cream"
@@ -57,7 +153,7 @@ export function FileRow({ icon, label, detail, onReveal }: { icon: React.ReactNo
         {detail}
       </span>
       {onReveal && (
-        <button onClick={onReveal} title="Show in folder" className="shrink-0 rounded p-0.5 text-engrave opacity-0 hover:bg-rule hover:text-cream group-hover:opacity-100">
+        <button onClick={onReveal} title={tr(T).showInFolder} className="shrink-0 rounded p-0.5 text-engrave opacity-0 hover:bg-rule hover:text-cream group-hover:opacity-100">
           <FolderOpen size={12} />
         </button>
       )}
@@ -69,11 +165,11 @@ export function FileRow({ icon, label, detail, onReveal }: { icon: React.ReactNo
  * hue: LED dot (detected, suggested), dashed (AI draft), cream outline
  * (edited), solid orange (needs you). */
 export const SOURCE_STYLE: Record<KitField["source"], { label: string; className: string; led?: string }> = {
-  detected: { label: "Detected", className: "border border-rule-strong text-body", led: "#3ddc84" },
-  suggested: { label: "Suggested", className: "border border-rule-strong text-body", led: "#5598e7" },
-  ai: { label: "AI draft", className: "border border-dashed border-engrave text-body" },
-  edited: { label: "Edited", className: "border border-cream text-cream" },
-  missing: { label: "Needs you", className: "border border-hot bg-hot font-medium text-chassis" },
+  detected: labelled(() => tr(T).detected, { className: "border border-rule-strong text-body", led: "#3ddc84" }),
+  suggested: labelled(() => tr(T).suggested, { className: "border border-rule-strong text-body", led: "#5598e7" }),
+  ai: labelled(() => tr(T).ai, { className: "border border-dashed border-engrave text-body" }),
+  edited: labelled(() => tr(T).edited, { className: "border border-cream text-cream" }),
+  missing: labelled(() => tr(T).missing, { className: "border border-hot bg-hot font-medium text-chassis" }),
 };
 
 /** The source badge for one Launch Kit field. */
@@ -87,11 +183,11 @@ export function SourceBadge({ source }: { source: KitField["source"] }) {
   );
 }
 
-export const VERDICT_LABEL: Record<AiFieldReview["verdict"], string> = {
-  ok: "AI: looks right",
-  check: "AI: worth a look",
-  wrong: "AI: looks wrong",
-};
+export const VERDICT_LABEL: Record<AiFieldReview["verdict"], string> = live({
+  ok: () => tr(T).ok,
+  check: () => tr(T).check,
+  wrong: () => tr(T).wrong,
+});
 
 /** Launch Kit readiness: how many fields need you, or reviewed/ready. */
 export function KitStatus({
@@ -108,13 +204,14 @@ export function KitStatus({
   /** Go to the next field that needs you (the plate becomes a button). */
   onJump?: () => void;
 }) {
+  const t = tr(T);
   const plate = "flex items-center gap-2 rounded px-3 py-1 font-display text-[15px] font-bold uppercase tracking-[0.04em]";
   if (missing) {
-    const label = `${missing} need${missing === 1 ? "s" : ""} you${warnings ? ` · ${warnings} to check` : ""}`;
+    const label = t.needYou(missing, warnings);
     return onJump ? (
       <button
         onClick={onJump}
-        title="Go to the next field that needs you"
+        title={t.nextField}
         className={`${plate} bg-hot text-chassis hover:bg-hot-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cream`}
       >
         {label}
@@ -126,9 +223,9 @@ export function KitStatus({
   return (
     <span className={`${plate} border border-rule-strong text-cream`}>
       <StatusDot color={accepted ? "#3ddc84" : "#ffc233"} />
-      {accepted ? "Ready to export" : "Ready to review"}
-      {aiVerified && " · AI-verified"}
-      {warnings ? ` · ${warnings} to check` : ""}
+      {accepted ? t.readyToExport : t.readyToReview}
+      {aiVerified && t.aiVerified}
+      {warnings ? t.toCheck(warnings) : ""}
     </span>
   );
 }
@@ -148,17 +245,18 @@ export function CheckLine({ check }: { check: KitCheck }) {
 /** The AI reviewer's verdict on a field, with its suggestion and a Use button. */
 export function AiLine({ review, onUse }: { review: AiFieldReview & { stale: boolean }; onUse: (v: string) => void }) {
   const low = review.confidence < LOW_CONFIDENCE;
+  const t = tr(T);
   const led = review.stale ? "#5a5850" : review.verdict === "wrong" ? "#ff4040" : review.verdict === "check" || low ? "#ffc233" : "#3ddc84";
   return (
     <div className="flex flex-col gap-1.5 rounded border border-dashed border-[#5a5850] p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className={engrave}>AI review</span>
+        <span className={engrave}>{t.aiReview}</span>
         {review.suggestion && !review.stale && (
           <button
             onClick={() => onUse(review.suggestion!)}
             className="rounded border border-rule-strong px-2.5 py-0.5 font-display text-[13px] font-semibold uppercase tracking-[0.06em] text-cream hover:bg-raised"
           >
-            Use
+            {t.use}
           </button>
         )}
       </div>
@@ -167,10 +265,10 @@ export function AiLine({ review, onUse }: { review: AiFieldReview & { stale: boo
           <StatusDot color={led} size={7} glow={!review.stale} />
         </span>
         <span>
-          <span className="font-medium text-cream">{VERDICT_LABEL[review.verdict]}</span> · {Math.round(review.confidence * 100)}% sure
-          {low && !review.stale && <span className="ml-1 rounded border border-warn/60 px-1 font-mono text-[10px] uppercase text-warn">low confidence</span>}
+          <span className="font-medium text-cream">{VERDICT_LABEL[review.verdict]}</span> · {t.sure(Math.round(review.confidence * 100))}
+          {low && !review.stale && <span className="ml-1 rounded border border-warn/60 px-1 font-mono text-[10px] uppercase text-warn">{t.lowConfidence}</span>}
           {review.reason && ` · ${review.reason}`}
-          {review.stale && " (checked an earlier value)"}
+          {review.stale && t.staleReview}
         </span>
       </div>
       {review.suggestion && !review.stale && (
@@ -185,6 +283,7 @@ export function AiLine({ review, onUse }: { review: AiFieldReview & { stale: boo
 /** One Launch Kit field: label, source badge, note, editor, checks and AI review. */
 export function FieldRow({ field, onChange, bare = false }: { field: KitField; onChange: (v: string | undefined) => void; bare?: boolean }) {
   const [copied, setCopied] = useState(false);
+  const t = tr(T);
   return (
     <div
       id={`kit-field-${field.id}`}
@@ -199,8 +298,8 @@ export function FieldRow({ field, onChange, bare = false }: { field: KitField; o
           {field.note}
         </span>
         {field.source === "edited" && (
-          <button onClick={() => onChange(undefined)} title="Back to the generated value" className="flex items-center gap-1 text-[11px] text-engrave hover:text-cream">
-            <RotateCcw size={11} /> Reset
+          <button onClick={() => onChange(undefined)} title={t.resetTitle} className="flex items-center gap-1 text-[11px] text-engrave hover:text-cream">
+            <RotateCcw size={11} /> {t.reset}
           </button>
         )}
         {field.kind === "multiline" && (
@@ -213,7 +312,7 @@ export function FieldRow({ field, onChange, bare = false }: { field: KitField; o
             }}
             className="flex items-center gap-1 text-[11px] text-engrave hover:text-cream"
           >
-            <ClipboardCopy size={11} /> {copied ? "Copied" : "Copy"}
+            <ClipboardCopy size={11} /> {copied ? t.copied : t.copy}
           </button>
         )}
       </div>
@@ -225,7 +324,8 @@ export function FieldRow({ field, onChange, bare = false }: { field: KitField; o
               onClick={() => onChange(o)}
               className={`rounded-md border px-3 py-1 text-sm ${field.value === o ? "border-cream bg-cream text-chassis" : "border-rule text-body hover:bg-raised"}`}
             >
-              {o}
+              {/* The value stays "Yes" / "No" (what distributors expect); only the label is translated. */}
+              {o === "Yes" ? tr(T).choiceYes : o === "No" ? tr(T).choiceNo : o}
             </button>
           ))}
         </div>
@@ -236,7 +336,7 @@ export function FieldRow({ field, onChange, bare = false }: { field: KitField; o
           type={field.kind === "date" ? "date" : "text"}
           value={field.value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={field.source === "missing" ? "Type it once" : undefined}
+          placeholder={field.source === "missing" ? t.typeOnce : undefined}
           className={`${input} [color-scheme:dark] ${field.source === "missing" ? "!border-hot" : ""}`}
         />
       )}

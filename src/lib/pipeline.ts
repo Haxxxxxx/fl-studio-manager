@@ -1,5 +1,5 @@
 import type { PipelineColumn, PipelineConfig, ProjectInfo, SongMeta, SongStatus, Workspace } from "../types";
-import { STATUSES, UNSORTED, lastSaveMs, newId } from "./songs";
+import { STATUSES, UNSORTED, lastSaveMs, newId, stageNames } from "./songs";
 
 // The pipeline: ONE model behind the board, the list and the table.
 //
@@ -48,7 +48,11 @@ export function resolvePipeline(ws: Pick<Workspace, "pipeline">): PipelineConfig
     const stage = c?.stage ?? null;
     if (!c || typeof c.id !== "string" || !c.id || seen.has(c.id) || stageIndex(stage) < 0) continue;
     seen.add(c.id);
-    columns.push({ id: c.id, name: cleanName(c.name) || stageLabel(stage), stage });
+    // A column still named after its stage (in any language) shows in the
+    // current one: switching language mustn't leave "Creation" in French.
+    const name = cleanName(c.name);
+    const isDefault = stageNames(stage).some((n) => n.toLowerCase() === name.toLowerCase());
+    columns.push({ id: c.id, name: name && !isDefault ? name : stageLabel(stage), stage });
   }
   for (const stage of STAGE_ORDER) {
     if (columns.some((c) => c.stage === stage)) continue;

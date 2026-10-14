@@ -1,4 +1,5 @@
 import type { CrewMemberRow, CrewSongRow, SongStatus } from "../types";
+import { dict, tr } from "../i18n";
 import { STALLED_DAYS } from "./crew";
 import { isFinished } from "./songs";
 
@@ -37,11 +38,13 @@ export interface CrewStats {
   members: CrewMemberStats[];
 }
 
+const T = dict({ formerMember: "Former member" }, { formerMember: "Ancien membre" });
+
 const STAGES: (SongStatus | null)[] = [null, "creation", "production", "prep", "release", "promotion"];
 
 /** `today` is a local YYYY-MM-DD (release dates are plain dates). */
 export function crewStats(songs: CrewSongRow[], members: CrewMemberRow[], now = Date.now(), today = localDay(now)): CrewStats {
-  const nameOf = (id: string | null | undefined) => members.find((m) => m.user_id === id)?.display_name ?? "Former member";
+  const nameOf = (id: string | null | undefined) => members.find((m) => m.user_id === id)?.display_name ?? tr(T).formerMember;
   const recent = now - RECENT_DAYS * DAY;
 
   const stalled = songs

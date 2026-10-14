@@ -1,6 +1,7 @@
 import type { Album, AlbumKind, CrewCredit, CrewReleaseRow, CrewSongRow, ProjectInfo, SongMeta, SongStatus, StageConflict, Workspace } from "../types";
 import { cleanTitle } from "./launchKit";
 import { lastSaveMs } from "./songs";
+import { dict, tr } from "../i18n";
 
 // Sync between the local workspace and the crew database (docs/ARCHITECTURE.md).
 // Pure functions: what to push for a shared song, which remote stage moves to
@@ -252,11 +253,27 @@ export interface SyncFacts {
 
 /** Why nothing of yours reaches the crew board, in one line (the first
  * blocker), or null when your shared songs sync. */
+const T_SYNC = dict(
+  {
+    demo: "Not syncing: you're looking at sample data, which is never shared. Link your real projects folder.",
+    readOnly: "Not syncing: Hivo can't save its data on this computer (see the message at the top of the window).",
+    noFolders: "Nothing to share yet: add your projects folder in Settings, then share songs.",
+    noneShared: "Nothing shared yet: your songs stay private until you share them (song panel, or select several in the Library).",
+  },
+  {
+    demo: "Pas de synchro\u202f: tu regardes des données d'exemple, qui ne sont jamais partagées. Relie ton vrai dossier de projets.",
+    readOnly: "Pas de synchro\u202f: Hivo n'arrive pas à enregistrer ses données sur cet ordi (voir le message en haut de la fenêtre).",
+    noFolders: "Rien à partager pour l'instant\u202f: ajoute ton dossier de projets dans les Réglages, puis partage des sons.",
+    noneShared: "Rien de partagé pour l'instant\u202f: tes sons restent privés tant que tu ne les partages pas (panneau du son, ou sélectionnes-en plusieurs dans la Bibliothèque).",
+  },
+);
+
 export function syncNote(f: SyncFacts): string | null {
-  if (f.demoMode) return "Not syncing: you're looking at sample data, which is never shared. Link your real projects folder.";
-  if (!f.workspaceWritable) return "Not syncing: Hivo can't save its data on this computer (see the message at the top of the window).";
-  if (!f.hasFolders) return "Nothing to share yet: add your projects folder in Settings, then share songs.";
-  if (f.sharedCount === 0) return "Nothing shared yet: your songs stay private until you share them (song panel, or select several in the Library).";
+  const t = tr(T_SYNC);
+  if (f.demoMode) return t.demo;
+  if (!f.workspaceWritable) return t.readOnly;
+  if (!f.hasFolders) return t.noFolders;
+  if (f.sharedCount === 0) return t.noneShared;
   return null;
 }
 

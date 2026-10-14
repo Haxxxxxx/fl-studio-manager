@@ -9,7 +9,7 @@ import { localDay } from "@shared/lib/crewStats";
 import type { CrewSongRow, SongStatus } from "@shared/types";
 import { useWeb } from "./store";
 import { Landing } from "./Landing";
-import { crewText } from "@shared/lib/crewMessages";
+import { crewText, setUiLang } from "@shared/lib/crewMessages";
 import { SIGN_IN } from "./landingCopy";
 import { cleanCode, isCodeComplete } from "@shared/lib/signInCode";
 import { pageLang, type Lang } from "./lang";
@@ -48,8 +48,12 @@ export function App() {
   if (!ready) return <Centered>Loading…</Centered>;
   if (!userId) {
     const lang = pageLang();
+    setUiLang(lang);
     return <Landing lang={lang} signIn={<SignIn lang={lang} />} />;
   }
+  // Signed in: the crew dashboard is English for now (see the FAQ), so the
+  // shared stage names and messages are too, never a French/English mix.
+  setUiLang("en");
   if (crews.length === 0 && loadError) return <Shell><LoadFailed message={loadError} /></Shell>;
   if (crews.length === 0) return <Shell><Join /></Shell>;
   return <Dashboard topError={error} />;

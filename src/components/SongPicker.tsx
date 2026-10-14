@@ -4,54 +4,101 @@ import { formatRelative } from "../lib/format";
 import { formatBpm, renderFreshness, songLabel, stageRank, statusInfo } from "../lib/songs";
 import type { ProjectInfo, Workspace } from "../types";
 import { StatusDot } from "./ui";
+import { dict, tr } from "../i18n";
 
 // Launch Kit song picker: the current song as a readable card, and a
 // searchable list grouped by how ready each song is to launch.
 
-const GROUPS = [
-  { id: "fresh", label: "Ready to launch", hint: "Mixdown is up to date" },
-  { id: "stale", label: "Mixdown outdated", hint: "Saved in FL after the last mixdown" },
-  { id: "none", label: "No mixdown yet", hint: "Render one to get snippets and a master" },
-] as const;
+const T = dict(
+  {
+    freshLabel: "Ready to launch",
+    freshHint: "Mixdown is up to date",
+    staleLabel: "Mixdown outdated",
+    staleHint: "Saved in FL after the last mixdown",
+    noneLabel: "No mixdown yet",
+    noneHint: "Render one to get snippets and a master",
+    mixdownReady: "Mixdown ready",
+    mixdownOutdated: "Mixdown outdated",
+    noMixdown: "No mixdown",
+    kitAccepted: "Kit accepted",
+    kitInProgress: "Kit in progress",
+    changeSong: "Change song",
+    searchPlaceholder: "Search songs, stage, key or tag",
+    searchLabel: "Search songs",
+    songs: "Songs",
+    noMatch: (q: string) => `No song matches “${q}”.`,
+    saved: (when: string) => `saved ${when}`,
+    keys: "↑ ↓ to move · Enter to open · Esc to close",
+  },
+  {
+    freshLabel: "Prêts à sortir",
+    freshHint: "Le mixdown est à jour",
+    staleLabel: "Mixdown pas à jour",
+    staleHint: "Sauvegardé dans FL après le dernier mixdown",
+    noneLabel: "Pas encore de mixdown",
+    noneHint: "Fais-en le rendu pour avoir des extraits et un master",
+    mixdownReady: "Mixdown prêt",
+    mixdownOutdated: "Mixdown pas à jour",
+    noMixdown: "Pas de mixdown",
+    kitAccepted: "Kit validé",
+    kitInProgress: "Kit en cours",
+    changeSong: "Changer de son",
+    searchPlaceholder: "Cherche un son, une étape, une tonalité ou un tag",
+    searchLabel: "Chercher des sons",
+    songs: "Sons",
+    noMatch: (q: string) => `Aucun son ne correspond à « ${q} ».`,
+    saved: (when: string) => `sauvegardé ${when}`,
+    keys: "↑ ↓ pour bouger · Entrée pour ouvrir · Échap pour fermer",
+  },
+);
 
+const GROUPS = ["fresh", "stale", "none"] as const;
 
+function groupText(id: (typeof GROUPS)[number]): { label: string; hint: string } {
+  const t = tr(T);
+  if (id === "fresh") return { label: t.freshLabel, hint: t.freshHint };
+  if (id === "stale") return { label: t.staleLabel, hint: t.staleHint };
+  return { label: t.noneLabel, hint: t.noneHint };
+}
 
 function MixdownState({ song }: { song: ProjectInfo }) {
   const f = renderFreshness(song);
+  const t = tr(T);
   if (f === "fresh") {
     return (
       <span className="flex items-center gap-1 text-emerald-300/90">
-        <Disc3 size={11} /> Mixdown ready
+        <Disc3 size={11} /> {t.mixdownReady}
       </span>
     );
   }
   if (f === "stale") {
     return (
       <span className="flex items-center gap-1 text-amber-300/90">
-        <AlertTriangle size={11} /> Mixdown outdated
+        <AlertTriangle size={11} /> {t.mixdownOutdated}
       </span>
     );
   }
-  return <span className="text-engrave">No mixdown</span>;
+  return <span className="text-engrave">{t.noMixdown}</span>;
 }
 
 function KitState({ song, workspace }: { song: ProjectInfo; workspace: Workspace }) {
   const kit = workspace.songs[song.path]?.launchKit;
+  const t = tr(T);
   if (kit?.acceptedAtMs) {
     return (
       <span className="flex items-center gap-1 text-emerald-300/90">
-        <CheckCircle2 size={11} /> Kit accepted
+        <CheckCircle2 size={11} /> {t.kitAccepted}
       </span>
     );
   }
   if (kit?.ai?.review || kit?.ai?.drafts) {
     return (
       <span className="flex items-center gap-1 text-body">
-        <Sparkles size={11} /> Kit in progress
+        <Sparkles size={11} /> {t.kitInProgress}
       </span>
     );
   }
-  if (kit?.edits && Object.keys(kit.edits).length) return <span className="text-engrave">Kit in progress</span>;
+  if (kit?.edits && Object.keys(kit.edits).length) return <span className="text-engrave">{t.kitInProgress}</span>;
   return null;
 }
 
@@ -82,9 +129,10 @@ export function SongPicker({
       return [s.name, statusInfo(meta?.status).label, meta?.key ?? "", ...(meta?.tags ?? [])].some((t) => t.toLowerCase().includes(q));
     });
     const rank = (s: ProjectInfo) => stageRank(workspace.songs[s.path]?.status);
-    return GROUPS.map((g) => ({
-      ...g,
-      songs: matches.filter((s) => renderFreshness(s) === g.id).sort((a, b) => rank(a) - rank(b) || b.modifiedAtMs - a.modifiedAtMs),
+    return GROUPS.map((id) => ({
+      id,
+      ...groupText(id),
+      songs: matches.filter((s) => renderFreshness(s) === id).sort((a, b) => rank(a) - rank(b) || b.modifiedAtMs - a.modifiedAtMs),
     })).filter((g) => g.songs.length);
   }, [songs, workspace.songs, query]);
   const flat = groups.flatMap((g) => g.songs);
@@ -129,6 +177,7 @@ export function SongPicker({
   const meta = workspace.songs[current.path];
   const status = statusInfo(meta?.status);
   let index = -1;
+  const t = tr(T);
 
   return (
     <div ref={root} className="relative min-w-0">
@@ -150,7 +199,7 @@ export function SongPicker({
           </div>
         </div>
         <span className="flex shrink-0 items-center gap-1 text-[11px] text-engrave group-hover:text-body">
-          Change song <ChevronDown size={14} className={open ? "rotate-180" : ""} />
+          {t.changeSong} <ChevronDown size={14} className={open ? "rotate-180" : ""} />
         </span>
       </button>
 
@@ -166,16 +215,16 @@ export function SongPicker({
                 setActive(0);
               }}
               onKeyDown={onKeyDown}
-              placeholder="Search songs, stage, key or tag"
-              aria-label="Search songs"
+              placeholder={t.searchPlaceholder}
+              aria-label={t.searchLabel}
               aria-controls="launch-song-list"
               aria-activedescendant={flat[active] ? `song-opt-${active}` : undefined}
               className="flex-1 bg-transparent text-sm text-cream placeholder:text-engrave focus:outline-none"
             />
             <kbd className="rounded border border-rule px-1 text-[10px] text-engrave">esc</kbd>
           </div>
-          <div ref={listRef} id="launch-song-list" role="listbox" aria-label="Songs" className="overflow-y-auto py-1">
-            {groups.length === 0 && <div className="px-4 py-6 text-center text-xs text-engrave">No song matches “{query}”.</div>}
+          <div ref={listRef} id="launch-song-list" role="listbox" aria-label={t.songs} className="overflow-y-auto py-1">
+            {groups.length === 0 && <div className="px-4 py-6 text-center text-xs text-engrave">{t.noMatch(query)}</div>}
             {groups.map((g) => (
               <div key={g.id} role="group" aria-label={g.label}>
                 <div className="sticky top-0 flex items-baseline gap-2 bg-panel px-4 pb-1 pt-2.5">
@@ -202,7 +251,7 @@ export function SongPicker({
                     >
                       <div className="flex items-center gap-2">
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-cream">{songLabel(s, songs)}</span>
-                        <span className="shrink-0 text-[11px] text-engrave">saved {formatRelative(s.modifiedAtMs)}</span>
+                        <span className="shrink-0 text-[11px] text-engrave">{t.saved(formatRelative(s.modifiedAtMs))}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-engrave">
                         <span className="flex items-center gap-1.5">
@@ -217,7 +266,7 @@ export function SongPicker({
               </div>
             ))}
           </div>
-          <div className="border-t border-rule px-4 py-2 text-[10px] text-engrave">↑ ↓ to move · Enter to open · Esc to close</div>
+          <div className="border-t border-rule px-4 py-2 text-[10px] text-engrave">{t.keys}</div>
         </div>
       )}
     </div>

@@ -5,15 +5,16 @@ import { sortBy, stageColor, stageLabel, type SortKey } from "../../lib/pipeline
 import { formatRelative } from "../../lib/format";
 import { formatBpm } from "../../lib/songs";
 import { StatusDot } from "../ui";
-import { ConflictDot, SourceError, useSource, type PipelineItem } from "./shared";
+import { ConflictDot, SourceError, T_PIPELINE, useSource, type PipelineItem } from "./shared";
 import type { PipelineColumn } from "../../types";
+import { tr } from "../../i18n";
 
-const HEADERS: { key: SortKey; label: string; className?: string }[] = [
-  { key: "name", label: "Song" },
-  { key: "column", label: "Column" },
-  { key: "saved", label: "Saved" },
-  { key: "bpm", label: "BPM", className: "text-right" },
-  { key: "key", label: "Key" },
+const HEADERS: { key: SortKey; label: "song" | "column" | "saved" | "bpm" | "key"; className?: string }[] = [
+  { key: "name", label: "song" },
+  { key: "column", label: "column" },
+  { key: "saved", label: "saved" },
+  { key: "bpm", label: "bpm", className: "text-right" },
+  { key: "key", label: "key" },
 ];
 
 type Row = { item: PipelineItem; column: PipelineColumn; boardIndex: number };
@@ -36,12 +37,13 @@ export function PipelineTable() {
       .flatMap((g) => g.items.map((item) => ({ item, column: g.column, boardIndex: i++ })));
     return sortBy(flat, (r) => ({ name: r.item.title, saved: r.item.savedMs, bpm: r.item.bpm, key: r.item.musicalKey, boardIndex: r.boardIndex }), key, dir);
   }, [groups, hidden, key, dir]);
+  const t = tr(T_PIPELINE);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <SourceError />
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-6 py-2" role="group" aria-label="Columns shown">
-        <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.14em] text-engrave">Show</span>
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-6 py-2" role="group" aria-label={t.columnsShown}>
+        <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.14em] text-engrave">{t.show}</span>
         {groups.map(({ column, items }) => {
           const on = !hidden.includes(column.id);
           return (
@@ -57,7 +59,7 @@ export function PipelineTable() {
         })}
         {key !== "board" && (
           <button onClick={() => setTableSort(scope, "board")} className="ml-auto text-xs text-engrave underline hover:text-cream">
-            Board order
+            {t.boardOrder}
           </button>
         )}
       </div>
@@ -73,13 +75,13 @@ export function PipelineTable() {
                   className={`border-b border-rule px-2 py-2 font-mono text-[10px] font-normal uppercase tracking-[0.14em] text-engrave ${h.className ?? "text-left"}`}
                 >
                   <button onClick={() => setTableSort(scope, h.key)} className="inline-flex items-center gap-1 uppercase hover:text-cream">
-                    {h.label}
+                    {t[h.label]}
                     {key === h.key && (dir === 1 ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
                   </button>
                 </th>
               ))}
               <th scope="col" className="border-b border-rule px-2 py-2 text-left font-mono text-[10px] font-normal uppercase tracking-[0.14em] text-engrave">
-                Tags
+                {t.tags}
               </th>
             </tr>
           </thead>
@@ -87,7 +89,7 @@ export function PipelineTable() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-2 py-6 text-center text-xs text-engrave">
-                  No songs to show.
+                  {t.noSongs}
                 </td>
               </tr>
             )}
@@ -100,14 +102,14 @@ export function PipelineTable() {
                   </span>
                 </td>
                 <td className="px-2 py-1.5">
-                  <span className="flex items-center gap-1.5 text-xs text-body" title={`Stage: ${stageLabel(column.stage)}`}>
+                  <span className="flex items-center gap-1.5 text-xs text-body" title={t.stageOf(stageLabel(column.stage))}>
                     <StatusDot color={stageColor(column.stage)} size={6} glow={false} /> {column.name}
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-2 py-1.5 text-xs text-engrave">{item.savedMs ? formatRelative(item.savedMs) : "—"}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-xs text-body">{formatBpm(item.bpm)}</td>
                 <td className="px-2 py-1.5 font-mono text-xs text-body">{item.musicalKey || "—"}</td>
-                <td className="max-w-[14rem] truncate px-2 py-1.5 text-xs text-engrave">{item.tags.map((t) => `#${t}`).join(" ")}</td>
+                <td className="max-w-[14rem] truncate px-2 py-1.5 text-xs text-engrave">{item.tags.map((tag) => `#${tag}`).join(" ")}</td>
               </tr>
             ))}
           </tbody>

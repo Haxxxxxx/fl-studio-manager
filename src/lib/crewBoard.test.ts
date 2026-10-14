@@ -14,7 +14,7 @@ const SERVER: CrewColumnRow[] = [
   col(4, "Mixing", "production", 3),
   col(5, "Prep", "prep", 4),
   col(6, "Out", "release", 5),
-  col(7, "Promo", "promotion", 6),
+  col(7, "Hype", "promotion", 6),
 ];
 
 describe("crew board", () => {
@@ -30,7 +30,7 @@ describe("crew board", () => {
   it("server columns in position order; a song sits in its column if it matches its stage", () => {
     const { cfg, onServer } = crewPipeline([...SERVER].reverse());
     expect(onServer).toBe(true);
-    expect(cfg.columns.map((c) => c.name)).toEqual(["Ideas", "Writing", "Studio", "Mixing", "Prep", "Out", "Promo"]);
+    expect(cfg.columns.map((c) => c.name)).toEqual(["Ideas", "Writing", "Studio", "Mixing", "Prep", "Out", "Hype"]);
     expect(crewColumnOf(song("a", "production", { column_id: U(4) }), cfg).name).toBe("Mixing");
     // Stage changed since (column cleared or stale): the stage's first column.
     expect(crewColumnOf(song("a", "prep", { column_id: U(4) }), cfg).name).toBe("Prep");

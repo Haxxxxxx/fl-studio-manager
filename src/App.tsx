@@ -1,4 +1,4 @@
-import { applyLang, resolveLang } from "./i18n";
+import { applyLang, dict, resolveLang, tr } from "./i18n";
 import { CrewBoardView, CrewMembersView, CrewReleasesView, CrewSettingsView } from "./components/CrewViews";
 import { useEffect } from "react";
 import { isTauri } from "@tauri-apps/api/core";
@@ -21,6 +21,31 @@ import { useCrewStore } from "./store/useCrewStore";
 
 const fileName = (p: string) => p.split(/[/\\]/).pop() ?? p;
 
+const T = dict(
+  {
+    kept: (n: number) => `Kept the details of ${n} renamed or moved song${n === 1 ? "" : "s"}`,
+    ok: "OK",
+    moved: (file: string) => `moved (${file})`,
+    more: (n: number) => `+${n} more`,
+    loading: "Loading...",
+    browserBefore: "This is the app's UI in a browser tab, so nothing can load or save here (no folders, settings or AI key). Run",
+    browserAfter: "and use the Hivo window that opens.",
+    dismiss: "Dismiss",
+  },
+  {
+    kept: (n: number) =>
+      n === 1 ? "Infos gardées pour 1 son renommé ou déplacé" : `Infos gardées pour ${n} sons renommés ou déplacés`,
+    ok: "OK",
+    moved: (file: string) => `déplacé (${file})`,
+    more: (n: number) => `+${n} autres`,
+    loading: "Chargement...",
+    browserBefore:
+      "C'est l'interface de l'app dans un onglet de navigateur, donc rien ne peut se charger ni s'enregistrer ici (pas de dossiers, de réglages ni de clé IA). Lance",
+    browserAfter: "et utilise la fenêtre Hivo qui s'ouvre.",
+    dismiss: "Fermer",
+  },
+);
+
 /** After a scan: which songs kept their stage, notes, crew share… across a rename/move. */
 function RelinkNotice() {
   const relinked = useAppStore((s) => s.relinked);
@@ -30,19 +55,19 @@ function RelinkNotice() {
     <div role="status" className="absolute bottom-3 right-3 z-40 max-w-sm rounded-md border border-rule bg-raised px-4 py-3 text-xs text-body shadow-xl">
       <div className="mb-1.5 flex items-center justify-between gap-3">
         <span className="font-medium text-cream">
-          Kept the details of {relinked.length} renamed or moved song{relinked.length === 1 ? "" : "s"}
+          {tr(T).kept(relinked.length)}
         </span>
         <button onClick={dismiss} className="text-body hover:text-cream">
-          OK
+          {tr(T).ok}
         </button>
       </div>
       <ul className="flex flex-col gap-0.5">
         {relinked.slice(0, 5).map((r) => (
           <li key={r.to} className="truncate" title={`${r.from} → ${r.to}`}>
-            {fileName(r.from)} → <span className="text-cream">{r.reason === "moved" ? `moved (${fileName(r.to)})` : fileName(r.to)}</span>
+            {fileName(r.from)} → <span className="text-cream">{r.reason === "moved" ? tr(T).moved(fileName(r.to)) : fileName(r.to)}</span>
           </li>
         ))}
-        {relinked.length > 5 && <li className="text-engrave">+{relinked.length - 5} more</li>}
+        {relinked.length > 5 && <li className="text-engrave">{tr(T).more(relinked.length - 5)}</li>}
       </ul>
     </div>
   );
@@ -89,7 +114,7 @@ export default function App() {
   if (!settingsLoaded) {
     return (
       <div className="flex h-screen items-center justify-center bg-chassis text-sm text-engrave">
-        Loading...
+        {tr(T).loading}
       </div>
     );
   }
@@ -117,15 +142,15 @@ export default function App() {
       <PackageConfirm />
       {!isTauri() && (
         <div className="absolute bottom-3 left-1/2 z-40 max-w-xl -translate-x-1/2 rounded-md border border-amber-400/40 bg-[#2a2112] px-4 py-2 text-xs text-amber-100 shadow-xl">
-          This is the app's UI in a browser tab, so nothing can load or save here (no folders, settings or AI key). Run{" "}
-          <code className="rounded bg-black/30 px-1">npm run tauri dev</code> and use the Hivo window that opens.
+          {tr(T).browserBefore}{" "}
+          <code className="rounded bg-black/30 px-1">npm run tauri dev</code> {tr(T).browserAfter}
         </div>
       )}
       <RelinkNotice />
       {(startupError || saveError) && (
         <div role="alert" className="absolute left-1/2 top-3 z-40 flex max-w-xl -translate-x-1/2 items-start gap-3 rounded-md border border-red-500/40 bg-[#2a1215] px-4 py-2 text-xs text-red-200 shadow-xl">
           <span>{saveError ?? startupError}</span>
-          <button onClick={dismissErrors} aria-label="Dismiss" className="shrink-0 text-red-200/70 hover:text-red-100">
+          <button onClick={dismissErrors} aria-label={tr(T).dismiss} className="shrink-0 text-red-200/70 hover:text-red-100">
             ✕
           </button>
         </div>

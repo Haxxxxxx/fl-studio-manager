@@ -1,5 +1,20 @@
 import { CheckCircle2, Loader2, XCircle, Clock, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  {
+    exporting: "Exporting projects...",
+    complete: "Export complete",
+    summary: (done: number, failed: number) => `${done} done${failed > 0 ? `, ${failed} failed` : ""}`,
+  },
+  {
+    exporting: "Export des projets...",
+    complete: "Export terminé",
+    summary: (done: number, failed: number) =>
+      `${done} terminé${done > 1 ? "s" : ""}${failed > 0 ? `, ${failed} en échec` : ""}`,
+  },
+);
 
 export function RenderPanel() {
   const renderJobs = useAppStore((s) => s.renderJobs);
@@ -16,7 +31,7 @@ export function RenderPanel() {
     <div className="absolute bottom-4 right-4 w-80 rounded-lg border border-rule bg-raised shadow-2xl">
       <div className="flex items-center justify-between border-b border-rule px-4 py-3">
         <div className="text-sm font-medium text-cream">
-          {rendering ? "Exporting projects..." : "Export complete"}
+          {rendering ? tr(T).exporting : tr(T).complete}
         </div>
         {!rendering && (
           <button
@@ -51,7 +66,7 @@ export function RenderPanel() {
       </div>
       {!rendering && (
         <div className="border-t border-rule px-4 py-2 text-[11px] text-engrave">
-          {done} done{errored > 0 ? `, ${errored} failed` : ""}
+          {tr(T).summary(done, errored)}
         </div>
       )}
     </div>
