@@ -1,5 +1,7 @@
 # Hivo (formerly FL Manager)
 
+**Hard rules first: [docs/GUARDRAILS.md](docs/GUARDRAILS.md).** Read them before any work. If a request conflicts with one, stop and say which guardrail before continuing.
+
 Desktop app (Tauri 2 + Rust backend, React 19 + TS + Zustand + Tailwind frontend) that reads FL Studio project folders for a five-person rap crew. Product vision, phases and principles: **[docs/ROADMAP.md](docs/ROADMAP.md)**. Read it before planning features.
 
 ## Where we are
