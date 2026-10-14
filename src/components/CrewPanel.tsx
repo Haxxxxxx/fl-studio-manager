@@ -212,8 +212,27 @@ function CreateOrJoin({ another = false, onDone }: { another?: boolean; onDone?:
   );
 }
 
-/** The crew you're in: members, role, invites, leave, sync. Also the sidebar's crew menu. */
+/** The crew you're in, all in one (Settings → Crew). The crew pages in the
+ * sidebar use the same pieces. */
 export function CrewHome() {
+  return (
+    <div className="flex flex-col gap-3">
+      <CrewStatus />
+      <CrewMembers />
+      <CrewInvites />
+      <CrewAccount />
+    </div>
+  );
+}
+
+function useActiveCrew() {
+  const crews = useCrewStore((s) => s.crews);
+  const activeCrewId = useCrewStore((s) => s.activeCrewId);
+  return crews.find((c) => c.id === activeCrewId) ?? crews[0];
+}
+
+/** Which crew (switch if several), your role, sync state, why nothing syncs, what you share. */
+export function CrewStatus() {
   const crew = useCrewStore();
   const scope = crew.activeCrewId && crew.userId ? { crewId: crew.activeCrewId, userId: crew.userId } : null;
   const projects = useAppStore((s) => s.projects);
@@ -226,15 +245,9 @@ export function CrewHome() {
   const note = syncNote({ demoMode, workspaceWritable, hasFolders, sharedCount });
   // Only meaningful once a scan has found something (an empty list could be a failed scan).
   const orphans = scope && projects.length > 0 && !scanning ? orphanedShares(projects, workspace, scope) : [];
-  const active = crew.crews.find((c) => c.id === crew.activeCrewId) ?? crew.crews[0];
-  const [copied, setCopied] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const active = useActiveCrew();
   const { busy, error, run } = useAction();
-  const isOwner = active.role === "owner";
-  const { loadInvites } = crew;
-  useEffect(() => {
-    if (isOwner) void loadInvites().catch(() => {});
-  }, [isOwner, active.id, loadInvites]);
+  if (!active) return null;
 
   const syncLine =
     crew.sync.kind === "syncing"
@@ -286,31 +299,62 @@ export function CrewHome() {
           </button>
         </div>
       )}
-      <div>
-        <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">Members · {crew.members.length}</div>
-        <div className="flex flex-wrap gap-1.5">
-          {crew.members.map((m) => (
-            <span key={m.user_id} className="flex items-center rounded-full bg-raised px-2.5 py-1 text-xs text-body">
-              {m.display_name}
-              {m.role === "owner" && <span className="ml-1 text-engrave">· owner</span>}
-              {m.user_id === crew.userId && <span className="ml-1 text-engrave">· you</span>}
-              {isOwner && m.user_id !== crew.userId && (
-                <ConfirmButton
-                  label="Remove"
-                  confirmLabel={`Remove ${m.display_name}?`}
-                  onConfirm={() => void run(() => crew.removeMember(m.user_id))}
-                  disabled={busy}
-                  className="ml-2 rounded-full border border-transparent px-1.5 text-[11px] text-engrave hover:text-cream disabled:opacity-40"
-                />
-              )}
-            </span>
-          ))}
-        </div>
-        {isOwner && crew.members.length > 1 && (
-          <div className="mt-1 text-[11px] text-engrave">Removing someone takes their shared songs off the crew board.</div>
-        )}
+      {error && <div className="text-xs text-red-300">{error}</div>}
+    </div>
+  );
+}
+
+/** Members (the owner can remove people). */
+export function CrewMembers() {
+  const crew = useCrewStore();
+  const active = useActiveCrew();
+  const { busy, error, run } = useAction();
+  if (!active) return null;
+  const isOwner = active.role === "owner";
+  return (
+    <div>
+      <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">Members · {crew.members.length}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {crew.members.map((m) => (
+          <span key={m.user_id} className="flex items-center rounded-full bg-raised px-2.5 py-1 text-xs text-body">
+            {m.display_name}
+            {m.role === "owner" && <span className="ml-1 text-engrave">· owner</span>}
+            {m.user_id === crew.userId && <span className="ml-1 text-engrave">· you</span>}
+            {isOwner && m.user_id !== crew.userId && (
+              <ConfirmButton
+                label="Remove"
+                confirmLabel={`Remove ${m.display_name}?`}
+                onConfirm={() => void run(() => crew.removeMember(m.user_id))}
+                disabled={busy}
+                className="ml-2 rounded-full border border-transparent px-1.5 text-[11px] text-engrave hover:text-cream disabled:opacity-40"
+              />
+            )}
+          </span>
+        ))}
       </div>
-      {isOwner && crew.invites.length > 0 && (
+      {isOwner && crew.members.length > 1 && (
+        <div className="mt-1 text-[11px] text-engrave">Removing someone takes their shared songs off the crew board.</div>
+      )}
+      {error && <div className="mt-1 text-xs text-red-300">{error}</div>}
+    </div>
+  );
+}
+
+/** Owner: open invite codes, a new code, revoke. Nothing for members. */
+export function CrewInvites() {
+  const crew = useCrewStore();
+  const active = useActiveCrew();
+  const [copied, setCopied] = useState(false);
+  const { busy, error, run } = useAction();
+  const isOwner = active?.role === "owner";
+  const { loadInvites } = crew;
+  useEffect(() => {
+    if (isOwner) void loadInvites().catch(() => {});
+  }, [isOwner, active?.id, loadInvites]);
+  if (!active || !isOwner) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      {crew.invites.length > 0 && (
         <div>
           <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">Open invite codes · {crew.invites.length}</div>
           <div className="flex flex-col gap-1">
@@ -333,26 +377,59 @@ export function CrewHome() {
           </div>
         </div>
       )}
-      {isOwner && (
-        <div className="flex items-center gap-2">
-          <button onClick={() => void run(crew.createInvite)} disabled={busy} className={secondary}>
-            New invite code
-          </button>
-          {crew.invite && (
-            <>
-              <code className="rounded bg-rule px-2 py-1.5 font-mono text-sm tracking-widest text-cream">{crew.invite}</code>
-              <button
-                onClick={() => void navigator.clipboard?.writeText(crew.invite!).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1200)))}
-                className="flex items-center gap-1 text-xs text-engrave hover:text-cream"
-              >
-                {copied ? <Check size={12} /> : <ClipboardCopy size={12} />} {copied ? "Copied" : "Copy"}
-              </button>
-              <span className="text-[11px] text-engrave">Valid 7 days, up to 10 people.</span>
-            </>
-          )}
-        </div>
-      )}
+      <div className="flex items-center gap-2">
+        <button onClick={() => void run(crew.createInvite)} disabled={busy} className={secondary}>
+          New invite code
+        </button>
+        {crew.invite && (
+          <>
+            <code className="rounded bg-rule px-2 py-1.5 font-mono text-sm tracking-widest text-cream">{crew.invite}</code>
+            <button
+              onClick={() => void navigator.clipboard?.writeText(crew.invite!).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1200)))}
+              className="flex items-center gap-1 text-xs text-engrave hover:text-cream"
+            >
+              {copied ? <Check size={12} /> : <ClipboardCopy size={12} />} {copied ? "Copied" : "Copy"}
+            </button>
+            <span className="text-[11px] text-engrave">Valid 7 days, up to 10 people.</span>
+          </>
+        )}
+      </div>
       {error && <div className="text-xs text-red-300">{error}</div>}
+    </div>
+  );
+}
+
+/** Leave the active crew (asks first; says who becomes owner). */
+export function LeaveCrewButton({ className = "hover:text-cream" }: { className?: string }) {
+  const crew = useCrewStore();
+  const active = useActiveCrew();
+  const { run } = useAction();
+  if (!active) return null;
+  return (
+    <button
+      onClick={() => {
+        const others = crew.members.filter((m) => m.user_id !== crew.userId);
+        const note =
+          active.role === "owner" && others.length
+            ? ` ${others[0].display_name} becomes the owner.`
+            : !others.length
+              ? " You're the last member, so the crew is deleted."
+              : "";
+        if (window.confirm(`Leave ${active.name}? Your shared songs leave the crew board with you.${note}`)) void run(crew.leaveCrew);
+      }}
+      className={className}
+    >
+      Leave crew
+    </button>
+  );
+}
+
+/** Join or create another crew, your email, leave, sign out. */
+export function CrewAccount() {
+  const crew = useCrewStore();
+  const [adding, setAdding] = useState(false);
+  return (
+    <div className="flex flex-col gap-3">
       {adding ? (
         <div className="rounded-md border border-rule p-3">
           <div className="mb-2 flex items-center text-xs font-medium text-body">
@@ -375,21 +452,7 @@ export function CrewHome() {
       )}
       <div className="flex gap-3 text-xs text-engrave">
         <span>{crew.email}</span>
-        <button
-          onClick={() => {
-            const others = crew.members.filter((m) => m.user_id !== crew.userId);
-            const note =
-              active.role === "owner" && others.length
-                ? ` ${others[0].display_name} becomes the owner.`
-                : !others.length
-                  ? " You're the last member, so the crew is deleted."
-                  : "";
-            if (window.confirm(`Leave ${active.name}? Your shared songs leave the crew board with you.${note}`)) void run(crew.leaveCrew);
-          }}
-          className="hover:text-cream"
-        >
-          Leave crew
-        </button>
+        <LeaveCrewButton />
         <button onClick={() => void crew.signOut()} className="flex items-center gap-1 hover:text-cream">
           <LogOut size={11} /> Sign out
         </button>
