@@ -7,6 +7,7 @@ import { formatRelative } from "../lib/format";
 import { orphanedShares, shareElsewhere, sharedHere, sharedTitle } from "../lib/crewSync";
 import { btn, btnPrimary, ConfirmButton, input } from "../ui";
 import { crewText } from "../lib/crewMessages";
+import { cleanCode, isCodeComplete } from "../lib/signInCode";
 
 const field = input;
 const primary = `${btnPrimary} shrink-0 justify-center py-2`;
@@ -104,19 +105,19 @@ function SignIn() {
           className="flex flex-col gap-2"
         >
           <div className="text-xs text-engrave">
-            We sent a 6-digit code to <b className="text-cream">{sentTo}</b>. It expires in 10 minutes.
+            We sent a sign-in code to <b className="text-cream">{sentTo}</b>. It expires in 10 minutes.
           </div>
           <div className="flex gap-2">
             <input
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(e) => setCode(cleanCode(e.target.value))}
               placeholder="123456"
               inputMode="numeric"
               autoComplete="one-time-code"
               aria-label="Sign-in code"
               className={`${field} font-mono tracking-[0.3em]`}
             />
-            <button type="submit" disabled={busy || code.length !== 6} className={primary}>
+            <button type="submit" disabled={busy || !isCodeComplete(code)} className={primary}>
               {busy ? "Checking…" : "Sign in"}
             </button>
           </div>
