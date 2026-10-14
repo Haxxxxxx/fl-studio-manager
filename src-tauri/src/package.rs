@@ -70,7 +70,9 @@ fn refuse_reason(path: &Path) -> Option<&'static str> {
         }
         None
     }
-    check(path).or_else(|| fs::canonicalize(path).ok().and_then(|real| check(&real)))
+    // Re-check where the path really leads. On Windows `canonicalize` gives
+    // `\\?\C:\…`, which would read as a device path and refuse every sample.
+    check(path).or_else(|| fs::canonicalize(path).ok().and_then(|real| check(&crate::paths::plain(real))))
 }
 
 /// The package contents for one project: every sample that is found, is a
@@ -102,8 +104,9 @@ fn plan_one(resolver: &mut Resolver, project: &Path) -> Result<PackagePlan, Stri
 #[tauri::command]
 pub async fn package_preview(app: AppHandle, project_paths: Vec<String>) -> Result<Vec<PackagePlan>, String> {
     let scope = crate::scope::Scope::load(&app)?;
+    let (fl, user_data) = crate::settings::fl_paths(&app);
     tauri::async_runtime::spawn_blocking(move || {
-        let mut resolver = Resolver::new(crate::settings::detect_fl_studio());
+        let mut resolver = Resolver::new(fl).with_user_data(user_data);
         project_paths
             .iter()
             .map(|p| {
@@ -239,8 +242,9 @@ pub async fn package_projects(
     if let Some(sub) = subfolder.as_deref().and_then(crate::scope::safe_subfolder) {
         out_dir.push(sub);
     }
+    let (fl, user_data) = crate::settings::fl_paths(&app);
     tauri::async_runtime::spawn_blocking(move || {
-        let mut resolver = Resolver::new(crate::settings::detect_fl_studio());
+        let mut resolver = Resolver::new(fl).with_user_data(user_data);
         let results: Vec<PackageResult> = project_paths
             .iter()
             .enumerate()

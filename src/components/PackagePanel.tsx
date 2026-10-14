@@ -68,9 +68,9 @@ export function PackageConfirm() {
                   </details>
                 )}
                 {p.missing.length > 0 && (
-                  <div className="mt-1 text-engrave" title={p.missing.join("\n")}>
+                  <PathList className="mt-1 text-engrave" paths={p.missing}>
                     {p.missing.length} sample{p.missing.length === 1 ? "" : "s"} not found
-                  </div>
+                  </PathList>
                 )}
               </>
             )}
@@ -154,14 +154,14 @@ export function PackagePanel() {
             </div>
             {r.error && <div className="ml-5 text-[11px] text-red-300/80">{r.error}</div>}
             {(r.refused?.length ?? 0) > 0 && (
-              <div className="ml-5 text-[11px] text-amber-300/80" title={r.refused!.join("\n")}>
+              <PathList className="ml-5 text-[11px] text-amber-300/80" paths={r.refused!}>
                 {r.refused!.length} path{r.refused!.length === 1 ? "" : "s"} refused (not audio, hidden or network)
-              </div>
+              </PathList>
             )}
             {r.missing.length > 0 && (
-              <div className="ml-5 text-[11px] text-amber-300/80" title={r.missing.join("\n")}>
+              <PathList className="ml-5 text-[11px] text-amber-300/80" paths={r.missing}>
                 {r.missing.length} sample{r.missing.length === 1 ? "" : "s"} couldn't be found and aren't included
-              </div>
+              </PathList>
             )}
           </div>
         ))}
@@ -170,5 +170,22 @@ export function PackagePanel() {
         Open a package directly from FL (File → Open) — samples relink automatically.
       </div>
     </div>
+  );
+}
+
+/** A count that opens into the actual paths (what FL has stored), so you can
+ * see which samples to find. */
+function PathList({ paths, className, children }: { paths: string[]; className: string; children: React.ReactNode }) {
+  return (
+    <details className={className}>
+      <summary className="cursor-pointer select-none hover:text-cream">{children}</summary>
+      <ul className="mt-1 flex max-h-40 flex-col gap-0.5 overflow-y-auto pl-3 font-mono text-[10.5px]">
+        {paths.map((path) => (
+          <li key={path} className="break-all select-text">
+            {path}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
