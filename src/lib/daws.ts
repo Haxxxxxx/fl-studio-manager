@@ -1,4 +1,5 @@
 import type { DawId } from "../types";
+import { dict, tr } from "../i18n";
 
 // The DAWs Hivo reads projects from (src-tauri/src/daws.rs). What the
 // app can do with a project depends on its DAW: rendering from the app uses
@@ -15,16 +16,41 @@ export interface DawInfo {
   exportTip: string;
 }
 
-const MASTER = "WAV, 44.1 kHz, 24-bit";
+// Menu paths stay as the DAWs show them (English in most installs); the
+// sentence around them follows the app's language.
+const TIPS = dict(
+  {
+    "fl-studio": "In FL Studio: File → Export → Wave file, 44,100 Hz, 24-bit.",
+    ableton: "In Ableton: File → Export Audio/Video, WAV, 44.1 kHz, 24-bit.",
+    reaper: "In REAPER: File → Render, WAV, 44.1 kHz, 24-bit.",
+    "studio-one": "In Studio One: Song → Export Mixdown, WAV, 44.1 kHz, 24-bit.",
+    "pro-tools": "In Pro Tools: File → Bounce Mix, WAV, 44.1 kHz, 24-bit (interleaved).",
+    cubase: "In Cubase: File → Export → Audio Mixdown, WAV, 44.1 kHz, 24-bit.",
+    bitwig: "In Bitwig: File → Export Audio, WAV, 44.1 kHz, 24-bit.",
+  },
+  {
+    "fl-studio": "Dans FL Studio : File → Export → Wave file, 44 100 Hz, 24 bits.",
+    ableton: "Dans Ableton : File → Export Audio/Video, WAV, 44,1 kHz, 24 bits.",
+    reaper: "Dans REAPER : File → Render, WAV, 44,1 kHz, 24 bits.",
+    "studio-one": "Dans Studio One : Song → Export Mixdown, WAV, 44,1 kHz, 24 bits.",
+    "pro-tools": "Dans Pro Tools : File → Bounce Mix, WAV, 44,1 kHz, 24 bits (interleaved).",
+    cubase: "Dans Cubase : File → Export → Audio Mixdown, WAV, 44,1 kHz, 24 bits.",
+    bitwig: "Dans Bitwig : File → Export Audio, WAV, 44,1 kHz, 24 bits.",
+  },
+);
+
+function daw(id: DawId, label: string, short: string, readable: DawInfo["readable"]): DawInfo {
+  return Object.defineProperty({ id, label, short, readable }, "exportTip", { enumerable: true, get: () => tr(TIPS)[id] }) as DawInfo;
+}
 
 export const DAWS: Record<DawId, DawInfo> = {
-  "fl-studio": { id: "fl-studio", label: "FL Studio", short: "FL", readable: "full", exportTip: `In FL Studio: File → Export → Wave file, 44,100 Hz, 24-bit.` },
-  ableton: { id: "ableton", label: "Ableton Live", short: "Live", readable: "full", exportTip: `In Ableton: File → Export Audio/Video, ${MASTER}.` },
-  reaper: { id: "reaper", label: "REAPER", short: "REAPER", readable: "full", exportTip: `In REAPER: File → Render, ${MASTER}.` },
-  "studio-one": { id: "studio-one", label: "Studio One", short: "S1", readable: "partial", exportTip: `In Studio One: Song → Export Mixdown, ${MASTER}.` },
-  "pro-tools": { id: "pro-tools", label: "Pro Tools", short: "PT", readable: "none", exportTip: `In Pro Tools: File → Bounce Mix, ${MASTER} (interleaved).` },
-  cubase: { id: "cubase", label: "Cubase", short: "Cubase", readable: "none", exportTip: `In Cubase: File → Export → Audio Mixdown, ${MASTER}.` },
-  bitwig: { id: "bitwig", label: "Bitwig Studio", short: "Bitwig", readable: "none", exportTip: `In Bitwig: File → Export Audio, ${MASTER}.` },
+  "fl-studio": daw("fl-studio", "FL Studio", "FL", "full"),
+  ableton: daw("ableton", "Ableton Live", "Live", "full"),
+  reaper: daw("reaper", "REAPER", "REAPER", "full"),
+  "studio-one": daw("studio-one", "Studio One", "S1", "partial"),
+  "pro-tools": daw("pro-tools", "Pro Tools", "PT", "none"),
+  cubase: daw("cubase", "Cubase", "Cubase", "none"),
+  bitwig: daw("bitwig", "Bitwig Studio", "Bitwig", "none"),
 };
 
 /** Projects from older scans (before multi-DAW) are FL Studio. */

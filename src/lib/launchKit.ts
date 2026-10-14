@@ -172,7 +172,7 @@ const T = dict(
     tempoFromProject: (daw: string) => `D'après le tempo du projet ${daw}`,
     closedFormat: (daw: string) => `Les projets ${daw} ne se lisent pas de l'extérieur. Tape le tempo une fois`,
     noTempoFound: "Aucun tempo trouvé dans le projet",
-    sure: (pct: number) => `sûr à ${pct}%`,
+    sure: (pct: number) => `sûr à ${pct} %`,
     keyInPanelAudio: (key: string, sure: string) => `Réglée dans le panneau du son. L'audio sonne plutôt en ${key} (${sure})`,
     keyInPanel: "Réglée dans le panneau du son",
     keyInTrackName: "Écrite dans un nom de piste du mixer",
