@@ -40,20 +40,7 @@ fn resolve(path: &Path) -> Option<PathBuf> {
     Some(parent.join(path.file_name()?))
 }
 
-/// Windows' canonical form is `\\?\C:\…`; keep the plain `C:\…` so it
-/// compares with everything else.
-fn plain(p: PathBuf) -> PathBuf {
-    #[cfg(windows)]
-    {
-        let s = p.to_string_lossy();
-        if let Some(rest) = s.strip_prefix(r"\\?\") {
-            if rest.get(1..2) == Some(":") {
-                return PathBuf::from(rest);
-            }
-        }
-    }
-    p
-}
+use crate::paths::plain;
 
 fn inside(path: &Path, root: &Path) -> bool {
     path.starts_with(root)

@@ -10,6 +10,9 @@ use walkdir::WalkDir;
 /// most projects share the same plugin folders and song folders.
 pub struct Resolver {
     factory_data: Option<PathBuf>,
+    /// FL's user data folder on this computer (`Documents/Image-Line/FL
+    /// Studio`), for songs that don't live under its `Projects` folder.
+    user_data: Option<PathBuf>,
     /// Lowercased file stems of every plugin in the standard folders
     /// ("fabfilter pro-ds" for FabFilter Pro-DS.vst3/.dll/.clap).
     installed_plugins: HashSet<String>,
@@ -44,6 +47,45 @@ fn user_data_for(project: &Path) -> Option<PathBuf> {
         .find(|a| a.file_name().is_some_and(|n| n.eq_ignore_ascii_case("Projects")))
         .and_then(|p| p.parent())
         .map(Path::to_path_buf)
+}
+
+/// FL's `%FLStudioFactoryData%`: the folder holding `Data/Patches`. Windows:
+/// the install folder (next to the exe). macOS: somewhere inside the `.app`
+/// bundle (the exe is in `Contents/MacOS`), so search for it rather than
+/// hardcoding a layout that varies between FL versions.
+pub fn factory_data_dir(fl_exe: &Path) -> Option<PathBuf> {
+    let next_to_exe = fl_exe.parent()?;
+    if next_to_exe.join("Data").join("Patches").is_dir() {
+        return Some(next_to_exe.to_path_buf());
+    }
+    if let Some(bundle) = fl_exe.ancestors().find(|a| a.extension().is_some_and(|x| x.eq_ignore_ascii_case("app"))) {
+        let found = WalkDir::new(bundle.join("Contents"))
+            .max_depth(5)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .find(|e| e.file_type().is_dir() && e.file_name() == "Data" && e.path().join("Patches").is_dir());
+        if let Some(data) = found {
+            return data.path().parent().map(Path::to_path_buf);
+        }
+    }
+    Some(next_to_exe.to_path_buf())
+}
+
+/// A path saved on another computer (`C:\Users\x\Documents\Image-Line\FL
+/// Studio\Audio\vox.wav`, `/Applications/FL Studio.app/…/Data/Patches/…`),
+/// moved onto this computer's FL folders. ASCII-lowercased for the search so
+/// byte offsets stay valid.
+fn rerooted(path: &str, user_data: Option<&Path>, factory_data: Option<&Path>) -> Vec<PathBuf> {
+    let norm = path.replace('\\', "/");
+    let low = norm.to_ascii_lowercase();
+    let mut out = Vec::new();
+    if let (Some(ud), Some(i)) = (user_data, low.find("/image-line/fl studio/")) {
+        out.push(ud.join(&norm[i + "/image-line/fl studio/".len()..]));
+    }
+    if let (Some(fd), Some(i)) = (factory_data, low.find("/data/patches/")) {
+        out.push(fd.join(&norm[i + 1..]));
+    }
+    out
 }
 
 fn plugin_dirs() -> Vec<PathBuf> {
@@ -102,11 +144,19 @@ impl Resolver {
             }
         }
         Self {
-            factory_data: fl_studio_exe.and_then(|p| Path::new(&p).parent().map(Path::to_path_buf)),
+            factory_data: fl_studio_exe.and_then(|p| factory_data_dir(Path::new(&p))),
+            user_data: None,
             installed_plugins,
             exists_cache: HashMap::new(),
             folder_files: HashMap::new(),
         }
+    }
+
+    /// FL's user data folder on this computer, used when a song isn't under
+    /// a `Projects` folder (only if it exists).
+    pub fn with_user_data(mut self, user_data: Option<PathBuf>) -> Self {
+        self.user_data = user_data.filter(|p| p.is_dir());
+        self
     }
 
     /// Network-share and device paths count as missing without a lookup
@@ -126,7 +176,7 @@ impl Resolver {
     fn expand(&self, raw: &str, project: &Path) -> String {
         let mut out = raw.to_string();
         if out.contains("%FLStudioUserData%") {
-            if let Some(ud) = user_data_for(project) {
+            if let Some(ud) = user_data_for(project).or_else(|| self.user_data.clone()) {
                 out = out.replace("%FLStudioUserData%", &ud.to_string_lossy());
             }
         }
@@ -160,6 +210,13 @@ impl Resolver {
         let on_disk = native(&path);
         if self.exists(&on_disk) {
             return (path, SampleStatus::Ok, Some(PathBuf::from(on_disk)));
+        }
+        // Saved on another computer: the same file under this one's FL folders.
+        for candidate in rerooted(&path, self.user_data.as_deref(), self.factory_data.as_deref()) {
+            let c = candidate.to_string_lossy().to_string();
+            if !is_remote_or_device(&c) && self.exists(&c) {
+                return (path, SampleStatus::Relocated, Some(candidate));
+            }
         }
         let folder = project.parent().unwrap_or(project).to_path_buf();
         let moved = lower_file_name(Path::new(&on_disk))
@@ -220,6 +277,59 @@ impl Resolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    #[test]
+    fn songs_saved_on_another_computer_find_this_ones_fl_folders() {
+        let ud = Path::new("/Users/me/Documents/Image-Line/FL Studio");
+        let fd = Path::new("/Applications/FL Studio 2024.app/Contents/Resources/FL");
+        // Saved on Windows, opened on macOS.
+        assert_eq!(
+            rerooted(r"C:\Users\Kay\Documents\Image-Line\FL Studio\Audio\Recorded\vox.wav", Some(ud), Some(fd)),
+            vec![ud.join("Audio/Recorded/vox.wav")]
+        );
+        assert_eq!(
+            rerooted(r"C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\Drums\Kick.wav", Some(ud), Some(fd)),
+            vec![fd.join("Data/Patches/Packs/Drums/Kick.wav")]
+        );
+        assert!(rerooted("/Users/me/Samples/kick.wav", Some(ud), Some(fd)).is_empty());
+    }
+
+    #[test]
+    fn factory_data_is_found_inside_the_mac_bundle() {
+        let root = std::env::temp_dir().join(format!("flsm-factory-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let app = root.join("FL Studio 2024.app");
+        let exe = app.join("Contents/MacOS/FL Studio");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        fs::write(&exe, b"x").unwrap();
+        fs::create_dir_all(app.join("Contents/Resources/FL/Data/Patches/Packs")).unwrap();
+        let found = factory_data_dir(&exe);
+        // Windows layout: Data next to the exe.
+        let win = root.join("FL Studio 21");
+        fs::create_dir_all(win.join("Data/Patches")).unwrap();
+        fs::write(win.join("FL64.exe"), b"x").unwrap();
+        let found_win = factory_data_dir(&win.join("FL64.exe"));
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(found, Some(app.join("Contents/Resources/FL")));
+        assert_eq!(found_win, Some(win));
+    }
+
+    #[test]
+    fn user_data_falls_back_to_fl_folder_outside_projects() {
+        let root = std::env::temp_dir().join(format!("flsm-userdata-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let ud = root.join("Image-Line").join("FL Studio");
+        fs::create_dir_all(ud.join("Audio")).unwrap();
+        fs::write(ud.join("Audio").join("vox.wav"), b"x").unwrap();
+        let song = root.join("Crew").join("Envy").join("Envy.flp");
+        fs::create_dir_all(song.parent().unwrap()).unwrap();
+        let mut r = Resolver::new(None).with_user_data(Some(ud.clone()));
+        let (found, missing) = r.package_files(&[r"%FLStudioUserData%\Audio\vox.wav".to_string()], &song);
+        let _ = fs::remove_dir_all(&root);
+        assert!(missing.is_empty(), "{missing:?}");
+        assert_eq!(found.len(), 1);
+    }
 
     #[test]
     fn user_data_is_parent_of_projects() {
