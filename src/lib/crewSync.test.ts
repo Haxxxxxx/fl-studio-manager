@@ -312,6 +312,12 @@ describe("shared releases", () => {
     const w = ws([album({ shared: false })], { deletedReleaseShares: [{ id: "r2", crewId: "crew1", userId: "me" }, { id: "r4", crewId: "crew1", userId: "me" }] });
     expect(staleReleaseIds(rows, w, sc)).toEqual(["r1", "r2"]);
   });
+
+  it("a release deleted before it was ever synced (no crew on the marker) still leaves the active crew", () => {
+    const rows = [{ id: "r9", crew_id: "crew1", owner_id: "me" }, { id: "r9b", crew_id: "crew1", owner_id: "someone" }] as CrewReleaseRow[];
+    const w = ws([], { deletedReleaseShares: [{ id: "r9" }, { id: "r9b" }] });
+    expect(staleReleaseIds(rows, w, sc)).toEqual(["r9"]);
+  });
 });
 
 describe("crew releases on screen", () => {
