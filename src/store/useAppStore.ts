@@ -2,6 +2,7 @@ import { create } from "zustand";
 import * as api from "../lib/tauri";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
+import { addColumn, moveCard, moveColumn, removeColumn, renameColumn } from "../lib/pipeline";
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
 import { canRenderInApp, dawOf, splitRenderable } from "../lib/daws";
 import type {
@@ -185,6 +186,14 @@ interface AppState {
   // Song metadata
   updateSong: (path: string, patch: Partial<SongMeta>) => void;
   setStatus: (paths: string[], status: SongStatus | undefined) => void;
+
+  // Pipeline columns (src/lib/pipeline.ts; shared by board, list and table)
+  renamePipelineColumn: (id: string, name: string) => void;
+  addPipelineColumn: (name: string, stage: SongStatus | null) => void;
+  removePipelineColumn: (id: string) => void;
+  movePipelineColumn: (id: string, toIndex: number) => void;
+  /** `songs` = the songs on the board (for the column's current order). */
+  movePipelineCard: (songs: ProjectInfo[], path: string, columnId: string, beforePath: string | null) => void;
 
   // Albums
   createAlbum: (title: string) => string;
@@ -735,16 +744,24 @@ export const useAppStore = create<AppState>((set, get) => {
         // A local stage change waits to be sent to the crew (crew sync
         // sends it with the version it was made on). Crew moves applied here
         // carry their own sync fields.
-        const stamped =
-          "status" in patch && patch.stagePending === undefined ? { ...patch, stageUpdatedAtMs: Date.now(), stagePending: true } : patch;
+        const stamped: Partial<SongMeta> =
+          "status" in patch && patch.stagePending === undefined ? { ...patch, stageUpdatedAtMs: Date.now(), stagePending: true } : { ...patch };
+        // A new stage from anywhere but the board drops the column pin.
+        if ("status" in patch && !("column" in patch) && patch.status !== ws.songs[path]?.status) stamped.column = undefined;
         return { ...ws, songs: { ...ws.songs, [path]: { ...ws.songs[path], ...stamped } } };
       }),
+
+    renamePipelineColumn: (id, name) => mutateWorkspace((ws) => renameColumn(ws, id, name)),
+    addPipelineColumn: (name, stage) => mutateWorkspace((ws) => addColumn(ws, name, stage)),
+    removePipelineColumn: (id) => mutateWorkspace((ws) => removeColumn(ws, id)),
+    movePipelineColumn: (id, toIndex) => mutateWorkspace((ws) => moveColumn(ws, id, toIndex)),
+    movePipelineCard: (songs, path, columnId, beforePath) => mutateWorkspace((ws) => moveCard(ws, songs, path, columnId, beforePath)),
 
     setStatus: (paths, status) =>
       mutateWorkspace((ws) => {
         const songs = { ...ws.songs };
         const now = Date.now();
-        for (const p of paths) songs[p] = { ...songs[p], status, stageUpdatedAtMs: now, stagePending: true };
+        for (const p of paths) songs[p] = { ...songs[p], status, column: songs[p]?.column && songs[p]?.status === status ? songs[p].column : undefined, stageUpdatedAtMs: now, stagePending: true };
         return { ...ws, songs };
       }),
 
