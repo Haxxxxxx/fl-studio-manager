@@ -4,6 +4,129 @@ import { usePipelineView, type PipelineScope, type PipelineViewKind } from "../.
 import { stageColor, stageLabel, STAGE_ORDER, NAME_MAX } from "../../lib/pipeline";
 import type { PipelineColumn, SongStatus } from "../../types";
 import { ConfirmButton, StatusDot } from "../ui";
+import { dict, tr } from "../../i18n";
+
+/** Every word of the pipeline pages (board, list, table, yours and the crew's). */
+export const T_PIPELINE = dict(
+  {
+    // Page
+    board: "Board",
+    list: "List",
+    table: "Table",
+    filterPlaceholder: "Filter songs, #tags, key",
+    filterLabel: "Filter songs",
+    viewLabel: "View",
+    // List and table headers
+    song: "Song",
+    column: "Column",
+    saved: "Saved",
+    bpm: "BPM",
+    key: "Key",
+    tags: "Tags",
+    who: "Who",
+    mixdown: "Mixdown",
+    emptyColumn: "Nothing here. Drag a song in.",
+    columnsShown: "Columns shown",
+    show: "Show",
+    boardOrder: "Board order",
+    noSongs: "No songs to show.",
+    stageOf: (stage: string) => `Stage: ${stage}`,
+    // Column header
+    dragColumns: "Drag to reorder columns",
+    expand: (name: string) => `Expand ${name}`,
+    collapse: (name: string) => `Collapse ${name}`,
+    columnName: "Column name",
+    renameHint: "Double-click (or Enter) to rename",
+    stageCrewSees: "The stage the crew sees",
+    newSong: "New song",
+    moveLeft: "Move left",
+    moveEarlier: (name: string) => `Move ${name} earlier`,
+    moveRight: "Move right",
+    moveLater: (name: string) => `Move ${name} later`,
+    rename: "Rename",
+    renameColumn: (name: string) => `Rename ${name}`,
+    removeHint: (stage: string) => `Remove (songs move to the other ${stage} column)`,
+    keepOne: "Every stage keeps one column. Rename it, or collapse it.",
+    removeColumn: (name: string) => `Remove ${name}`,
+    removeConfirm: "Remove?",
+    // Add a column
+    addColumn: "Add a column",
+    newColumnPlaceholder: "Column name (e.g. Mixing)",
+    newColumnLabel: "New column name",
+    stagePick: "Stage (what the crew sees)",
+    add: "Add",
+    cancel: "Cancel",
+    // Bits
+    conflict: "A crewmate moved this song on the crew board too: open it to choose",
+    conflictLabel: "Stage conflict",
+    // Crew cards
+    you: "You",
+    crewmate: "Crewmate",
+    savedAgo: (when: string) => `saved ${when}`,
+    out: (date: string) => `· out ${date}`,
+    hasMixdown: "Has a mixdown",
+    kitAccepted: "Launch Kit accepted",
+    movedBy: (who: string) => `moved by ${who}`,
+    youLower: "you",
+    aCrewmate: "a crewmate",
+  },
+  {
+    board: "Tableau",
+    list: "Liste",
+    table: "Table",
+    filterPlaceholder: "Filtrer sons, #tags, tonalité",
+    filterLabel: "Filtrer les sons",
+    viewLabel: "Vue",
+    song: "Son",
+    column: "Colonne",
+    saved: "Enregistré",
+    bpm: "BPM",
+    key: "Tonalité",
+    tags: "Tags",
+    who: "Qui",
+    mixdown: "Mixdown",
+    emptyColumn: "Rien ici. Glisse un son dedans.",
+    columnsShown: "Colonnes affichées",
+    show: "Afficher",
+    boardOrder: "Ordre du tableau",
+    noSongs: "Aucun son à afficher.",
+    stageOf: (stage: string) => `Étape : ${stage}`,
+    dragColumns: "Glisse pour réordonner les colonnes",
+    expand: (name: string) => `Déplier ${name}`,
+    collapse: (name: string) => `Replier ${name}`,
+    columnName: "Nom de la colonne",
+    renameHint: "Double-clic (ou Entrée) pour renommer",
+    stageCrewSees: "L'étape que voit le crew",
+    newSong: "Nouveau son",
+    moveLeft: "Déplacer à gauche",
+    moveEarlier: (name: string) => `Avancer ${name}`,
+    moveRight: "Déplacer à droite",
+    moveLater: (name: string) => `Reculer ${name}`,
+    rename: "Renommer",
+    renameColumn: (name: string) => `Renommer ${name}`,
+    removeHint: (stage: string) => `Supprimer (les sons passent dans l'autre colonne ${stage})`,
+    keepOne: "Chaque étape garde au moins une colonne. Renomme-la ou replie-la.",
+    removeColumn: (name: string) => `Supprimer ${name}`,
+    removeConfirm: "Supprimer ?",
+    addColumn: "Ajouter une colonne",
+    newColumnPlaceholder: "Nom de la colonne (ex. Mix)",
+    newColumnLabel: "Nom de la nouvelle colonne",
+    stagePick: "Étape (ce que voit le crew)",
+    add: "Ajouter",
+    cancel: "Annuler",
+    conflict: "Quelqu'un du crew a aussi déplacé ce son sur le tableau du crew : ouvre-le pour choisir",
+    conflictLabel: "Conflit d'étape",
+    you: "Toi",
+    crewmate: "Membre du crew",
+    savedAgo: (when: string) => `enregistré ${when}`,
+    out: (date: string) => `· sortie le ${date}`,
+    hasMixdown: "A un mixdown",
+    kitAccepted: "Launch Kit validé",
+    movedBy: (who: string) => `déplacé par ${who}`,
+    youLower: "toi",
+    aCrewmate: "quelqu'un du crew",
+  },
+);
 
 // Pieces shared by the board, list and table, for any pipeline: yours
 // (src/components/pipeline/mine.tsx) or the crew's (crew.tsx). A pipeline is
@@ -183,18 +306,19 @@ export function ColumnHeader({
   const removable = source.canRemove(column.id);
   const renamed = column.name.toLowerCase() !== stageLabel(column.stage).toLowerCase();
   const hasActions = source.editable || (column.stage === "creation" && !!source.newSong);
+  const t = tr(T_PIPELINE);
 
   return (
     <div
       draggable={source.editable && !editing}
       onDragStart={(e) => startColumnDrag(e, column.id)}
-      title={source.editable && !editing ? "Drag to reorder columns" : undefined}
+      title={source.editable && !editing ? t.dragColumns : undefined}
       className={`group/col relative min-w-0 ${source.editable ? "cursor-grab active:cursor-grabbing" : ""} ${className}`}
     >
       <div className="flex min-w-0 items-center gap-1.5">
         <button
           onClick={() => toggleCollapsed(source.scope, view, column.id)}
-          aria-label={collapsed ? `Expand ${column.name}` : `Collapse ${column.name}`}
+          aria-label={collapsed ? t.expand(column.name) : t.collapse(column.name)}
           aria-expanded={!collapsed}
           className="shrink-0 rounded text-engrave hover:text-cream"
         >
@@ -206,7 +330,7 @@ export function ColumnHeader({
             autoFocus
             defaultValue={column.name}
             maxLength={NAME_MAX}
-            aria-label="Column name"
+            aria-label={t.columnName}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
               if (e.key === "Escape") {
@@ -225,7 +349,7 @@ export function ColumnHeader({
           <button
             onDoubleClick={startEditing}
             onKeyDown={(e) => source.editable && (e.key === "Enter" || e.key === "F2") && (e.preventDefault(), startEditing())}
-            title={source.editable ? "Double-click (or Enter) to rename" : undefined}
+            title={source.editable ? t.renameHint : undefined}
             className="min-w-0 truncate text-left text-xs font-medium text-cream"
           >
             {column.name}
@@ -234,7 +358,7 @@ export function ColumnHeader({
         <span className="shrink-0 text-xs text-engrave">{count}</span>
       </div>
       {renamed && !editing && (
-        <div className="mt-0.5 pl-[34px] font-mono text-[9.5px] uppercase tracking-wider text-engrave" title="The stage the crew sees">
+        <div className="mt-0.5 pl-[34px] font-mono text-[9.5px] uppercase tracking-wider text-engrave" title={t.stageCrewSees}>
           {stageLabel(column.stage)}
         </div>
       )}
@@ -242,26 +366,26 @@ export function ColumnHeader({
       {!editing && hasActions && (
         <span className="absolute right-0 top-0 flex items-center gap-0.5 rounded bg-panel pl-1 opacity-0 focus-within:opacity-100 group-hover/col:opacity-100">
           {column.stage === "creation" && source.newSong && (
-            <button onClick={source.newSong} title="New song" aria-label="New song" className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
+            <button onClick={source.newSong} title={t.newSong} aria-label={t.newSong} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
               <Plus size={13} />
             </button>
           )}
           {source.editable && (
             <>
-              <button onClick={() => source.moveColumn(column.id, index - 1)} disabled={index <= 0} title="Move left" aria-label={`Move ${column.name} earlier`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
+              <button onClick={() => source.moveColumn(column.id, index - 1)} disabled={index <= 0} title={t.moveLeft} aria-label={t.moveEarlier(column.name)} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
                 <ArrowLeft size={12} />
               </button>
-              <button onClick={() => source.moveColumn(column.id, index + 1)} disabled={index >= columns.length - 1} title="Move right" aria-label={`Move ${column.name} later`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
+              <button onClick={() => source.moveColumn(column.id, index + 1)} disabled={index >= columns.length - 1} title={t.moveRight} aria-label={t.moveLater(column.name)} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream disabled:opacity-30">
                 <ArrowRight size={12} />
               </button>
-              <button onClick={startEditing} title="Rename" aria-label={`Rename ${column.name}`} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
+              <button onClick={startEditing} title={t.rename} aria-label={t.renameColumn(column.name)} className="rounded p-0.5 text-engrave hover:bg-rule hover:text-cream">
                 <Pencil size={12} />
               </button>
-              <span title={removable ? `Remove (songs move to the other ${stageLabel(column.stage)} column)` : `Every stage keeps one column. Rename it, or collapse it.`}>
+              <span title={removable ? t.removeHint(stageLabel(column.stage)) : t.keepOne}>
                 <ConfirmButton
                   disabled={!removable}
-                  label={<Trash2 size={12} aria-label={`Remove ${column.name}`} />}
-                  confirmLabel="Remove?"
+                  label={<Trash2 size={12} aria-label={t.removeColumn(column.name)} />}
+                  confirmLabel={t.removeConfirm}
                   onConfirm={() => source.remove(column.id)}
                   className="rounded border border-transparent p-0.5 text-[10px] text-engrave hover:bg-rule hover:text-cream disabled:opacity-30"
                 />
@@ -282,13 +406,14 @@ export function AddColumn({ compact = false }: { compact?: boolean }) {
   const [name, setName] = useState("");
   const [stage, setStage] = useState<SongStatus | null>("production");
   if (!source.editable || source.query) return null;
+  const t = tr(T_PIPELINE);
   if (!open) {
     return (
       <button
         onClick={() => setOpen(true)}
         className={`flex items-center gap-1.5 rounded-lg border border-dashed border-rule px-3 py-2 text-xs text-engrave hover:border-rule-strong hover:text-cream ${compact ? "" : "h-fit min-w-[150px]"}`}
       >
-        <Plus size={13} /> Add a column
+        <Plus size={13} /> {t.addColumn}
       </button>
     );
   }
@@ -312,12 +437,12 @@ export function AddColumn({ compact = false }: { compact?: boolean }) {
         maxLength={NAME_MAX}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-        placeholder="Column name (e.g. Mixing)"
-        aria-label="New column name"
+        placeholder={t.newColumnPlaceholder}
+        aria-label={t.newColumnLabel}
         className="rounded border border-rule-strong bg-chassis px-2 py-1.5 text-xs text-cream placeholder:text-engrave focus:border-hot focus:outline-none"
       />
       <label className="flex flex-col gap-1 text-[11px] text-engrave">
-        Stage (what the crew sees)
+        {t.stagePick}
         <select
           value={stage ?? ""}
           onChange={(e) => setStage((e.target.value || null) as SongStatus | null)}
@@ -332,10 +457,10 @@ export function AddColumn({ compact = false }: { compact?: boolean }) {
       </label>
       <div className="flex gap-2">
         <button type="submit" disabled={!name.trim()} className="rounded bg-hot px-2.5 py-1 text-xs font-semibold text-chassis disabled:opacity-50">
-          Add
+          {t.add}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="px-2 text-xs text-engrave hover:text-cream">
-          Cancel
+          {t.cancel}
         </button>
       </div>
     </form>
@@ -348,8 +473,8 @@ export function ConflictDot({ on }: { on?: boolean }) {
   if (!on) return null;
   return (
     <span
-      title="A crewmate moved this song on the crew board too: open it to choose"
-      aria-label="Stage conflict"
+      title={tr(T_PIPELINE).conflict}
+      aria-label={tr(T_PIPELINE).conflictLabel}
       className="h-2 w-2 shrink-0 rounded-full bg-amber-400"
     />
   );
