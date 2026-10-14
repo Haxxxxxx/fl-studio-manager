@@ -61,7 +61,7 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
 
       <Card icon={<Hourglass size={13} />} title={`Stalled · no save in ${STALLED_DAYS}+ days`}>
         {stalled.length === 0 ? (
-          <div className="text-xs text-engrave">Nothing stuck in Creation or Production.</div>
+          <div className="text-xs text-engrave">Nothing stuck: every unfinished song was saved in the last {STALLED_DAYS} days.</div>
         ) : (
           <div className="flex flex-col gap-1">
             {stalled.slice(0, 5).map((s) => (
