@@ -1,7 +1,7 @@
 -- Crew board columns (set_crew_columns, move_crew_card).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(35);
+select plan(36);
 
 insert into auth.users (instance_id, id, aud, role, email) values
   ('00000000-0000-0000-0000-000000000000', 'a0000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'ana@test.local'),
@@ -147,6 +147,16 @@ select ok(not has_function_privilege('anon', 'public.move_crew_card(uuid, uuid, 
   and not has_function_privilege('anon', 'public.set_crew_columns(uuid, jsonb)', 'execute'), 'anonymous visitors cannot call them');
 select ok(exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'crew_columns'),
   'crew_columns is published for live updates');
+
+-- Moving a pinned song to another crew can't keep this crew's column.
+reset role;
+select set_config('request.jwt.claims', '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+insert into ids values ('crew2', public.create_crew('Crew Two', 'Ana')::text);
+update public.songs set column_id = (select id from public.crew_columns where crew_id = (select v::uuid from ids where k = 'crew') and stage is not distinct from (select stage from public.songs where id = '5a000000-0000-0000-0000-000000000001') limit 1)
+  where id = '5a000000-0000-0000-0000-000000000001';
+select throws_ok($$ update public.songs set crew_id = (select v::uuid from ids where k = 'crew2') where id = '5a000000-0000-0000-0000-000000000001' $$,
+  '22023', null, 'a song pinned to a column can''t move to another crew with it');
 
 select * from finish();
 rollback;

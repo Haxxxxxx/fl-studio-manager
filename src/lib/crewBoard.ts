@@ -54,9 +54,20 @@ export function orderFor(columnSongs: CrewSongRow[], movingId: string, beforeId:
 
 /** What a card move does on the server. */
 export type CrewMove =
-  | { kind: "card"; songId: string; columnId: string; order: number; expectedAt: string }
+  | {
+      kind: "card";
+      songId: string;
+      columnId: string;
+      order: number;
+      expectedAt: string;
+      /** Other cards of the column to place by hand too, so the card lands
+       * exactly where it was dropped (same stage: only their order changes). */
+      renumber: { songId: string; order: number }[];
+    }
   | { kind: "stage"; songId: string; stage: SongStatus | null; expectedAt: string }
   | { kind: "none" };
+
+const placed = (s: CrewSongRow) => Number.isFinite(s.board_order ?? NaN);
 
 /** Moving a crew song: a card move (column + order) once the crew has its
  * columns on the server, else a plain stage move. */
@@ -67,8 +78,44 @@ export function crewMove(songs: CrewSongRow[], cfg: PipelineConfig, onServer: bo
   if (!onServer) {
     return (song.stage ?? null) === column.stage ? { kind: "none" } : { kind: "stage", songId, stage: column.stage, expectedAt: song.stage_updated_at };
   }
+  // Dropped on itself: nothing moves (a tiny accidental drag).
+  if (beforeId === songId) {
+    if (crewColumnOf(song, cfg).id === columnId) return { kind: "none" };
+    beforeId = null;
+  }
   const inColumn = groupCrewSongs(songs, cfg).find((g) => g.column.id === columnId)!.songs;
-  return { kind: "card", songId, columnId, order: orderFor(inColumn, songId, beforeId), expectedAt: song.stage_updated_at };
+  const others = inColumn.filter((s) => s.id !== songId);
+  let at = beforeId ? others.findIndex((s) => s.id === beforeId) : others.length;
+  if (at < 0) at = others.length;
+  const base = { kind: "card" as const, songId, columnId, expectedAt: song.stage_updated_at };
+  // Every card up to the drop point is placed by hand: one order between them.
+  if (others.slice(0, at === others.length ? at : at + 1).every(placed)) {
+    return { ...base, order: orderFor(inColumn, songId, beforeId), renumber: [] };
+  }
+  // Cards nobody placed sit after placed ones, so the drop point can't be
+  // expressed with one order: place the whole column as it's shown.
+  const list = [...others];
+  list.splice(at, 0, song);
+  const renumber = list.flatMap((s, i) => (s.id !== songId && s.board_order !== i + 1 ? [{ songId: s.id, order: i + 1 }] : []));
+  return { ...base, order: at + 1, renumber };
+}
+
+/** The board right after a card move (shown before the server answers). */
+export function applyCardMove(songs: CrewSongRow[], move: Extract<CrewMove, { kind: "card" }>, stage: SongStatus | null): CrewSongRow[] {
+  const orders = new Map(move.renumber.map((r) => [r.songId, r.order]));
+  return songs.map((s) =>
+    s.id === move.songId
+      ? { ...s, stage, column_id: move.columnId, board_order: move.order }
+      : orders.has(s.id)
+        ? { ...s, column_id: move.columnId, board_order: orders.get(s.id)! }
+        : s,
+  );
+}
+
+/** Undo a refused move on these songs only (other updates that arrived meanwhile stay). */
+export function restoreSongs(now: CrewSongRow[], before: CrewSongRow[], ids: string[]): CrewSongRow[] {
+  const old = new Map(before.filter((s) => ids.includes(s.id)).map((s) => [s.id, s]));
+  return now.map((s) => old.get(s.id) ?? s);
 }
 
 // ---- Owner edits: same rules as your pipeline, sent whole to set_crew_columns ----

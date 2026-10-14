@@ -5,7 +5,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { crewErrorMessage, supabase } from "../lib/supabase";
 import { shareElsewhere, sharedHere, sharedPayloads, stageSync, staleShareIds, type ShareScope, type StageSync } from "../lib/crewSync";
 import type { CrewColumnRow, CrewMemberRow, CrewSongRow, CrewSummary, PipelineConfig, SongStatus } from "../types";
-import { columnsPayload, crewMove, crewPipeline } from "../lib/crewBoard";
+import { applyCardMove, columnsPayload, crewMove, crewPipeline, restoreSongs } from "../lib/crewBoard";
 import { useAppStore } from "./useAppStore";
 
 // The crew side of the app (docs/ARCHITECTURE.md): sign-in, crews, the
@@ -664,30 +664,49 @@ export const useCrewStore = create<CrewState>((set, get) => {
       const move = crewMove(get().songs, cfg, onServer, songId, columnId, beforeId);
       if (move.kind === "none") return;
       if (move.kind === "stage") return get().moveCrewSong(songId, move.stage);
+      const crewId = get().activeCrewId;
       const before = get().songs;
+      const touched = [songId, ...move.renumber.map((r) => r.songId)];
       const stage = cfg.columns.find((c) => c.id === columnId)!.stage;
-      // Optimistic: the version stays the one this move was made on.
-      set({ songs: before.map((s) => (s.id === songId ? { ...s, stage, column_id: columnId, board_order: move.order } : s)) });
-      let r: { applied: boolean; stage: SongStatus | null; stage_updated_at: string; stage_updated_by: string | null; column_id: string | null; board_order: number | null };
-      try {
-        const { data, error } = await supabase.rpc("move_crew_card", { p_song: songId, p_column: columnId, p_order: move.order, p_expected_at: move.expectedAt });
-        if (error) throw error;
-        r = (Array.isArray(data) ? data[0] : data) as typeof r;
-      } catch (e) {
-        set({ songs: before });
+      // Optimistic: the move carries the version it was made on.
+      set({ songs: applyCardMove(before, move, stage) });
+      const undo = (e: unknown) => {
+        // Only these cards, and only if this crew is still the one shown.
+        if (get().activeCrewId === crewId) set({ songs: restoreSongs(get().songs, before, touched) });
         throw new Error(crewErrorMessage(e));
+      };
+      type Row = { applied: boolean; stage: SongStatus | null; stage_updated_at: string; stage_updated_by: string | null; column_id: string | null; board_order: number | null };
+      const call = async (id: string, order: number, expected: string) => {
+        const { data, error } = await supabase!.rpc("move_crew_card", { p_song: id, p_column: columnId, p_order: order, p_expected_at: expected });
+        if (error) throw error;
+        return (Array.isArray(data) ? data[0] : data) as Row;
+      };
+      let r: Row;
+      try {
+        r = await call(songId, move.order, move.expectedAt);
+      } catch (e) {
+        return undo(e);
       }
-      set({
-        songs: get().songs.map((s) =>
-          s.id === songId
-            ? { ...s, stage: r.stage, stage_updated_at: r.stage_updated_at, stage_updated_by: r.stage_updated_by, column_id: r.column_id, board_order: r.board_order }
-            : s,
-        ),
-      });
+      if (get().activeCrewId !== crewId) return;
+      const settle = (id: string, x: Row) =>
+        set({ songs: get().songs.map((s) => (s.id === id ? { ...s, stage: x.stage, stage_updated_at: x.stage_updated_at, stage_updated_by: x.stage_updated_by, column_id: x.column_id, board_order: x.board_order } : s)) });
+      settle(songId, r);
       applyRemoteMoves();
       if (!r.applied) {
         const who = get().members.find((m) => m.user_id === r.stage_updated_by)?.display_name ?? crewText("someone");
+        if (get().activeCrewId === crewId) set({ songs: restoreSongs(get().songs, before, move.renumber.map((x) => x.songId)) });
         throw new Error(crewText("movedMeanwhile", undefined, { who, stage: statusInfo(r.stage ?? undefined).label }));
+      }
+      // Place the column's other cards so the card sits where it was dropped
+      // (same stage: no version needed).
+      for (const x of move.renumber) {
+        const row = get().songs.find((s) => s.id === x.songId);
+        if (!row) continue;
+        try {
+          settle(x.songId, await call(x.songId, x.order, row.stage_updated_at));
+        } catch (e) {
+          throw new Error(crewErrorMessage(e));
+        }
       }
     },
   };

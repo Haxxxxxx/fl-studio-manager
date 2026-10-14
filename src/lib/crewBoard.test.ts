@@ -61,7 +61,7 @@ describe("crew board", () => {
   it("with server columns, a move is a card move (column + order + version)", () => {
     const { cfg } = crewPipeline(SERVER);
     const songs = [song("a", "creation", { stage_updated_at: T(3) }), song("b", "production", { board_order: 5, column_id: U(4) })];
-    expect(crewMove(songs, cfg, true, "a", U(4), "b")).toEqual({ kind: "card", songId: "a", columnId: U(4), order: 4, expectedAt: T(3) });
+    expect(crewMove(songs, cfg, true, "a", U(4), "b")).toEqual({ kind: "card", songId: "a", columnId: U(4), order: 4, expectedAt: T(3), renumber: [] });
     expect(crewMove(songs, cfg, true, "nope", U(4), null)).toEqual({ kind: "none" });
   });
 
@@ -77,5 +77,31 @@ describe("crew board", () => {
     expect(payload.find((c) => c.name === "Mixing")!.id).toBe(U(9));
     expect(payload.find((c) => c.name === "Studio")!.id).toMatch(/^new-/);
     expect(payload.map((c) => c.stage)).toEqual([null, "creation", "production", "production", "prep", "release", "promotion"]);
+  });
+
+  it("dropping a card on itself does nothing", () => {
+    const { cfg } = crewPipeline(SERVER);
+    const songs = [song("a", "production", { column_id: U(4), board_order: 1 }), song("b", "production", { column_id: U(4), board_order: 2 })];
+    expect(crewMove(songs, cfg, true, "a", U(4), "a")).toEqual({ kind: "none" });
+  });
+
+  it("among cards nobody placed, the whole column is placed as shown", () => {
+    const { cfg } = crewPipeline(SERVER);
+    // Fresh crew: nothing placed; shown latest move first: c, b, a.
+    const songs = [
+      song("a", "creation", { stage_updated_at: T(1) }),
+      song("b", "creation", { stage_updated_at: T(2) }),
+      song("c", "creation", { stage_updated_at: T(3) }),
+      song("z", "prep", { stage_updated_at: T(9) }),
+    ];
+    const m = crewMove(songs, cfg, true, "z", U(2), "a");
+    expect(m).toMatchObject({ kind: "card", order: 3, renumber: [{ songId: "c", order: 1 }, { songId: "b", order: 2 }, { songId: "a", order: 4 }] });
+    // Applying it gives exactly c, b, z, a.
+    const after = songs.map((s) => {
+      if (s.id === "z") return { ...s, stage: "creation" as const, column_id: U(2), board_order: 3 };
+      const r = m.kind === "card" ? m.renumber.find((x) => x.songId === s.id) : undefined;
+      return r ? { ...s, column_id: U(2), board_order: r.order } : s;
+    });
+    expect(groupCrewSongs(after, cfg)[1].songs.map((s) => s.id)).toEqual(["c", "b", "z", "a"]);
   });
 });

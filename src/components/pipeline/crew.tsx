@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Disc3 } from "lucide-react";
 import { useCrewStore } from "../../store/useCrewStore";
 import { useAppStore } from "../../store/useAppStore";
@@ -34,6 +34,9 @@ export function useCrewSource(): PipelineSource {
   const openDetail = useAppStore((s) => s.openDetail);
   const query = usePipelineView((s) => s.query.crew);
   const [error, setError] = useState<string | null>(null);
+  const activeCrewId = useCrewStore((s) => s.activeCrewId);
+  // A refused move in one crew isn't news in another.
+  useEffect(() => setError(null), [activeCrewId]);
 
   return useMemo(() => {
     const { cfg } = crewPipeline(columns);

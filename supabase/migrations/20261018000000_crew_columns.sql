@@ -61,7 +61,7 @@ begin
 end;
 $$;
 
-create trigger songs_column_guard before insert or update of column_id, stage on public.songs
+create trigger songs_column_guard before insert or update of column_id, stage, crew_id on public.songs
   for each row execute function public.guard_song_column();
 
 -- -------------------------------------------------------- owner: columns
@@ -141,7 +141,7 @@ begin
   delete from public.crew_columns c where c.crew_id = p_crew and c.id <> all (v_ids);
 
   for i in 1 .. array_length(v_ids, 1) loop
-    select c.stage into v_old_stage from public.crew_columns c where c.id = v_ids[i];
+    select c.stage into v_old_stage from public.crew_columns c where c.id = v_ids[i] and c.crew_id = p_crew;
     if found then
       -- A column moved to another stage drops the cards of the old stage.
       if v_old_stage is distinct from v_stages[i] then
@@ -149,7 +149,7 @@ begin
       end if;
       update public.crew_columns c
         set name = v_names[i], stage = v_stages[i], position = i - 1
-        where c.id = v_ids[i];
+        where c.id = v_ids[i] and c.crew_id = p_crew;
     else
       insert into public.crew_columns (id, crew_id, name, stage, position)
         values (v_ids[i], p_crew, v_names[i], v_stages[i], i - 1);
@@ -162,6 +162,9 @@ $$;
 
 -- -------------------------------------------------------- member: cards
 
+-- Note: an owner deleting a column while someone drops a card into it can
+-- deadlock (40P01) in Postgres; one of the two calls fails and the app
+-- rolls back and says so. Rare enough to leave.
 -- Same stage: only the column and order change (no version check, the stage
 -- stamps stay). Another stage: a stage move, applied only if the song is
 -- still on the version the caller saw (millisecond precision); otherwise
