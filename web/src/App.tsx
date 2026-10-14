@@ -132,7 +132,7 @@ function SignIn({ lang }: { lang: Lang }) {
           </button>
         </form>
       )}
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
     </div>
   );
 }
@@ -144,7 +144,7 @@ function LoadFailed({ message }: { message: string }) {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold">Couldn't load your crews</h1>
-      <p className="text-sm text-red-300">{error ?? message}</p>
+      <p role="alert" className="text-sm text-red-300">{error ?? message}</p>
       <button onClick={() => void run(loadCrews)} disabled={busy} className={primary}>
         {busy ? "Trying…" : "Try again"}
       </button>
@@ -206,7 +206,7 @@ function Join({ another = false, onDone }: { another?: boolean; onDone?: () => v
           </button>
         </div>
       </details>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       {!another && (
         <button onClick={() => void signOut()} className="self-start text-xs text-engrave hover:text-cream">
           Sign out
@@ -261,7 +261,7 @@ function Dashboard({ topError }: { topError: string | null }) {
           </button>
         ))}
       </nav>
-      {topError && <div className="mx-4 mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{topError}</div>}
+      {topError && <div role="alert" className="mx-4 mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{topError}</div>}
       <main className="flex min-h-0 flex-1 flex-col">
         {tab === "board" && <Board />}
         {tab === "releases" && <Releases />}
@@ -340,7 +340,8 @@ function Board() {
             onDragOver={(e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
-              if (spotRef.current?.col !== column.id) mark({ col: column.id, before: null });
+              // Not over a card (cards stop the event): the end of the column.
+              mark({ col: column.id, before: null });
             }}
             onDragLeave={(e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node | null)) mark(null);
