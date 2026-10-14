@@ -40,7 +40,19 @@ const DEFAULT_SETTINGS: Settings = {
   ffmpegPath: null,
 };
 
-export type View = "dashboard" | "library" | "pipeline" | "albums" | "people" | "launch" | "calendar" | "settings";
+export type View =
+  | "dashboard"
+  | "library"
+  | "pipeline"
+  | "albums"
+  | "people"
+  | "launch"
+  | "calendar"
+  | "settings"
+  // The crew section of the menu (CrewSection).
+  | "crewBoard"
+  | "crewMembers"
+  | "crewSettings";
 export type SortKey = "modified" | "name" | "status" | "tempo" | "key" | "versions";
 export type SortDir = "asc" | "desc";
 /** "unsorted" = songs with no status yet. */
@@ -71,9 +83,6 @@ interface AppState {
   startupError: string | null;
   /** The last workspace save failed (cleared by the next successful save). */
   saveError: string | null;
-  /** Which board Pipeline shows: your songs or the crew's. */
-  pipelineBoard: "mine" | "crew";
-  setPipelineBoard: (board: "mine" | "crew") => void;
   dismissErrors: () => void;
   /** FL's default projects folder when found and nothing is linked yet. */
   /** DAW default folders found on this computer; null = not looked yet. */
@@ -341,8 +350,6 @@ export const useAppStore = create<AppState>((set, get) => {
     settingsLoaded: false,
     startupError: null,
     saveError: null,
-    pipelineBoard: "mine",
-    setPipelineBoard: (board) => set({ pipelineBoard: board }),
     dismissErrors: () => set({ startupError: null, saveError: null }),
     detectedFolders: null,
     workspace: EMPTY_WORKSPACE,

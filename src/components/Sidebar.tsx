@@ -1,7 +1,7 @@
 import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, Plus, Rocket, Settings as SettingsIcon, Users } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { btnPrimary, engrave, Wordmark } from "../ui";
-import { CrewMenu } from "./CrewMenu";
+import { CrewSection } from "./CrewSection";
 import { useInCrew } from "../store/useCrewStore";
 
 export function Sidebar() {
@@ -81,6 +81,8 @@ export function Sidebar() {
         )}
       </nav>
 
+      <CrewSection />
+
       {albums.length > 0 && (
         <div className="mt-2 flex min-h-0 flex-col px-2">
           <div className={`px-3 pb-1.5 ${engrave}`}>Releases</div>
@@ -102,9 +104,6 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="mt-auto pt-2">
-        <CrewMenu />
-      </div>
     </aside>
   );
 }
