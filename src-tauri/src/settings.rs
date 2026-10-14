@@ -180,6 +180,19 @@ pub fn clear_path_setting(app: AppHandle, which: String) -> Result<Settings, Str
     Ok(saved)
 }
 
+/// What sample resolution needs to know about FL on this computer: the FL
+/// Studio binary (from Settings, else auto-detected) and FL's user data
+/// folder (`Documents/Image-Line/FL Studio`).
+pub fn fl_paths(app: &AppHandle) -> (Option<String>, Option<PathBuf>) {
+    let fl = crate::scope::Scope::load(app)
+        .ok()
+        .and_then(|s| s.fl_studio().ok())
+        .map(|p| p.to_string_lossy().to_string())
+        .or_else(detect_fl_studio);
+    let user_data = app.path().document_dir().ok().map(|d| d.join("Image-Line").join("FL Studio"));
+    (fl, user_data)
+}
+
 /// Each DAW's usual projects folder, same names on macOS and Windows, under
 /// Documents unless noted.
 fn default_project_folders(docs: &Path, music: Option<&Path>) -> Vec<(&'static str, PathBuf)> {

@@ -9,7 +9,24 @@
 //! open-path directly).
 
 use crate::daws::Daw;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// `\\?\C:\…` → `C:\…` (only drive paths; real device paths stay as they are).
+pub fn strip_verbatim_drive(s: &str) -> Option<&str> {
+    let rest = s.strip_prefix(r"\\?\")?;
+    (rest.get(1..2) == Some(":")).then_some(rest)
+}
+
+/// Windows' canonical form is `\\?\C:\…`; keep the plain `C:\…` so it
+/// compares with everything else and isn't mistaken for a device path.
+pub fn plain(p: PathBuf) -> PathBuf {
+    if cfg!(windows) {
+        if let Some(rest) = strip_verbatim_drive(&p.to_string_lossy()) {
+            return PathBuf::from(rest);
+        }
+    }
+    p
+}
 
 /// A UNC path (`\\host\share`, `//host/share`) or a device / NT path
 /// (`\\?\`, `\\.\`, `\??\`), with either separator.
@@ -52,6 +69,14 @@ pub fn reveal_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn verbatim_drive_paths_become_plain() {
+        assert_eq!(strip_verbatim_drive(r"\\?\C:\Users\x\kick.wav"), Some(r"C:\Users\x\kick.wav"));
+        // Real device / UNC verbatim paths are not drive paths: still refused.
+        assert_eq!(strip_verbatim_drive(r"\\?\UNC\host\share\kick.wav"), None);
+        assert_eq!(strip_verbatim_drive(r"C:\kick.wav"), None);
+    }
 
     #[test]
     fn spots_network_and_device_paths() {

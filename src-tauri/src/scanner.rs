@@ -154,9 +154,13 @@ fn index_exports(output_folder: Option<&str>) -> HashMap<String, Vec<FileEntry>>
     index
 }
 
+#[cfg(test)]
 fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
+    scan_with(folders, output_folder, Resolver::new(crate::settings::detect_fl_studio()))
+}
+
+fn scan_with(folders: &[String], output_folder: Option<&str>, mut resolver: Resolver) -> Vec<ProjectInfo> {
     let exports = index_exports(output_folder);
-    let mut resolver = Resolver::new(crate::settings::detect_fl_studio());
     let mut seen = HashSet::new();
     let mut projects: Vec<ProjectInfo> = Vec::new();
     // (file, DAW, backup-only file type)
@@ -461,7 +465,10 @@ pub async fn scan_projects(app: AppHandle) -> Result<Vec<ProjectInfo>, String> {
     for folder in folders.iter().chain(output_folder.iter()) {
         let _ = assets.allow_directory(folder, true);
     }
-    let projects = tauri::async_runtime::spawn_blocking(move || scan(&folders, output_folder.as_deref()))
+    let (fl, user_data) = crate::settings::fl_paths(&app);
+    let projects = tauri::async_runtime::spawn_blocking(move || {
+        scan_with(&folders, output_folder.as_deref(), Resolver::new(fl).with_user_data(user_data))
+    })
         .await
         .map_err(|e| format!("scan failed: {e}"))?;
     remember_scan(&projects);
