@@ -4,7 +4,8 @@ import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { crewErrorMessage, supabase } from "../lib/supabase";
 import { shareElsewhere, sharedHere, sharedPayloads, stageSync, staleShareIds, type ShareScope, type StageSync } from "../lib/crewSync";
-import type { CrewMemberRow, CrewSongRow, CrewSummary, SongStatus } from "../types";
+import type { CrewColumnRow, CrewMemberRow, CrewSongRow, CrewSummary, PipelineConfig, SongStatus } from "../types";
+import { columnsPayload, crewMove, crewPipeline } from "../lib/crewBoard";
 import { useAppStore } from "./useAppStore";
 
 // The crew side of the app (docs/ARCHITECTURE.md): sign-in, crews, the
@@ -48,6 +49,8 @@ interface CrewState {
   activeCrewId: string | null;
   members: CrewMemberRow[];
   songs: CrewSongRow[];
+  /** The crew board's columns (empty: one per stage, never edited). */
+  columns: CrewColumnRow[];
   invite: string | null;
   /** Open invite codes of the active crew (owners only). */
   invites: CrewInvite[];
@@ -78,6 +81,10 @@ interface CrewState {
   /** A crewmate moved my song while my move was waiting: keep theirs or mine. */
   resolveStageConflict: (path: string, keep: "theirs" | "mine") => void;
   syncNow: () => Promise<void>;
+  /** Owner: save the crew board's columns (the whole set, src/lib/crewBoard.ts). */
+  saveCrewColumns: (cfg: PipelineConfig) => Promise<void>;
+  /** Move a crew card to a column, before another card (or at the end). */
+  moveCrewCard: (songId: string, columnId: string, beforeId: string | null) => Promise<void>;
 }
 
 let initialized = false;
@@ -143,23 +150,26 @@ export const useCrewStore = create<CrewState>((set, get) => {
   async function loadCrewData(): Promise<boolean> {
     const crewId = get().activeCrewId;
     if (!supabase || !crewId) {
-      set({ songs: [], members: [] });
+      set({ songs: [], members: [], columns: [] });
       return false;
     }
-    const [songs, members] = await Promise.all([
+    const [songs, members, columns] = await Promise.all([
       supabase.from("songs").select("*").eq("crew_id", crewId).order("updated_at", { ascending: false }),
       supabase.from("crew_members").select("*").eq("crew_id", crewId).order("joined_at"),
+      supabase.from("crew_columns").select("*").eq("crew_id", crewId).order("position"),
     ]);
     if (get().activeCrewId !== crewId) return false;
     if (songs.error) throw songs.error;
     if (members.error) throw members.error;
+    // An older crew server without board columns: one column per stage.
+    const columnRows = columns.error ? [] : (columns.data as CrewColumnRow[]);
     const memberRows = members.data as CrewMemberRow[];
     if (!memberRows.some((m) => m.user_id === get().userId)) {
       // Removed from the crew (or it was deleted): back to the crew list.
       void get().loadCrews().catch(() => {});
       return false;
     }
-    set({ songs: songs.data as CrewSongRow[], members: memberRows });
+    set({ songs: songs.data as CrewSongRow[], members: memberRows, columns: columnRows });
     return true;
   }
 
@@ -201,6 +211,12 @@ export const useCrewStore = create<CrewState>((set, get) => {
     return r;
   }
 
+  async function reloadColumns(crewId: string) {
+    if (!supabase || get().activeCrewId !== crewId) return;
+    const { data, error } = await supabase.from("crew_columns").select("*").eq("crew_id", crewId).order("position");
+    if (!error && get().activeCrewId === crewId) set({ columns: data as CrewColumnRow[] });
+  }
+
   function subscribe(crewId: string | null) {
     if (channel && supabase) void supabase.removeChannel(channel);
     channel = null;
@@ -218,6 +234,13 @@ export const useCrewStore = create<CrewState>((set, get) => {
         const id = (p.old as { id?: string })?.id;
         if (get().activeCrewId !== crewId || !id || !get().songs.some((s) => s.id === id)) return;
         set({ songs: get().songs.filter((s) => s.id !== id) });
+      })
+      // The owner edited the board's columns (a whole set at a time): refetch them.
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "crew_columns", filter: `crew_id=eq.${crewId}` }, () => void reloadColumns(crewId))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "crew_columns", filter: `crew_id=eq.${crewId}` }, () => void reloadColumns(crewId))
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "crew_columns" }, (p) => {
+        const id = (p.old as { id?: string })?.id;
+        if (id && get().columns.some((c) => c.id === id)) void reloadColumns(crewId);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "crew_members", filter: `crew_id=eq.${crewId}` }, () => {
         if (get().activeCrewId === crewId) void loadCrewData().catch(() => {});
@@ -373,6 +396,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
     activeCrewId: null,
     members: [],
     songs: [],
+    columns: [],
     invite: null,
     invites: [],
     sync: { kind: "idle" },
@@ -394,7 +418,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
         const userId = session?.user.id ?? null;
         if (userId === get().userId) return;
         resetSession();
-        set({ userId, email: session?.user.email ?? null, crews: [], loadError: null, activeCrewId: null, songs: [], members: [], invite: null, invites: [], sync: { kind: "idle" } });
+        set({ userId, email: session?.user.email ?? null, crews: [], loadError: null, activeCrewId: null, songs: [], members: [], columns: [], invite: null, invites: [], sync: { kind: "idle" } });
         // Not awaited: supabase-js forbids awaiting its own calls in this callback.
         if (userId) setTimeout(() => void get().loadCrews().catch(() => {}), 0);
       });
@@ -464,7 +488,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
       writeActiveCrew(id);
       lastPushed.clear();
       rejected.clear();
-      set({ activeCrewId: id, invite: null, invites: [], songs: [], members: [], sync: { kind: "idle" } });
+      set({ activeCrewId: id, invite: null, invites: [], songs: [], members: [], columns: [], sync: { kind: "idle" } });
       subscribe(id);
       if (!id) return;
       if (canSync()) return cycle();
@@ -619,6 +643,53 @@ export const useCrewStore = create<CrewState>((set, get) => {
     },
 
     syncNow: () => cycle(),
+
+    saveCrewColumns: async (cfg) => {
+      const crewId = get().activeCrewId;
+      if (!supabase || !crewId) return;
+      const before = get().columns;
+      const payload = columnsPayload(cfg, uuid);
+      set({ columns: payload.map((c, i) => ({ ...c, crew_id: crewId, position: i })) });
+      const { data, error } = await supabase.rpc("set_crew_columns", { p_crew: crewId, p_columns: payload });
+      if (error) {
+        if (get().activeCrewId === crewId) set({ columns: before });
+        throw new Error(crewErrorMessage(error));
+      }
+      if (get().activeCrewId === crewId) set({ columns: data as CrewColumnRow[] });
+    },
+
+    moveCrewCard: async (songId, columnId, beforeId) => {
+      if (!supabase) return;
+      const { cfg, onServer } = crewPipeline(get().columns);
+      const move = crewMove(get().songs, cfg, onServer, songId, columnId, beforeId);
+      if (move.kind === "none") return;
+      if (move.kind === "stage") return get().moveCrewSong(songId, move.stage);
+      const before = get().songs;
+      const stage = cfg.columns.find((c) => c.id === columnId)!.stage;
+      // Optimistic: the version stays the one this move was made on.
+      set({ songs: before.map((s) => (s.id === songId ? { ...s, stage, column_id: columnId, board_order: move.order } : s)) });
+      let r: { applied: boolean; stage: SongStatus | null; stage_updated_at: string; stage_updated_by: string | null; column_id: string | null; board_order: number | null };
+      try {
+        const { data, error } = await supabase.rpc("move_crew_card", { p_song: songId, p_column: columnId, p_order: move.order, p_expected_at: move.expectedAt });
+        if (error) throw error;
+        r = (Array.isArray(data) ? data[0] : data) as typeof r;
+      } catch (e) {
+        set({ songs: before });
+        throw new Error(crewErrorMessage(e));
+      }
+      set({
+        songs: get().songs.map((s) =>
+          s.id === songId
+            ? { ...s, stage: r.stage, stage_updated_at: r.stage_updated_at, stage_updated_by: r.stage_updated_by, column_id: r.column_id, board_order: r.board_order }
+            : s,
+        ),
+      });
+      applyRemoteMoves();
+      if (!r.applied) {
+        const who = get().members.find((m) => m.user_id === r.stage_updated_by)?.display_name ?? crewText("someone");
+        throw new Error(crewText("movedMeanwhile", undefined, { who, stage: statusInfo(r.stage ?? undefined).label }));
+      }
+    },
   };
 });
 

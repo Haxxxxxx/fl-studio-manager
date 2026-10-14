@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useCrewStore, useInCrew } from "../store/useCrewStore";
-import { CrewBoard } from "./CrewBoard";
+import { PipelinePage } from "./pipeline/PipelinePage";
+import { useCrewSource } from "./pipeline/crew";
 import { CrewAccount, CrewInvites, CrewMembers, CrewStatus } from "./CrewPanel";
 
 // The crew pages behind the sidebar's crew section. The board is for every
@@ -34,14 +35,22 @@ function OwnerOnly() {
   return <div className="p-6 text-sm text-engrave">Only the crew's owner manages this.</div>;
 }
 
+/** The crew's pipeline: the same board / list / table as yours, over the
+ * crew's songs and columns. The owner edits columns; anyone moves cards. */
 export function CrewBoardView() {
   const inCrew = useInCrew();
+  const owner = useIsCrewOwner();
   const name = useCrewName();
-  return (
-    <Page title="Crew board" sub={name ? `${name} · anyone in the crew can move a card` : undefined}>
-      {inCrew ? <CrewBoard /> : <NotInCrew />}
-    </Page>
-  );
+  const source = useCrewSource();
+  if (!inCrew) {
+    return (
+      <Page title="Crew board">
+        <NotInCrew />
+      </Page>
+    );
+  }
+  const sub = `${name ?? "Crew"} · anyone in the crew can move a card${owner ? " · you edit the columns" : ""}`;
+  return <PipelinePage title="Crew board" sub={sub} source={source} />;
 }
 
 export function CrewMembersView() {

@@ -433,7 +433,20 @@ export interface CrewSongRow {
   last_saved_at: string | null;
   stage_updated_at: string;
   stage_updated_by?: string | null;
+  /** The crew board column it sits in (null: its stage's first column). */
+  column_id?: string | null;
+  /** Hand-placed position in its column (null: not placed by hand). */
+  board_order?: number | null;
   updated_at?: string;
+}
+
+/** A crew board column (crew_columns). Only the owner edits them. */
+export interface CrewColumnRow {
+  id: string;
+  crew_id: string;
+  name: string;
+  stage: SongStatus | null;
+  position: number;
 }
 
 export interface CrewMemberRow {
