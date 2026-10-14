@@ -1,6 +1,7 @@
 import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, Plus, Rocket, Settings as SettingsIcon, Users } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { btnPrimary, engrave, Wordmark } from "../ui";
+import { CrewMenu } from "./CrewMenu";
 
 export function Sidebar() {
   const view = useAppStore((s) => s.view);
@@ -87,6 +88,10 @@ export function Sidebar() {
           </div>
         </div>
       )}
+
+      <div className="mt-auto pt-2">
+        <CrewMenu />
+      </div>
     </aside>
   );
 }
