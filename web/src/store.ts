@@ -2,7 +2,7 @@ import { statusInfo } from "@shared/lib/songs";
 import { crewText } from "@shared/lib/crewMessages";
 import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { CrewColumnRow, CrewMemberRow, CrewSongRow, CrewSummary, SongStatus } from "@shared/types";
+import type { CrewColumnRow, CrewMemberRow, CrewReleaseRow, CrewSongRow, CrewSummary, SongStatus } from "@shared/types";
 import { applyCardMove, crewMove, crewPipeline, restoreSongs } from "@shared/lib/crewBoard";
 import { errorMessage, supabase } from "./supabase";
 
@@ -24,6 +24,8 @@ interface WebState {
   members: CrewMemberRow[];
   /** The crew board's columns, as the owner set them in the app (empty: one per stage). */
   columns: CrewColumnRow[];
+  /** Releases shared with the crew (from the app). */
+  releases: CrewReleaseRow[];
   error: string | null;
 
   init: () => Promise<void>;
@@ -61,11 +63,12 @@ const remembered = () => {
 export const useWeb = create<WebState>((set, get) => {
   async function loadCrewData() {
     const id = get().activeCrewId;
-    if (!supabase || !id) return set({ songs: [], members: [], columns: [] });
-    const [songs, members, columns] = await Promise.all([
+    if (!supabase || !id) return set({ songs: [], members: [], columns: [], releases: [] });
+    const [songs, members, columns, releases] = await Promise.all([
       supabase.from("songs").select("*").eq("crew_id", id).order("updated_at", { ascending: false }),
       supabase.from("crew_members").select("*").eq("crew_id", id).order("joined_at"),
       supabase.from("crew_columns").select("*").eq("crew_id", id).order("position"),
+      supabase.from("releases").select("*").eq("crew_id", id),
     ]);
     if (get().activeCrewId !== id) return;
     if (songs.error) throw songs.error;
@@ -75,7 +78,12 @@ export const useWeb = create<WebState>((set, get) => {
       // Removed from the crew (or it was deleted): back to the crew list.
       return void get().loadCrews().catch((e) => set({ error: errorMessage(e) }));
     }
-    set({ songs: songs.data as CrewSongRow[], members: memberRows, columns: columns.error ? [] : (columns.data as CrewColumnRow[]), error: null });
+    set({ songs: songs.data as CrewSongRow[], members: memberRows, columns: columns.error ? [] : (columns.data as CrewColumnRow[]), releases: releases.error ? [] : (releases.data as CrewReleaseRow[]), error: null });
+  }
+
+  function upsertRelease(row: CrewReleaseRow) {
+    if (!row?.id || row.crew_id !== get().activeCrewId) return;
+    set({ releases: [...get().releases.filter((r) => r.id !== row.id), row] });
   }
 
   async function reloadColumns(id: string) {
@@ -116,6 +124,12 @@ export const useWeb = create<WebState>((set, get) => {
         if (get().activeCrewId !== id || !gone || !get().songs.some((s) => s.id === gone)) return;
         set({ songs: get().songs.filter((s) => s.id !== gone) });
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "releases", filter: `crew_id=eq.${id}` }, (p) => upsertRelease(p.new as CrewReleaseRow))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "releases", filter: `crew_id=eq.${id}` }, (p) => upsertRelease(p.new as CrewReleaseRow))
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "releases" }, (p) => {
+        const old = (p.old as { id?: string })?.id;
+        if (old && get().releases.some((r) => r.id === old)) set({ releases: get().releases.filter((r) => r.id !== old) });
+      })
       // The owner edited the columns in the app: refetch them.
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "crew_columns", filter: `crew_id=eq.${id}` }, () => void reloadColumns(id))
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "crew_columns", filter: `crew_id=eq.${id}` }, () => void reloadColumns(id))
@@ -150,6 +164,7 @@ export const useWeb = create<WebState>((set, get) => {
     activeCrewId: null,
     songs: [],
     columns: [],
+    releases: [],
     members: [],
     error: null,
 
@@ -167,7 +182,7 @@ export const useWeb = create<WebState>((set, get) => {
         const userId = session?.user.id ?? null;
         if (userId === get().userId) return;
         subscribe(null);
-        set({ userId, email: session?.user.email ?? null, crews: [], loadError: null, activeCrewId: null, songs: [], members: [], columns: [], error: null });
+        set({ userId, email: session?.user.email ?? null, crews: [], loadError: null, activeCrewId: null, songs: [], members: [], columns: [], releases: [], error: null });
         // Not awaited: supabase-js forbids awaiting its own calls in this callback.
         if (userId) setTimeout(() => void get().loadCrews().catch((e) => set({ error: errorMessage(e) })), 0);
       });
@@ -220,7 +235,7 @@ export const useWeb = create<WebState>((set, get) => {
 
     selectCrew: async (id) => {
       remember(id);
-      set({ activeCrewId: id, songs: [], members: [], columns: [], error: null });
+      set({ activeCrewId: id, songs: [], members: [], columns: [], releases: [], error: null });
       subscribe(id);
       if (id) await loadCrewData().catch((e) => set({ error: errorMessage(e) }));
     },

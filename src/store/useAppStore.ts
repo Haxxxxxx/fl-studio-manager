@@ -51,6 +51,7 @@ export type View =
   | "settings"
   // The crew section of the menu (CrewSection).
   | "crewBoard"
+  | "crewReleases"
   | "crewMembers"
   | "crewSettings";
 export type SortKey = "modified" | "name" | "status" | "tempo" | "key" | "versions";
@@ -208,6 +209,8 @@ interface AppState {
   createAlbum: (title: string) => string;
   updateAlbum: (id: string, patch: Partial<Omit<Album, "id">>) => void;
   deleteAlbum: (id: string) => void;
+  /** Crew sync: forget deleted-release markers once their rows are gone. */
+  clearDeletedReleaseShares: (ids: string[]) => void;
 
   // People (collaborators & contacts), credits and pitches
   createPerson: (name: string, aliases?: string[]) => string;
@@ -838,9 +841,20 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     deleteAlbum: (id) => {
-      mutateWorkspace((ws) => ({ ...ws, albums: ws.albums.filter((a) => a.id !== id) }));
+      mutateWorkspace((ws) => {
+        const gone = ws.albums.find((a) => a.id === id);
+        // Shared: remember it, so the crew sync deletes its row too.
+        const tomb =
+          gone?.shareId && gone.shared !== false && gone.shareCrewId && gone.shareUserId
+            ? [...(ws.deletedReleaseShares ?? []), { id: gone.shareId, crewId: gone.shareCrewId, userId: gone.shareUserId }]
+            : ws.deletedReleaseShares;
+        return { ...ws, albums: ws.albums.filter((a) => a.id !== id), deletedReleaseShares: tomb };
+      });
       if (get().openAlbumId === id) set({ openAlbumId: null });
     },
+
+    clearDeletedReleaseShares: (ids) =>
+      mutateWorkspace((ws) => ({ ...ws, deletedReleaseShares: (ws.deletedReleaseShares ?? []).filter((d) => !ids.includes(d.id)) })),
 
     addTracks: (albumId, paths) =>
       mutateAlbum(albumId, (a) => ({

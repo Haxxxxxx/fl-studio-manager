@@ -4,6 +4,8 @@ import { CalendarDays, CheckCircle2, Disc3, KanbanSquare, LogOut, Users } from "
 import { STATUSES, UNSORTED, statusInfo } from "@shared/lib/songs";
 import { formatRelative } from "@shared/lib/format";
 import { crewPipeline, groupCrewSongs } from "@shared/lib/crewBoard";
+import { releaseTracks, sortCrewReleases } from "@shared/lib/crewSync";
+import { localDay } from "@shared/lib/crewStats";
 import type { CrewSongRow, SongStatus } from "@shared/types";
 import { useWeb } from "./store";
 import { Landing } from "./Landing";
@@ -16,7 +18,7 @@ const input =
   "w-full rounded-lg border border-rule-strong bg-chassis px-3 py-2.5 text-base text-cream placeholder:text-engrave shadow-[inset_0_2px_3px_rgb(0_0_0/0.5)] focus:border-hot focus:outline-none sm:text-sm";
 const primary = "rounded bg-hot px-4 py-2.5 font-display uppercase tracking-[0.06em] text-[15px] font-bold text-chassis hover:bg-hot-hover disabled:cursor-not-allowed disabled:opacity-70";
 const COLUMNS = [{ id: undefined as SongStatus | undefined, ...UNSORTED }, ...STATUSES];
-type Tab = "board" | "calendar" | "crew";
+type Tab = "board" | "releases" | "calendar" | "crew";
 
 function useAction() {
   const [busy, setBusy] = useState(false);
@@ -220,6 +222,7 @@ function Dashboard({ topError }: { topError: string | null }) {
   const active = crews.find((c) => c.id === activeCrewId) ?? crews[0];
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "board", label: "Board", icon: <KanbanSquare size={15} /> },
+    { id: "releases", label: "Releases", icon: <Disc3 size={15} /> },
     { id: "calendar", label: "Calendar", icon: <CalendarDays size={15} /> },
     { id: "crew", label: "Crew", icon: <Users size={15} /> },
   ];
@@ -261,6 +264,7 @@ function Dashboard({ topError }: { topError: string | null }) {
       {topError && <div className="mx-4 mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{topError}</div>}
       <main className="flex min-h-0 flex-1 flex-col">
         {tab === "board" && <Board />}
+        {tab === "releases" && <Releases />}
         {tab === "calendar" && <Calendar />}
         {tab === "crew" && <Crew />}
       </main>
@@ -441,6 +445,58 @@ function SongCard({
       </label>
       {mover && s.stage_updated_by !== s.owner_id && <div className="mt-1 text-[10px] text-engrave">moved by {mover}</div>}
     </article>
+  );
+}
+
+const KIND_LABEL: Record<string, string> = { album: "Album", ep: "EP", single: "Single", mixtape: "Mixtape" };
+
+/** Releases the crew shares from the app: title, date, tracks and where each track is. */
+function Releases() {
+  const releases = useWeb((s) => s.releases);
+  const songs = useWeb((s) => s.songs);
+  const userId = useWeb((s) => s.userId);
+  const names = useNames();
+  const list = sortCrewReleases(releases, localDay(Date.now()));
+  if (list.length === 0) return <div className="p-8 text-center text-sm text-body">No releases shared yet. Share one from its page in the Hivo app.</div>;
+  return (
+    <div className="mx-auto grid w-full max-w-5xl gap-4 p-4 sm:p-6 md:grid-cols-2">
+      {list.map((r) => {
+        const tracks = releaseTracks(r, songs);
+        const done = tracks.filter((t) => t.stage === "prep" || t.stage === "release" || t.stage === "promotion").length;
+        const dateMs = r.release_date ? new Date(`${r.release_date}T00:00:00`).getTime() : null;
+        return (
+          <article key={r.id} aria-label={r.title} className="rounded-xl border border-rule bg-panel p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-1 h-8 w-8 shrink-0 rounded" style={{ background: r.color ?? "var(--color-raised)" }} aria-hidden />
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-engrave">
+                  {KIND_LABEL[r.kind] ?? r.kind} · {r.owner_id === userId ? "You" : (names.get(r.owner_id) ?? "Former member")}
+                </div>
+                <h2 className="truncate text-base font-semibold text-cream">{r.title}</h2>
+                <div className="text-xs text-body">
+                  {dateMs ? `${new Date(dateMs).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })} · ${formatRelative(dateMs)}` : "No date yet"}
+                </div>
+              </div>
+              <span className="shrink-0 text-xs text-engrave">
+                {done}/{tracks.length} finished
+              </span>
+            </div>
+            {tracks.length > 0 && (
+              <ol className="mt-3 flex flex-col gap-1 border-t border-rule pt-3">
+                {tracks.map((t, i) => (
+                  <li key={t.id} className="flex items-center gap-2 text-xs">
+                    <span className="w-4 text-right font-mono text-engrave">{i + 1}</span>
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: statusInfo(t.stage ?? undefined).color }} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-cream">{t.title}</span>
+                    <span className="text-engrave">{statusInfo(t.stage ?? undefined).label}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </article>
+        );
+      })}
+    </div>
   );
 }
 
