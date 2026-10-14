@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { useAppStore } from "../../store/useAppStore";
-import { usePipelineView } from "../../store/usePipelineView";
-import { flatRows, sortRows, stageColor, stageLabel, type SortKey } from "../../lib/pipeline";
+import { useCollapsed, usePipelineView } from "../../store/usePipelineView";
+import { sortBy, stageColor, stageLabel, type SortKey } from "../../lib/pipeline";
 import { formatRelative } from "../../lib/format";
-import { formatBpm, lastSaveMs } from "../../lib/songs";
+import { formatBpm } from "../../lib/songs";
 import { StatusDot } from "../ui";
-import { ConflictDot, usePipelineModel } from "./shared";
+import { ConflictDot, SourceError, useSource, type PipelineItem } from "./shared";
+import type { PipelineColumn } from "../../types";
 
 const HEADERS: { key: SortKey; label: string; className?: string }[] = [
   { key: "name", label: "Song" },
@@ -16,42 +16,47 @@ const HEADERS: { key: SortKey; label: string; className?: string }[] = [
   { key: "key", label: "Key" },
 ];
 
+type Row = { item: PipelineItem; column: PipelineColumn; boardIndex: number };
+
 /** One flat, sortable table over the same rows as the list. Its sort and
  * hidden columns are its own: they never reorder the board. Read-only: click
  * a row to open the song. */
 export function PipelineTable() {
-  const { groups, workspace } = usePipelineModel();
-  const { key, dir } = usePipelineView((s) => s.tableSort);
+  const source = useSource();
+  const { groups, scope } = source;
+  const { key, dir } = usePipelineView((s) => s.tableSort[scope]);
   const setTableSort = usePipelineView((s) => s.setTableSort);
-  const hidden = usePipelineView((s) => s.collapsed.table);
+  const hidden = useCollapsed(scope, "table");
   const toggleCollapsed = usePipelineView((s) => s.toggleCollapsed);
-  const openDetail = useAppStore((s) => s.openDetail);
-  const detailPath = useAppStore((s) => s.detailPath);
 
-  const rows = useMemo(
-    () => sortRows(flatRows(groups.filter((g) => !hidden.includes(g.column.id))), key, dir, workspace),
-    [groups, hidden, key, dir, workspace],
-  );
+  const rows = useMemo(() => {
+    let i = 0;
+    const flat: Row[] = groups
+      .filter((g) => !hidden.includes(g.column.id))
+      .flatMap((g) => g.items.map((item) => ({ item, column: g.column, boardIndex: i++ })));
+    return sortBy(flat, (r) => ({ name: r.item.title, saved: r.item.savedMs, bpm: r.item.bpm, key: r.item.musicalKey, boardIndex: r.boardIndex }), key, dir);
+  }, [groups, hidden, key, dir]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      <SourceError />
       <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-6 py-2" role="group" aria-label="Columns shown">
         <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.14em] text-engrave">Show</span>
-        {groups.map(({ column, songs }) => {
+        {groups.map(({ column, items }) => {
           const on = !hidden.includes(column.id);
           return (
             <button
               key={column.id}
               aria-pressed={on}
-              onClick={() => toggleCollapsed("table", column.id)}
+              onClick={() => toggleCollapsed(scope, "table", column.id)}
               className={`flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs ${on ? "border-rule-strong text-cream" : "border-rule text-engrave line-through"}`}
             >
-              <StatusDot color={stageColor(column.stage)} size={6} glow={false} /> {column.name} <span className="text-engrave">{songs.length}</span>
+              <StatusDot color={stageColor(column.stage)} size={6} glow={false} /> {column.name} <span className="text-engrave">{items.length}</span>
             </button>
           );
         })}
         {key !== "board" && (
-          <button onClick={() => setTableSort("board")} className="ml-auto text-xs text-engrave underline hover:text-cream">
+          <button onClick={() => setTableSort(scope, "board")} className="ml-auto text-xs text-engrave underline hover:text-cream">
             Board order
           </button>
         )}
@@ -67,7 +72,7 @@ export function PipelineTable() {
                   aria-sort={key === h.key ? (dir === 1 ? "ascending" : "descending") : "none"}
                   className={`border-b border-rule px-2 py-2 font-mono text-[10px] font-normal uppercase tracking-[0.14em] text-engrave ${h.className ?? "text-left"}`}
                 >
-                  <button onClick={() => setTableSort(h.key)} className="inline-flex items-center gap-1 uppercase hover:text-cream">
+                  <button onClick={() => setTableSort(scope, h.key)} className="inline-flex items-center gap-1 uppercase hover:text-cream">
                     {h.label}
                     {key === h.key && (dir === 1 ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
                   </button>
@@ -86,32 +91,25 @@ export function PipelineTable() {
                 </td>
               </tr>
             )}
-            {rows.map(({ song, column }) => {
-              const meta = workspace.songs[song.path];
-              return (
-                <tr
-                  key={song.path}
-                  onClick={() => openDetail(detailPath === song.path ? null : song.path)}
-                  className={`cursor-pointer border-b border-rule ${detailPath === song.path ? "bg-raised" : "hover:bg-panel"}`}
-                >
-                  <td className="px-2 py-1.5">
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate font-medium text-cream">{song.name}</span>
-                      <ConflictDot path={song.path} />
-                    </span>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <span className="flex items-center gap-1.5 text-xs text-body" title={`Stage: ${stageLabel(column.stage)}`}>
-                      <StatusDot color={stageColor(column.stage)} size={6} glow={false} /> {column.name}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-xs text-engrave">{formatRelative(lastSaveMs(song))}</td>
-                  <td className="px-2 py-1.5 text-right font-mono text-xs text-body">{formatBpm(song.tempoBpm)}</td>
-                  <td className="px-2 py-1.5 font-mono text-xs text-body">{meta?.key || "—"}</td>
-                  <td className="max-w-[14rem] truncate px-2 py-1.5 text-xs text-engrave">{(meta?.tags ?? []).map((t) => `#${t}`).join(" ")}</td>
-                </tr>
-              );
-            })}
+            {rows.map(({ item, column }) => (
+              <tr key={item.key} onClick={item.open} className={`border-b border-rule ${item.open ? "cursor-pointer" : ""} ${item.selected ? "bg-raised" : "hover:bg-panel"}`}>
+                <td className="px-2 py-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-medium text-cream">{item.title}</span>
+                    <ConflictDot on={item.conflict} />
+                  </span>
+                </td>
+                <td className="px-2 py-1.5">
+                  <span className="flex items-center gap-1.5 text-xs text-body" title={`Stage: ${stageLabel(column.stage)}`}>
+                    <StatusDot color={stageColor(column.stage)} size={6} glow={false} /> {column.name}
+                  </span>
+                </td>
+                <td className="whitespace-nowrap px-2 py-1.5 text-xs text-engrave">{item.savedMs ? formatRelative(item.savedMs) : "—"}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-xs text-body">{formatBpm(item.bpm)}</td>
+                <td className="px-2 py-1.5 font-mono text-xs text-body">{item.musicalKey || "—"}</td>
+                <td className="max-w-[14rem] truncate px-2 py-1.5 text-xs text-engrave">{item.tags.map((t) => `#${t}`).join(" ")}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
