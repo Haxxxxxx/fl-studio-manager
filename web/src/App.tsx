@@ -13,11 +13,12 @@ import { crewText, setUiLang } from "@shared/lib/crewMessages";
 import { SIGN_IN } from "./landingCopy";
 import { cleanCode, isCodeComplete } from "@shared/lib/signInCode";
 import { pageLang, type Lang } from "./lang";
+import { W } from "./dashboardCopy";
+import { locale, tr } from "@shared/i18n";
 
 const input =
   "w-full rounded-lg border border-rule-strong bg-chassis px-3 py-2.5 text-base text-cream placeholder:text-engrave shadow-[inset_0_2px_3px_rgb(0_0_0/0.5)] focus:border-hot focus:outline-none sm:text-sm";
 const primary = "rounded bg-hot px-4 py-2.5 font-display uppercase tracking-[0.06em] text-[15px] font-bold text-chassis hover:bg-hot-hover disabled:cursor-not-allowed disabled:opacity-70";
-const COLUMNS = [{ id: undefined as SongStatus | undefined, ...UNSORTED }, ...STATUSES];
 type Tab = "board" | "releases" | "calendar" | "crew";
 
 function useAction() {
@@ -45,15 +46,12 @@ export function App() {
     void init();
   }, [init]);
 
-  if (!ready) return <Centered>Loading…</Centered>;
-  if (!userId) {
-    const lang = pageLang();
-    setUiLang(lang);
-    return <Landing lang={lang} signIn={<SignIn lang={lang} />} />;
-  }
-  // Signed in: the crew dashboard is English for now (see the FAQ), so the
-  // shared stage names and messages are too, never a French/English mix.
-  setUiLang("en");
+  // The whole site follows the page's language (/fr, /en, else the browser):
+  // landing, sign-in and the crew dashboard, shared stage names included.
+  const lang = pageLang();
+  setUiLang(lang);
+  if (!ready) return <Centered>{tr(W).loading}</Centered>;
+  if (!userId) return <Landing lang={lang} signIn={<SignIn lang={lang} />} />;
   if (crews.length === 0 && loadError) return <Shell><LoadFailed message={loadError} /></Shell>;
   if (crews.length === 0) return <Shell><Join /></Shell>;
   return <Dashboard topError={error} />;
@@ -67,7 +65,7 @@ function Logo() {
   return (
     <div className="flex items-end gap-2.5">
       <Wordmark size={26} />
-      <div className="pb-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-engrave">Crew</div>
+      <div className="pb-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-engrave">{tr(W).crewTag}</div>
     </div>
   );
 }
@@ -78,7 +76,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <Logo />
       {children}
       <p className="mt-auto text-[11px] leading-relaxed text-engrave">
-        Your crew's shared songs: titles, stages, BPM, key, tags, credits and release dates. Never audio, files, notes or track names. Stored in the EU (Ireland).
+        {tr(W).footer}
       </p>
     </div>
   );
@@ -147,13 +145,13 @@ function LoadFailed({ message }: { message: string }) {
   const { busy, error, run } = useAction();
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Couldn't load your crews</h1>
+      <h1 className="text-xl font-semibold">{tr(W).loadFailed}</h1>
       <p role="alert" className="text-sm text-red-300">{error ?? message}</p>
       <button onClick={() => void run(loadCrews)} disabled={busy} className={primary}>
-        {busy ? "Trying…" : "Try again"}
+        {busy ? tr(W).trying : tr(W).tryAgain}
       </button>
       <button onClick={() => void signOut()} className="self-start text-xs text-engrave hover:text-cream">
-        Sign out
+        {tr(W).signOut}
       </button>
     </div>
   );
@@ -178,7 +176,7 @@ function Join({ another = false, onDone }: { another?: boolean; onDone?: () => v
     <div className="flex flex-col gap-4">
       {!another && (
         <>
-          <h1 className="text-xl font-semibold">Join your crew</h1>
+          <h1 className="text-xl font-semibold">{tr(W).joinTitle}</h1>
           <p className="text-sm text-body" role="status">{crewText("noCrew", undefined, { email: email ?? "" })}</p>
           <p className="text-xs text-engrave">{crewText("noInviteYet")}</p>
         </>
@@ -187,33 +185,33 @@ function Join({ another = false, onDone }: { another?: boolean; onDone?: () => v
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
         maxLength={DISPLAY_NAME_MAX}
-        placeholder="Your name in the crew (artist name)"
-        aria-label="Your name in the crew"
+        placeholder={tr(W).yourName}
+        aria-label={tr(W).yourNameLabel}
         className={input}
       />
       <input
         value={code}
         onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
-        placeholder="INVITE CODE"
-        aria-label="Invite code"
+        placeholder={tr(W).inviteCode}
+        aria-label={tr(W).inviteCodeLabel}
         className={`${input} text-center font-mono tracking-widest`}
       />
       <button onClick={() => void run(() => joinCrew(code, displayName)).then(done)} disabled={busy || code.length !== 8 || !displayName.trim()} className={primary}>
-        Join crew
+        {tr(W).joinCrew}
       </button>
       <details className="text-sm text-engrave">
-        <summary className="cursor-pointer text-body">Starting a new crew instead?</summary>
+        <summary className="cursor-pointer text-body">{tr(W).newCrewInstead}</summary>
         <div className="mt-3 flex flex-col gap-3">
-          <input value={crewName} onChange={(e) => setCrewName(e.target.value)} maxLength={CREW_NAME_MAX} placeholder="Crew name" aria-label="Crew name" className={input} />
+          <input value={crewName} onChange={(e) => setCrewName(e.target.value)} maxLength={CREW_NAME_MAX} placeholder={tr(W).crewName} aria-label={tr(W).crewName} className={input} />
           <button onClick={() => void run(() => createCrew(crewName, displayName)).then(done)} disabled={busy || !crewName.trim() || !displayName.trim()} className="rounded-lg border border-rule-strong px-4 py-2.5 text-sm text-cream hover:bg-raised disabled:opacity-40">
-            Create crew
+            {tr(W).createCrew}
           </button>
         </div>
       </details>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       {!another && (
         <button onClick={() => void signOut()} className="self-start text-xs text-engrave hover:text-cream">
-          Sign out
+          {tr(W).signOut}
         </button>
       )}
     </div>
@@ -225,10 +223,10 @@ function Dashboard({ topError }: { topError: string | null }) {
   const [tab, setTab] = useState<Tab>("board");
   const active = crews.find((c) => c.id === activeCrewId) ?? crews[0];
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "board", label: "Board", icon: <KanbanSquare size={15} /> },
-    { id: "releases", label: "Releases", icon: <Disc3 size={15} /> },
-    { id: "calendar", label: "Calendar", icon: <CalendarDays size={15} /> },
-    { id: "crew", label: "Crew", icon: <Users size={15} /> },
+    { id: "board", label: tr(W).tabBoard, icon: <KanbanSquare size={15} /> },
+    { id: "releases", label: tr(W).tabReleases, icon: <Disc3 size={15} /> },
+    { id: "calendar", label: tr(W).tabCalendar, icon: <CalendarDays size={15} /> },
+    { id: "crew", label: tr(W).tabCrew, icon: <Users size={15} /> },
   ];
   return (
     <div className="flex min-h-dvh flex-col">
@@ -236,7 +234,7 @@ function Dashboard({ topError }: { topError: string | null }) {
         <Logo />
         <div className="ml-auto flex items-center gap-2">
           {crews.length > 1 ? (
-            <select value={active.id} onChange={(e) => void selectCrew(e.target.value)} className="rounded-md border border-rule bg-raised px-2 py-1.5 text-sm">
+            <select value={active.id} onChange={(e) => void selectCrew(e.target.value)} aria-label={tr(W).activeCrew} className="rounded-md border border-rule bg-raised px-2 py-1.5 text-sm">
               {crews.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -246,7 +244,8 @@ function Dashboard({ topError }: { topError: string | null }) {
           ) : (
             <span className="text-sm font-medium text-cream">{active.name}</span>
           )}
-          <button onClick={() => void signOut()} aria-label="Sign out" className="rounded p-1.5 text-engrave hover:bg-rule hover:text-cream">
+          <DashLangSwitch />
+          <button onClick={() => void signOut()} aria-label={tr(W).signOut} className="rounded p-1.5 text-engrave hover:bg-rule hover:text-cream">
             <LogOut size={15} />
           </button>
         </div>
@@ -296,7 +295,7 @@ function Board() {
   const groups = useMemo(() => groupCrewSongs(songs, cfg), [songs, cfg]);
 
   if (songs.length === 0) {
-    return <div className="p-8 text-center text-sm text-body">Nothing shared yet. Songs appear here when the crew shares them from Hivo.</div>;
+    return <div className="p-8 text-center text-sm text-body">{tr(W).nothingShared}</div>;
   }
   const mark = (next: { col: string; before: string | null } | null) => {
     if (spotRef.current?.col === next?.col && spotRef.current?.before === next?.before) return;
@@ -311,7 +310,7 @@ function Board() {
       columnId={groups.find((g) => g.songs.includes(s))!.column.id}
       you={s.owner_id === userId}
       owner={names.get(s.owner_id)}
-      mover={s.stage_updated_by ? (s.stage_updated_by === userId ? "you" : names.get(s.stage_updated_by)) : undefined}
+      mover={s.stage_updated_by ? (s.stage_updated_by === userId ? tr(W).youLower : names.get(s.stage_updated_by)) : undefined}
       onMove={(col) => void moveCard(s.id, col, null).catch(() => {})}
     />
   );
@@ -334,7 +333,7 @@ function Board() {
               {items.map(card)}
             </section>
           ))}
-        {empty.length > 0 && <p className="text-[11px] text-engrave">Empty: {empty.map((g) => g.column.name).join(", ")}</p>}
+        {empty.length > 0 && <p className="text-[11px] text-engrave">{tr(W).empty(empty.map((g) => g.column.name).join(", "))}</p>}
       </div>
       <div className="hidden flex-1 gap-3 overflow-x-auto p-5 sm:flex" onDragEnd={() => mark(null)}>
         {groups.map(({ column, songs: items }) => (
@@ -420,25 +419,30 @@ function SongCard({
     >
       <div className="truncate text-sm font-medium text-cream">{s.title}</div>
       <div className="mt-1 text-xs text-body">
-        {you ? "You" : (owner ?? "Crewmate")}
+        {you ? tr(W).you : (owner ?? tr(W).crewmate)}
         {s.bpm != null && ` · ${Math.round(s.bpm)} BPM`}
         {s.musical_key && ` · ${s.musical_key}`}
       </div>
       <div className="mt-1.5 flex items-center gap-2 text-[11px] text-engrave">
-        {s.last_saved_at && <span>saved {formatRelative(Date.parse(s.last_saved_at))}</span>}
-        {s.release_date && <span>· out {s.release_date}</span>}
+        {s.last_saved_at && <span>{tr(W).saved(formatRelative(Date.parse(s.last_saved_at)))}</span>}
+        {s.release_date && (
+          <span>
+            {s.last_saved_at ? "· " : ""}
+            {tr(W).out(new Date(`${s.release_date}T00:00:00`).toLocaleDateString(locale(), { day: "numeric", month: "short" }))}
+          </span>
+        )}
         <span className="ml-auto flex items-center gap-1">
-          {s.has_mixdown && <Disc3 size={11} aria-label="Has a mixdown" />}
-          {s.kit_accepted && <CheckCircle2 size={11} className="text-emerald-300/80" aria-label="Launch Kit accepted" />}
+          {s.has_mixdown && <Disc3 size={11} aria-label={tr(W).hasMixdown} />}
+          {s.kit_accepted && <CheckCircle2 size={11} className="text-emerald-300/80" aria-label={tr(W).kitAccepted} />}
         </span>
       </div>
       {/* Touch screens can't drag: a column picker on every card. */}
       <label className="mt-2 flex items-center gap-2 text-[11px] text-engrave">
-        Column
+        {tr(W).column}
         <select
           value={columnId}
           onChange={(e) => onMove(e.target.value)}
-          aria-label={`Column of ${s.title}`}
+          aria-label={tr(W).columnOf(s.title)}
           className="flex-1 rounded border border-rule bg-raised px-1.5 py-1.5 text-sm text-cream sm:py-1 sm:text-xs"
         >
           {columns.map((c) => (
@@ -448,12 +452,12 @@ function SongCard({
           ))}
         </select>
       </label>
-      {mover && s.stage_updated_by !== s.owner_id && <div className="mt-1 text-[10px] text-engrave">moved by {mover}</div>}
+      {mover && s.stage_updated_by !== s.owner_id && <div className="mt-1 text-[10px] text-engrave">{tr(W).movedBy(mover)}</div>}
     </article>
   );
 }
 
-const KIND_LABEL: Record<string, string> = { album: "Album", ep: "EP", single: "Single", mixtape: "Mixtape" };
+const kindLabel = (kind: string) => ({ album: tr(W).kindAlbum, ep: tr(W).kindEp, single: tr(W).kindSingle, mixtape: tr(W).kindMixtape })[kind] ?? kind;
 
 /** Releases the crew shares from the app: title, date, tracks and where each track is. */
 function Releases() {
@@ -462,7 +466,7 @@ function Releases() {
   const userId = useWeb((s) => s.userId);
   const names = useNames();
   const list = sortCrewReleases(releases, localDay(Date.now()));
-  if (list.length === 0) return <div className="p-8 text-center text-sm text-body">No releases shared yet. Share one from its page in the Hivo app.</div>;
+  if (list.length === 0) return <div className="p-8 text-center text-sm text-body">{tr(W).noReleases}</div>;
   return (
     <div className="mx-auto grid w-full max-w-5xl gap-4 p-4 sm:p-6 md:grid-cols-2">
       {list.map((r) => {
@@ -475,16 +479,14 @@ function Releases() {
               <span className="mt-1 h-8 w-8 shrink-0 rounded" style={{ background: r.color ?? "var(--color-raised)" }} aria-hidden />
               <div className="min-w-0 flex-1">
                 <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-engrave">
-                  {KIND_LABEL[r.kind] ?? r.kind} · {r.owner_id === userId ? "You" : (names.get(r.owner_id) ?? "Former member")}
+                  {kindLabel(r.kind)} · {r.owner_id === userId ? tr(W).you : (names.get(r.owner_id) ?? tr(W).formerMember)}
                 </div>
                 <h2 className="truncate text-base font-semibold text-cream">{r.title}</h2>
                 <div className="text-xs text-body">
-                  {dateMs ? `${new Date(dateMs).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })} · ${formatRelative(dateMs)}` : "No date yet"}
+                  {dateMs ? `${new Date(dateMs).toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" })} · ${formatRelative(dateMs)}` : tr(W).noDate}
                 </div>
               </div>
-              <span className="shrink-0 text-xs text-engrave">
-                {done}/{tracks.length} finished
-              </span>
+              <span className="shrink-0 text-xs text-engrave">{tr(W).finished(done, tracks.length)}</span>
             </div>
             {tracks.length > 0 && (
               <ol className="mt-3 flex flex-col gap-1 border-t border-rule pt-3">
@@ -521,19 +523,19 @@ function Calendar() {
   const upcoming = dated.filter((x) => x.date.getTime() >= todayMs);
   const past = dated.filter((x) => x.date.getTime() < todayMs).reverse();
 
-  if (dated.length === 0) return <div className="p-8 text-center text-sm text-body">No release dates yet. They come from the crew's releases and Launch Kits.</div>;
+  if (dated.length === 0) return <div className="p-8 text-center text-sm text-body">{tr(W).noDates}</div>;
   const Row = ({ s, date }: { s: CrewSongRow; date: Date }) => (
     <div className="flex items-center gap-3 rounded-xl border border-rule bg-panel p-3">
       <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-raised py-1">
-        <span className="text-[10px]  text-body">{date.toLocaleDateString(undefined, { weekday: "short" })}</span>
+        <span className="text-[10px]  text-body">{date.toLocaleDateString(locale(), { weekday: "short" })}</span>
         <span className="text-lg font-semibold leading-tight">{date.getDate()}</span>
-        <span className="text-[10px]  text-body">{date.toLocaleDateString(undefined, { month: "short" })}</span>
+        <span className="text-[10px]  text-body">{date.toLocaleDateString(locale(), { month: "short" })}</span>
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{s.title}</div>
         <div className="text-xs text-body">
-          {s.owner_id === userId ? "You" : (names.get(s.owner_id) ?? "Crewmate")} · {statusInfo(s.stage ?? undefined).label}
-          {s.kit_accepted ? " · kit ready" : ""}
+          {s.owner_id === userId ? tr(W).you : (names.get(s.owner_id) ?? tr(W).crewmate)} · {statusInfo(s.stage ?? undefined).label}
+          {s.kit_accepted ? tr(W).kitReady : ""}
         </div>
       </div>
       <span className="shrink-0 text-xs text-body">{formatRelative(date.getTime())}</span>
@@ -541,9 +543,9 @@ function Calendar() {
   );
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 p-4 sm:p-6">
-      <h2 className="text-xs font-medium  text-engrave">Coming up</h2>
-      {upcoming.length ? upcoming.map((x) => <Row key={x.s.id} {...x} />) : <p className="text-sm text-body">Nothing planned.</p>}
-      {past.length > 0 && <h2 className="mt-4 text-xs font-medium  text-engrave">Released</h2>}
+      <h2 className="text-xs font-medium  text-engrave">{tr(W).comingUp}</h2>
+      {upcoming.length ? upcoming.map((x) => <Row key={x.s.id} {...x} />) : <p className="text-sm text-body">{tr(W).nothingPlanned}</p>}
+      {past.length > 0 && <h2 className="mt-4 text-xs font-medium  text-engrave">{tr(W).released}</h2>}
       {past.slice(0, 10).map((x) => (
         <Row key={x.s.id} {...x} />
       ))}
@@ -554,6 +556,8 @@ function Calendar() {
 function Crew() {
   const { members, songs, userId, crews } = useWeb();
   const [adding, setAdding] = useState(false);
+  // Built here, not at module level: stage names follow the language.
+  const stages = [{ id: undefined as SongStatus | undefined, ...UNSORTED }, ...STATUSES];
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -565,14 +569,14 @@ function Crew() {
             <div key={m.user_id} className="rounded-xl border border-rule bg-panel p-4">
               <div className="flex items-baseline gap-2">
                 <span className="font-medium">{m.display_name}</span>
-                {m.role === "owner" && <span className="text-xs text-engrave">owner</span>}
-                {m.user_id === userId && <span className="text-xs text-engrave">you</span>}
+                {m.role === "owner" && <span className="text-xs text-engrave">{tr(W).owner}</span>}
+                {m.user_id === userId && <span className="text-xs text-engrave">{tr(W).youLower}</span>}
               </div>
               <div className="mt-1 text-xs text-body">
-                {theirs.length} shared · {active} being made · {last ? `last session ${formatRelative(last)}` : "no sessions yet"}
+                {tr(W).memberLine(theirs.length, active, last ? formatRelative(last) : null)}
               </div>
               <div className="mt-3 flex h-1.5 gap-px overflow-hidden rounded-full bg-raised">
-                {COLUMNS.map((c) => {
+                {stages.map((c) => {
                   const n = theirs.filter((s) => (s.stage ?? undefined) === c.id).length;
                   return n ? <span key={c.label} style={{ flexGrow: n, background: c.color }} title={`${c.label}: ${n}`} /> : null;
                 })}
@@ -584,9 +588,9 @@ function Crew() {
       {adding ? (
         <div className="max-w-md rounded-xl border border-rule p-4">
           <div className="mb-3 flex items-center text-sm font-medium text-cream">
-            Join or create another crew
+            {tr(W).anotherCrew}
             <button onClick={() => setAdding(false)} className="ml-auto text-xs text-engrave hover:text-cream">
-              Cancel
+              {tr(W).cancel}
             </button>
           </div>
           <Join another onDone={() => setAdding(false)} />
@@ -595,12 +599,33 @@ function Crew() {
         <button
           onClick={() => setAdding(true)}
           disabled={crews.length >= MAX_CREWS}
-          title={crews.length >= MAX_CREWS ? "You're in 10 crews, the most allowed. Leave one first." : undefined}
+          title={crews.length >= MAX_CREWS ? tr(W).tenCrews : undefined}
           className="self-start text-sm text-body hover:text-cream disabled:opacity-40"
         >
-          + Join or create another crew
+          {tr(W).addCrew}
         </button>
       )}
     </div>
+  );
+}
+
+/** FR | EN for the signed-in site: real links (/fr, /en), same as the landing. */
+function DashLangSwitch() {
+  const lang = pageLang();
+  return (
+    <nav aria-label={tr(W).language} className="flex items-center gap-1 font-mono text-xs">
+      {(["fr", "en"] as const).map((l, i) => (
+        <span key={l} className="flex items-center gap-1">
+          {i > 0 && (
+            <span className="text-engrave" aria-hidden>
+              |
+            </span>
+          )}
+          <a href={`/${l}`} hrefLang={l} lang={l} aria-current={l === lang ? "page" : undefined} className={`rounded px-1 py-1 uppercase ${l === lang ? "text-cream" : "text-engrave hover:text-cream"}`}>
+            {l}
+          </a>
+        </span>
+      ))}
+    </nav>
   );
 }
