@@ -298,9 +298,15 @@ export function releasePayloads(ws: Workspace, scope: ShareScope): SharedRelease
 export function staleReleaseIds(rows: CrewReleaseRow[], ws: Workspace, scope: ShareScope): string[] {
   const gone = new Set([
     ...ws.albums.filter((a) => a.shared === false && a.shareId && (a.shareCrewId ?? scope.crewId) === scope.crewId && (a.shareUserId ?? scope.userId) === scope.userId).map((a) => a.shareId!),
-    ...(ws.deletedReleaseShares ?? []).filter((d) => d.crewId === scope.crewId && d.userId === scope.userId).map((d) => d.id),
+    ...releaseTombstones(ws, scope),
   ]);
   return rows.filter((r) => r.owner_id === scope.userId && r.crew_id === scope.crewId && gone.has(r.id)).map((r) => r.id);
+}
+
+/** Releases deleted on this computer while shared with this crew (a marker
+ * without a crew is from before scoping: it counts for the active one). */
+export function releaseTombstones(ws: Workspace, scope: ShareScope): string[] {
+  return (ws.deletedReleaseShares ?? []).filter((d) => (d.crewId ?? scope.crewId) === scope.crewId && (d.userId ?? scope.userId) === scope.userId).map((d) => d.id);
 }
 
 /** A release's tracks that aren't shared with this crew yet (to offer "share the rest"). */

@@ -3,7 +3,7 @@ import { crewText } from "../lib/crewMessages";
 import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { crewErrorMessage, supabase } from "../lib/supabase";
-import { releasePayloads, releaseSharedHere, shareElsewhere, sharedHere, sharedPayloads, stageSync, staleReleaseIds, staleShareIds, type ShareScope, type StageSync } from "../lib/crewSync";
+import { releasePayloads, releaseSharedHere, releaseTombstones, shareElsewhere, sharedHere, sharedPayloads, stageSync, staleReleaseIds, staleShareIds, type ShareScope, type StageSync } from "../lib/crewSync";
 import type { CrewColumnRow, CrewMemberRow, CrewReleaseRow, CrewSongRow, CrewSummary, PipelineConfig, SongStatus } from "../types";
 import { applyCardMove, columnsPayload, crewMove, crewPipeline, restoreSongs } from "../lib/crewBoard";
 import { useAppStore } from "./useAppStore";
@@ -293,10 +293,10 @@ export const useCrewStore = create<CrewState>((set, get) => {
    * bad value (a CHECK or a malformed field), retry them one by one and skip
    * the bad ones, so one song can't block everyone else's. Returns the rows
    * that went through. */
-  async function upsertRows<T extends { id: string }>(rows: T[], onlyNew: boolean): Promise<T[]> {
+  async function upsertRows<T extends { id: string }>(rows: T[], onlyNew: boolean, table: "songs" | "releases" = "songs"): Promise<T[]> {
     if (!supabase || !rows.length) return [];
     const opts = onlyNew ? { onConflict: "id", ignoreDuplicates: true } : { onConflict: "id" };
-    const { error } = await supabase.from("songs").upsert(rows, opts);
+    const { error } = await supabase.from(table).upsert(rows, opts);
     if (!error) {
       rows.forEach((r) => rejected.delete(r.id));
       return rows;
@@ -304,7 +304,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
     if (!isBadValue(error)) throw error;
     const ok: T[] = [];
     for (const r of rows) {
-      const res = await supabase.from("songs").upsert([r], opts);
+      const res = await supabase.from(table).upsert([r], opts);
       if (!res.error) {
         rejected.delete(r.id);
         ok.push(r);
@@ -378,14 +378,11 @@ export const useCrewStore = create<CrewState>((set, get) => {
       }
     }
     const { workspace } = useAppStore.getState();
-    const changed = releasePayloads(workspace, sc).filter((r) => lastPushedRelease.get(r.id) !== JSON.stringify(r));
-    if (changed.length) {
-      const { error } = await supabase.from("releases").upsert(changed, { onConflict: "id" });
-      if (error) throw error;
-      changed.forEach((r) => lastPushedRelease.set(r.id, JSON.stringify(r)));
-    }
+    // One refused release (a bad value) doesn't block the others, like songs.
+    const changed = releasePayloads(workspace, sc).filter((r) => lastPushedRelease.get(r.id) !== JSON.stringify(r) && rejected.get(r.id) !== JSON.stringify(r));
+    for (const r of await upsertRows(changed, false, "releases")) lastPushedRelease.set(r.id, JSON.stringify(r));
     const stale = staleReleaseIds(get().releases, workspace, sc);
-    const tombs = (workspace.deletedReleaseShares ?? []).filter((d) => d.crewId === sc.crewId && d.userId === sc.userId).map((d) => d.id);
+    const tombs = releaseTombstones(workspace, sc);
     if (stale.length) {
       const { error } = await supabase.from("releases").delete().in("id", stale);
       if (error) throw error;
@@ -545,6 +542,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
     selectCrew: async (id) => {
       writeActiveCrew(id);
       lastPushed.clear();
+      lastPushedRelease.clear();
       rejected.clear();
       set({ activeCrewId: id, invite: null, invites: [], songs: [], members: [], columns: [], releases: [], sync: { kind: "idle" } });
       subscribe(id);
@@ -623,6 +621,13 @@ export const useCrewStore = create<CrewState>((set, get) => {
           app.updateSong(path, { shared: false, shareId: undefined, shareCrewId: undefined, shareUserId: undefined });
         }
       }
+      // My releases left with me too (after_member_left).
+      for (const a of app.workspace.albums) {
+        if (a.shareId && releaseSharedHere({ ...a, shared: true }, sc)) {
+          app.updateAlbum(a.id, { shared: false, shareId: undefined, shareCrewId: undefined, shareUserId: undefined });
+        }
+      }
+      app.clearDeletedReleaseShares(releaseTombstones(useAppStore.getState().workspace, sc));
       writeActiveCrew(null);
       await get().loadCrews();
     },
@@ -669,6 +674,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
 
     moveCrewSong: async (songId, stage) => {
       if (!supabase) return;
+      const crewId = get().activeCrewId;
       const before = get().songs;
       const row = before.find((s) => s.id === songId);
       // Optimistic stage only: the version stays the one this move was made on.
@@ -677,7 +683,8 @@ export const useCrewStore = create<CrewState>((set, get) => {
       try {
         r = await moveStage(songId, stage, row?.stage_updated_at ?? null);
       } catch (e) {
-        set({ songs: before });
+        // Only this card, and only if this crew is still the one shown.
+        if (get().activeCrewId === crewId) set({ songs: restoreSongs(get().songs, before, [songId]) });
         throw new Error(crewErrorMessage(e));
       }
       applyRemoteMoves();
@@ -721,8 +728,17 @@ export const useCrewStore = create<CrewState>((set, get) => {
       const app = useAppStore.getState();
       const album = app.workspace.albums.find((a) => a.id === albumId);
       if (!sc || !album) return 0;
+      const elsewhere = !!album.shareId && ((album.shareCrewId ?? sc.crewId) !== sc.crewId || (album.shareUserId ?? sc.userId) !== sc.userId);
       if (!shared) {
-        app.updateAlbum(albumId, { shared: false });
+        if (!elsewhere) app.updateAlbum(albumId, { shared: false });
+        return 0;
+      }
+      if (elsewhere && album.shared) throw new Error("This release is shared with another crew. Stop sharing it there first.");
+      if (elsewhere) {
+        // Unshared there but not synced yet: that crew's row is deleted on its
+        // next sync (marker); this crew gets its own id, so the two never mix.
+        app.markReleaseShareDeleted({ id: album.shareId!, crewId: album.shareCrewId, userId: album.shareUserId });
+        app.updateAlbum(albumId, { shared: true, shareId: uuid(), shareCrewId: sc.crewId, shareUserId: sc.userId });
       } else {
         app.updateAlbum(albumId, { shared: true, shareId: album.shareId ?? uuid(), shareCrewId: sc.crewId, shareUserId: sc.userId });
       }
@@ -777,6 +793,8 @@ export const useCrewStore = create<CrewState>((set, get) => {
         try {
           settle(x.songId, await call(x.songId, x.order, row.stage_updated_at));
         } catch (e) {
+          // Part of the column was placed: show the server's order again.
+          void loadCrewData().catch(() => {});
           throw new Error(crewErrorMessage(e));
         }
       }
