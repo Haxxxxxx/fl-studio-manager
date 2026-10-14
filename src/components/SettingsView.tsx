@@ -89,6 +89,24 @@ export function SettingsView() {
   return (
     <div className="flex-1 overflow-auto px-8 py-8">
       <div className="mx-auto flex max-w-2xl flex-col gap-8">
+        {/* Both languages on purpose: findable whichever one is showing. */}
+        <section className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-cream">Language · Langue</h2>
+            <p className="mt-0.5 text-xs text-engrave">The whole app, in English or French · Toute l'appli, en français ou en anglais</p>
+          </div>
+          <select
+            value={settings.uiLanguage ?? "system"}
+            onChange={(e) => updateSettings({ uiLanguage: e.target.value as "system" | "fr" | "en" })}
+            aria-label="Language · Langue"
+            className={`${field} !w-auto`}
+          >
+            <option value="system">System · Système</option>
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+          </select>
+        </section>
+
         <section className="flex items-center justify-between rounded-lg border border-rule bg-panel px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold text-cream">Sample data</h2>

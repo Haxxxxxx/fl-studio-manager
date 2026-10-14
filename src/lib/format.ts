@@ -1,34 +1,60 @@
+import { currentLang, dict, locale, tr } from "../i18n";
+
+const T = dict(
+  {
+    trash: navigator.userAgent.includes("Mac") ? "Trash" : "Recycle Bin",
+    units: "B KB MB GB",
+    today: "today",
+    todayAt: (time: string) => `Today ${time}`,
+    ago: (n: number, unit: "day" | "week" | "month") => `${n} ${unit}${n === 1 ? "" : "s"} ago`,
+    inTime: (n: number, unit: "day" | "week" | "month") => `in ${n} ${unit}${n === 1 ? "" : "s"}`,
+  },
+  {
+    trash: "Corbeille",
+    units: "o Ko Mo Go",
+    today: "aujourd'hui",
+    todayAt: (time: string) => `Aujourd'hui ${time}`,
+    ago: (n: number, unit: "day" | "week" | "month") => `il y a ${n} ${frUnit(n, unit)}`,
+    inTime: (n: number, unit: "day" | "week" | "month") => `dans ${n} ${frUnit(n, unit)}`,
+  },
+);
+
+function frUnit(n: number, unit: "day" | "week" | "month"): string {
+  if (unit === "month") return "mois";
+  const word = unit === "day" ? "jour" : "semaine";
+  return n === 1 ? word : `${word}s`;
+}
+
 /** What the OS calls the place deleted files go. */
-export const TRASH_NAME = navigator.userAgent.includes("Mac") ? "Trash" : "Recycle Bin";
+export function trashName(): string {
+  return tr(T).trash;
+}
 
 export function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  const i = Math.min(
-    units.length - 1,
-    Math.floor(Math.log(bytes) / Math.log(1024)),
-  );
+  const units = tr(T).units.split(" ");
+  if (bytes === 0) return `0 ${units[0]}`;
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
   const value = bytes / Math.pow(1024, i);
-  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  const n = value.toFixed(i === 0 ? 0 : 1);
+  return `${currentLang() === "fr" ? n.replace(".", ",") : n} ${units[i]}`;
 }
 
 export function formatDateTime(ms: number): string {
   if (!ms) return "—";
   const date = new Date(ms);
-  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const time = date.toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit" });
   const sameDay = date.toDateString() === new Date().toDateString();
-  return sameDay ? `Today ${time}` : `${formatDate(ms)}, ${time}`;
+  return sameDay ? tr(T).todayAt(time) : `${formatDate(ms)}, ${time}`;
 }
 
-/** "3 days ago", "in 5 weeks" — for release countdowns and recency. */
+/** "3 days ago", "in 5 weeks" (or French): release countdowns and recency. */
 export function formatRelative(ms: number): string {
   const days = Math.round((ms - Date.now()) / (24 * 60 * 60 * 1000));
   const abs = Math.abs(days);
-  const [n, unit] =
-    abs < 1 ? [0, "today"] : abs < 14 ? [abs, "day"] : abs < 60 ? [Math.round(abs / 7), "week"] : [Math.round(abs / 30), "month"];
-  if (unit === "today") return "today";
-  const label = `${n} ${unit}${n === 1 ? "" : "s"}`;
-  return days < 0 ? `${label} ago` : `in ${label}`;
+  if (abs < 1) return tr(T).today;
+  const [n, unit]: [number, "day" | "week" | "month"] =
+    abs < 14 ? [abs, "day"] : abs < 60 ? [Math.round(abs / 7), "week"] : [Math.round(abs / 30), "month"];
+  return days < 0 ? tr(T).ago(n, unit) : tr(T).inTime(n, unit);
 }
 
 export function formatDate(ms: number): string {
@@ -37,12 +63,12 @@ export function formatDate(ms: number): string {
   const now = new Date();
   const sameDay = date.toDateString() === now.toDateString();
   if (sameDay) {
-    return date.toLocaleTimeString(undefined, {
+    return date.toLocaleTimeString(locale(), {
       hour: "numeric",
       minute: "2-digit",
     });
   }
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(locale(), {
     month: "short",
     day: "numeric",
     year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",

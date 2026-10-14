@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS: Settings = {
   aiLanguage: null,
   aiIncludeNotes: false,
   captionLanguage: "fr",
+  uiLanguage: "system",
   ffmpegPath: null,
 };
 

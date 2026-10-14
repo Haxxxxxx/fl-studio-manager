@@ -59,6 +59,9 @@ fn apply_preferences(saved: &mut Settings, from: Settings) {
     if matches!(from.caption_language.as_str(), "fr" | "en") {
         saved.caption_language = from.caption_language;
     }
+    if matches!(from.ui_language.as_str(), "system" | "fr" | "en") {
+        saved.ui_language = from.ui_language;
+    }
 }
 
 /// Runs a native picker off the main thread. None = cancelled.
@@ -381,6 +384,16 @@ mod tests {
         assert_eq!(saved.render_format, "wav", "unknown formats are ignored");
         assert!(saved.ai_include_notes);
         assert_eq!(saved.ai_language.as_deref(), Some("French"));
+    }
+
+    #[test]
+    fn app_language_is_saved_and_checked() {
+        let mut saved = Settings::default();
+        assert_eq!(saved.ui_language, "system");
+        apply_preferences(&mut saved, Settings { ui_language: "fr".into(), ..Settings::default() });
+        assert_eq!(saved.ui_language, "fr");
+        apply_preferences(&mut saved, Settings { ui_language: "klingon".into(), ..Settings::default() });
+        assert_eq!(saved.ui_language, "fr");
     }
 
     #[test]

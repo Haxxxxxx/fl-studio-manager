@@ -1,17 +1,60 @@
 import type { Album, ProjectInfo, RenderFreshness, SongStatus, Workspace } from "../types";
+import { dict, tr } from "../i18n";
 
 // The song lifecycle from docs/ROADMAP.md: every track is in exactly one
 // stage. Stages are ordinal, so they share one blue stepped dark → light
 // (System 02's stage ramp, lit as LEDs on the #161614 panel).
 // Songs nobody has triaged yet sit in neutral gray, outside the ramp.
+// Names and hints follow the app's language (getters, read when shown).
+const STAGE_TEXT = dict(
+  {
+    creation: "Creation",
+    creationHint: "Beat and lyrics exist, still rough",
+    production: "Production",
+    productionHint: "Recording, mixing, mastering until final",
+    prep: "Prep",
+    prepHint: "Cover, metadata, release date, distributor",
+    release: "Release",
+    releaseHint: "Release day",
+    promotion: "Promotion",
+    promotionHint: "Posts, reels, stories, follow-up",
+    unsorted: "Unsorted",
+    unsortedHint: "Not placed in a stage yet",
+  },
+  {
+    creation: "Création",
+    creationHint: "La prod et les textes existent, encore brut",
+    production: "Production",
+    productionHint: "Enregistrement, mix, master jusqu'à la version finale",
+    prep: "Prépa",
+    prepHint: "Cover, métadonnées, date de sortie, distributeur",
+    release: "Sortie",
+    releaseHint: "Le jour de la sortie",
+    promotion: "Promo",
+    promotionHint: "Posts, reels, stories, relances",
+    unsorted: "Non classé",
+    unsortedHint: "Pas encore placé dans une étape",
+  },
+);
+
+type StageId = SongStatus | "unsorted";
+/** A stage whose label and hint are read in the current language. Getters,
+ * so spread a stage only where it's shown (a spread copies today's words). */
+function stage<T extends object>(base: T, id: StageId): T & { label: string; hint: string } {
+  return Object.defineProperties(base, {
+    label: { enumerable: true, get: () => tr(STAGE_TEXT)[id] },
+    hint: { enumerable: true, get: () => tr(STAGE_TEXT)[`${id}Hint` as keyof (typeof STAGE_TEXT)["en"]] },
+  }) as T & { label: string; hint: string };
+}
+
 export const STATUSES: { id: SongStatus; label: string; color: string; hint: string }[] = [
-  { id: "creation", label: "Creation", color: "#1C5CAB", hint: "Beat and lyrics exist, still rough" },
-  { id: "production", label: "Production", color: "#2A78D6", hint: "Recording, mixing, mastering until final" },
-  { id: "prep", label: "Prep", color: "#5598E7", hint: "Cover, metadata, release date, distributor" },
-  { id: "release", label: "Release", color: "#86B6EF", hint: "Release day" },
-  { id: "promotion", label: "Promotion", color: "#B7D3F6", hint: "Posts, reels, stories, follow-up" },
+  stage({ id: "creation" as const, color: "#1C5CAB" }, "creation"),
+  stage({ id: "production" as const, color: "#2A78D6" }, "production"),
+  stage({ id: "prep" as const, color: "#5598E7" }, "prep"),
+  stage({ id: "release" as const, color: "#86B6EF" }, "release"),
+  stage({ id: "promotion" as const, color: "#B7D3F6" }, "promotion"),
 ];
-export const UNSORTED = { label: "Unsorted", color: "#5B5B63", hint: "Not placed in a stage yet" };
+export const UNSORTED: { label: string; color: string; hint: string } = stage({ color: "#5B5B63" }, "unsorted");
 
 export function statusInfo(status: SongStatus | undefined) {
   return STATUSES.find((s) => s.id === status) ?? { id: undefined, ...UNSORTED };
