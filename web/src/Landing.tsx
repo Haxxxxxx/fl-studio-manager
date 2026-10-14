@@ -10,7 +10,7 @@ import type { Lang } from "./lang";
 // (landingCopy.ts): /fr and /en pick one, / follows the browser. Every claim
 // has to be true of the shipped app: when a feature changes, change both.
 
-const VERSION = "0.2.1";
+const VERSION = "0.2.2";
 
 const primary = "inline-flex items-center gap-2 rounded bg-hot px-5 py-2.5 font-display uppercase tracking-[0.06em] text-base font-bold text-chassis hover:bg-hot-hover";
 const ghost = "inline-flex items-center gap-2 rounded border border-rule-strong px-5 py-2.5 font-display uppercase tracking-[0.06em] text-base font-semibold text-cream hover:bg-raised";
