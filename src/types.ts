@@ -394,7 +394,7 @@ export interface Workspace {
   /** The user's pipeline columns. Missing = one column per stage. */
   pipeline?: PipelineConfig;
   /** Shared releases deleted here: their crew rows are deleted on the next sync. */
-  deletedReleaseShares?: { id: string; crewId: string; userId: string }[];
+  deletedReleaseShares?: { id: string; crewId?: string; userId?: string }[];
 }
 
 /** A pipeline column. Columns sit on the fixed lifecycle stages: putting a
