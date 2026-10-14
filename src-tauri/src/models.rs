@@ -130,10 +130,17 @@ pub struct Settings {
     /// ffmpeg for shorts; None = found automatically.
     #[serde(default)]
     pub ffmpeg_path: Option<String>,
+    /// The app's language: "system", "fr" or "en".
+    #[serde(default = "default_ui_language")]
+    pub ui_language: String,
 }
 
 fn default_caption_language() -> String {
     "fr".to_string()
+}
+
+fn default_ui_language() -> String {
+    "system".to_string()
 }
 
 impl Default for Settings {
@@ -149,6 +156,7 @@ impl Default for Settings {
             ai_include_notes: false,
             caption_language: default_caption_language(),
             ffmpeg_path: None,
+            ui_language: default_ui_language(),
         }
     }
 }

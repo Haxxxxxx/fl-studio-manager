@@ -101,6 +101,8 @@ export interface Settings {
   aiIncludeNotes: boolean;
   /** Language of Launch Kit captions and the kit README (overridable per kit). */
   captionLanguage: CaptionLang;
+  /** The app's language: follow the system, or French / English. */
+  uiLanguage?: "system" | "fr" | "en";
   /** ffmpeg for shorts; null = found automatically. */
   ffmpegPath: string | null;
 }
