@@ -1,7 +1,7 @@
 -- Crew board columns (set_crew_columns, move_crew_card).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(34);
+select plan(35);
 
 insert into auth.users (instance_id, id, aud, role, email) values
   ('00000000-0000-0000-0000-000000000000', 'a0000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'ana@test.local'),
@@ -117,6 +117,8 @@ select is((select stage || '/' || column_id::text || '/' || board_order from pub
 -- Foreign columns.
 select throws_ok($$ select * from public.move_crew_card('5a000000-0000-0000-0000-000000000001', (select v::uuid from ids where k = 'foreign'), 1, now()) $$,
   '22023', null, 'another crew''s column is refused in move_crew_card');
+select throws_ok($$ select * from public.move_crew_card('5a000000-0000-0000-0000-000000000001', (select v::uuid from ids where k = 'mixing'), 'NaN'::double precision, null) $$,
+  '22023', null, 'a NaN card order is refused');
 select throws_ok($$ update public.songs set column_id = (select v::uuid from ids where k = 'foreign') where id = '5a000000-0000-0000-0000-000000000001' $$,
   '22023', null, 'the song owner cannot pin it to another crew''s column directly');
 

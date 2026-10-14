@@ -185,6 +185,9 @@ begin
   if p_column is null then
     raise exception 'column not in this crew' using errcode = '22023';
   end if;
+  if p_order is not null and (p_order = 'NaN'::double precision or p_order in ('Infinity'::double precision, '-Infinity'::double precision)) then
+    raise exception 'bad card order' using errcode = '22023';
+  end if;
   select c.crew_id, c.stage into v_crew, v_stage from public.crew_columns c where c.id = p_column;
   if not found or v_crew <> v_row.crew_id then
     raise exception 'column not in this crew' using errcode = '22023';
