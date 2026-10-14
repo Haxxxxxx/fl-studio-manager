@@ -676,17 +676,13 @@ function CrewDashboard() {
   const workspace = useAppStore((s) => s.workspace);
   const openDetail = useAppStore((s) => s.openDetail);
   const setView = useAppStore((s) => s.setView);
-  const setPipelineBoard = useAppStore((s) => s.setPipelineBoard);
   const stats = useMemo(() => crewStats(songs, members), [songs, members]);
   const localPath = useMemo(() => pathsByShareId(workspace), [workspace]);
   // Your own shared songs open their panel; others' songs open the crew board.
   const open = (id: string) => {
     const path = localPath.get(id);
     if (path) openDetail(path);
-    else {
-      setPipelineBoard("crew");
-      setView("pipeline");
-    }
+    else setView("crewBoard");
   };
   const who = (id: string, name: string) => (id === userId ? "You" : name);
 
