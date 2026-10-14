@@ -45,7 +45,8 @@ export function crewStats(songs: CrewSongRow[], members: CrewMemberRow[], now = 
   const recent = now - RECENT_DAYS * DAY;
 
   const stalled = songs
-    .filter((s) => s.stage === "creation" || s.stage === "production")
+    // No save or move date known: can't tell, so not "20,000 days" stalled.
+    .filter((s) => (s.stage === "creation" || s.stage === "production") && lastActivityMs(s) > 0)
     .map((s) => ({ song: s, days: Math.floor((now - lastActivityMs(s)) / DAY), owner: nameOf(s.owner_id) }))
     .filter((x) => x.days >= STALLED_DAYS)
     .sort((a, b) => b.days - a.days);

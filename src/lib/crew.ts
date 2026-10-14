@@ -1,6 +1,6 @@
 import type { Person, ProjectInfo, SongStatus, Workspace } from "../types";
 import { songsOf } from "./people";
-import { isFinished } from "./songs";
+import { isFinished, lastSaveMs } from "./songs";
 
 // Group-level stats for the dashboard (docs/ROADMAP.md, Phase 1a): who's
 // working on what, and which tracks are stuck.
@@ -15,11 +15,15 @@ export interface StalledSong {
   idleDays: number;
 }
 
-/** Songs still being made (Creation/Production) with no save in a while, oldest first. */
+/** Songs still being made (Creation/Production) with no save (backups
+ * included) in `days`+ days, oldest first. Songs with no known save date are
+ * left out rather than shown as decades old. */
 export function stalledSongs(songs: ProjectInfo[], ws: Workspace, now = Date.now(), days = STALLED_DAYS): StalledSong[] {
   return songs
-    .map((song) => ({ song, status: ws.songs[song.path]?.status, idleDays: Math.floor((now - song.modifiedAtMs) / DAY) }))
-    .filter((s) => (s.status === "creation" || s.status === "production") && s.idleDays >= days)
+    .map((song) => ({ song, status: ws.songs[song.path]?.status, last: lastSaveMs(song) }))
+    .filter((s) => (s.status === "creation" || s.status === "production") && s.last > 0)
+    .map(({ song, status, last }) => ({ song, status, idleDays: Math.floor((now - last) / DAY) }))
+    .filter((s) => s.idleDays >= days)
     .sort((a, b) => b.idleDays - a.idleDays);
 }
 
@@ -49,7 +53,7 @@ export function crewActivity(people: Person[], songs: ProjectInfo[], ws: Workspa
         songs: theirs,
         active: theirs.filter((s) => !isFinished(ws.songs[s.path]?.status)).length,
         byStage,
-        lastSessionMs: Math.max(0, ...theirs.map((s) => s.modifiedAtMs)),
+        lastSessionMs: Math.max(0, ...theirs.map(lastSaveMs)),
       };
     })
     .sort((a, b) => b.lastSessionMs - a.lastSessionMs);
