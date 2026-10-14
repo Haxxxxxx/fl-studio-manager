@@ -187,16 +187,19 @@ fn default_project_folders(docs: &Path, music: Option<&Path>) -> Vec<(&'static s
         ("FL Studio", docs.join("Image-Line").join("FL Studio").join("Projects")),
         ("Studio One", docs.join("Studio One").join("Songs")),
         ("REAPER", docs.join("REAPER Media")),
-        ("Ableton Live", docs.join("Ableton").join("Projects")),
+        // Live has no projects folder of its own: it creates `Ableton` (User
+        // Library, Factory Packs, Live Recordings) and Sets are saved around
+        // it. The bare folder is safe to link: the scanner and the count
+        // below skip the library folders (daws::LIBRARY_DIRS).
+        ("Ableton Live", docs.join("Ableton")),
         ("Cubase", docs.join("Cubase Projects")),
         ("Cubase", docs.join("Steinberg").join("Cubase Projects")),
         ("Bitwig Studio", docs.join("Bitwig Studio").join("Projects")),
         ("Pro Tools", docs.join("Pro Tools")),
     ];
-    // Ableton on macOS keeps its folder under ~/Music. Not the bare
-    // `Ableton` folder: that's the User Library and Factory Packs.
+    // Ableton on macOS keeps its folder under ~/Music.
     if let Some(m) = music {
-        out.push(("Ableton Live", m.join("Ableton").join("Projects")));
+        out.push(("Ableton Live", m.join("Ableton")));
     }
     out
 }
@@ -213,11 +216,17 @@ fn detected_folders(app: &AppHandle) -> Vec<(&'static str, PathBuf)> {
 }
 
 /// Projects of any DAW in a folder (a few levels deep), capped: it's a hint
-/// for the user, not a scan.
+/// for the user, not a scan. Skips DAW content libraries (Ableton's demo
+/// Sets are not your projects), like the scanner does.
 fn count_projects(dir: &Path) -> usize {
     walkdir::WalkDir::new(dir)
         .max_depth(4)
         .into_iter()
+        .filter_entry(|e| {
+            e.depth() == 0
+                || !e.file_type().is_dir()
+                || !crate::daws::LIBRARY_DIRS.contains(&e.file_name().to_string_lossy().to_lowercase().as_str())
+        })
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file() && crate::daws::Daw::of_project(e.path()).is_some())
         .take(999)
@@ -384,6 +393,30 @@ mod tests {
         let _ = fs::remove_dir_all(&docs);
         let summary: Vec<(&str, usize, bool)> = found.iter().map(|f| (f.daw.as_str(), f.projects, f.linked)).collect();
         assert_eq!(summary, vec![("FL Studio", 1, true), ("Studio One", 2, false)]);
+    }
+
+    #[test]
+    fn finds_ableton_where_live_actually_puts_its_folder() {
+        // Live creates `Ableton` (Documents on Windows, ~/Music on macOS) with
+        // its User Library inside; Sets are saved next to it. No `Projects`.
+        let root = std::env::temp_dir().join(format!("flsm-detect-live-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let (docs, music) = (root.join("Documents"), root.join("Music"));
+        let live = music.join("Ableton");
+        fs::create_dir_all(live.join("User Library").join("Templates")).unwrap();
+        fs::create_dir_all(live.join("Night Run Project")).unwrap();
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(live.join("User Library").join("Templates").join("Default.als"), b"x").unwrap();
+        fs::write(live.join("Night Run Project").join("Night Run.als"), b"x").unwrap();
+
+        let found = describe(existing_folders(&docs, Some(&music)), &[]);
+        // Windows: Live's folder sits directly under Documents (no ~/Music).
+        let win = describe(existing_folders(&music, None), &[]);
+        let _ = fs::remove_dir_all(&root);
+        let summary: Vec<(&str, usize)> = found.iter().map(|f| (f.daw.as_str(), f.projects)).collect();
+        // One real Set; the template in the User Library doesn't count.
+        assert_eq!(summary, vec![("Ableton Live", 1)]);
+        assert!(win.iter().any(|f| f.daw == "Ableton Live"));
     }
 
     #[test]
