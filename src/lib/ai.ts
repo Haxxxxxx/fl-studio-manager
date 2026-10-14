@@ -2,6 +2,7 @@ import * as api from "./tauri";
 import { artistLine, briefSpecs, CAPTION_HEADINGS, CAPTION_LANGUAGE_NAMES, isoDate, parseDate, type KitField, type KitInput } from "./launchKit";
 import { detectKey, detectedPeople } from "./people";
 import type { AiFieldReview, KitFieldId, Settings } from "../types";
+import { dict, tr } from "../i18n";
 
 // The Launch Kit's AI layer (roadmap principle 2): Gemini drafts the copy,
 // then a separate pass checks every field (its own drafts included) against
@@ -49,15 +50,33 @@ export function kitContext({ project, meta, people, albums, analysis, today = ne
   };
 }
 
+// On-screen text only: the prompts and what's sent stay as they are.
+const T = dict(
+  {
+    disclosure: (includeNotes: boolean) =>
+      "Sends the song name (the project file's name), stage, tags, tempo, key, credits, release dates and the kit fields to Google Gemini" +
+      (includeNotes ? ", plus your notes when checking a kit" : "") +
+      ". Never audio, file paths, sample names or your track names (only a key or a crew member's name spotted in them)" +
+      (includeNotes ? "" : ", and never your notes") +
+      ". On the free tier Google may use what it receives to improve its products.",
+    draftIncomplete: "Gemini's draft came back incomplete. Try again.",
+    checkEmpty: "Gemini's check came back empty. Try again.",
+  },
+  {
+    disclosure: (includeNotes: boolean) =>
+      "Envoie à Google Gemini le nom du son (celui du fichier projet), l'étape, les tags, le tempo, la tonalité, les crédits, les dates de sortie et les champs du kit" +
+      (includeNotes ? ", plus tes notes quand tu vérifies un kit" : "") +
+      ". Jamais l'audio, les chemins de fichiers, les noms de samples ni les noms de tes pistes (seulement une tonalité ou le nom d'un membre du crew repéré dedans)" +
+      (includeNotes ? "" : ", et jamais tes notes") +
+      ". Avec l'offre gratuite, Google peut utiliser ce qu'il reçoit pour améliorer ses produits.",
+    draftIncomplete: "Le brouillon de Gemini est revenu incomplet. Réessaie.",
+    checkEmpty: "La vérif de Gemini est revenue vide. Réessaie.",
+  },
+);
+
 /** What AI calls send, worded once for every place that says it. */
 export function aiDisclosure(includeNotes: boolean): string {
-  return (
-    "Sends the song name (the project file's name), stage, tags, tempo, key, credits, release dates and the kit fields to Google Gemini" +
-    (includeNotes ? ", plus your notes when checking a kit" : "") +
-    ". Never audio, file paths, sample names or your track names (only a key or a crew member's name spotted in them)" +
-    (includeNotes ? "" : ", and never your notes") +
-    ". On the free tier Google may use what it receives to improve its products."
-  );
+  return tr(T).disclosure(includeNotes);
 }
 
 // ---- Drafting ----
@@ -80,7 +99,7 @@ export async function draftCopy(input: KitInput, fields: KitField[], settings: S
   });
   const d = (answer.data ?? {}) as Record<string, unknown>;
   const s = (k: string) => (typeof d[k] === "string" ? (d[k] as string).trim() : "");
-  if (!s("announce") || !s("concept")) throw new Error("Gemini's draft came back incomplete. Try again.");
+  if (!s("announce") || !s("concept")) throw new Error(tr(T).draftIncomplete);
   const value = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
   const h = CAPTION_HEADINGS[lang];
   const captions = `${h.announce}\n${s("announce")}\n\n${h.teaser}\n${s("teaser")}\n\n${h.releaseDay}\n${s("releaseDay")}`;
@@ -156,6 +175,6 @@ export async function reviewKit(input: KitInput, fields: KitField[], settings: S
   const language = CAPTION_LANGUAGE_NAMES[input.captionLanguage ?? "fr"];
   const answer = await api.aiKit({ kind: "review", model: settings.aiModel, language, context, fields: values });
   const review = sanitizeReview(answer.data, fields);
-  if (Object.keys(review).length === 0) throw new Error("Gemini's check came back empty. Try again.");
+  if (Object.keys(review).length === 0) throw new Error(tr(T).checkEmpty);
   return { review, model: answer.model };
 }
