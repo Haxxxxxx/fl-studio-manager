@@ -307,3 +307,24 @@ export function staleReleaseIds(rows: CrewReleaseRow[], ws: Workspace, scope: Sh
 export function unsharedTracks(a: Album, ws: Workspace, scope: ShareScope): string[] {
   return a.trackPaths.filter((p) => !sharedHere(ws.songs[p], scope));
 }
+
+/** The crew's releases in the order to show them: upcoming (soonest first),
+ * then undated, then past (latest first). `today` is a local YYYY-MM-DD. */
+export function sortCrewReleases(rows: CrewReleaseRow[], today: string): CrewReleaseRow[] {
+  const rank = (r: CrewReleaseRow) => (!r.release_date ? 1 : r.release_date >= today ? 0 : 2);
+  return [...rows].sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    if (ra === 0) return a.release_date!.localeCompare(b.release_date!);
+    if (ra === 2) return b.release_date!.localeCompare(a.release_date!);
+    return a.title.localeCompare(b.title);
+  });
+}
+
+/** A release's tracks as crew songs (in tracklist order; songs no longer shared are left out). */
+export function releaseTracks(r: CrewReleaseRow, songs: CrewSongRow[]): CrewSongRow[] {
+  const byId = new Map(songs.map((s) => [s.id, s]));
+  return r.song_ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+}
+

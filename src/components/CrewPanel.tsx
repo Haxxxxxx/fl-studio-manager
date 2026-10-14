@@ -4,7 +4,7 @@ import { Check, ClipboardCopy, LogOut, RefreshCw, Users } from "lucide-react";
 import { useCrewStore } from "../store/useCrewStore";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
-import { orphanedShares, shareElsewhere, sharedHere, sharedTitle, syncNote } from "../lib/crewSync";
+import { orphanedShares, releaseSharedHere, shareElsewhere, sharedHere, sharedTitle, syncNote, unsharedTracks } from "../lib/crewSync";
 import { btn, btnPrimary, ConfirmButton, input } from "../ui";
 import { crewText } from "../lib/crewMessages";
 import { cleanCode, isCodeComplete } from "../lib/signInCode";
@@ -469,6 +469,56 @@ export function useCanShare(): { can: boolean; crewName: string | null } {
   const demoMode = useAppStore((s) => s.demoMode);
   const crewName = crews.find((c) => c.id === activeCrewId)?.name ?? null;
   return { can: !!userId && !!activeCrewId && !demoMode, crewName };
+}
+
+/** Release page: share the release and all its tracks with the crew at once. */
+export function ReleaseShare({ albumId }: { albumId: string }) {
+  const { can, crewName } = useCanShare();
+  const crewId = useCrewStore((s) => s.activeCrewId);
+  const userId = useCrewStore((s) => s.userId);
+  const shareRelease = useCrewStore((s) => s.shareRelease);
+  const setShared = useCrewStore((s) => s.setShared);
+  const workspace = useAppStore((s) => s.workspace);
+  const [note, setNote] = useState<string | null>(null);
+  const album = workspace.albums.find((a) => a.id === albumId);
+  if (!can || !crewId || !userId || !album) return null;
+  const scope = { crewId, userId };
+  const here = releaseSharedHere(album, scope);
+  const elsewhere = !!album.shared && !!album.shareId && !here;
+  const missing = unsharedTracks(album, workspace, scope);
+  const say = (skipped: number) =>
+    setNote(skipped ? `${skipped} track${skipped === 1 ? " is" : "s are"} shared with another crew, so ${skipped === 1 ? "it stays" : "they stay"} there.` : null);
+
+  if (elsewhere) return <div className="mt-3 text-xs text-engrave">Shared with another crew or account.</div>;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+      {here ? (
+        <>
+          <span className="flex items-center gap-1.5 text-body">
+            <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
+            Shared with {crewName} · {album.trackPaths.length - missing.length}/{album.trackPaths.length} tracks
+          </span>
+          {missing.length > 0 && (
+            <button onClick={() => say(setShared(missing, true))} className="underline hover:text-cream">
+              Share the {missing.length} other track{missing.length === 1 ? "" : "s"}
+            </button>
+          )}
+          <ConfirmButton
+            label="Stop sharing"
+            confirmLabel="Stop sharing the release?"
+            onConfirm={() => (shareRelease(album.id, false), setNote("The release leaves the crew's list. Its tracks stay shared."))}
+            className="rounded border border-transparent px-1 text-engrave hover:text-cream"
+          />
+        </>
+      ) : (
+        <button onClick={() => say(shareRelease(album.id, true))} className={secondary}>
+          Share with {crewName}
+        </button>
+      )}
+      {!here && album.trackPaths.length > 0 && <span className="text-engrave">Shares the release and its {album.trackPaths.length} track{album.trackPaths.length === 1 ? "" : "s"}.</span>}
+      {note && <span className="basis-full text-engrave">{note}</span>}
+    </div>
+  );
 }
 
 /** Song panel: share this song with the crew (opt-in). */

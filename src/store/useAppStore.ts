@@ -51,6 +51,7 @@ export type View =
   | "settings"
   // The crew section of the menu (CrewSection).
   | "crewBoard"
+  | "crewReleases"
   | "crewMembers"
   | "crewSettings";
 export type SortKey = "modified" | "name" | "status" | "tempo" | "key" | "versions";

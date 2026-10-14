@@ -1,4 +1,4 @@
-import { KanbanSquare, Settings2, UserPlus } from "lucide-react";
+import { Disc3, KanbanSquare, Settings2, UserPlus } from "lucide-react";
 import { useAppStore, type View } from "../store/useAppStore";
 import { useCrewStore, useInCrew } from "../store/useCrewStore";
 import { engrave } from "../ui";
@@ -25,6 +25,7 @@ export function CrewSection() {
 
   const items: { id: View; label: string; icon: typeof KanbanSquare }[] = [
     { id: "crewBoard", label: "Crew board", icon: KanbanSquare },
+    { id: "crewReleases", label: "Crew releases", icon: Disc3 },
     ...(owner
       ? [
           { id: "crewMembers" as const, label: "Members & invites", icon: UserPlus },

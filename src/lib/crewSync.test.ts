@@ -12,6 +12,8 @@ import {
   stageSync,
   syncNote,
   releasePayloads,
+  releaseTracks,
+  sortCrewReleases,
   staleReleaseIds,
   unsharedTracks,
 } from "./crewSync";
@@ -311,3 +313,16 @@ describe("shared releases", () => {
     expect(staleReleaseIds(rows, w, sc)).toEqual(["r1", "r2"]);
   });
 });
+
+describe("crew releases on screen", () => {
+  const r = (id: string, release_date: string | null, song_ids: string[] = []) => ({ id, title: id, release_date, song_ids }) as CrewReleaseRow;
+  it("upcoming soonest first, then undated, then past latest first", () => {
+    const rows = [r("past1", "2026-01-01"), r("soon", "2026-10-20"), r("later", "2026-12-01"), r("nodate", null), r("past2", "2026-09-01")];
+    expect(sortCrewReleases(rows, "2026-10-14").map((x) => x.id)).toEqual(["soon", "later", "nodate", "past2", "past1"]);
+  });
+  it("tracks in tracklist order, unshared ones left out", () => {
+    const songs = [{ id: "b" }, { id: "a" }] as CrewSongRow[];
+    expect(releaseTracks(r("x", null, ["a", "gone", "b"]), songs).map((s) => s.id)).toEqual(["a", "b"]);
+  });
+});
+

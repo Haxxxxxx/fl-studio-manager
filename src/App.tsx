@@ -1,4 +1,4 @@
-import { CrewBoardView, CrewMembersView, CrewSettingsView } from "./components/CrewViews";
+import { CrewBoardView, CrewMembersView, CrewReleasesView, CrewSettingsView } from "./components/CrewViews";
 import { useEffect } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -101,6 +101,7 @@ export default function App() {
       {view === "calendar" && <CalendarView />}
       {view === "settings" && <SettingsView />}
       {view === "crewBoard" && <CrewBoardView />}
+      {view === "crewReleases" && <CrewReleasesView />}
       {view === "crewMembers" && <CrewMembersView />}
       {view === "crewSettings" && <CrewSettingsView />}
       {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
