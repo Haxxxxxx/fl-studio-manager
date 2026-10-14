@@ -2,6 +2,7 @@ import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, Plus, Rock
 import { useAppStore } from "../store/useAppStore";
 import { btnPrimary, engrave, Wordmark } from "../ui";
 import { CrewMenu } from "./CrewMenu";
+import { useInCrew } from "../store/useCrewStore";
 
 export function Sidebar() {
   const view = useAppStore((s) => s.view);
@@ -14,6 +15,7 @@ export function Sidebar() {
   const openNewProject = useAppStore((s) => s.openNewProject);
   const openPerson = useAppStore((s) => s.openPerson);
   const peopleCount = useAppStore((s) => s.workspace.people.length);
+  const inCrew = useInCrew();
 
   const items = [
     { id: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
@@ -21,7 +23,8 @@ export function Sidebar() {
     { id: "pipeline" as const, label: "Pipeline", icon: KanbanSquare },
     { id: "albums" as const, label: "Releases", icon: Disc3, badge: albums.length },
     { id: "calendar" as const, label: "Calendar", icon: CalendarDays },
-    { id: "people" as const, label: "People", icon: Users, badge: peopleCount },
+    // Solo: People (credits, collaborators) moves down the list, see below.
+    ...(inCrew ? [{ id: "people" as const, label: "People", icon: Users, badge: peopleCount }] : []),
     { id: "launch" as const, label: "Launch Kit", icon: Rocket },
     { id: "settings" as const, label: "Settings", icon: SettingsIcon },
   ];
@@ -66,6 +69,16 @@ export function Sidebar() {
             </button>
           );
         })}
+        {!inCrew && (
+          <button
+            onClick={() => openPerson(null)}
+            className={`mt-1 flex items-center gap-2 rounded-md px-3 py-1.5 text-xs transition-colors ${
+              view === "people" ? "bg-cream font-medium text-chassis" : "text-engrave hover:bg-raised hover:text-cream"
+            }`}
+          >
+            <Users size={13} strokeWidth={2} /> People &amp; credits
+          </button>
+        )}
       </nav>
 
       {albums.length > 0 && (
