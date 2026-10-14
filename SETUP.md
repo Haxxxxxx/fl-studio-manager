@@ -17,7 +17,7 @@ Local builds are made with `npm run tauri build` (see below) and end up in `src-
 
 The builds aren't code-signed, so the OS warns the first time:
 
-- **macOS** — "Hivo can't be opened" / "is damaged": right-click the app in Applications → **Open** → **Open**. If it still refuses, run `xattr -cr "/Applications/Hivo.app"` once in Terminal.
+- **macOS** — "Apple can't verify the developer" (the app is signed but not notarized): click **Done**, then **System Settings → Privacy & Security** → **Open Anyway** next to Hivo. If macOS says it "is damaged" (builds before 0.2.1), run `xattr -cr "/Applications/Hivo.app"` once in Terminal.
 - **Windows** — SmartScreen "Windows protected your PC": **More info** → **Run anyway**.
 
 A macOS build only runs on the architecture it was built on (Apple Silicon vs Intel) unless built as universal: `npm run tauri build -- --target universal-apple-darwin` (needs `rustup target add x86_64-apple-darwin aarch64-apple-darwin`).

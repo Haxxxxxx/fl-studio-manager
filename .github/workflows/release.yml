@@ -83,7 +83,7 @@ jobs:
 
           **Windows:** download the `_x64-setup.exe` and run it. If Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
 
-          **macOS:** download the `.dmg`, drag Hivo to Applications. The app isn't notarized yet: the first time, right-click it → **Open** → **Open**. If macOS says it's "damaged", run `xattr -cr "/Applications/Hivo.app"` in Terminal once.
+          **macOS:** download the `.dmg`, drag Hivo to Applications and open it. The app is signed but not notarized by Apple yet, so the first time macOS says it can't verify the developer: click **Done**, then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Hivo. If macOS ever says it's "damaged", run `xattr -cr "/Applications/Hivo.app"` in Terminal once.
           EOF
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "$dmg" "$exe" --clobber
