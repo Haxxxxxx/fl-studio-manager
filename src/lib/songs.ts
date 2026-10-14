@@ -38,6 +38,13 @@ const STAGE_TEXT = dict(
 );
 
 type StageId = SongStatus | "unsorted";
+
+/** A stage's default name in every language (a column still named that way
+ * shows in the current language). */
+export function stageNames(id: SongStatus | null): string[] {
+  const key: StageId = id ?? "unsorted";
+  return [STAGE_TEXT.en[key], STAGE_TEXT.fr[key]];
+}
 /** A stage whose label and hint are read in the current language. Getters,
  * so spread a stage only where it's shown (a spread copies today's words). */
 function stage<T extends object>(base: T, id: StageId): T & { label: string; hint: string } {

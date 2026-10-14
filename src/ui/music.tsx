@@ -43,6 +43,8 @@ const T = dict(
     resetTitle: "Back to the generated value",
     reset: "Reset",
     copied: "Copied",
+    choiceYes: "Yes",
+    choiceNo: "No",
     copy: "Copy",
     typeOnce: "Type it once",
   },
@@ -80,6 +82,8 @@ const T = dict(
     resetTitle: "Revenir à la valeur générée",
     reset: "Réinitialiser",
     copied: "Copié",
+    choiceYes: "Oui",
+    choiceNo: "Non",
     copy: "Copier",
     typeOnce: "Tape-le une fois",
   },
@@ -320,7 +324,8 @@ export function FieldRow({ field, onChange, bare = false }: { field: KitField; o
               onClick={() => onChange(o)}
               className={`rounded-md border px-3 py-1 text-sm ${field.value === o ? "border-cream bg-cream text-chassis" : "border-rule text-body hover:bg-raised"}`}
             >
-              {o}
+              {/* The value stays "Yes" / "No" (what distributors expect); only the label is translated. */}
+              {o === "Yes" ? tr(T).choiceYes : o === "No" ? tr(T).choiceNo : o}
             </button>
           ))}
         </div>

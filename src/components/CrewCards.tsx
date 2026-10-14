@@ -45,7 +45,7 @@ const T = dict(
       `Rien de bloqué : chaque son pas fini a été sauvegardé dans les ${days} derniers jours.`,
     idleDays: (n: number) => `${n}j`,
     more: (n: number) => `+${n} autres`,
-    crewTitle: "Crew · qui est sur quoi",
+    crewTitle: "Crew · qui bosse sur quoi",
     people: "Personnes",
     addCrewBefore: "Ajoute le crew dans",
     addCrewAfter: "pour voir qui bosse sur quoi. Les noms dans les pistes du mixer sont repérés tout seuls.",

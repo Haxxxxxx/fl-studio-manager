@@ -165,7 +165,7 @@ const T = dict(
     featCredited: "Crédité en feat. dans le panneau du son",
     noFeat: "Aucun feat. crédité. Laisse vide s'il n'y en a pas",
     writersFromCredits: "D'après les crédits du son. Les distributeurs veulent les noms légaux, pas les noms d'artiste",
-    whoWrote: "Qui l'a écrit ? Noms légaux, séparés par ;  ex. Jane Doe (paroles) 50%; John Roe (musique) 50%",
+    whoWrote: "Qui l'a écrit ? Noms légaux, séparés par ;  ex. Jane Doe (paroles) 50% ; John Roe (musique) 50%",
     creditProducer: "Crédite un producteur dans le panneau du son, ou tape-le ici",
     genreFromProject: (daw: string) => `D'après les infos du projet dans ${daw}`,
     crewDefault: "Par défaut pour le crew. Change-le si ce son est différent",
@@ -621,7 +621,7 @@ function captions(v: Record<KitFieldId, string>, lang: CaptionLang): string {
   if (lang === "fr") {
     const who = artistLine(v.artists, v.featuring) || "[artiste]";
     return [
-      `${h.announce}\n"${v.title}" de ${who}, dispo le ${date}.\nPré-save : lien en bio.`,
+      `${h.announce}\n"${v.title}" de ${who}, dispo le ${date}.\nPré-save : lien en bio.`,
       `${h.teaser}\nVous êtes pas prêts pour celui-là. "${v.title}" sort le ${date}.`,
       `${h.releaseDay}\n"${v.title}" est dispo partout.${prod}\nLien en bio.`,
     ].join("\n\n");
@@ -1072,7 +1072,7 @@ export function kitGuide(lang: KitLang, { title, master, snippets }: { title: st
     },
     {
       file: "captions.md",
-      what: fr ? "Les textes des posts : annonce, teaser, jour de sortie." : "Post texts: announcement, teaser, release day.",
+      what: fr ? "Les textes des posts : annonce, teaser, jour de sortie." : "Post texts: announcement, teaser, release day.",
       todo: fr ? "Colle chaque texte sous le post qui va avec, au bon moment." : "Paste each one under the matching post, at the right time.",
     },
     {
@@ -1088,11 +1088,11 @@ export function kitGuide(lang: KitLang, { title, master, snippets }: { title: st
     {
       file: "metadata.json / metadata.csv",
       what: fr ? "Les mêmes infos pour un tableur ou un autre outil." : "The same details for a spreadsheet or another tool.",
-      todo: fr ? "Optionnel : importe-les si ton outil le permet." : "Optional: import them if your tool can.",
+      todo: fr ? "Optionnel : importe-les si ton outil le permet." : "Optional: import them if your tool can.",
     },
   ];
   return {
-    title: fr ? `Kit de sortie : ${title}` : `Launch kit: ${title}`,
+    title: fr ? `Kit de sortie : ${title}` : `Launch kit: ${title}`,
     intro: fr ? "Tout ce qu'il faut pour sortir ce son. Voici ce que contient le dossier et quoi en faire." : "Everything you need to release this song. Here's what's in the folder and what to do with it.",
     items,
     steps: fr
@@ -1100,8 +1100,8 @@ export function kitGuide(lang: KitLang, { title, master, snippets }: { title: st
           "Vérifie checklist.md.",
           "Upload le mixdown chez ton distributeur avec distributor-sheet.md (vise 3 à 4 semaines avant la sortie pour les playlists).",
           "Fais la cover à partir de cover-brief.md.",
-          "Avant la sortie : poste le teaser et les extraits avec les textes de captions.md.",
-          "Le jour J : poste le texte « jour de sortie ».",
+          "Avant la sortie : poste le teaser et les extraits avec les textes de captions.md.",
+          "Le jour J : poste le texte « jour de sortie ».",
         ]
       : [
           "Check checklist.md.",

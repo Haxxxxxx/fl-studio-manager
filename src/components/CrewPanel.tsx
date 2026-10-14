@@ -107,7 +107,7 @@ const T = dict(
   },
   {
     privacy:
-      "Partage les sons de ton choix avec ton crew : tout le monde les voit sur le tableau du crew, dans le calendrier et dans « qui fait quoi ». Pour chaque son partagé, le crew voit son titre, son étape, son BPM, sa tonalité, ses tags, ses crédits, sa date de sortie, s'il a un mixdown, si son Launch Kit est validé, et quand le projet a été enregistré pour la dernière fois. Il voit aussi le nom du crew et ton nom affiché (pas ton email, que seul le service de connexion garde). Jamais d'audio, de chemins de fichiers, de samples, de notes ni de noms de pistes. Stocké dans l'UE (Irlande).",
+      "Partage les sons de ton choix avec ton crew : tout le monde les voit sur le tableau du crew, dans le calendrier et dans « qui bosse sur quoi ». Pour chaque son partagé, le crew voit son titre, son étape, son BPM, sa tonalité, ses tags, ses crédits, sa date de sortie, s'il a un mixdown, si son Launch Kit est validé, et quand le projet a été enregistré pour la dernière fois. Il voit aussi le nom du crew et ton nom affiché (pas ton email, que seul le service de connexion garde). Jamais d'audio, de chemins de fichiers, de samples, de notes ni de noms de pistes. Stocké dans l'UE (Irlande).",
     notConfigured: "Le partage en crew n'est pas activé dans cette version (aucun serveur de crew configuré).",
     loading: "Chargement…",
     loadFailed: (error: string) => `Impossible de charger tes crews : ${error}`,
