@@ -33,7 +33,7 @@ export function DetectedFolders({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`flex flex-col gap-2 ${compact ? "text-left" : ""}`}>
       {detected.length === 0 ? (
-        <div className="text-xs text-engrave">No DAW's default projects folder was found on this computer. Add your folders by hand.</div>
+        <div className="text-xs text-engrave">No DAW's default projects folder was found on this computer. This only checks the usual default places: if you save your projects somewhere else, add that folder above.</div>
       ) : (
         <ul className="flex flex-col gap-1.5" aria-label="DAW folders found on this computer">
           {detected.map((f) => (
