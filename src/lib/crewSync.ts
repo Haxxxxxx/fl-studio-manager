@@ -240,3 +240,22 @@ export function orphanedShares(projects: ProjectInfo[], ws: Workspace, scope: Sh
     .filter(([path, m]) => sharedHere(m, scope) && !present.has(path))
     .map(([path]) => path);
 }
+
+export interface SyncFacts {
+  demoMode: boolean;
+  /** Hivo could read and can save workspace.json. */
+  workspaceWritable: boolean;
+  hasFolders: boolean;
+  /** Songs shared with this crew from this computer. */
+  sharedCount: number;
+}
+
+/** Why nothing of yours reaches the crew board, in one line (the first
+ * blocker), or null when your shared songs sync. */
+export function syncNote(f: SyncFacts): string | null {
+  if (f.demoMode) return "Not syncing: you're looking at sample data, which is never shared. Link your real projects folder.";
+  if (!f.workspaceWritable) return "Not syncing: Hivo can't save its data on this computer (see the message at the top of the window).";
+  if (!f.hasFolders) return "Nothing to share yet: add your projects folder in Settings, then share songs.";
+  if (f.sharedCount === 0) return "Nothing shared yet: your songs stay private until you share them (song panel, or select several in the Library).";
+  return null;
+}

@@ -22,10 +22,24 @@ describe("onboarding messages", () => {
     expect(crewErrorMessage({ message: "Token has expired or is invalid" }, "fr")).toBe("Ce code est faux ou expiré. Demande un nouveau code.");
   });
 
-  it("asking for a code again too soon: wait a few seconds (not 'after 0 seconds')", () => {
+  it("asking for a code again too soon: check the inbox or wait (not 'after 0 seconds')", () => {
     const err = { message: "For security purposes, you can only request this after 0 seconds." };
-    expect(crewErrorMessage(err, "en")).toMatch(/Wait a few seconds/);
-    expect(crewErrorMessage(err, "fr")).toMatch(/Attends quelques secondes/);
+    expect(crewErrorMessage(err, "en")).toMatch(/Check your inbox \(and spam\), or wait a minute/);
+    expect(crewErrorMessage(err, "fr")).toMatch(/attends une minute/);
+  });
+
+  it("the hourly email cap is not the 60-second timer", () => {
+    for (const message of ["email rate limit exceeded", "over_email_send_rate_limit"]) {
+      expect(crewErrorMessage({ message }, "en")).toMatch(/Too many sign-in emails.*up to an hour/);
+      expect(crewErrorMessage({ message }, "fr")).toMatch(/jusqu'à une heure/);
+    }
+  });
+
+  it("a mail server that refuses to send says so (not a raw error)", () => {
+    for (const message of ["Error sending magic link email", "Email address not authorized", "Error sending confirmation email"]) {
+      expect(crewErrorMessage({ message }, "en")).toMatch(/couldn't be sent.*tell whoever runs Hivo/);
+    }
+    expect(crewErrorMessage({ message: "Error sending magic link email" }, "fr")).toMatch(/n'a pas pu être envoyé/);
   });
 
   it("signed in but no crew: enter your invite code", () => {
