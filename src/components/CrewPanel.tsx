@@ -4,7 +4,7 @@ import { Check, ClipboardCopy, LogOut, RefreshCw, Users } from "lucide-react";
 import { useCrewStore } from "../store/useCrewStore";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
-import { orphanedShares, shareElsewhere, sharedHere, sharedTitle } from "../lib/crewSync";
+import { orphanedShares, shareElsewhere, sharedHere, sharedTitle, syncNote } from "../lib/crewSync";
 import { btn, btnPrimary, ConfirmButton, input } from "../ui";
 import { crewText } from "../lib/crewMessages";
 import { cleanCode, isCodeComplete } from "../lib/signInCode";
@@ -221,6 +221,9 @@ export function CrewHome() {
   const scanning = useAppStore((s) => s.scanning);
   const demoMode = useAppStore((s) => s.demoMode);
   const sharedCount = scope ? Object.values(workspace.songs).filter((m) => sharedHere(m, scope)).length : 0;
+  const workspaceWritable = useAppStore((s) => s.workspaceWritable);
+  const hasFolders = useAppStore((s) => s.settings.watchedFolders.length > 0);
+  const note = syncNote({ demoMode, workspaceWritable, hasFolders, sharedCount });
   // Only meaningful once a scan has found something (an empty list could be a failed scan).
   const orphans = scope && projects.length > 0 && !scanning ? orphanedShares(projects, workspace, scope) : [];
   const active = crew.crews.find((c) => c.id === crew.activeCrewId) ?? crew.crews[0];
@@ -263,7 +266,11 @@ export function CrewHome() {
           <RefreshCw size={13} className={crew.sync.kind === "syncing" ? "animate-spin" : ""} />
         </button>
       </div>
-      {demoMode && <div className="text-xs text-amber-300">Sample data is never shared. Link your real folder to sync.</div>}
+      {note && (
+        <div role="status" className="rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-cream">
+          {note}
+        </div>
+      )}
       <div className="text-xs text-engrave">
         You share <b className="text-cream">{sharedCount}</b> song{sharedCount === 1 ? "" : "s"}. Share songs from their panel, or select
         several in the Library.

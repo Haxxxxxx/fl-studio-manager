@@ -32,8 +32,16 @@ const TEXT = {
     fr: "Ce code est faux ou expiré. Demande un nouveau code.",
   },
   codeTooSoon: {
-    en: "A code was just sent. Wait a few seconds before asking for another one.",
-    fr: "Un code vient d'être envoyé. Attends quelques secondes avant d'en redemander un.",
+    en: "A code was just sent. Check your inbox (and spam), or wait a minute before asking for another one.",
+    fr: "Un code vient d'être envoyé. Regarde ta boîte mail (et les spams), ou attends une minute avant d'en redemander un.",
+  },
+  emailLimit: {
+    en: "Too many sign-in emails were sent in the last hour. Wait a while (up to an hour) and try again. If it keeps happening, tell whoever runs Hivo.",
+    fr: "Trop d'emails de connexion envoyés dans la dernière heure. Attends un peu (jusqu'à une heure) et réessaie. Si ça continue, préviens la personne qui gère Hivo.",
+  },
+  emailFailed: {
+    en: "The sign-in email couldn't be sent. Try again in a few minutes. If it keeps failing, tell whoever runs Hivo: the email sender needs checking.",
+    fr: "L'email de connexion n'a pas pu être envoyé. Réessaie dans quelques minutes. Si ça bloque encore, préviens la personne qui gère Hivo : l'envoi d'emails est à vérifier.",
   },
   invalidInvite: {
     en: "That invite code didn't work: it's wrong, expired, used up or revoked (or you're already in 10 crews). Ask your crew for a new one.",
@@ -94,7 +102,11 @@ export function crewErrorMessage(e: unknown, lang: UiLang = currentUiLang()): st
   const t = (k: CrewTextKey) => crewText(k, lang);
   if (/signups? not allowed|user not found|otp_disabled/i.test(msg)) return t("unknownEmail");
   if (/token has expired|invalid.*otp|otp.*invalid/i.test(msg)) return t("badCode");
-  if (/only request this after|over_email_send_rate_limit|email rate limit/i.test(msg)) return t("codeTooSoon");
+  // The 60-second resend timer, the project's hourly email cap and a mail
+  // server that refuses to send are three different problems.
+  if (/only request this after/i.test(msg)) return t("codeTooSoon");
+  if (/over_email_send_rate_limit|email rate limit/i.test(msg)) return t("emailLimit");
+  if (/error sending .*email|email address not authorized|email_address_not_authorized|smtp/i.test(msg)) return t("emailFailed");
   if (/wait 10 minutes/i.test(msg)) return t("tooManyInvites");
   if (/share limit|release limit|too many open invites/i.test(msg)) return msg.charAt(0).toUpperCase() + msg.slice(1) + ".";
   if (/rate limit|too many/i.test(msg)) return t("tooManyTries");

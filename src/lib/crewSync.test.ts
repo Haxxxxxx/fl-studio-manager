@@ -10,6 +10,7 @@ import {
   sharedTitle,
   staleShareIds,
   stageSync,
+  syncNote,
 } from "./crewSync";
 
 // Regression tests for the crew-sync review (data loss and rewound moves).
@@ -251,5 +252,18 @@ describe("what a shared song sends (allow-list)", () => {
     const [payload] = sharedPayloads([p], ws({ [p.path]: { ...meta, shareTitle: "  Midnight Run  " } }), scope);
     expect(payload.title).toBe("Midnight Run");
     expect(sharedTitle("Night Run v3", "   ")).toBe("Night Run");
+  });
+});
+
+describe("why nothing syncs (crew panel note)", () => {
+  const ok = { demoMode: false, workspaceWritable: true, hasFolders: true, sharedCount: 3 };
+  it("is quiet when shared songs sync", () => {
+    expect(syncNote(ok)).toBeNull();
+  });
+  it("names the first blocker", () => {
+    expect(syncNote({ ...ok, demoMode: true, sharedCount: 0 })).toMatch(/sample data/);
+    expect(syncNote({ ...ok, workspaceWritable: false })).toMatch(/can't save its data/);
+    expect(syncNote({ ...ok, hasFolders: false, sharedCount: 0 })).toMatch(/add your projects folder/);
+    expect(syncNote({ ...ok, sharedCount: 0 })).toMatch(/stay private until you share them/);
   });
 });
