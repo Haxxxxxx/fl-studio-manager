@@ -1,35 +1,33 @@
 import { Fragment } from "react";
-import { useAppStore } from "../../store/useAppStore";
-import { usePipelineView } from "../../store/usePipelineView";
+import { useCollapsed } from "../../store/usePipelineView";
 import { formatRelative } from "../../lib/format";
-import { formatBpm, lastSaveMs } from "../../lib/songs";
-import { MixdownBadge } from "../../ui";
-import { AddColumn, beforePathFor, ColumnHeader, ConflictDot, DropLine, startSongDrag, usePipelineDrop, usePipelineModel } from "./shared";
+import { formatBpm } from "../../lib/songs";
+import { AddColumn, beforeKeyFor, ColumnHeader, ConflictDot, DropLine, SourceError, startSongDrag, usePipelineDrop, useSource } from "./shared";
 
-const ROW = "grid grid-cols-[minmax(0,1fr)_7rem_4.5rem_3.5rem_minmax(0,10rem)_5.5rem] items-center gap-3";
+const ROW = "grid grid-cols-[minmax(0,1fr)_7rem_4.5rem_3.5rem_minmax(0,10rem)_7rem] items-center gap-3";
 
 /** The board as sections, one per column, one row per song. Same model and
  * drag rules as the board: drag rows to reorder or move them, drag a section
  * header to reorder columns. */
 export function PipelineList() {
-  const { songs, groups, workspace, query } = usePipelineModel();
-  const collapsed = usePipelineView((s) => s.collapsed.list);
-  const openDetail = useAppStore((s) => s.openDetail);
-  const detailPath = useAppStore((s) => s.detailPath);
-  const dnd = usePipelineDrop(songs);
+  const source = useSource();
+  const { groups, query, scope } = source;
+  const collapsed = useCollapsed(scope, "list");
+  const dnd = usePipelineDrop();
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-4" onDragEnd={dnd.end}>
+      <SourceError />
       <div className={`${ROW} px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-engrave`} aria-hidden>
         <span>Song</span>
         <span>Saved</span>
         <span>BPM</span>
         <span>Key</span>
         <span>Tags</span>
-        <span className="text-right">Mixdown</span>
+        <span className="text-right">{scope === "crew" ? "Who" : "Mixdown"}</span>
       </div>
       <div className="flex flex-col gap-3">
-        {groups.map(({ column, songs: items }, colIndex) => {
+        {groups.map(({ column, items }, colIndex) => {
           const isCollapsed = collapsed.includes(column.id);
           const active = dnd.spot?.columnId === column.id || dnd.columnOver === column.id;
           return (
@@ -45,41 +43,38 @@ export function PipelineList() {
               {!isCollapsed && (
                 <div role="list" className="flex flex-col gap-px px-1.5 pb-1.5">
                   {items.length === 0 && <div className="px-3 py-2 text-xs text-engrave">Nothing here. Drag a song in.</div>}
-                  {items.map((p, i) => {
-                    const meta = workspace.songs[p.path];
-                    return (
-                      <Fragment key={p.path}>
-                        {dnd.spot?.columnId === column.id && dnd.spot.beforePath === p.path && <DropLine />}
-                        <div
-                          role="listitem"
-                          draggable
-                          onDragStart={(e) => startSongDrag(e, p.path)}
-                          onDragOver={(e) => dnd.over(e, column.id, query ? null : beforePathFor(e, items, i))}
-                          onClick={() => openDetail(detailPath === p.path ? null : p.path)}
-                          className={`${ROW} cursor-grab rounded px-3 py-1.5 text-sm active:cursor-grabbing ${
-                            detailPath === p.path ? "bg-raised ring-1 ring-orange-400/40" : "hover:bg-raised"
-                          }`}
-                        >
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <span className="truncate font-medium text-cream">{p.name}</span>
-                            <ConflictDot path={p.path} />
-                          </span>
-                          <span className="text-xs text-engrave">{formatRelative(lastSaveMs(p))}</span>
-                          <span className="font-mono text-xs text-body">{formatBpm(p.tempoBpm)}</span>
-                          <span className="font-mono text-xs text-body">{meta?.key || "—"}</span>
-                          <span className="truncate text-xs text-engrave">{(meta?.tags ?? []).map((t) => `#${t}`).join(" ")}</span>
-                          <span className="flex justify-end">{p.renders.length > 0 && <MixdownBadge project={p} compact />}</span>
-                        </div>
-                      </Fragment>
-                    );
-                  })}
-                  {dnd.spot?.columnId === column.id && dnd.spot.beforePath === null && items.length > 0 && <DropLine />}
+                  {items.map((item, i) => (
+                    <Fragment key={item.key}>
+                      {dnd.spot?.columnId === column.id && dnd.spot.beforeKey === item.key && <DropLine />}
+                      <div
+                        role="listitem"
+                        draggable
+                        onDragStart={(e) => startSongDrag(e, item.key)}
+                        onDragOver={(e) => dnd.over(e, column.id, query ? null : beforeKeyFor(e, items, i))}
+                        onClick={item.open}
+                        className={`${ROW} cursor-grab rounded px-3 py-1.5 text-sm active:cursor-grabbing ${
+                          item.selected ? "bg-raised ring-1 ring-orange-400/40" : "hover:bg-raised"
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate font-medium text-cream">{item.title}</span>
+                          <ConflictDot on={item.conflict} />
+                        </span>
+                        <span className="text-xs text-engrave">{item.savedMs ? formatRelative(item.savedMs) : "—"}</span>
+                        <span className="font-mono text-xs text-body">{formatBpm(item.bpm)}</span>
+                        <span className="font-mono text-xs text-body">{item.musicalKey || "—"}</span>
+                        <span className="truncate text-xs text-engrave">{item.tags.map((t) => `#${t}`).join(" ")}</span>
+                        <span className="flex justify-end truncate text-xs text-body">{item.extra}</span>
+                      </div>
+                    </Fragment>
+                  ))}
+                  {dnd.spot?.columnId === column.id && dnd.spot.beforeKey === null && items.length > 0 && <DropLine />}
                 </div>
               )}
             </section>
           );
         })}
-        {!query && <AddColumn compact />}
+        <AddColumn compact />
       </div>
     </div>
   );
