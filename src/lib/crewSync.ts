@@ -1,4 +1,4 @@
-import type { CrewCredit, CrewSongRow, ProjectInfo, SongMeta, SongStatus, StageConflict, Workspace } from "../types";
+import type { Album, AlbumKind, CrewCredit, CrewReleaseRow, CrewSongRow, ProjectInfo, SongMeta, SongStatus, StageConflict, Workspace } from "../types";
 import { cleanTitle } from "./launchKit";
 import { lastSaveMs } from "./songs";
 
@@ -258,4 +258,52 @@ export function syncNote(f: SyncFacts): string | null {
   if (!f.hasFolders) return "Nothing to share yet: add your projects folder in Settings, then share songs.";
   if (f.sharedCount === 0) return "Nothing shared yet: your songs stay private until you share them (song panel, or select several in the Library).";
   return null;
+}
+
+// ---- Shared releases ----
+
+export interface SharedReleasePayload {
+  id: string;
+  crew_id: string;
+  title: string;
+  kind: AlbumKind;
+  color: string | null;
+  release_date: string | null;
+  /** Shared tracks only, in tracklist order. */
+  song_ids: string[];
+}
+
+export function releaseSharedHere(a: Album, scope: ShareScope): boolean {
+  return !!a.shared && !!a.shareId && (a.shareCrewId ?? scope.crewId) === scope.crewId && (a.shareUserId ?? scope.userId) === scope.userId;
+}
+
+const KINDS: AlbumKind[] = ["album", "ep", "single", "mixtape"];
+
+/** What each of my shared releases sends: title, type, colour, date and the
+ * tracks I share in this crew (nothing else, never paths or notes). */
+export function releasePayloads(ws: Workspace, scope: ShareScope): SharedReleasePayload[] {
+  return ws.albums.filter((a) => releaseSharedHere(a, scope)).map((a) => ({
+    id: a.shareId!,
+    crew_id: scope.crewId,
+    title: a.title.trim().slice(0, 200) || "Untitled release",
+    kind: KINDS.includes(a.kind) ? a.kind : "album",
+    color: /^#[0-9a-fA-F]{6}$/.test(a.color) ? a.color : null,
+    release_date: a.releaseDate && isRealDate(a.releaseDate) ? a.releaseDate : null,
+    song_ids: [...new Set(a.trackPaths.map((p) => ws.songs[p]).filter((m) => sharedHere(m, scope)).map((m) => m!.shareId!))].slice(0, 100),
+  }));
+}
+
+/** My release rows to delete: unshared here, or deleted here while shared.
+ * Never "not in this workspace" (my other computer may not know it). */
+export function staleReleaseIds(rows: CrewReleaseRow[], ws: Workspace, scope: ShareScope): string[] {
+  const gone = new Set([
+    ...ws.albums.filter((a) => a.shared === false && a.shareId && (a.shareCrewId ?? scope.crewId) === scope.crewId && (a.shareUserId ?? scope.userId) === scope.userId).map((a) => a.shareId!),
+    ...(ws.deletedReleaseShares ?? []).filter((d) => d.crewId === scope.crewId && d.userId === scope.userId).map((d) => d.id),
+  ]);
+  return rows.filter((r) => r.owner_id === scope.userId && r.crew_id === scope.crewId && gone.has(r.id)).map((r) => r.id);
+}
+
+/** A release's tracks that aren't shared with this crew yet (to offer "share the rest"). */
+export function unsharedTracks(a: Album, ws: Workspace, scope: ShareScope): string[] {
+  return a.trackPaths.filter((p) => !sharedHere(ws.songs[p], scope));
 }

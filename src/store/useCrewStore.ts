@@ -3,8 +3,8 @@ import { crewText } from "../lib/crewMessages";
 import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { crewErrorMessage, supabase } from "../lib/supabase";
-import { shareElsewhere, sharedHere, sharedPayloads, stageSync, staleShareIds, type ShareScope, type StageSync } from "../lib/crewSync";
-import type { CrewColumnRow, CrewMemberRow, CrewSongRow, CrewSummary, PipelineConfig, SongStatus } from "../types";
+import { releasePayloads, releaseSharedHere, shareElsewhere, sharedHere, sharedPayloads, stageSync, staleReleaseIds, staleShareIds, type ShareScope, type StageSync } from "../lib/crewSync";
+import type { CrewColumnRow, CrewMemberRow, CrewReleaseRow, CrewSongRow, CrewSummary, PipelineConfig, SongStatus } from "../types";
 import { applyCardMove, columnsPayload, crewMove, crewPipeline, restoreSongs } from "../lib/crewBoard";
 import { useAppStore } from "./useAppStore";
 
@@ -51,6 +51,8 @@ interface CrewState {
   songs: CrewSongRow[];
   /** The crew board's columns (empty: one per stage, never edited). */
   columns: CrewColumnRow[];
+  /** Releases shared with the active crew (everyone's). */
+  releases: CrewReleaseRow[];
   invite: string | null;
   /** Open invite codes of the active crew (owners only). */
   invites: CrewInvite[];
@@ -83,6 +85,10 @@ interface CrewState {
   syncNow: () => Promise<void>;
   /** Owner: save the crew board's columns (the whole set, src/lib/crewBoard.ts). */
   saveCrewColumns: (cfg: PipelineConfig) => Promise<void>;
+  /** Share a release with the active crew, with all its tracks (or stop
+   * sharing it; its tracks stay shared). Returns how many tracks were skipped
+   * because they're shared with another crew. */
+  shareRelease: (albumId: string, shared: boolean) => number;
   /** Move a crew card to a column, before another card (or at the end). */
   moveCrewCard: (songId: string, columnId: string, beforeId: string | null) => Promise<void>;
 }
@@ -94,6 +100,8 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let cycleRunning = false;
 let cycleAgain = false;
 let lastCycleMs = 0;
+/** Last payload pushed per release id. */
+const lastPushedRelease = new Map<string, string>();
 /** Last payload pushed per song id, so unchanged songs aren't re-sent. */
 const lastPushed = new Map<string, string>();
 /** Payloads the database refused (bad value): not retried until they change. */
@@ -150,13 +158,14 @@ export const useCrewStore = create<CrewState>((set, get) => {
   async function loadCrewData(): Promise<boolean> {
     const crewId = get().activeCrewId;
     if (!supabase || !crewId) {
-      set({ songs: [], members: [], columns: [] });
+      set({ songs: [], members: [], columns: [], releases: [] });
       return false;
     }
-    const [songs, members, columns] = await Promise.all([
+    const [songs, members, columns, releases] = await Promise.all([
       supabase.from("songs").select("*").eq("crew_id", crewId).order("updated_at", { ascending: false }),
       supabase.from("crew_members").select("*").eq("crew_id", crewId).order("joined_at"),
       supabase.from("crew_columns").select("*").eq("crew_id", crewId).order("position"),
+      supabase.from("releases").select("*").eq("crew_id", crewId).order("release_date", { ascending: true, nullsFirst: false }),
     ]);
     if (get().activeCrewId !== crewId) return false;
     if (songs.error) throw songs.error;
@@ -169,7 +178,8 @@ export const useCrewStore = create<CrewState>((set, get) => {
       void get().loadCrews().catch(() => {});
       return false;
     }
-    set({ songs: songs.data as CrewSongRow[], members: memberRows, columns: columnRows });
+    if (releases.error) throw releases.error;
+    set({ songs: songs.data as CrewSongRow[], members: memberRows, columns: columnRows, releases: releases.data as CrewReleaseRow[] });
     return true;
   }
 
@@ -211,6 +221,11 @@ export const useCrewStore = create<CrewState>((set, get) => {
     return r;
   }
 
+  function upsertRelease(crewId: string, row: CrewReleaseRow) {
+    if (get().activeCrewId !== crewId || !row?.id) return;
+    set({ releases: [...get().releases.filter((r) => r.id !== row.id), row] });
+  }
+
   async function reloadColumns(crewId: string) {
     if (!supabase || get().activeCrewId !== crewId) return;
     const { data, error } = await supabase.from("crew_columns").select("*").eq("crew_id", crewId).order("position");
@@ -234,6 +249,13 @@ export const useCrewStore = create<CrewState>((set, get) => {
         const id = (p.old as { id?: string })?.id;
         if (get().activeCrewId !== crewId || !id || !get().songs.some((s) => s.id === id)) return;
         set({ songs: get().songs.filter((s) => s.id !== id) });
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "releases", filter: `crew_id=eq.${crewId}` }, (p) => upsertRelease(crewId, p.new as CrewReleaseRow))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "releases", filter: `crew_id=eq.${crewId}` }, (p) => upsertRelease(crewId, p.new as CrewReleaseRow))
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "releases" }, (p) => {
+        const id = (p.old as { id?: string })?.id;
+        if (get().activeCrewId !== crewId || !id || !get().releases.some((r) => r.id === id)) return;
+        set({ releases: get().releases.filter((r) => r.id !== id) });
       })
       // The owner edited the board's columns (a whole set at a time): refetch them.
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "crew_columns", filter: `crew_id=eq.${crewId}` }, () => void reloadColumns(crewId))
@@ -341,7 +363,41 @@ export const useCrewStore = create<CrewState>((set, get) => {
         }
       }
     }
+    await pushReleases(sc);
     return rows.filter((r) => rejected.has(r.id)).length;
+  }
+
+  /** My shared releases: send what changed, delete what I unshared or deleted. */
+  async function pushReleases(sc: ShareScope) {
+    if (!supabase) return;
+    const app = useAppStore.getState();
+    // Adopt scope on first sync, like songs.
+    for (const a of app.workspace.albums) {
+      if (a.shared && a.shareId && (!a.shareCrewId || !a.shareUserId) && releaseSharedHere(a, sc)) {
+        app.updateAlbum(a.id, { shareCrewId: sc.crewId, shareUserId: sc.userId });
+      }
+    }
+    const { workspace } = useAppStore.getState();
+    const changed = releasePayloads(workspace, sc).filter((r) => lastPushedRelease.get(r.id) !== JSON.stringify(r));
+    if (changed.length) {
+      const { error } = await supabase.from("releases").upsert(changed, { onConflict: "id" });
+      if (error) throw error;
+      changed.forEach((r) => lastPushedRelease.set(r.id, JSON.stringify(r)));
+    }
+    const stale = staleReleaseIds(get().releases, workspace, sc);
+    const tombs = (workspace.deletedReleaseShares ?? []).filter((d) => d.crewId === sc.crewId && d.userId === sc.userId).map((d) => d.id);
+    if (stale.length) {
+      const { error } = await supabase.from("releases").delete().in("id", stale);
+      if (error) throw error;
+      stale.forEach((id) => lastPushedRelease.delete(id));
+      set({ releases: get().releases.filter((r) => !stale.includes(r.id)) });
+      for (const a of useAppStore.getState().workspace.albums) {
+        if (a.shareId && stale.includes(a.shareId)) useAppStore.getState().updateAlbum(a.id, { shareId: undefined, shareCrewId: undefined, shareUserId: undefined });
+      }
+    }
+    // Deleted here and gone there (or never pushed): forget the markers.
+    const done = tombs.filter((id) => !get().releases.some((r) => r.id === id));
+    if (done.length) useAppStore.getState().clearDeletedReleaseShares(done);
   }
 
   /** One sync cycle (pull, apply, push), never two at once. */
@@ -383,6 +439,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
     if (retryTimer) clearTimeout(retryTimer);
     pushTimer = retryTimer = null;
     lastPushed.clear();
+    lastPushedRelease.clear();
     rejected.clear();
   }
 
@@ -397,6 +454,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
     members: [],
     songs: [],
     columns: [],
+    releases: [],
     invite: null,
     invites: [],
     sync: { kind: "idle" },
@@ -418,7 +476,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
         const userId = session?.user.id ?? null;
         if (userId === get().userId) return;
         resetSession();
-        set({ userId, email: session?.user.email ?? null, crews: [], loadError: null, activeCrewId: null, songs: [], members: [], columns: [], invite: null, invites: [], sync: { kind: "idle" } });
+        set({ userId, email: session?.user.email ?? null, crews: [], loadError: null, activeCrewId: null, songs: [], members: [], columns: [], releases: [], invite: null, invites: [], sync: { kind: "idle" } });
         // Not awaited: supabase-js forbids awaiting its own calls in this callback.
         if (userId) setTimeout(() => void get().loadCrews().catch(() => {}), 0);
       });
@@ -488,7 +546,7 @@ export const useCrewStore = create<CrewState>((set, get) => {
       writeActiveCrew(id);
       lastPushed.clear();
       rejected.clear();
-      set({ activeCrewId: id, invite: null, invites: [], songs: [], members: [], columns: [], sync: { kind: "idle" } });
+      set({ activeCrewId: id, invite: null, invites: [], songs: [], members: [], columns: [], releases: [], sync: { kind: "idle" } });
       subscribe(id);
       if (!id) return;
       if (canSync()) return cycle();
@@ -656,6 +714,20 @@ export const useCrewStore = create<CrewState>((set, get) => {
         throw new Error(crewErrorMessage(error));
       }
       if (get().activeCrewId === crewId) set({ columns: data as CrewColumnRow[] });
+    },
+
+    shareRelease: (albumId, shared) => {
+      const sc = scope();
+      const app = useAppStore.getState();
+      const album = app.workspace.albums.find((a) => a.id === albumId);
+      if (!sc || !album) return 0;
+      if (!shared) {
+        app.updateAlbum(albumId, { shared: false });
+      } else {
+        app.updateAlbum(albumId, { shared: true, shareId: album.shareId ?? uuid(), shareCrewId: sc.crewId, shareUserId: sc.userId });
+      }
+      // The workspace change above starts the sync (debounced), like songs.
+      return shared ? get().setShared(album.trackPaths, true) : 0;
     },
 
     moveCrewCard: async (songId, columnId, beforeId) => {
