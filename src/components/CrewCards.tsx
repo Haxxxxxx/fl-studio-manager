@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { AlertTriangle, CalendarDays, Hourglass, Users } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
+import { useInCrew } from "../store/useCrewStore";
 import { buildCalendar } from "../lib/calendar";
 import { crewActivity, stalledSongs, STALLED_DAYS } from "../lib/crew";
 import { formatRelative } from "../lib/format";
@@ -8,8 +9,9 @@ import { STATUSES, UNSORTED, statusInfo } from "../lib/songs";
 import type { ProjectInfo } from "../types";
 import { StatusDot } from "./ui";
 
-/** Dashboard row: next release, stalled tracks, who's working on what. */
+/** Dashboard row: next release, stalled tracks, and (in a crew) who's working on what. */
 export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
+  const inCrew = useInCrew();
   const projects = useAppStore((s) => s.projects);
   const workspace = useAppStore((s) => s.workspace);
   const setView = useAppStore((s) => s.setView);
@@ -23,7 +25,7 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
   const crew = useMemo(() => crewActivity(workspace.people, songs, workspace), [songs, workspace]);
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className={`grid gap-4 ${inCrew ? "grid-cols-3" : "grid-cols-2"}`}>
       <Card icon={<CalendarDays size={13} />} title="Next release" action={{ label: "Calendar", run: () => setView("calendar") }}>
         {next ? (
           <button
@@ -74,6 +76,7 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
         )}
       </Card>
 
+      {inCrew && (
       <Card icon={<Users size={13} />} title="Crew · who's on what" action={{ label: "People", run: () => openPerson(null) }}>
         {crew.length === 0 ? (
           <div className="text-xs text-engrave">
@@ -103,6 +106,7 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
           </div>
         )}
       </Card>
+      )}
     </div>
   );
 }

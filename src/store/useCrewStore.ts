@@ -621,3 +621,9 @@ export const useCrewStore = create<CrewState>((set, get) => {
     syncNow: () => cycle(),
   };
 });
+
+/** In a crew (signed in, with an active crew): crew features show. Otherwise
+ * the app is the solo app (Launch Kit included; crew-only UI hidden). */
+export function useInCrew(): boolean {
+  return useCrewStore((s) => s.enabled && !!s.userId && !!s.activeCrewId && s.crews.some((c) => c.id === s.activeCrewId));
+}

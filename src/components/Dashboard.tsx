@@ -28,7 +28,7 @@ import { EmptyLibrary, useVisibleSongs } from "./LibraryView";
 import { CrewCards } from "./CrewCards";
 import { AttentionCarousel } from "./AttentionCarousel";
 import { attentionItems } from "../lib/attention";
-import { useCrewStore } from "../store/useCrewStore";
+import { useCrewStore, useInCrew } from "../store/useCrewStore";
 import { crewStats, RECENT_DAYS } from "../lib/crewStats";
 import { STALLED_DAYS } from "../lib/crew";
 import { pathsByShareId } from "../lib/crewSync";
@@ -639,7 +639,7 @@ type Scope = "me" | "crew";
 /** "Me" = this computer's songs and studio habits. "Crew" = group stats from
  * shared songs only (roadmap 1a). The switch appears once you're in a crew. */
 export function Dashboard() {
-  const inCrew = useCrewStore((s) => s.enabled && !!s.userId && !!s.activeCrewId);
+  const inCrew = useInCrew();
   const crewName = useCrewStore((s) => s.crews.find((c) => c.id === s.activeCrewId)?.name ?? "Crew");
   const hasLocal = useAppStore((s) => s.projects.length > 0 || s.settings.watchedFolders.length > 0);
   const [picked, setPicked] = useState<Scope | null>(null);
