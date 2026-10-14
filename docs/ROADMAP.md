@@ -1,6 +1,6 @@
 # Hivo (formerly FL Manager): Roadmap and status
 
-> Status as of **13 October 2026, evening**. This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
+> Status as of **14 October 2026, evening**. Hard rules for any work: [GUARDRAILS.md](GUARDRAILS.md). This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
 
 ---
 
@@ -8,14 +8,14 @@
 
 - **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion. It comes with a web dashboard for the crew.
 - **The name.** The app is now **Hivo** (formerly FL Manager), with a hive-cell logo. The rename is merged, the website shows it, and so do the sign-in emails.
-- **Installers.** Mac and Windows installers exist: built locally and saved in the private repo's GitHub releases (latest: `desktop-0.1.0-r2`). The automatic cloud build is still blocked.
+- **Installers.** **v0.2.1** is the latest GitHub release (private repo): Mac universal .dmg (signed ad-hoc: opens with "Open Anyway") and Windows setup .exe. Built automatically on the Mac (self-hosted GitHub runner) when a version tag is pushed.
 - **Phase 0 (stabilize, demo-ready).** Done, except two things: the crew pitch, and cleaning the git history before the repo can go public.
-- **Phase 1 (crew dashboard, Launch Kit, design identity).** Built and merged.
-- **Phase 2 (plugins, hardware, social publishing, distributor integrations).** Not started; ideas only.
-- **Biggest blockers today:**
-  - reliable sign-in emails need a mail provider and a domain;
+- **Phase 1 (crew dashboard, Launch Kit, design identity).** Built and merged. Batch 2 (feedback from the first real artist) is merged too: pipeline board/list/table with editable columns, crew menu, solo mode.
+- **Phase 2 (plugins, hardware, distributor integrations).** Not started; ideas only.
+- **Biggest open items today:**
+  - **a human end-to-end test of the crew flow** (sign in, create/join a crew, share a song, see it on the website). Nothing new gets built on the crew side before it passes (guardrail 4);
   - the repo can't go public until the history scrub;
-  - automatic installer builds are stuck behind a GitHub billing issue. Installers can still be built by hand on a Mac.
+  - the crew pitch.
 
 ---
 
@@ -27,14 +27,15 @@
   - web dashboard: Vite on Vercel;
   - crew backend: Supabase in the EU (Ireland).
 - **Tests:**
-  - 61 unit tests for the app logic;
-  - 97 Rust tests for scanning, files, audio and the AI connection;
-  - 57 database tests covering crew rules, privacy and limits.
+  - 115 unit tests for the app logic;
+  - 127 Rust tests for scanning, files, audio and the AI connection;
+  - 104 database tests covering crew rules, privacy, limits and stage versions.
   - Both builds are clean.
-- **Pull requests:** 26 merged since the start (#1 to #27). None open.
+- **Pull requests:** 61 merged since the start. None open.
 - **Live:**
   - crew website: https://fl-manager-crew.vercel.app (Hivo);
-  - installers: GitHub releases in the private repo (`desktop-0.1.0-r2`: Mac universal .dmg and Windows setup .exe);
+  - installers: GitHub releases in the private repo (latest `v0.2.1`: Mac universal .dmg and Windows setup .exe);
+  - sign-in emails: sent through Brevo from the hi-vo.fr domain (Supabase custom SMTP);
   - Claude Design project "fl-Manager": holds the 28 synced components, already in the Hivo / System 02 look.
 - **Quality pass done:** a three-part audit (Rust↔app bridge, app wiring, crew backend) found and fixed every broken link between features (PR #24).
 - **Free stack, by choice:**
@@ -67,10 +68,10 @@
 - **FL Studio only:** render a mixdown from the app, and package a project with all its samples into a zip.
 
 **Seeing the whole picture**
-- Pipeline board: every song by stage (Creation, Production, Prep, Release, Promotion), with drag and drop.
+- **Pipeline** in three views over one model: board, list and table. Rename, add, remove and reorder columns; each column sits on a stage (Creation, Production, Prep, Release, Promotion), so the crew always sees the stage. Hand-sorted cards, one shared filter; the table sorts on its own without touching the board.
 - **Dashboard:**
-  - song counts, a year of studio activity, stalled songs (no save in 21+ days) and the next release;
-  - who's on what, and a plugin toolkit (which plugins each song uses);
+  - song counts, a year of studio activity, stalled songs (no save in 21+ days, FL backups and autosaves count as saves) and the next release;
+  - who's on what (in a crew);
   - a health check: "will this computer open your songs" (missing plugins or samples).
   - A Me / Crew switch.
 - Releases (EPs, albums) with their track lists, and a release calendar with readiness checks.
@@ -103,6 +104,9 @@
 - Each song is shared only if you choose to. Only facts travel: title (editable for the crew), stage, BPM, key, tags, credits, dates, "has a mixdown", "kit accepted" and the last save date. Audio, file paths, samples, notes and track names never leave your computer through sharing.
 - The optional AI features are the one exception, and say so where they're switched on: the song name, tags, tempo, key, credits and kit text go to Google Gemini (notes only if you turn that on), and a cover prompt goes to Cloudflare.
 - Live updates for everyone, including when a song is unshared or someone leaves.
+- A crew menu at the bottom of the sidebar (crew, role, members, invites, switch crew), and a note saying why nothing syncs when that's the case.
+- Solo mode: until you're in a crew, crew features stay hidden; the Launch Kit is always there.
+- Stage moves never trust anyone's clock: the server keeps a version, and a real clash asks you to choose.
 - A song only disappears from the crew when you unshare it, never because a scan missed it.
 
 **The crew website**
@@ -120,26 +124,20 @@
 
 ### In progress
 
+- **Human test of the crew flow** (guardrail 4): two accounts, create and join a crew, share a real song, see it on the website.
 - **Testing on real songs and a real PC.**
-  - The new hook detection was tested on synthetic audio, not yet on the crew's tracks.
+  - The hook detection was tested on synthetic audio, not yet on the crew's tracks.
   - The Windows installer was cross-built on a Mac and hasn't been run on a Windows PC yet.
 
 ### Blocked
 
-- **Automatic installer builds.**
-  - The cloud build (Windows .exe/.msi and Mac .dmg on every version tag) is written and ready.
-  - GitHub refuses to run it: "recent account payments have failed or your spending limit needs to be increased".
-  - **Workaround in use:** build both installers by hand on the Mac.
-  - **Unblock:** fix GitHub billing, or make the repo public (which needs the history scrub first).
-- **Going public with the repo.** Old commits still contain artist names and a personal email. **Unblock:** rewrite the git history.
-- **Sign-in emails at crew scale.** Supabase's built-in email sender is heavily rate-limited. **Unblock:** pick a domain for Hivo, then connect a free mail provider (Brevo was the plan).
+- **Going public with the repo.** Old commits still contain artist names and a personal email. **Unblock:** rewrite the git history (needs your OK: it rewrites every commit).
 - **The crew pitch (Phase 0).** Waiting on you: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
 
 ### Decisions waiting on you
 
-- **Crash safety in release builds.** Right now a crash while reading a damaged project file closes the whole app (the release build is set to abort on panic). The recommendation is to switch to unwind so it just skips that file.
-- **Stage conflicts between devices.** When two people move the same song at nearly the same time, the app compares device and server clocks. With a badly wrong clock, the wrong move can win. Rare, but it needs a design call.
-- **A Hivo domain**, needed for the website address and for sign-in emails.
+- **Website address.** hi-vo.fr is bought (it already sends the sign-in emails). Pointing the website at it needs a DNS record at the registrar.
+- **Apple notarization** (removes the Mac warning entirely) needs a paid Apple Developer account. Not done: free stack.
 
 ### Thought about, not built
 
@@ -152,9 +150,10 @@
   - **Plugin recommendations:** suggest plugins by stage, knowing what's installed. Today the app knows which plugins each song uses and whether this computer has them. It does not scan plugin folders or compare against a market catalog.
   - **Hardware awareness:** identify connected interfaces, controllers and synths (USB IDs, MIDI and audio device names).
   - **A "confirm once" studio profile** for what can't be detected (cloud plugins, analog gear).
-  - **Social publishing** straight from the Launch Kit (via a posting service such as Typefully, Buffer or Ayrshare; Instagram rules to check early).
+  - ~~Social publishing straight from the Launch Kit~~: rejected. Posting is a human hand-off (guardrail 2).
   - **Distributor integrations** (push metadata and files instead of re-typing; many distributors only allow manual upload).
-- **Money (splits, contracts, rights registration).** Deliberately out of scope until the crew decides together.
+- **Money (splits, contracts, rights registration).** Not before the crew actually releases through Hivo (guardrail 4).
+- **Release stats** (streams, listeners, revenue): blocked, no free API gives real numbers (guardrail 6).
 
 ---
 
@@ -216,16 +215,15 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 
 ## 8. Suggested next steps
 
-1. Try the Launch Kit on a few real songs whose hook you know, and run the Windows installer on a PC.
-2. Pick a Hivo domain; set up the mail provider so crew sign-in is reliable.
-3. Decide crash safety (abort vs unwind) before handing installers to the crew.
-4. Prepare and give the crew pitch with the demo.
-5. Fix GitHub billing (or scrub history and go public) so installers build automatically.
-6. Then choose the first Phase 2 slice. Social publishing from the Launch Kit is the natural next "magic" moment.
+1. Test the crew flow end to end yourself with v0.2.1 (two accounts, Mac + PC). Until it passes, nothing new on the crew side.
+2. Try the Launch Kit on a few real songs whose hook you know, and run the Windows installer on a PC.
+3. Prepare and give the crew pitch with the demo (November milestone: prove the crew lives in the board).
+4. Decide whether to scrub the history and make the repo public.
+5. Then, and only then, pick the next slice, inside the guardrails.
 
 ## 9. Notes for Claude Code
 
-- Read `CLAUDE.md` first: it has the commands, rules and where each feature lives.
+- Read [GUARDRAILS.md](GUARDRAILS.md) and `CLAUDE.md` first: the hard rules, then the commands, rules and where each feature lives.
 - Keep paths, credentials and keys out of the code. Only the public Supabase key ships in apps.
 - Free stack only; ask before adding anything paid.
 - Never change the app identifier (`com.theiaweb.flstudiomanager`): it's where everyone's data lives.
