@@ -18,7 +18,7 @@ const song = (name: string, savedDaysAgo: number, backupsDaysAgo: number[] = [])
   }) as unknown as ProjectInfo;
 const ws = (songs: Workspace["songs"]): Workspace => ({ version: 2, songs, albums: [], people: [] });
 
-describe("stalled songs (no save in 21+ days, still being made)", () => {
+describe("stalled songs (no save in 21+ days, not finished)", () => {
   const songs = [
     song("Fresh", 2),
     song("Old file, autosaved yesterday", 60, [1, 40]),
@@ -41,12 +41,13 @@ describe("stalled songs (no save in 21+ days, still being made)", () => {
     "/p/No date.flp": { status: "creation" },
   });
 
-  it("lists exactly the old ones, oldest first", () => {
+  it("lists exactly the old unfinished ones (Unsorted included), most recently dropped first", () => {
     const got = stalledSongs(songs, meta, NOW).map((s) => [s.song.name, s.idleDays]);
     expect(got).toEqual([
-      ["Older", 70],
-      ["Old", 30],
       ["Exactly 21", 21],
+      ["Old", 30],
+      ["Older", 70],
+      ["Old but unsorted", 80],
     ]);
   });
 
@@ -69,10 +70,20 @@ describe("crew stalled card", () => {
 
   it("skips songs with no known date instead of showing them decades old", () => {
     const stats = crewStats(
-      [row("Old", "creation", 40), row("Recent", "production", 3), row("Unknown", "creation", null), row("Moved lately", "creation", 50, 2)],
+      [
+        row("Old", "creation", 40),
+        row("Recent", "production", 3),
+        row("Unknown", "creation", null),
+        row("Moved lately", "creation", 50, 2),
+        row("Old unsorted", null, 25),
+        row("Old in Prep", "prep", 60),
+      ],
       [],
       NOW,
     );
-    expect(stats.stalled.map((s) => [s.song.title, s.days])).toEqual([["Old", 40]]);
+    expect(stats.stalled.map((s) => [s.song.title, s.days])).toEqual([
+      ["Old unsorted", 25],
+      ["Old", 40],
+    ]);
   });
 });

@@ -15,16 +15,18 @@ export interface StalledSong {
   idleDays: number;
 }
 
-/** Songs still being made (Creation/Production) with no save (backups
- * included) in `days`+ days, oldest first. Songs with no known save date are
- * left out rather than shown as decades old. */
+/** Unfinished songs (Unsorted, Creation, Production) with no save (backups
+ * included) in `days`+ days, most recently dropped first: a song left three
+ * weeks ago matters more than an old idea from two years back. Unsorted
+ * counts: most songs never get placed in a stage. Songs with no known save
+ * date are left out rather than shown as decades old. */
 export function stalledSongs(songs: ProjectInfo[], ws: Workspace, now = Date.now(), days = STALLED_DAYS): StalledSong[] {
   return songs
     .map((song) => ({ song, status: ws.songs[song.path]?.status, last: lastSaveMs(song) }))
-    .filter((s) => (s.status === "creation" || s.status === "production") && s.last > 0)
+    .filter((s) => !isFinished(s.status) && s.last > 0)
     .map(({ song, status, last }) => ({ song, status, idleDays: Math.floor((now - last) / DAY) }))
     .filter((s) => s.idleDays >= days)
-    .sort((a, b) => b.idleDays - a.idleDays);
+    .sort((a, b) => a.idleDays - b.idleDays);
 }
 
 export interface CrewMember {
