@@ -259,13 +259,15 @@ export const useWeb = create<WebState>((set, get) => {
 
     moveSong: async (songId, stage) => {
       if (!supabase) return;
+      const crewId = get().activeCrewId;
       const before = get().songs;
       const row = before.find((s) => s.id === songId);
       // Optimistic stage only: the move carries the version it was made on.
       set({ songs: before.map((s) => (s.id === songId ? { ...s, stage } : s)) });
       const { data, error } = await supabase.rpc("move_song_stage", { p_song: songId, p_stage: stage, p_expected_at: row?.stage_updated_at ?? null });
       if (error) {
-        set({ songs: before, error: errorMessage(error) });
+        // Only this card, and only if this crew is still the one shown.
+        if (get().activeCrewId === crewId) set({ songs: restoreSongs(get().songs, before, [songId]), error: errorMessage(error) });
         throw new Error(errorMessage(error));
       }
       const r = (Array.isArray(data) ? data[0] : data) as { applied: boolean; stage: SongStatus | null; stage_updated_at: string; stage_updated_by: string | null };
@@ -326,7 +328,9 @@ export const useWeb = create<WebState>((set, get) => {
         try {
           settle(x.songId, await call(x.songId, x.order, row.stage_updated_at));
         } catch (e) {
+          // Part of the column was placed: show the server's order again.
           set({ error: errorMessage(e) });
+          void loadCrewData().catch(() => {});
           throw new Error(errorMessage(e));
         }
       }
