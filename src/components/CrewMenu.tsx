@@ -75,7 +75,9 @@ export function CrewMenu() {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-cream">{active.name}</span>
           <span className="block text-[11px] text-engrave">
-            {active.role === "owner" ? "Owner" : "Member"} · {members} member{members === 1 ? "" : "s"}
+            {active.role === "owner" ? "Owner" : "Member"}
+            {/* You're always a member: 0 means the list hasn't loaded yet. */}
+            {members > 0 && ` · ${members} member${members === 1 ? "" : "s"}`}
           </span>
         </span>
         <StatusDot color={light} size={7} />
