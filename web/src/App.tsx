@@ -8,6 +8,7 @@ import { useWeb } from "./store";
 import { Landing } from "./Landing";
 import { crewText } from "@shared/lib/crewMessages";
 import { SIGN_IN } from "./landingCopy";
+import { cleanCode, isCodeComplete } from "@shared/lib/signInCode";
 import { pageLang, type Lang } from "./lang";
 
 const input =
@@ -113,14 +114,14 @@ function SignIn({ lang }: { lang: Lang }) {
           </p>
           <input
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            onChange={(e) => setCode(cleanCode(e.target.value))}
             placeholder="123456"
             inputMode="numeric"
             autoComplete="one-time-code"
             aria-label={t.code}
             className={`${input} text-center font-mono text-2xl tracking-[0.4em]`}
           />
-          <button disabled={busy || code.length !== 6} className={primary}>
+          <button disabled={busy || !isCodeComplete(code)} className={primary}>
             {busy ? t.checking : t.signIn}
           </button>
           <button type="button" onClick={() => (setSentTo(null), setCode(""))} className="text-xs text-engrave hover:text-cream">
