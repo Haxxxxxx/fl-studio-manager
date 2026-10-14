@@ -163,6 +163,9 @@ export interface SongMeta {
   key?: string;
   /** Hidden from the library, board and stats (the yearly "clear out"). */
   archived?: boolean;
+  /** The pipeline column it sits in (a column of its stage, see
+   * src/lib/pipeline.ts). Missing or stale = the first column of its stage. */
+  column?: string;
   credits?: Credit[];
   pitches?: Pitch[];
   launchKit?: LaunchKitMeta;
@@ -381,6 +384,25 @@ export interface Workspace {
   songs: Record<string, SongMeta>;
   albums: Album[];
   people: Person[];
+  /** The user's pipeline columns. Missing = one column per stage. */
+  pipeline?: PipelineConfig;
+}
+
+/** A pipeline column. Columns sit on the fixed lifecycle stages: putting a
+ * song in a column sets that stage, so crew sync, "finished", stalled and the
+ * calendar keep working. null = Unsorted. */
+export interface PipelineColumn {
+  id: string;
+  name: string;
+  stage: SongStatus | null;
+}
+
+export interface PipelineConfig {
+  /** Display order. Every stage (and Unsorted) keeps at least one column. */
+  columns: PipelineColumn[];
+  /** Hand-sorted card order per column id (.flp paths). Songs not listed
+   * follow, most recently saved first. */
+  order: Record<string, string[]>;
 }
 
 /** Whether the newest mixdown is newer than the last save of the project. */
