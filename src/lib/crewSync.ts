@@ -1,5 +1,6 @@
 import type { CrewCredit, CrewSongRow, ProjectInfo, SongMeta, SongStatus, StageConflict, Workspace } from "../types";
 import { cleanTitle } from "./launchKit";
+import { lastSaveMs } from "./songs";
 
 // Sync between the local workspace and the crew database (docs/ARCHITECTURE.md).
 // Pure functions: what to push for a shared song, which remote stage moves to
@@ -136,7 +137,7 @@ export function sharedSongPayload(project: ProjectInfo, meta: SongMeta, ws: Work
     release_date: releaseDateFor(project.path, meta, ws),
     has_mixdown: project.renders.length > 0,
     kit_accepted: !!meta.launchKit?.acceptedAtMs,
-    last_saved_at: Number.isFinite(project.modifiedAtMs) ? iso(project.modifiedAtMs) : null,
+    last_saved_at: lastSaveMs(project) > 0 ? iso(lastSaveMs(project)) : null,
   };
 }
 

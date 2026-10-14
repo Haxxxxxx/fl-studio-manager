@@ -85,7 +85,14 @@ export function formatBpm(bpm: number | null): string {
 
 /** Every save FL recorded for a song: the current file plus each backup. */
 export function saveTimestamps(p: ProjectInfo): number[] {
-  return [p.modifiedAtMs, ...p.backups.map((b) => b.modifiedAtMs)];
+  return [p.modifiedAtMs, ...(p.backups ?? []).map((b) => b.modifiedAtMs)];
+}
+
+/** The latest save, backups included: FL's autosave and save-backups land in
+ * the Backup folder, so the project file alone can look weeks old while the
+ * song was worked on yesterday. 0 = unknown. */
+export function lastSaveMs(p: ProjectInfo): number {
+  return Math.max(0, ...saveTimestamps(p).filter((t) => Number.isFinite(t) && t > 0));
 }
 
 export function missingPlugins(p: ProjectInfo) {
