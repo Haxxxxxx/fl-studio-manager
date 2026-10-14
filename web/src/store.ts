@@ -2,7 +2,8 @@ import { statusInfo } from "@shared/lib/songs";
 import { crewText } from "@shared/lib/crewMessages";
 import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { CrewMemberRow, CrewSongRow, CrewSummary, SongStatus } from "@shared/types";
+import type { CrewColumnRow, CrewMemberRow, CrewSongRow, CrewSummary, SongStatus } from "@shared/types";
+import { crewMove, crewPipeline } from "@shared/lib/crewBoard";
 import { errorMessage, supabase } from "./supabase";
 
 // The web dashboard's state: session, crews, the active crew's shared songs
@@ -21,6 +22,8 @@ interface WebState {
   activeCrewId: string | null;
   songs: CrewSongRow[];
   members: CrewMemberRow[];
+  /** The crew board's columns, as the owner set them in the app (empty: one per stage). */
+  columns: CrewColumnRow[];
   error: string | null;
 
   init: () => Promise<void>;
@@ -32,6 +35,8 @@ interface WebState {
   createCrew: (name: string, displayName: string) => Promise<void>;
   joinCrew: (code: string, displayName: string) => Promise<void>;
   moveSong: (songId: string, stage: SongStatus | null) => Promise<void>;
+  /** Move a card to a column, before another card (or at the end). */
+  moveCard: (songId: string, columnId: string, beforeId: string | null) => Promise<void>;
 }
 
 let channel: RealtimeChannel | null = null;
@@ -56,10 +61,11 @@ const remembered = () => {
 export const useWeb = create<WebState>((set, get) => {
   async function loadCrewData() {
     const id = get().activeCrewId;
-    if (!supabase || !id) return set({ songs: [], members: [] });
-    const [songs, members] = await Promise.all([
+    if (!supabase || !id) return set({ songs: [], members: [], columns: [] });
+    const [songs, members, columns] = await Promise.all([
       supabase.from("songs").select("*").eq("crew_id", id).order("updated_at", { ascending: false }),
       supabase.from("crew_members").select("*").eq("crew_id", id).order("joined_at"),
+      supabase.from("crew_columns").select("*").eq("crew_id", id).order("position"),
     ]);
     if (get().activeCrewId !== id) return;
     if (songs.error) throw songs.error;
@@ -69,7 +75,13 @@ export const useWeb = create<WebState>((set, get) => {
       // Removed from the crew (or it was deleted): back to the crew list.
       return void get().loadCrews().catch((e) => set({ error: errorMessage(e) }));
     }
-    set({ songs: songs.data as CrewSongRow[], members: memberRows, error: null });
+    set({ songs: songs.data as CrewSongRow[], members: memberRows, columns: columns.error ? [] : (columns.data as CrewColumnRow[]), error: null });
+  }
+
+  async function reloadColumns(id: string) {
+    if (!supabase || get().activeCrewId !== id) return;
+    const { data, error } = await supabase.from("crew_columns").select("*").eq("crew_id", id).order("position");
+    if (!error && get().activeCrewId === id) set({ columns: data as CrewColumnRow[] });
   }
 
   /** Refetch (after a reconnect, or when the tab/phone comes back). */
@@ -104,6 +116,13 @@ export const useWeb = create<WebState>((set, get) => {
         if (get().activeCrewId !== id || !gone || !get().songs.some((s) => s.id === gone)) return;
         set({ songs: get().songs.filter((s) => s.id !== gone) });
       })
+      // The owner edited the columns in the app: refetch them.
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "crew_columns", filter: `crew_id=eq.${id}` }, () => void reloadColumns(id))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "crew_columns", filter: `crew_id=eq.${id}` }, () => void reloadColumns(id))
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "crew_columns" }, (p) => {
+        const old = (p.old as { id?: string })?.id;
+        if (old && get().columns.some((c) => c.id === old)) void reloadColumns(id);
+      })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "crew_members", filter: `crew_id=eq.${id}` }, reloadMembers)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "crew_members", filter: `crew_id=eq.${id}` }, reloadMembers)
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "crew_members" }, (p) => {
@@ -130,6 +149,7 @@ export const useWeb = create<WebState>((set, get) => {
     loadError: null,
     activeCrewId: null,
     songs: [],
+    columns: [],
     members: [],
     error: null,
 
@@ -147,7 +167,7 @@ export const useWeb = create<WebState>((set, get) => {
         const userId = session?.user.id ?? null;
         if (userId === get().userId) return;
         subscribe(null);
-        set({ userId, email: session?.user.email ?? null, crews: [], loadError: null, activeCrewId: null, songs: [], members: [], error: null });
+        set({ userId, email: session?.user.email ?? null, crews: [], loadError: null, activeCrewId: null, songs: [], members: [], columns: [], error: null });
         // Not awaited: supabase-js forbids awaiting its own calls in this callback.
         if (userId) setTimeout(() => void get().loadCrews().catch((e) => set({ error: errorMessage(e) })), 0);
       });
@@ -200,7 +220,7 @@ export const useWeb = create<WebState>((set, get) => {
 
     selectCrew: async (id) => {
       remember(id);
-      set({ activeCrewId: id, songs: [], members: [], error: null });
+      set({ activeCrewId: id, songs: [], members: [], columns: [], error: null });
       subscribe(id);
       if (id) await loadCrewData().catch((e) => set({ error: errorMessage(e) }));
     },
@@ -237,6 +257,45 @@ export const useWeb = create<WebState>((set, get) => {
       set({ songs: get().songs.map((s) => (s.id === songId ? { ...s, stage: r.stage, stage_updated_at: r.stage_updated_at, stage_updated_by: r.stage_updated_by } : s)) });
       if (!r.applied) {
         // A crewmate moved it just before: theirs stands, and we say so.
+        const who = get().members.find((m) => m.user_id === r.stage_updated_by)?.display_name ?? crewText("someone");
+        const message = crewText("movedMeanwhile", undefined, { who, stage: statusInfo(r.stage ?? undefined).label });
+        set({ error: message });
+        throw new Error(message);
+      }
+      set({ error: null });
+    },
+
+    moveCard: async (songId, columnId, beforeId) => {
+      if (!supabase) return;
+      const { cfg, onServer } = crewPipeline(get().columns);
+      const move = crewMove(get().songs, cfg, onServer, songId, columnId, beforeId);
+      if (move.kind === "none") return;
+      if (move.kind === "stage") return get().moveSong(songId, move.stage);
+      const before = get().songs;
+      const stage = cfg.columns.find((c) => c.id === columnId)!.stage;
+      // Optimistic: the move carries the version it was made on.
+      set({ songs: before.map((s) => (s.id === songId ? { ...s, stage, column_id: columnId, board_order: move.order } : s)) });
+      const { data, error } = await supabase.rpc("move_crew_card", { p_song: songId, p_column: columnId, p_order: move.order, p_expected_at: move.expectedAt });
+      if (error) {
+        set({ songs: before, error: errorMessage(error) });
+        throw new Error(errorMessage(error));
+      }
+      const r = (Array.isArray(data) ? data[0] : data) as {
+        applied: boolean;
+        stage: SongStatus | null;
+        stage_updated_at: string;
+        stage_updated_by: string | null;
+        column_id: string | null;
+        board_order: number | null;
+      };
+      set({
+        songs: get().songs.map((s) =>
+          s.id === songId
+            ? { ...s, stage: r.stage, stage_updated_at: r.stage_updated_at, stage_updated_by: r.stage_updated_by, column_id: r.column_id, board_order: r.board_order }
+            : s,
+        ),
+      });
+      if (!r.applied) {
         const who = get().members.find((m) => m.user_id === r.stage_updated_by)?.display_name ?? crewText("someone");
         const message = crewText("movedMeanwhile", undefined, { who, stage: statusInfo(r.stage ?? undefined).label });
         set({ error: message });

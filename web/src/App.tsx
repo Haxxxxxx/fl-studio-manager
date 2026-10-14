@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Wordmark } from "./LogoMark";
 import { CalendarDays, CheckCircle2, Disc3, KanbanSquare, LogOut, Users } from "lucide-react";
 import { STATUSES, UNSORTED, statusInfo } from "@shared/lib/songs";
 import { formatRelative } from "@shared/lib/format";
+import { crewPipeline, groupCrewSongs } from "@shared/lib/crewBoard";
 import type { CrewSongRow, SongStatus } from "@shared/types";
 import { useWeb } from "./store";
 import { Landing } from "./Landing";
@@ -272,82 +273,133 @@ function useNames() {
   return useMemo(() => new Map(members.map((m) => [m.user_id, m.display_name])), [members]);
 }
 
+/** The crew board, in the crew's columns (the owner sets them in the app).
+ * Same rules as the app: moving a card to a column of another stage moves
+ * the song to that stage. */
 function Board() {
   const songs = useWeb((s) => s.songs);
-  const moveSong = useWeb((s) => s.moveSong);
+  const columns = useWeb((s) => s.columns);
+  const moveCard = useWeb((s) => s.moveCard);
   const userId = useWeb((s) => s.userId);
   const names = useNames();
-  const [dragOver, setDragOver] = useState<string | null>(null);
-  const byStage = useMemo(() => {
-    const m = new Map<string, CrewSongRow[]>(COLUMNS.map((c) => [c.id ?? "", []]));
-    for (const s of songs) m.get(s.stage ?? "")?.push(s);
-    return m;
-  }, [songs]);
+  const [spot, setSpot] = useState<{ col: string; before: string | null } | null>(null);
+  const spotRef = useRef(spot);
+  const { cfg } = useMemo(() => crewPipeline(columns), [columns]);
+  const groups = useMemo(() => groupCrewSongs(songs, cfg), [songs, cfg]);
 
   if (songs.length === 0) {
     return <div className="p-8 text-center text-sm text-body">Nothing shared yet. Songs appear here when the crew shares them from Hivo.</div>;
   }
-  const card = (s: CrewSongRow) => <SongCard key={s.id} s={s} you={s.owner_id === userId} owner={names.get(s.owner_id)} mover={s.stage_updated_by ? (s.stage_updated_by === userId ? "you" : names.get(s.stage_updated_by)) : undefined} onMove={(st) => void moveSong(s.id, st).catch(() => {})} />;
-  const empty = COLUMNS.filter((c) => !(byStage.get(c.id ?? "") ?? []).length);
+  const mark = (next: { col: string; before: string | null } | null) => {
+    if (spotRef.current?.col === next?.col && spotRef.current?.before === next?.before) return;
+    spotRef.current = next;
+    setSpot(next);
+  };
+  const card = (s: CrewSongRow) => (
+    <SongCard
+      key={s.id}
+      s={s}
+      columns={cfg.columns}
+      columnId={groups.find((g) => g.songs.includes(s))!.column.id}
+      you={s.owner_id === userId}
+      owner={names.get(s.owner_id)}
+      mover={s.stage_updated_by ? (s.stage_updated_by === userId ? "you" : names.get(s.stage_updated_by)) : undefined}
+      onMove={(col) => void moveCard(s.id, col, null).catch(() => {})}
+    />
+  );
+  const hint = (c: (typeof cfg.columns)[number]) => (c.name.toLowerCase() === statusInfo(c.stage ?? undefined).label.toLowerCase() ? statusInfo(c.stage ?? undefined).hint : statusInfo(c.stage ?? undefined).label);
+  const empty = groups.filter((g) => !g.songs.length);
   return (
     <>
-      {/* Phones: one list grouped by stage (columns don't fit a narrow screen). */}
+      {/* Phones: one list grouped by column (columns don't fit a narrow screen). */}
       <div className="flex flex-col gap-5 p-4 sm:hidden">
-        {COLUMNS.filter((c) => (byStage.get(c.id ?? "") ?? []).length).map((col) => (
-          <section key={col.label} aria-label={col.label} className="flex flex-col gap-2">
-            <div className="flex items-baseline gap-2">
-              <span className="h-2 w-2 self-center rounded-full" style={{ background: col.color }} />
-              <span className="text-sm font-medium text-cream">{col.label}</span>
-              <span className="text-sm text-engrave">{byStage.get(col.id ?? "")!.length}</span>
-              <span className="truncate text-[11px] text-engrave">{col.hint}</span>
-            </div>
-            {byStage.get(col.id ?? "")!.map(card)}
-          </section>
-        ))}
-        {empty.length > 0 && <p className="text-[11px] text-engrave">Empty: {empty.map((c) => c.label).join(", ")}</p>}
+        {groups
+          .filter((g) => g.songs.length)
+          .map(({ column, songs: items }) => (
+            <section key={column.id} aria-label={column.name} className="flex flex-col gap-2">
+              <div className="flex items-baseline gap-2">
+                <span className="h-2 w-2 self-center rounded-full" style={{ background: statusInfo(column.stage ?? undefined).color }} />
+                <span className="text-sm font-medium text-cream">{column.name}</span>
+                <span className="text-sm text-engrave">{items.length}</span>
+                <span className="truncate text-[11px] text-engrave">{hint(column)}</span>
+              </div>
+              {items.map(card)}
+            </section>
+          ))}
+        {empty.length > 0 && <p className="text-[11px] text-engrave">Empty: {empty.map((g) => g.column.name).join(", ")}</p>}
       </div>
-      <div className="hidden flex-1 gap-3 overflow-x-auto p-5 sm:flex">
-      {COLUMNS.map((col) => {
-        const key = col.id ?? "";
-        const items = byStage.get(key) ?? [];
-        return (
+      <div className="hidden flex-1 gap-3 overflow-x-auto p-5 sm:flex" onDragEnd={() => mark(null)}>
+        {groups.map(({ column, songs: items }) => (
           <section
-            key={key}
-            aria-label={col.label}
+            key={column.id}
+            aria-label={column.name}
             onDragOver={(e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
-              setDragOver(key);
+              if (spotRef.current?.col !== column.id) mark({ col: column.id, before: null });
             }}
             onDragLeave={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver((k) => (k === key ? null : k));
-              }}
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) mark(null);
+            }}
             onDrop={(e) => {
               e.preventDefault();
-              setDragOver(null);
+              const target = spotRef.current?.col === column.id ? spotRef.current.before : null;
+              mark(null);
               const id = e.dataTransfer.getData("application/x-crew-song");
-              if (id) void moveSong(id, col.id ?? null).catch(() => {});
+              if (id) void moveCard(id, column.id, target).catch(() => {});
             }}
-            className={`flex min-w-[200px] flex-1 basis-0 flex-col rounded-xl border ${dragOver === key ? "border-orange-400/50 bg-orange-500/[0.05]" : "border-rule bg-panel"}`}
+            className={`flex min-w-[200px] flex-1 basis-0 flex-col rounded-xl border ${spot?.col === column.id ? "border-orange-400/50 bg-orange-500/[0.05]" : "border-rule bg-panel"}`}
           >
             <div className="px-3 pb-2 pt-3">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full" style={{ background: col.color }} />
-                <span className="text-sm font-medium text-cream">{col.label}</span>
+                <span className="h-2 w-2 rounded-full" style={{ background: statusInfo(column.stage ?? undefined).color }} />
+                <span className="truncate text-sm font-medium text-cream">{column.name}</span>
                 <span className="text-sm text-engrave">{items.length}</span>
               </div>
-              <p className="mt-0.5 text-[11px] text-engrave">{col.hint}</p>
+              <p className="mt-0.5 text-[11px] text-engrave">{hint(column)}</p>
             </div>
-            <div className="flex flex-col gap-2 px-2 pb-2">{items.map(card)}</div>
+            <div className="flex flex-col gap-2 px-2 pb-2">
+              {items.map((s, i) => (
+                <div
+                  key={s.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const before = e.clientY < r.top + r.height / 2 ? s.id : (items[i + 1]?.id ?? null);
+                    mark({ col: column.id, before });
+                  }}
+                >
+                  {spot?.col === column.id && spot.before === s.id && <div className="mb-2 h-0.5 rounded-full bg-hot" aria-hidden />}
+                  {card(s)}
+                </div>
+              ))}
+              {spot?.col === column.id && spot.before === null && items.length > 0 && <div className="h-0.5 rounded-full bg-hot" aria-hidden />}
+            </div>
           </section>
-        );
-      })}
+        ))}
       </div>
     </>
   );
 }
 
-function SongCard({ s, you, owner, mover, onMove }: { s: CrewSongRow; you: boolean; owner?: string; mover?: string; onMove: (stage: SongStatus | null) => void }) {
+function SongCard({
+  s,
+  columns,
+  columnId,
+  you,
+  owner,
+  mover,
+  onMove,
+}: {
+  s: CrewSongRow;
+  columns: { id: string; name: string }[];
+  columnId: string;
+  you: boolean;
+  owner?: string;
+  mover?: string;
+  onMove: (columnId: string) => void;
+}) {
   return (
     <article
       draggable
@@ -371,19 +423,18 @@ function SongCard({ s, you, owner, mover, onMove }: { s: CrewSongRow; you: boole
           {s.kit_accepted && <CheckCircle2 size={11} className="text-emerald-300/80" aria-label="Launch Kit accepted" />}
         </span>
       </div>
-      {/* Touch screens can't drag: a stage picker on every card. */}
+      {/* Touch screens can't drag: a column picker on every card. */}
       <label className="mt-2 flex items-center gap-2 text-[11px] text-engrave">
-        Stage
+        Column
         <select
-          value={s.stage ?? ""}
-          onChange={(e) => onMove((e.target.value || null) as SongStatus | null)}
-          aria-label={`Stage of ${s.title}`}
+          value={columnId}
+          onChange={(e) => onMove(e.target.value)}
+          aria-label={`Column of ${s.title}`}
           className="flex-1 rounded border border-rule bg-raised px-1.5 py-1.5 text-sm text-cream sm:py-1 sm:text-xs"
         >
-          <option value="">{UNSORTED.label}</option>
-          {STATUSES.map((st) => (
-            <option key={st.id} value={st.id}>
-              {st.label}
+          {columns.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
             </option>
           ))}
         </select>
