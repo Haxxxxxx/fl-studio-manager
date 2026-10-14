@@ -17,6 +17,7 @@ import {
   staleReleaseIds,
   unsharedTracks,
 } from "./crewSync";
+import { applyLang } from "../i18n";
 
 // Regression tests for the crew-sync review (data loss and rewound moves).
 
@@ -270,6 +271,17 @@ describe("why nothing syncs (crew panel note)", () => {
     expect(syncNote({ ...ok, workspaceWritable: false })).toMatch(/can't save its data/);
     expect(syncNote({ ...ok, hasFolders: false, sharedCount: 0 })).toMatch(/add your projects folder/);
     expect(syncNote({ ...ok, sharedCount: 0 })).toMatch(/stay private until you share them/);
+  });
+  it("speaks French when the app does", () => {
+    applyLang("fr");
+    try {
+      expect(syncNote({ ...ok, demoMode: true })).toMatch(/^Pas de synchro : .*données d'exemple/);
+      expect(syncNote({ ...ok, sharedCount: 0 })).toMatch(/restent privés/);
+      expect(syncNote(ok)).toBeNull();
+    } finally {
+      applyLang("en");
+    }
+    expect(syncNote({ ...ok, demoMode: true })).toMatch(/sample data/);
   });
 });
 

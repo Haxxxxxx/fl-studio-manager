@@ -2,7 +2,8 @@ import { Fragment } from "react";
 import { useCollapsed } from "../../store/usePipelineView";
 import { formatRelative } from "../../lib/format";
 import { formatBpm } from "../../lib/songs";
-import { AddColumn, beforeKeyFor, ColumnHeader, ConflictDot, DropLine, SourceError, startSongDrag, usePipelineDrop, useSource } from "./shared";
+import { AddColumn, beforeKeyFor, ColumnHeader, ConflictDot, DropLine, SourceError, startSongDrag, T_PIPELINE, usePipelineDrop, useSource } from "./shared";
+import { tr } from "../../i18n";
 
 const ROW = "grid grid-cols-[minmax(0,1fr)_7rem_4.5rem_3.5rem_minmax(0,10rem)_7rem] items-center gap-3";
 
@@ -14,17 +15,18 @@ export function PipelineList() {
   const { groups, query, scope } = source;
   const collapsed = useCollapsed(scope, "list");
   const dnd = usePipelineDrop();
+  const t = tr(T_PIPELINE);
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-4" onDragEnd={dnd.end}>
       <SourceError />
       <div className={`${ROW} px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-engrave`} aria-hidden>
-        <span>Song</span>
-        <span>Saved</span>
-        <span>BPM</span>
-        <span>Key</span>
-        <span>Tags</span>
-        <span className="text-right">{scope === "crew" ? "Who" : "Mixdown"}</span>
+        <span>{t.song}</span>
+        <span>{t.saved}</span>
+        <span>{t.bpm}</span>
+        <span>{t.key}</span>
+        <span>{t.tags}</span>
+        <span className="text-right">{scope === "crew" ? t.who : t.mixdown}</span>
       </div>
       <div className="flex flex-col gap-3">
         {groups.map(({ column, items }, colIndex) => {
@@ -42,7 +44,7 @@ export function PipelineList() {
               <ColumnHeader column={column} count={items.length} view="list" collapsed={isCollapsed} className="px-3 py-2" />
               {!isCollapsed && (
                 <div role="list" className="flex flex-col gap-px px-1.5 pb-1.5">
-                  {items.length === 0 && <div className="px-3 py-2 text-xs text-engrave">Nothing here. Drag a song in.</div>}
+                  {items.length === 0 && <div className="px-3 py-2 text-xs text-engrave">{t.emptyColumn}</div>}
                   {items.map((item, i) => (
                     <Fragment key={item.key}>
                       {dnd.spot?.columnId === column.id && dnd.spot.beforeKey === item.key && <DropLine />}
@@ -63,7 +65,7 @@ export function PipelineList() {
                         <span className="text-xs text-engrave">{item.savedMs ? formatRelative(item.savedMs) : "—"}</span>
                         <span className="font-mono text-xs text-body">{formatBpm(item.bpm)}</span>
                         <span className="font-mono text-xs text-body">{item.musicalKey || "—"}</span>
-                        <span className="truncate text-xs text-engrave">{item.tags.map((t) => `#${t}`).join(" ")}</span>
+                        <span className="truncate text-xs text-engrave">{item.tags.map((tag) => `#${tag}`).join(" ")}</span>
                         <span className="flex justify-end truncate text-xs text-body">{item.extra}</span>
                       </div>
                     </Fragment>

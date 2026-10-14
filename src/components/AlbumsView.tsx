@@ -7,6 +7,84 @@ import type { Album, AlbumKind, ProjectInfo, Workspace } from "../types";
 import { ConfirmButton, Modal, StatusDot, StatusSelect, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { MixdownBadge, Stat } from "../ui";
 import { ReleaseShare } from "./CrewPanel";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  {
+    title: "Albums & releases",
+    newRelease: "New release",
+    releaseTitle: "Release title",
+    create: "Create",
+    cancel: "Cancel",
+    empty: "No releases yet. Create one and add songs from your library.",
+    cardLine: (tracks: number, done: number) => `${tracks} track${tracks === 1 ? "" : "s"} · ${done} done`,
+    allReleases: "All releases",
+    coverColor: (color: string) => `Cover color ${color}`,
+    releaseDate: "Release date",
+    released: (when: string) => `released ${when}`,
+    releasing: (when: string) => `release ${when}`,
+    tracks: "Tracks",
+    done: "Done",
+    mixdownsCurrent: "Mixdowns current",
+    bpmRange: "BPM range",
+    tracklist: "Tracklist",
+    addSongs: "Add songs",
+    newSong: "New song for this release",
+    packageHint:
+      "Zip every track with its samples into <export folder>/Packages/<release title> — for a mix engineer, a collaborator, or archiving",
+    packageRelease: "Package release",
+    exportHint: "Render every track, numbered, into <export folder>/<release title>",
+    exportRelease: "Export release",
+    noTracks: "No tracks yet — add songs from your library.",
+    missing: (file: string) => `Missing: ${file} (moved or renamed?)`,
+    removeTrack: "Remove from release",
+    notes: "Notes",
+    notesPlaceholder: "Concept, artwork ideas, features, release plan…",
+    deleteRelease: "Delete release",
+    deleteConfirm: "Delete? The songs themselves are kept. Click again",
+    addTo: (title: string) => `Add songs to ${title}`,
+    search: "Search songs",
+    nothing: "Nothing to add",
+    addPicked: (n: number) => `Add ${n || ""} song${n === 1 ? "" : "s"}`,
+  },
+  {
+    title: "Albums et sorties",
+    newRelease: "Nouvelle sortie",
+    releaseTitle: "Titre de la sortie",
+    create: "Créer",
+    cancel: "Annuler",
+    empty: "Pas encore de sortie. Crées-en une et ajoute des sons depuis ta bibliothèque.",
+    cardLine: (tracks: number, done: number) => `${tracks} morceau${tracks === 1 ? "" : "x"} · ${done} fini${done > 1 ? "s" : ""}`,
+    allReleases: "Toutes les sorties",
+    coverColor: (color: string) => `Couleur de cover ${color}`,
+    releaseDate: "Date de sortie",
+    released: (when: string) => `sortie ${when}`,
+    releasing: (when: string) => `sortie ${when}`,
+    tracks: "Morceaux",
+    done: "Finis",
+    mixdownsCurrent: "Mixdowns à jour",
+    bpmRange: "Plage de BPM",
+    tracklist: "Tracklist",
+    addSongs: "Ajouter des sons",
+    newSong: "Nouveau son pour cette sortie",
+    packageHint:
+      "Zippe chaque morceau avec ses samples dans <dossier d'export>/Packages/<titre de la sortie> — pour un ingé mix, un collab ou pour archiver",
+    packageRelease: "Faire le pack zip",
+    exportHint: "Fait le rendu de chaque morceau, numéroté, dans <dossier d'export>/<titre de la sortie>",
+    exportRelease: "Exporter la sortie",
+    noTracks: "Pas encore de morceaux — ajoute des sons depuis ta bibliothèque.",
+    missing: (file: string) => `Introuvable : ${file} (déplacé ou renommé ?)`,
+    removeTrack: "Retirer de la sortie",
+    notes: "Notes",
+    notesPlaceholder: "Concept, idées de visuels, feats, plan de sortie…",
+    deleteRelease: "Supprimer la sortie",
+    deleteConfirm: "Supprimer ? Les sons eux-mêmes sont gardés. Clique encore",
+    addTo: (title: string) => `Ajouter des sons à ${title}`,
+    search: "Chercher des sons",
+    nothing: "Rien à ajouter",
+    addPicked: (n: number) => (n === 0 ? "Ajouter des sons" : `Ajouter ${n} son${n === 1 ? "" : "s"}`),
+  },
+);
 
 const KINDS: { id: AlbumKind; label: string }[] = [
   { id: "album", label: "Album" },
@@ -37,17 +115,18 @@ function AlbumGrid() {
   const createAlbum = useAppStore((s) => s.createAlbum);
   const openAlbum = useAppStore((s) => s.openAlbum);
   const [draft, setDraft] = useState<string | null>(null);
+  const t = tr(T);
 
   return (
     <div className="flex-1 overflow-auto px-8 py-8">
       <div className="mx-auto max-w-5xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">Albums & releases</h1>
+            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">{t.title}</h1>
           </div>
           {draft === null && (
             <button onClick={() => setDraft("")} className={btnPrimary}>
-              <Plus size={14} /> New release
+              <Plus size={14} /> {t.newRelease}
             </button>
           )}
         </div>
@@ -62,12 +141,12 @@ function AlbumGrid() {
               openAlbum(id);
             }}
           >
-            <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Release title" className={input} />
+            <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t.releaseTitle} className={input} />
             <button type="submit" className={btnPrimary}>
-              Create
+              {t.create}
             </button>
             <button type="button" onClick={() => setDraft(null)} className={btn}>
-              Cancel
+              {t.cancel}
             </button>
           </form>
         )}
@@ -75,7 +154,7 @@ function AlbumGrid() {
         {workspace.albums.length === 0 && draft === null ? (
           <div className="mt-16 flex flex-col items-center gap-2 text-center text-engrave">
             <Disc3 size={32} />
-            <div className="text-sm">No releases yet. Create one and add songs from your library.</div>
+            <div className="text-sm">{t.empty}</div>
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-4">
@@ -110,7 +189,7 @@ function AlbumCard({
         <div className="shrink-0 text-[11px]  text-engrave">{kindLabel(album.kind)}</div>
       </div>
       <div className="mt-0.5 text-xs text-engrave">
-        {tracks.length} track{tracks.length === 1 ? "" : "s"} · {done} done
+        {tr(T).cardLine(tracks.length, done)}
         {album.releaseDate && ` · ${formatRelative(new Date(album.releaseDate).getTime())}`}
       </div>
       <div className="mt-2">
@@ -181,6 +260,7 @@ function AlbumDetail({ album }: { album: Album }) {
   const mixed = present.filter((t) => renderFreshness(t) === "fresh").length;
   const bpms = present.map((t) => t.tempoBpm).filter((b): b is number => b != null);
   const releaseMs = album.releaseDate ? new Date(album.releaseDate).getTime() : null;
+  const t = tr(T);
 
   async function exportAlbum() {
     setError(null);
@@ -201,7 +281,7 @@ function AlbumDetail({ album }: { album: Album }) {
     <div className="min-w-0 flex-1 overflow-auto px-8 py-6">
       <div className="mx-auto max-w-4xl">
         <button onClick={() => openAlbum(null)} className="flex items-center gap-1 text-xs text-engrave hover:text-cream">
-          <ArrowLeft size={13} /> All releases
+          <ArrowLeft size={13} /> {t.allReleases}
         </button>
 
         <div className="mt-4 flex gap-6">
@@ -214,7 +294,7 @@ function AlbumDetail({ album }: { album: Album }) {
                   onClick={() => updateAlbum(album.id, { color: c })}
                   className={`h-5 w-5 rounded-full ${album.color === c ? "ring-2 ring-cream ring-offset-2 ring-offset-chassis" : ""}`}
                   style={{ background: c }}
-                  aria-label={`Cover color ${c}`}
+                  aria-label={t.coverColor(c)}
                 />
               ))}
             </div>
@@ -241,7 +321,7 @@ function AlbumDetail({ album }: { album: Album }) {
             />
             <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-engrave">
               <label className="flex items-center gap-1.5">
-                <span className="text-engrave">Release date</span>
+                <span className="text-engrave">{t.releaseDate}</span>
                 <input
                   type="date"
                   value={album.releaseDate ?? ""}
@@ -251,18 +331,18 @@ function AlbumDetail({ album }: { album: Album }) {
               </label>
               {releaseMs && (
                 <span className={releaseMs < Date.now() ? "text-engrave" : "text-orange-300"}>
-                  {releaseMs < Date.now() ? "released" : "release"} {formatRelative(releaseMs)}
+                  {releaseMs < Date.now() ? t.released(formatRelative(releaseMs)) : t.releasing(formatRelative(releaseMs))}
                 </span>
               )}
             </div>
             <ReleaseShare albumId={album.id} />
 
             <div className="mt-4 grid grid-cols-4 gap-2">
-              <Stat label="Tracks" value={String(album.trackPaths.length)} />
-              <Stat label="Done" value={`${done}/${album.trackPaths.length}`} />
-              <Stat label="Mixdowns current" value={`${mixed}/${present.length}`} />
+              <Stat label={t.tracks} value={String(album.trackPaths.length)} />
+              <Stat label={t.done} value={`${done}/${album.trackPaths.length}`} />
+              <Stat label={t.mixdownsCurrent} value={`${mixed}/${present.length}`} />
               <Stat
-                label="BPM range"
+                label={t.bpmRange}
                 value={bpms.length ? `${formatBpm(Math.min(...bpms))}–${formatBpm(Math.max(...bpms))}` : "—"}
               />
             </div>
@@ -284,13 +364,13 @@ function AlbumDetail({ album }: { album: Album }) {
         </div>
 
         <div className="mt-8 flex items-center gap-2">
-          <div className={sectionLabel}>Tracklist</div>
+          <div className={sectionLabel}>{t.tracklist}</div>
           <div className="ml-auto flex gap-2">
             <button onClick={() => setPicking(true)} className={btn}>
-              <Plus size={14} /> Add songs
+              <Plus size={14} /> {t.addSongs}
             </button>
             <button onClick={() => openNewProject({ albumId: album.id, status: "creation" })} className={btn}>
-              <Plus size={14} /> New song for this release
+              <Plus size={14} /> {t.newSong}
             </button>
             <button
               onClick={() =>
@@ -300,17 +380,17 @@ function AlbumDetail({ album }: { album: Album }) {
               }
               disabled={demoMode || packaging || present.length === 0}
               className={btn}
-              title="Zip every track with its samples into <export folder>/Packages/<release title> — for a mix engineer, a collaborator, or archiving"
+              title={t.packageHint}
             >
-              <Package size={14} /> Package release
+              <Package size={14} /> {t.packageRelease}
             </button>
             <button
               onClick={exportAlbum}
               disabled={demoMode || rendering || present.length === 0}
               className={btnPrimary}
-              title="Render every track, numbered, into <export folder>/<release title>"
+              title={t.exportHint}
             >
-              <Download size={14} /> Export release
+              <Download size={14} /> {t.exportRelease}
             </button>
           </div>
         </div>
@@ -320,7 +400,7 @@ function AlbumDetail({ album }: { album: Album }) {
 
         <div className="mt-3 overflow-hidden rounded-lg border border-rule">
           {tracks.length === 0 && (
-            <div className="px-4 py-8 text-center text-sm text-engrave">No tracks yet — add songs from your library.</div>
+            <div className="px-4 py-8 text-center text-sm text-engrave">{t.noTracks}</div>
           )}
           {tracks.map((t, i) => {
             const path = album.trackPaths[i];
@@ -353,10 +433,10 @@ function AlbumDetail({ album }: { album: Album }) {
                   </>
                 ) : (
                   <span className="flex-1 truncate text-engrave" title={path}>
-                    Missing: {path.split(/[/\\]/).pop()} (moved or renamed?)
+                    {tr(T).missing(path.split(/[/\\]/).pop() ?? "")}
                   </span>
                 )}
-                <button onClick={() => removeTrack(album.id, path)} title="Remove from release" className="text-body opacity-0 hover:text-cream group-hover:opacity-100">
+                <button onClick={() => removeTrack(album.id, path)} title={tr(T).removeTrack} className="text-body opacity-0 hover:text-cream group-hover:opacity-100">
                   <X size={14} />
                 </button>
               </div>
@@ -364,11 +444,11 @@ function AlbumDetail({ album }: { album: Album }) {
           })}
         </div>
 
-        <div className={`${sectionLabel} mt-8`}>Notes</div>
+        <div className={`${sectionLabel} mt-8`}>{t.notes}</div>
         <textarea
           value={album.notes}
           onChange={(e) => updateAlbum(album.id, { notes: e.target.value })}
-          placeholder="Concept, artwork ideas, features, release plan…"
+          placeholder={t.notesPlaceholder}
           rows={4}
           className={`${input} mt-2 resize-y text-sm`}
         />
@@ -377,10 +457,10 @@ function AlbumDetail({ album }: { album: Album }) {
           <ConfirmButton
             label={
               <>
-                <Trash2 size={13} /> Delete release
+                <Trash2 size={13} /> {t.deleteRelease}
               </>
             }
-            confirmLabel="Delete? The songs themselves are kept. Click again"
+            confirmLabel={t.deleteConfirm}
             onConfirm={() => deleteAlbum(album.id)}
             className={`${btn} text-xs`}
           />
@@ -405,12 +485,13 @@ function TrackPicker({ album, onClose }: { album: Album; onClose: () => void }) 
       (p) => !p.isTemplate && !album.trackPaths.includes(p.path) && (!q || p.name.toLowerCase().includes(q)),
     );
   }, [projects, album.trackPaths, query]);
+  const t = tr(T);
 
   return (
-    <Modal title={`Add songs to ${album.title}`} onClose={onClose}>
+    <Modal title={t.addTo(album.title)} onClose={onClose}>
       <div className="relative">
         <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-engrave" />
-        <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search songs" className={`${input} pl-8`} />
+        <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search} className={`${input} pl-8`} />
       </div>
       <div className="mt-3 max-h-80 overflow-auto">
         {candidates.map((p) => {
@@ -431,11 +512,11 @@ function TrackPicker({ album, onClose }: { album: Album; onClose: () => void }) 
             </label>
           );
         })}
-        {candidates.length === 0 && <div className="py-6 text-center text-sm text-engrave">Nothing to add</div>}
+        {candidates.length === 0 && <div className="py-6 text-center text-sm text-engrave">{t.nothing}</div>}
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button onClick={onClose} className={btn}>
-          Cancel
+          {t.cancel}
         </button>
         <button
           disabled={picked.length === 0}
@@ -445,7 +526,7 @@ function TrackPicker({ album, onClose }: { album: Album; onClose: () => void }) 
           }}
           className={btnPrimary}
         >
-          Add {picked.length || ""} song{picked.length === 1 ? "" : "s"}
+          {t.addPicked(picked.length)}
         </button>
       </div>
     </Modal>

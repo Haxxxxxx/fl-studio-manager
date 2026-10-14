@@ -7,7 +7,8 @@ import { crewEdits, crewPipeline, groupCrewSongs } from "../../lib/crewBoard";
 import { pathsByShareId } from "../../lib/crewSync";
 import { formatRelative } from "../../lib/format";
 import type { CrewSongRow, PipelineConfig } from "../../types";
-import type { PipelineItem, PipelineSource } from "./shared";
+import { T_PIPELINE, type PipelineItem, type PipelineSource } from "./shared";
+import { tr } from "../../i18n";
 
 // The crew's pipeline: every song the crew shares, in the crew's columns
 // (crew_columns on the server, the same on the website). The owner edits
@@ -47,10 +48,11 @@ export function useCrewSource(): PipelineSource {
       setError(null);
       saveCrewColumns(next).catch(fail);
     };
+    const t = tr(T_PIPELINE);
     const item = (s: CrewSongRow): PipelineItem => {
       const mine = s.owner_id === userId;
       const path = mine ? localPath.get(s.id) : undefined;
-      const who = mine ? "You" : (nameOf.get(s.owner_id) ?? "Crewmate");
+      const who = mine ? t.you : (nameOf.get(s.owner_id) ?? t.crewmate);
       return {
         key: s.id,
         title: s.title,
@@ -66,15 +68,15 @@ export function useCrewSource(): PipelineSource {
               {s.musical_key && <span>· {s.musical_key}</span>}
             </div>
             <div className="mt-1 flex items-center gap-2 text-[10px] text-engrave">
-              {s.last_saved_at && <span>saved {formatRelative(Date.parse(s.last_saved_at))}</span>}
-              {s.release_date && <span>· out {s.release_date}</span>}
+              {s.last_saved_at && <span>{t.savedAgo(formatRelative(Date.parse(s.last_saved_at)))}</span>}
+              {s.release_date && <span>{t.out(s.release_date)}</span>}
               <span className="ml-auto flex items-center gap-1">
-                {s.has_mixdown && <Disc3 size={10} aria-label="Has a mixdown" />}
-                {s.kit_accepted && <CheckCircle2 size={10} className="text-emerald-300/80" aria-label="Launch Kit accepted" />}
+                {s.has_mixdown && <Disc3 size={10} aria-label={t.hasMixdown} />}
+                {s.kit_accepted && <CheckCircle2 size={10} className="text-emerald-300/80" aria-label={t.kitAccepted} />}
               </span>
             </div>
             {s.stage_updated_by && s.stage_updated_by !== s.owner_id && (
-              <div className="mt-1 text-[10px] text-engrave">moved by {s.stage_updated_by === userId ? "you" : (nameOf.get(s.stage_updated_by) ?? "a crewmate")}</div>
+              <div className="mt-1 text-[10px] text-engrave">{t.movedBy(s.stage_updated_by === userId ? t.youLower : (nameOf.get(s.stage_updated_by) ?? t.aCrewmate))}</div>
             )}
           </>
         ),
