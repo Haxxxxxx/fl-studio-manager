@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -41,9 +40,6 @@ import { Card, HeroStat, SongLines, StatTile } from "../ui";
 // "stage" and orange "needs you". Storage is part-to-whole over four
 // categories in fixed order, backed by direct labels in the legend.
 const STORAGE_COLORS = ["#f2efe8", "#8d897f", "#5a5850", "#c98500"];
-const SERIES_1 = "#c9c5bb";
-const AXIS_COLOR = "#8d897f";
-const GRID_COLOR = "#2c2b27";
 // Activity heatmap: one hue (the app accent), stepped by opacity over the surface.
 const HEAT = ["#1f1f1c", "rgba(255,90,31,0.32)", "rgba(255,90,31,0.55)", "rgba(255,90,31,0.8)", "#ff5a1f"];
 
@@ -99,21 +95,6 @@ function MyDashboard() {
     ];
   }, [songs]);
   const storageTotal = storage.reduce((t, s) => t + s.bytes, 0);
-
-  const tempo = useMemo(() => {
-    const bins = new Map<number, number>();
-    for (const p of songs) {
-      if (p.tempoBpm == null) continue;
-      const bin = Math.floor(p.tempoBpm / 10) * 10;
-      bins.set(bin, (bins.get(bin) ?? 0) + 1);
-    }
-    if (bins.size === 0) return [];
-    const lo = Math.min(...bins.keys());
-    const hi = Math.max(...bins.keys());
-    const out = [];
-    for (let b = lo; b <= hi; b += 10) out.push({ label: `${b}–${b + 9}`, count: bins.get(b) ?? 0 });
-    return out;
-  }, [songs]);
 
   if (songs.length === 0) {
     if (!demoMode && watchedFolders.length === 0) return <EmptyLibrary />;
@@ -236,27 +217,6 @@ function MyDashboard() {
             )}
           </Card>
 
-          <Card title="Tempo — songs per 10 BPM">
-            {tempo.length ? (
-              <ResponsiveContainer width="100%" height={190}>
-                <BarChart data={tempo} margin={{ left: -18, right: 4, top: 4, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-                  <XAxis dataKey="label" tick={{ fill: AXIS_COLOR, fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fill: AXIS_COLOR, fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip content={<TempoTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-                  <Bar dataKey="count" fill={SERIES_1} radius={[4, 4, 0, 0]} maxBarSize={22} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="py-10 text-center text-xs text-engrave">No tempo data</div>
-            )}
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Card title="Plugin toolkit — songs using each">
-            <PluginToolkit />
-          </Card>
           <Card title="Will this computer open your songs?">
             <HealthCard />
           </Card>
@@ -576,60 +536,6 @@ function useShowSongsWithPlugin() {
   };
 }
 
-function PluginToolkit() {
-  const stats = usePluginStats();
-  const showSongs = useShowSongsWithPlugin();
-  const [thirdPartyOnly, setThirdPartyOnly] = useState(true);
-  const list = stats.filter((s) => !thirdPartyOnly || s.thirdParty).slice(0, 10);
-  const max = Math.max(1, ...list.map((s) => s.count));
-  if (!stats.length) return <div className="py-6 text-center text-xs text-engrave">No plugin data</div>;
-  return (
-    <div>
-      <div className="mb-2 flex gap-1 text-[11px]">
-        {[
-          [true, "Third-party"],
-          [false, "All"],
-        ].map(([value, label]) => (
-          <button
-            key={String(value)}
-            onClick={() => setThirdPartyOnly(value as boolean)}
-            className={`rounded-full px-2 py-0.5 ${thirdPartyOnly === value ? "bg-rule-strong text-cream" : "text-body hover:bg-raised"}`}
-          >
-            {label as string}
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-col gap-1">
-        {list.map((s) => (
-          <button
-            key={s.name}
-            onClick={() => showSongs(s.name)}
-            title={`Show the ${s.count} songs using ${s.name}`}
-            className="group flex items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-panel"
-          >
-            <span className={`flex w-36 shrink-0 items-center gap-1 truncate text-xs ${s.missing ? "text-red-300" : "text-body"}`}>
-              {s.missing && <AlertTriangle size={11} className="shrink-0" />}
-              <span className="truncate">{s.name}</span>
-            </span>
-            <span className="flex h-3 flex-1 items-center">
-              <span
-                className="h-full rounded-r"
-                style={{ width: `${(s.count / max) * 100}%`, minWidth: 3, background: s.missing ? CRITICAL : SERIES_1 }}
-              />
-            </span>
-            <span className="w-6 text-right text-xs tabular-nums text-body">{s.count}</span>
-          </button>
-        ))}
-      </div>
-      {list.some((s) => s.missing) && (
-        <div className="mt-2 flex items-center gap-1 text-[10px] text-engrave">
-          <AlertTriangle size={10} className="text-red-300" /> Not installed on this computer
-        </div>
-      )}
-    </div>
-  );
-}
-
 function HealthCard() {
   const songs = useVisibleSongs();
   const stats = usePluginStats();
@@ -724,18 +630,6 @@ function HealthCard() {
           </span>
         </div>
       )}
-    </div>
-  );
-}
-
-function TempoTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-md border border-rule bg-chassis px-3 py-2 text-xs shadow-xl">
-      <div className="text-engrave">{label} BPM</div>
-      <div className="mt-0.5 font-medium text-cream">
-        {payload[0].value} song{payload[0].value === 1 ? "" : "s"}
-      </div>
     </div>
   );
 }
