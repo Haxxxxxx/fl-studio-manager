@@ -4,16 +4,92 @@ import { useAppStore } from "../store/useAppStore";
 import { detectedPeople } from "../lib/people";
 import type { PitchOutcome, ProjectInfo } from "../types";
 import { btn, input } from "./ui";
+import { dict, tr } from "../i18n";
 
+const T = dict(
+  {
+    name: "Name",
+    newPerson: "+ New person…",
+    unknown: "Unknown",
+    splitTitle: "Agreed split (%)",
+    splitsOver: (n: number) => `Splits add up to ${n}%.`,
+    inSession: "In this session:",
+    suggestTitle: "Found in the song's mixer/recording track names — click to credit",
+    creditSomeone: "Credit someone",
+    notSent: "Not sent to anyone yet.",
+    notePlaceholder: "Note (feedback, price, link…)",
+    logSend: "Log a send",
+  },
+  {
+    name: "Nom",
+    newPerson: "+ Nouvelle personne…",
+    unknown: "Inconnu",
+    splitTitle: "Répartition convenue (%)",
+    splitsOver: (n: number) => `Les répartitions font ${n} %.`,
+    inSession: "Dans cette session :",
+    suggestTitle: "Trouvé dans les noms de pistes du mixer ou des prises du son — clique pour créditer",
+    creditSomeone: "Créditer quelqu'un",
+    notSent: "Envoyé à personne pour l'instant.",
+    notePlaceholder: "Note (retour, prix, lien…)",
+    logSend: "Noter un envoi",
+  },
+);
+
+// Roles are stored as these English words (they're data: shared with the
+// crew, used by the Launch Kit); only what's shown is translated.
 export const ROLES = ["Producer", "Co-producer", "Vocals", "Feature", "Writer", "Mix", "Master", "Engineer", "Other"];
 
+const T_ROLES = dict(
+  {
+    Producer: "Producer",
+    "Co-producer": "Co-producer",
+    Vocals: "Vocals",
+    Feature: "Feature",
+    Writer: "Writer",
+    Mix: "Mix",
+    Master: "Master",
+    Engineer: "Engineer",
+    Other: "Other",
+  },
+  {
+    Producer: "Prod",
+    "Co-producer": "Coprod",
+    Vocals: "Voix",
+    Feature: "Feat",
+    Writer: "Auteur",
+    Mix: "Mix",
+    Master: "Master",
+    Engineer: "Ingé son",
+    Other: "Autre",
+  },
+);
+
+/** A credit role as shown (custom roles stay as typed). */
+export function roleLabel(role: string): string {
+  const t = tr(T_ROLES) as Record<string, string>;
+  return Object.prototype.hasOwnProperty.call(t, role) ? t[role] : role;
+}
+
+const T_OUTCOMES = dict(
+  { sent: "Sent", listened: "Listened", interested: "Interested", placed: "Placed", sold: "Sold", passed: "Passed" },
+  { sent: "Envoyé", listened: "Écouté", interested: "Intéressé", placed: "Placé", sold: "Vendu", passed: "Refusé" },
+);
+
+const outcome = (id: PitchOutcome, tone: string) => ({
+  id,
+  tone,
+  get label() {
+    return tr(T_OUTCOMES)[id];
+  },
+});
+
 export const OUTCOMES: { id: PitchOutcome; label: string; tone: string }[] = [
-  { id: "sent", label: "Sent", tone: "text-body" },
-  { id: "listened", label: "Listened", tone: "text-body" },
-  { id: "interested", label: "Interested", tone: "text-sky-300" },
-  { id: "placed", label: "Placed", tone: "text-emerald-300" },
-  { id: "sold", label: "Sold", tone: "text-emerald-300" },
-  { id: "passed", label: "Passed", tone: "text-engrave" },
+  outcome("sent", "text-body"),
+  outcome("listened", "text-body"),
+  outcome("interested", "text-sky-300"),
+  outcome("placed", "text-emerald-300"),
+  outcome("sold", "text-emerald-300"),
+  outcome("passed", "text-engrave"),
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -38,7 +114,7 @@ function PersonPicker({ onPick, label }: { onPick: (personId: string) => void; l
           setNaming(false);
         }}
       >
-        <input autoFocus={naming} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={`${input} py-1 text-xs`} />
+        <input autoFocus={naming} value={name} onChange={(e) => setName(e.target.value)} placeholder={tr(T).name} className={`${input} py-1 text-xs`} />
         <button type="submit" className={`${btn} py-1 text-xs`}>
           {label}
         </button>
@@ -64,7 +140,7 @@ function PersonPicker({ onPick, label }: { onPick: (personId: string) => void; l
             {p.name}
           </option>
         ))}
-        <option value="__new">+ New person…</option>
+        <option value="__new">{tr(T).newPerson}</option>
       </select>
     </label>
   );
@@ -84,6 +160,7 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
     if (!credits.some((c) => c.personId === personId)) setCredits([...credits, { personId, role }]);
   };
   const splitTotal = credits.reduce((t, c) => t + (c.split ?? 0), 0);
+  const t = tr(T);
 
   return (
     <div>
@@ -91,7 +168,7 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
         {credits.map((c, i) => (
           <div key={c.personId} className="flex items-center gap-2 text-xs">
             <button onClick={() => openPerson(c.personId)} className="min-w-0 flex-1 truncate text-left text-cream hover:underline">
-              {byId.get(c.personId)?.name ?? "Unknown"}
+              {byId.get(c.personId)?.name ?? t.unknown}
             </button>
             <select
               value={c.role}
@@ -100,11 +177,11 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
             >
               {ROLES.map((r) => (
                 <option key={r} value={r} className="bg-raised">
-                  {r}
+                  {roleLabel(r)}
                 </option>
               ))}
             </select>
-            <label className="flex items-center gap-0.5 text-engrave" title="Agreed split (%)">
+            <label className="flex items-center gap-0.5 text-engrave" title={t.splitTitle}>
               <input
                 type="number"
                 min={0}
@@ -128,16 +205,16 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
           </div>
         ))}
       </div>
-      {splitTotal > 100 && <div className="mt-1 text-[11px] text-amber-300">Splits add up to {splitTotal}%.</div>}
+      {splitTotal > 100 && <div className="mt-1 text-[11px] text-amber-300">{t.splitsOver(splitTotal)}</div>}
 
       {suggested.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1">
-          <span className="text-[11px] text-engrave">In this session:</span>
+          <span className="text-[11px] text-engrave">{t.inSession}</span>
           {suggested.map((p) => (
             <button
               key={p.id}
               onClick={() => add(p.id)}
-              title="Found in the song's mixer/recording track names — click to credit"
+              title={t.suggestTitle}
               className="rounded-full border border-dashed border-rule-strong px-2 py-0.5 text-[11px] text-body hover:border-engrave hover:text-cream"
             >
               + {p.name}
@@ -146,7 +223,7 @@ export function SongCredits({ project }: { project: ProjectInfo }) {
         </div>
       )}
       <div className="mt-2">
-        <PersonPicker label="Credit someone" onPick={(id) => add(id, "Feature")} />
+        <PersonPicker label={t.creditSomeone} onPick={(id) => add(id, "Feature")} />
       </div>
     </div>
   );
@@ -161,10 +238,11 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
   const openPerson = useAppStore((s) => s.openPerson);
   const byId = new Map(people.map((p) => [p.id, p]));
   const sorted = [...pitches].sort((a, b) => b.date.localeCompare(a.date));
+  const t = tr(T);
 
   return (
     <div>
-      {sorted.length === 0 && <div className="mb-2 text-xs text-engrave">Not sent to anyone yet.</div>}
+      {sorted.length === 0 && <div className="mb-2 text-xs text-engrave">{t.notSent}</div>}
       <div className="flex flex-col gap-1.5">
         {sorted.map((p) => {
           const outcome = OUTCOMES.find((o) => o.id === p.outcome);
@@ -173,7 +251,7 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
               <div className="flex items-center gap-2">
                 <Send size={11} className="shrink-0 text-engrave" />
                 <button onClick={() => openPerson(p.personId)} className="min-w-0 flex-1 truncate text-left text-cream hover:underline">
-                  {byId.get(p.personId)?.name ?? "Unknown"}
+                  {byId.get(p.personId)?.name ?? t.unknown}
                 </button>
                 <input
                   type="date"
@@ -199,7 +277,7 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
               <input
                 value={p.note ?? ""}
                 onChange={(e) => updatePitch(project.path, p.id, { note: e.target.value })}
-                placeholder="Note (feedback, price, link…)"
+                placeholder={t.notePlaceholder}
                 className="ml-5 mt-0.5 w-[calc(100%-1.25rem)] bg-transparent text-[11px] text-engrave placeholder:text-engrave focus:outline-none"
               />
             </div>
@@ -207,7 +285,7 @@ export function SongPitches({ project }: { project: ProjectInfo }) {
         })}
       </div>
       <div className="mt-2">
-        <PersonPicker label="Log a send" onPick={(personId) => addPitch(project.path, { personId, date: today(), outcome: "sent" })} />
+        <PersonPicker label={t.logSend} onPick={(personId) => addPitch(project.path, { personId, date: today(), outcome: "sent" })} />
       </div>
     </div>
   );

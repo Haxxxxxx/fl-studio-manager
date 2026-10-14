@@ -6,9 +6,70 @@ import { songsOf, suggestedPeople } from "../lib/people";
 import { statusInfo } from "../lib/songs";
 import type { Person, ProjectInfo } from "../types";
 import { useVisibleSongs } from "./LibraryView";
-import { OUTCOMES } from "./SongPeople";
+import { OUTCOMES, roleLabel } from "./SongPeople";
 import { ConfirmButton, StatusDot, TagEditor, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { Avatar } from "../ui";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  {
+    people: "People",
+    addPerson: "Add person",
+    namePlaceholder: "Name or artist name",
+    add: "Add",
+    cancel: "Cancel",
+    foundInSessions: "Found in your session track names — add who's a real person",
+    songs: (n: number) => `${n} song${n === 1 ? "" : "s"}`,
+    spellingsHint: "Same person under several spellings (NV, Novah…)? Add one, then add the others as aliases on their page.",
+    noPeople: "No people yet.",
+    aka: (names: string) => `aka ${names}`,
+    sent: (n: number, won: number) => `${n} sent${won ? ` · ${won} won` : ""}`,
+    allPeople: "All people",
+    alsoAppearsAs: "Also appears as",
+    aliasHint: "Spellings used in track names (NV, Novah…). Case doesn't matter.",
+    contact: "Contact",
+    contactPlaceholder: "Email, @handle, phone…",
+    notes: "Notes",
+    notesPlaceholder: "What they like, deals, availability…",
+    songsCount: (n: number) => `Songs · ${n}`,
+    notOnAny:
+      "Not on any song yet. Credit them from a song's panel, or add the spelling used in your track names as an alias.",
+    inTrackNames: "in track names",
+    sentToThem: (n: number) => `Sent to them · ${n}`,
+    logHint: 'Log a send from any song\'s panel ("Sent to").',
+    removePerson: "Remove person",
+    confirmRemove: "Also removes their credits and send log. Click again",
+  },
+  {
+    people: "Personnes",
+    addPerson: "Ajouter une personne",
+    namePlaceholder: "Nom ou nom d'artiste",
+    add: "Ajouter",
+    cancel: "Annuler",
+    foundInSessions: "Trouvés dans les noms de pistes de tes sessions — ajoute ceux qui sont de vraies personnes",
+    songs: (n: number) => `${n} son${n === 1 ? "" : "s"}`,
+    spellingsHint:
+      "La même personne sous plusieurs orthographes (NV, Novah…) ? Ajoutes-en une, puis ajoute les autres comme alias sur sa page.",
+    noPeople: "Personne pour l'instant.",
+    aka: (names: string) => `alias ${names}`,
+    sent: (n: number, won: number) => `${n} envoi${n > 1 ? "s" : ""}${won ? ` · ${won} gagné${won > 1 ? "s" : ""}` : ""}`,
+    allPeople: "Toutes les personnes",
+    alsoAppearsAs: "Apparaît aussi comme",
+    aliasHint: "Orthographes utilisées dans les noms de pistes (NV, Novah…). Majuscules ou pas, peu importe.",
+    contact: "Contact",
+    contactPlaceholder: "E-mail, @pseudo, téléphone…",
+    notes: "Notes",
+    notesPlaceholder: "Ce qu'il ou elle aime, deals, dispos…",
+    songsCount: (n: number) => `Sons · ${n}`,
+    notOnAny:
+      "Sur aucun son pour l'instant. Crédite cette personne depuis le panneau d'un son, ou ajoute en alias l'orthographe utilisée dans tes noms de pistes.",
+    inTrackNames: "dans les noms de pistes",
+    sentToThem: (n: number) => `Envoyé à cette personne · ${n}`,
+    logHint: "Note un envoi depuis le panneau de n'importe quel son (« Envoyé à »).",
+    removePerson: "Supprimer la personne",
+    confirmRemove: "Supprime aussi ses crédits et son historique d'envois. Clique encore",
+  },
+);
 
 export function PeopleView() {
   const openPersonId = useAppStore((s) => s.openPersonId);
@@ -49,17 +110,18 @@ function PeopleList() {
         .sort((a, b) => b.songs + b.pitches.length - (a.songs + a.pitches.length)),
     [workspace, songs, allPitches],
   );
+  const t = tr(T);
 
   return (
     <div className="min-w-0 flex-1 overflow-auto px-8 py-8">
       <div className="mx-auto max-w-4xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">People</h1>
+            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">{t.people}</h1>
           </div>
           {draft === null && (
             <button onClick={() => setDraft("")} className={btnPrimary}>
-              <Plus size={14} /> Add person
+              <Plus size={14} /> {t.addPerson}
             </button>
           )}
         </div>
@@ -74,12 +136,12 @@ function PeopleList() {
               setDraft(null);
             }}
           >
-            <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Name or artist name" className={input} />
+            <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t.namePlaceholder} className={input} />
             <button type="submit" className={btnPrimary}>
-              Add
+              {t.add}
             </button>
             <button type="button" onClick={() => setDraft(null)} className={btn}>
-              Cancel
+              {t.cancel}
             </button>
           </form>
         )}
@@ -87,7 +149,7 @@ function PeopleList() {
         {suggestions.length > 0 && (
           <div className="mt-6 rounded-lg border border-rule bg-panel p-4">
             <div className="flex items-center gap-1.5 text-xs text-body">
-              <Sparkles size={13} className="text-orange-300" /> Found in your session track names — add who's a real person
+              <Sparkles size={13} className="text-orange-300" /> {t.foundInSessions}
             </div>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {suggestions.map((s) => (
@@ -96,12 +158,12 @@ function PeopleList() {
                   onClick={() => createPerson(s.name)}
                   className="rounded-full border border-dashed border-rule-strong px-2.5 py-1 text-xs text-body hover:border-orange-400/50 hover:text-cream"
                 >
-                  + {s.name} <span className="text-engrave">· {s.songs} song{s.songs === 1 ? "" : "s"}</span>
+                  + {s.name} <span className="text-engrave">· {t.songs(s.songs)}</span>
                 </button>
               ))}
             </div>
             <div className="mt-2 text-[11px] text-engrave">
-              Same person under several spellings (NV, Novah…)? Add one, then add the others as aliases on their page.
+              {t.spellingsHint}
             </div>
           </div>
         )}
@@ -109,7 +171,7 @@ function PeopleList() {
         {rows.length === 0 ? (
           <div className="mt-16 flex flex-col items-center gap-2 text-center text-engrave">
             <Users size={32} />
-            <div className="text-sm">No people yet.</div>
+            <div className="text-sm">{t.noPeople}</div>
           </div>
         ) : (
           <div className="mt-6 overflow-hidden rounded-lg border border-rule">
@@ -125,14 +187,14 @@ function PeopleList() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-cream">{person.name}</div>
                     <div className="truncate text-[11px] text-engrave">
-                      {[person.aliases.length ? `aka ${person.aliases.join(", ")}` : "", person.contact].filter(Boolean).join(" · ") || "—"}
+                      {[person.aliases.length ? t.aka(person.aliases.join(", ")) : "", person.contact].filter(Boolean).join(" · ") || "—"}
                     </div>
                   </div>
                   <div className="w-20 text-right text-xs text-body">
-                    {n} song{n === 1 ? "" : "s"}
+                    {t.songs(n)}
                   </div>
                   <div className="w-28 text-right text-xs text-body">
-                    {pitches.length ? `${pitches.length} sent${wins ? ` · ${wins} won` : ""}` : "—"}
+                    {pitches.length ? t.sent(pitches.length, wins) : "—"}
                   </div>
                 </button>
               );
@@ -153,12 +215,13 @@ function PersonDetail({ person }: { person: Person }) {
   const openDetail = useAppStore((s) => s.openDetail);
   const pitches = usePitchesOf(person.id);
   const theirSongs = useMemo(() => songsOf(person, songs, workspace), [person, songs, workspace]);
+  const t = tr(T);
 
   return (
     <div className="min-w-0 flex-1 overflow-auto px-8 py-6">
       <div className="mx-auto max-w-3xl">
         <button onClick={() => openPerson(null)} className="flex items-center gap-1 text-xs text-engrave hover:text-cream">
-          <ArrowLeft size={13} /> All people
+          <ArrowLeft size={13} /> {t.allPeople}
         </button>
 
         <div className="mt-4 flex items-center gap-4">
@@ -172,35 +235,35 @@ function PersonDetail({ person }: { person: Person }) {
 
         <div className="mt-6 grid grid-cols-2 gap-4">
           <div>
-            <div className={`${sectionLabel} mb-2`}>Also appears as</div>
+            <div className={`${sectionLabel} mb-2`}>{t.alsoAppearsAs}</div>
             <TagEditor tags={person.aliases} suggestions={[]} onChange={(aliases) => updatePerson(person.id, { aliases })} />
-            <div className="mt-1 text-[11px] text-engrave">Spellings used in track names (NV, Novah…). Case doesn't matter.</div>
+            <div className="mt-1 text-[11px] text-engrave">{t.aliasHint}</div>
           </div>
           <div>
-            <div className={`${sectionLabel} mb-2`}>Contact</div>
+            <div className={`${sectionLabel} mb-2`}>{t.contact}</div>
             <input
               value={person.contact}
               onChange={(e) => updatePerson(person.id, { contact: e.target.value })}
-              placeholder="Email, @handle, phone…"
+              placeholder={t.contactPlaceholder}
               className={`${input} py-1.5 text-xs`}
             />
           </div>
         </div>
 
-        <div className={`${sectionLabel} mt-6 mb-2`}>Notes</div>
+        <div className={`${sectionLabel} mt-6 mb-2`}>{t.notes}</div>
         <textarea
           value={person.notes}
           onChange={(e) => updatePerson(person.id, { notes: e.target.value })}
-          placeholder="What they like, deals, availability…"
+          placeholder={t.notesPlaceholder}
           rows={3}
           className={`${input} resize-y text-xs`}
         />
 
-        <div className={`${sectionLabel} mt-8 mb-2`}>Songs · {theirSongs.length}</div>
+        <div className={`${sectionLabel} mt-8 mb-2`}>{t.songsCount(theirSongs.length)}</div>
         <div className="overflow-hidden rounded-lg border border-rule">
           {theirSongs.length === 0 && (
             <div className="px-4 py-6 text-center text-xs text-engrave">
-              Not on any song yet. Credit them from a song's panel, or add the spelling used in your track names as an alias.
+              {t.notOnAny}
             </div>
           )}
           {theirSongs.map(({ song, credit, detected }) => {
@@ -213,7 +276,7 @@ function PersonDetail({ person }: { person: Person }) {
               >
                 <span className="min-w-0 flex-1 truncate text-cream">{song.name}</span>
                 <span className="text-xs text-engrave">
-                  {credit ? `${credit.role}${credit.split != null ? ` · ${credit.split}%` : ""}` : detected ? "in track names" : ""}
+                  {credit ? `${roleLabel(credit.role)}${credit.split != null ? ` · ${credit.split}%` : ""}` : detected ? t.inTrackNames : ""}
                 </span>
                 <span className="flex w-28 items-center gap-1.5 text-xs text-body">
                   <StatusDot color={s.color} size={6} /> {s.label}
@@ -224,9 +287,9 @@ function PersonDetail({ person }: { person: Person }) {
           })}
         </div>
 
-        <div className={`${sectionLabel} mt-8 mb-2`}>Sent to them · {pitches.length}</div>
+        <div className={`${sectionLabel} mt-8 mb-2`}>{t.sentToThem(pitches.length)}</div>
         {pitches.length === 0 ? (
-          <div className="text-xs text-engrave">Log a send from any song's panel ("Sent to").</div>
+          <div className="text-xs text-engrave">{t.logHint}</div>
         ) : (
           <div className="flex flex-col gap-1">
             {pitches.map(({ song, path, pitch }) => {
@@ -247,10 +310,10 @@ function PersonDetail({ person }: { person: Person }) {
           <ConfirmButton
             label={
               <>
-                <Trash2 size={13} /> Remove person
+                <Trash2 size={13} /> {t.removePerson}
               </>
             }
-            confirmLabel="Also removes their credits and send log. Click again"
+            confirmLabel={t.confirmRemove}
             onConfirm={() => deletePerson(person.id)}
             className={`${btn} text-xs`}
           />
