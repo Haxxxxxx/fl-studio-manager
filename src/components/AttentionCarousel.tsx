@@ -5,6 +5,26 @@ import { dawOf } from "../lib/daws";
 import { formatRelative } from "../lib/format";
 import { statusInfo } from "../lib/songs";
 import { StatusDot } from "../ui";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  {
+    empty: "Nothing needs you right now: mixdowns are current and every song opens cleanly.",
+    count: (n: number) => `${n} song${n === 1 ? "" : "s"}`,
+    previous: "Previous songs",
+    more: "More songs",
+    list: "Songs that need attention",
+    lastActivity: (when: string) => `Last activity ${when}`,
+  },
+  {
+    empty: "Rien à compléter pour l'instant : les mixdowns sont à jour et chaque son s'ouvre sans souci.",
+    count: (n: number) => `${n} son${n === 1 ? "" : "s"}`,
+    previous: "Sons précédents",
+    more: "Plus de sons",
+    list: "Sons qui demandent ton attention",
+    lastActivity: (when: string) => `Dernière activité ${when}`,
+  },
+);
 
 const LEVEL: Record<string, string> = {
   "no-mixdown": "#ff4040",
@@ -42,7 +62,7 @@ export function AttentionCarousel({ items, label, onOpen }: { items: AttentionIt
   };
 
   if (!items.length) {
-    return <div className="text-xs text-engrave">Nothing needs you right now: mixdowns are current and every song opens cleanly.</div>;
+    return <div className="text-xs text-engrave">{tr(T).empty}</div>;
   }
 
   const arrow = "flex h-7 w-7 items-center justify-center rounded border border-rule text-body hover:bg-raised hover:text-cream disabled:opacity-30";
@@ -50,19 +70,19 @@ export function AttentionCarousel({ items, label, onOpen }: { items: AttentionIt
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-xs text-engrave">
         <span className="flex-1">
-          {items.length} song{items.length === 1 ? "" : "s"}
+          {tr(T).count(items.length)}
         </span>
-        <button onClick={() => page(-1)} disabled={edges.start} aria-label="Previous songs" className={arrow}>
+        <button onClick={() => page(-1)} disabled={edges.start} aria-label={tr(T).previous} className={arrow}>
           <ChevronLeft size={14} />
         </button>
-        <button onClick={() => page(1)} disabled={edges.end} aria-label="More songs" className={arrow}>
+        <button onClick={() => page(1)} disabled={edges.end} aria-label={tr(T).more} className={arrow}>
           <ChevronRight size={14} />
         </button>
       </div>
       <div
         ref={row}
         role="list"
-        aria-label="Songs that need attention"
+        aria-label={tr(T).list}
         tabIndex={0}
         onScroll={measure}
         onKeyDown={(e) => {
@@ -97,7 +117,7 @@ export function AttentionCarousel({ items, label, onOpen }: { items: AttentionIt
                     </span>
                   ))}
                 </span>
-                <span className="mt-auto text-[11px] text-engrave">Last activity {formatRelative(i.lastActivityMs)}</span>
+                <span className="mt-auto text-[11px] text-engrave">{tr(T).lastActivity(formatRelative(i.lastActivityMs))}</span>
               </button>
             </div>
           );

@@ -1,4 +1,5 @@
 import type { Album, AlbumKind, ProjectInfo, Workspace } from "../types";
+import { dict, locale, tr } from "../i18n";
 import { parseDate } from "./launchKit";
 import { isFinished } from "./songs";
 
@@ -34,6 +35,28 @@ export interface CalendarEntry {
   checks: CalendarCheck[];
 }
 
+const s = (n: number) => (n === 1 ? "" : "s");
+
+const T = dict(
+  {
+    notFriday: "Not a Friday: new music drops worldwide on Fridays",
+    notFinishedSoon: (n: number) => `${n} track${s(n)} not finished, and it's under a week away`,
+    stillInProgress: (n: number) => `${n} track${s(n)} still in Creation/Production`,
+    kitNotAccepted: (n: number) => `Launch Kit not accepted for ${n} track${s(n)}`,
+    stuckInPrep: (n: number) => `Released, but ${n} track${n === 1 ? " is" : "s are"} still in Prep: move to Release or Promotion`,
+    notFound: (n: number) => `${n} track${s(n)} not found (moved or renamed)`,
+  },
+  {
+    notFriday: "Pas un vendredi : les nouveaux sons sortent partout le vendredi",
+    notFinishedSoon: (n: number) => `${n} morceau${n === 1 ? " pas fini" : "x pas finis"}, et c'est dans moins d'une semaine`,
+    stillInProgress: (n: number) => `${n} morceau${n === 1 ? "" : "x"} encore en Création/Production`,
+    kitNotAccepted: (n: number) => `Launch Kit pas validé pour ${n} morceau${n === 1 ? "" : "x"}`,
+    stuckInPrep: (n: number) =>
+      `Sorti, mais ${n} morceau${n === 1 ? " est" : "x sont"} encore en Prépa : passe-${n === 1 ? "le" : "les"} en Sortie ou Promo`,
+    notFound: (n: number) => `${n} morceau${n === 1 ? " introuvable" : "x introuvables"} (déplacé${s(n)} ou renommé${s(n)})`,
+  },
+);
+
 function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
@@ -42,20 +65,21 @@ function checksFor(e: Omit<CalendarEntry, "checks">, ws: Workspace): CalendarChe
   const out: CalendarCheck[] = [];
   const d = new Date(e.dateMs);
   const total = e.tracks.length;
-  if (e.daysAway >= 0 && d.getDay() !== 5) out.push({ level: "info", message: "Not a Friday: new music drops worldwide on Fridays" });
+  const t = tr(T);
+  if (e.daysAway >= 0 && d.getDay() !== 5) out.push({ level: "info", message: t.notFriday });
   if (e.daysAway >= 0 && e.daysAway < 7 && e.finished < total) {
-    out.push({ level: "warn", message: `${total - e.finished} track${total - e.finished === 1 ? "" : "s"} not finished, and it's under a week away` });
+    out.push({ level: "warn", message: t.notFinishedSoon(total - e.finished) });
   } else if (e.daysAway >= 7 && e.daysAway < 28 && e.finished < total) {
-    out.push({ level: "info", message: `${total - e.finished} track${total - e.finished === 1 ? "" : "s"} still in Creation/Production` });
+    out.push({ level: "info", message: t.stillInProgress(total - e.finished) });
   }
   if (e.daysAway >= 0 && e.daysAway < 14 && e.kitsAccepted < total) {
-    out.push({ level: "warn", message: `Launch Kit not accepted for ${total - e.kitsAccepted} track${total - e.kitsAccepted === 1 ? "" : "s"}` });
+    out.push({ level: "warn", message: t.kitNotAccepted(total - e.kitsAccepted) });
   }
-  const stuckInPrep = e.tracks.filter((t) => ws.songs[t.path]?.status === "prep").length;
+  const stuckInPrep = e.tracks.filter((track) => ws.songs[track.path]?.status === "prep").length;
   if (e.daysAway < 0 && stuckInPrep) {
-    out.push({ level: "info", message: `Released, but ${stuckInPrep} track${stuckInPrep === 1 ? " is" : "s are"} still in Prep: move to Release or Promotion` });
+    out.push({ level: "info", message: t.stuckInPrep(stuckInPrep) });
   }
-  if (e.missingTracks) out.push({ level: "warn", message: `${e.missingTracks} track${e.missingTracks === 1 ? "" : "s"} not found (moved or renamed)` });
+  if (e.missingTracks) out.push({ level: "warn", message: t.notFound(e.missingTracks) });
   return out;
 }
 
@@ -101,5 +125,5 @@ export function buildCalendar(projects: ProjectInfo[], ws: Workspace, today = ne
 
 /** "December 2026" group label. */
 export function monthLabel(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return new Date(ms).toLocaleDateString(locale(), { month: "long", year: "numeric" });
 }

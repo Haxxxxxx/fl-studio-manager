@@ -1,4 +1,5 @@
 import type { ProjectInfo, SongStatus, Workspace } from "../types";
+import { dict, tr } from "../i18n";
 import { isFinished, missingPlugins, missingSamples, renderFreshness } from "./songs";
 
 // The dashboard's "Needs attention" carousel: songs with something to fix,
@@ -19,18 +20,31 @@ export interface AttentionItem {
   lastActivityMs: number;
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const T = dict(
+  {
+    noMixdown: "Finished, but no mixdown yet",
+    staleMixdown: "Mixdown is older than the project",
+    missingSamples: (n: number) => `${n} sample${n === 1 ? "" : "s"} missing`,
+    missingPlugins: (n: number) => `${n} plugin${n === 1 ? "" : "s"} not installed here`,
+  },
+  {
+    noMixdown: "Fini, mais pas encore de mixdown",
+    staleMixdown: "Le mixdown est plus vieux que le projet",
+    missingSamples: (n: number) => `${n} sample${n === 1 ? "" : "s"} manquant${n === 1 ? "" : "s"}`,
+    missingPlugins: (n: number) => `${n} plugin${n === 1 ? "" : "s"} pas installé${n === 1 ? "" : "s"} ici`,
+  },
+);
 
 /** Why a song needs attention, most urgent first; empty if it doesn't. */
 export function attentionReasons(song: ProjectInfo, status: SongStatus | undefined): AttentionReason[] {
   const reasons: AttentionReason[] = [];
   const freshness = renderFreshness(song);
-  if (isFinished(status) && freshness === "none") reasons.push({ kind: "no-mixdown", text: "Finished, but no mixdown yet" });
-  if (freshness === "stale") reasons.push({ kind: "stale-mixdown", text: "Mixdown is older than the project" });
+  if (isFinished(status) && freshness === "none") reasons.push({ kind: "no-mixdown", text: tr(T).noMixdown });
+  if (freshness === "stale") reasons.push({ kind: "stale-mixdown", text: tr(T).staleMixdown });
   const samples = missingSamples(song).length;
-  if (samples) reasons.push({ kind: "missing-samples", text: `${plural(samples, "sample")} missing` });
+  if (samples) reasons.push({ kind: "missing-samples", text: tr(T).missingSamples(samples) });
   const plugins = missingPlugins(song).length;
-  if (plugins) reasons.push({ kind: "missing-plugins", text: `${plural(plugins, "plugin")} not installed here` });
+  if (plugins) reasons.push({ kind: "missing-plugins", text: tr(T).missingPlugins(plugins) });
   return reasons;
 }
 

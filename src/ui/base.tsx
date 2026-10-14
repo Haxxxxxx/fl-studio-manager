@@ -7,6 +7,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { STATUSES, UNSORTED, statusInfo } from "../lib/songs";
 import type { SongStatus } from "../types";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  { remove: (tag: string) => `Remove ${tag}`, addTag: "Add tag…", close: "Close" },
+  { remove: (tag: string) => `Retirer ${tag}`, addTag: "Ajouter un tag…", close: "Fermer" },
+);
 
 /** Small mono caps label, the "engraving" on every panel and field. */
 export const engrave = "font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave";
@@ -82,7 +88,7 @@ export function TagEditor({
         {tags.map((t) => (
           <span key={t} className="flex items-center gap-1.5 rounded border border-rule-strong bg-raised px-2 py-0.5 text-xs text-cream">
             {t}
-            <button onClick={() => onChange(tags.filter((x) => x !== t))} aria-label={`Remove ${t}`} className="text-engrave hover:text-cream">
+            <button onClick={() => onChange(tags.filter((x) => x !== t))} aria-label={tr(T).remove(t)} className="text-engrave hover:text-cream">
               <X size={11} />
             </button>
           </span>
@@ -98,7 +104,7 @@ export function TagEditor({
               onChange(tags.slice(0, -1));
             }
           }}
-          placeholder="Add tag…"
+          placeholder={tr(T).addTag}
           className="min-w-[80px] flex-1 bg-transparent px-1 py-0.5 text-xs text-cream placeholder:text-engrave focus:outline-none"
         />
       </div>
@@ -145,7 +151,7 @@ export function Modal({
       >
         <div className="flex items-center justify-between gap-4 px-5 pb-1 pt-5">
           <h2 className="font-display text-2xl font-bold uppercase leading-none text-cream">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
+          <button onClick={onClose} aria-label={tr(T).close} className="rounded p-1 text-engrave hover:bg-rule hover:text-cream">
             <X size={15} />
           </button>
         </div>
