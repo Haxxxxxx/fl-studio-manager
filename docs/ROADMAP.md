@@ -1,6 +1,6 @@
 # Hivo (formerly FL Manager): Roadmap and status
 
-> Status as of **14 October 2026, evening**. Hard rules for any work: [GUARDRAILS.md](GUARDRAILS.md). This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
+> Status as of **14 October 2026, night**. Hard rules for any work: [GUARDRAILS.md](GUARDRAILS.md). This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
 
 ---
 
@@ -8,7 +8,7 @@
 
 - **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion. It comes with a web dashboard for the crew.
 - **The name.** The app is now **Hivo** (formerly FL Manager), with a hive-cell logo. The rename is merged, the website shows it, and so do the sign-in emails.
-- **Installers.** **v0.2.1** is the latest GitHub release: Mac universal .dmg (signed ad-hoc: opens with "Open Anyway") and Windows setup .exe. Built automatically on the Mac (self-hosted GitHub runner) when a version tag is pushed.
+- **Installers.** **v0.2.2** is the latest GitHub release: Mac universal .dmg (signed ad-hoc: opens with "Open Anyway") and Windows setup .exe. Built automatically on the Mac (self-hosted GitHub runner) when a version tag is pushed.
 - **Phase 0 (stabilize, demo-ready).** Done, except two things: the crew pitch, and cleaning the git history before the repo can go public.
 - **Phase 1 (crew dashboard, Launch Kit, design identity).** Built and merged. Batch 2 (feedback from the first real artist) is merged too: pipeline board/list/table with editable columns, crew menu, solo mode.
 - **Phase 2 (plugins, hardware, distributor integrations).** Not started; ideas only.
@@ -27,14 +27,14 @@
   - web dashboard: Vite on Vercel;
   - crew backend: Supabase in the EU (Ireland).
 - **Tests:**
-  - 115 unit tests for the app logic;
-  - 127 Rust tests for scanning, files, audio and the AI connection;
-  - 104 database tests covering crew rules, privacy, limits and stage versions.
+  - 128 unit tests for the app logic;
+  - 132 Rust tests for scanning, files, audio and the AI connection;
+  - 140 database tests covering crew rules, privacy, limits, stage versions and crew columns.
   - Both builds are clean.
-- **Pull requests:** 61 merged since the start. None open.
+- **Pull requests:** 70 merged since the start. None open.
 - **Live:**
   - crew website: https://www.hi-vo.fr (also still at fl-manager-crew.vercel.app);
-  - installers: GitHub releases (public repo; latest `v0.2.1`: Mac universal .dmg and Windows setup .exe);
+  - installers: GitHub releases (public repo; latest `v0.2.2`: Mac universal .dmg and Windows setup .exe);
   - sign-in emails: sent through Brevo from the hi-vo.fr domain (Supabase custom SMTP);
   - Claude Design project "fl-Manager": holds the 28 synced components, already in the Hivo / System 02 look.
 - **Quality pass done:** a three-part audit (Rust↔app bridge, app wiring, crew backend) found and fixed every broken link between features (PR #24).
@@ -104,7 +104,9 @@
 - Each song is shared only if you choose to. Only facts travel: title (editable for the crew), stage, BPM, key, tags, credits, dates, "has a mixdown", "kit accepted" and the last save date. Audio, file paths, samples, notes and track names never leave your computer through sharing.
 - The optional AI features are the one exception, and say so where they're switched on: the song name, tags, tempo, key, credits and kit text go to Google Gemini (notes only if you turn that on), and a cover prompt goes to Cloudflare.
 - Live updates for everyone, including when a song is unshared or someone leaves.
-- A crew menu at the bottom of the sidebar (crew, role, members, invites, switch crew), and a note saying why nothing syncs when that's the case.
+- A crew section in the menu: Crew board and Crew releases for everyone; Members & invites and Crew settings for the owner. A note says why nothing syncs when that's the case.
+- The crew board is the same board / list / table as yours, in the crew's own columns: the owner renames, adds, removes and reorders them; anyone moves cards. The website shows the same columns and order.
+- Share a whole release (and its tracks) at once; the crew sees it in Crew releases and on the website's Releases tab.
 - Solo mode: until you're in a crew, crew features stay hidden; the Launch Kit is always there.
 - Stage moves never trust anyone's clock: the server keeps a version, and a real clash asks you to choose.
 - A song only disappears from the crew when you unshare it, never because a scan missed it.
