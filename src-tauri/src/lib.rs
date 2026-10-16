@@ -18,6 +18,7 @@ mod sections;
 mod settings;
 mod shorts;
 mod workspace;
+mod youtube;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -65,6 +66,9 @@ pub fn run() {
             cover::set_cover_credentials,
             cover::generate_cover,
             cover::save_cover,
+            youtube::youtube_status,
+            youtube::set_youtube_key,
+            youtube::youtube_search,
             paths::open_project,
             paths::reveal_path,
         ])

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import * as api from "../lib/tauri";
-import type { BeatFile } from "../types";
+import type { BeatFile, YoutubeVideo } from "../types";
 
 // The Digger: raw beats from the beats folders, up to 5 picked to dig for
 // similar ones (docs/GUARDRAILS.md: a deliberate addition for the Creation
@@ -19,6 +19,15 @@ interface DiggerState {
   toggle: (path: string) => void;
   clearPicks: () => void;
   setQuery: (query: string) => void;
+  /** The web search (DigPanel): what was searched and what YouTube gave back. */
+  webQuery: string;
+  results: YoutubeVideo[];
+  searching: boolean;
+  searchError: string | null;
+  /** The query the current `results` answer (null before any search). */
+  searchedFor: string | null;
+  setWebQuery: (q: string) => void;
+  searchYoutube: (q: string) => Promise<void>;
 }
 
 export const useDigger = create<DiggerState>((set, get) => ({
@@ -46,6 +55,26 @@ export const useDigger = create<DiggerState>((set, get) => ({
   },
   clearPicks: () => set({ picked: [] }),
   setQuery: (query) => set({ query }),
+  webQuery: "",
+  results: [],
+  searching: false,
+  searchError: null,
+  searchedFor: null,
+  setWebQuery: (webQuery) => set({ webQuery }),
+  searchYoutube: async (q) => {
+    const query = q.trim();
+    if (!query) return;
+    set({ webQuery: query, searching: true, searchError: null });
+    try {
+      const results = await api.youtubeSearch(query);
+      // A slower, older search must not overwrite a newer one.
+      if (get().webQuery === query) set({ results, searchedFor: query });
+    } catch (e) {
+      if (get().webQuery === query) set({ results: [], searchedFor: null, searchError: e instanceof Error ? e.message : String(e) });
+    } finally {
+      if (get().webQuery === query) set({ searching: false });
+    }
+  },
 }));
 
 /** Beats matching a search (name or folder), every word must match. */

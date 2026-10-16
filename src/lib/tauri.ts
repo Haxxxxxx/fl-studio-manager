@@ -16,6 +16,8 @@ import type {
   TemplateInfo,
   Workspace,
   BeatFile,
+  YoutubeStatus,
+  YoutubeVideo,
 } from "../types";
 
 /** Scans the linked folders and export folder saved in Settings (Rust reads them). */
@@ -45,6 +47,12 @@ export const pickOutputFolder = (): Promise<Settings> => invoke("pick_output_fol
 export const pickBeatFolder = (): Promise<Settings> => invoke("pick_beat_folder");
 export const removeBeatFolder = (folder: string): Promise<Settings> => invoke("remove_beat_folder", { folder });
 export const scanBeats = (): Promise<BeatFile[]> => invoke("scan_beats");
+/** Whether a YouTube Data API key is set (the key itself never comes back). */
+export const youtubeStatus = (): Promise<YoutubeStatus> => invoke("youtube_status");
+/** Saves (or, with null, removes) the YouTube key. */
+export const setYoutubeKey = (key: string | null): Promise<void> => invoke("set_youtube_key", { key });
+/** YouTube music-video search (Rust side, cached for a few hours). */
+export const youtubeSearch = (query: string): Promise<YoutubeVideo[]> => invoke("youtube_search", { query });
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
 export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
 export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");
