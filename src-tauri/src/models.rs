@@ -133,6 +133,10 @@ pub struct Settings {
     /// The app's language: "system", "fr" or "en".
     #[serde(default = "default_ui_language")]
     pub ui_language: String,
+    /// Folders of raw beats (mp3/wav from YouTube & co.): the Digger's
+    /// source. Not songs: never scanned as projects.
+    #[serde(default)]
+    pub beat_folders: Vec<String>,
 }
 
 fn default_caption_language() -> String {
@@ -157,6 +161,7 @@ impl Default for Settings {
             caption_language: default_caption_language(),
             ffmpeg_path: None,
             ui_language: default_ui_language(),
+            beat_folders: Vec::new(),
         }
     }
 }

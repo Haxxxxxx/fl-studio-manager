@@ -68,3 +68,12 @@ If any task starts to require work beyond its stated justification, STOP and fla
 ## RULE 8 - SHARED vs PER-VIEW (pipeline views) - do not get this wrong
 - SHARED across board/list/table (lives on the data model): column identity, column NAME, add/remove/reorder columns, a song's stage, and all data edits. Rename a column once -> all three views show the new name.
 - PER-VIEW (transient only): table sort order, collapsed/visible columns, column widths. Sorting the table must NEVER reshuffle the board.
+
+================================================================
+## EXCEPTION - THE DIGGER (approved by the user, 2026-10-16)
+The Digger (left menu) is a deliberate, user-approved exception to rules 1-2: it serves the Creation stage (finding beats to write on), not release or promotion.
+- Scope is fixed: raw beats from Settings -> Beats folders, pick up to 5, the AI describes what they share and finds similar beats on the web (YouTube Data API if a key is set, Gemini search grounding, plain YouTube search links).
+- Beats live ONLY in the Digger: never in Library, stats, calendar or the crew backend.
+- NO downloading from YouTube or anywhere (terms of service). Leasing or buying a beat is a human hand-off: the Digger only opens links.
+- Audio sent to the AI is opt-in (a Settings toggle), short excerpts only, disclosed in the UI.
+- Anything beyond this (a beat store, auto-download, producer outreach, beat stats): STOP and flag, rule 0 applies.
