@@ -137,6 +137,10 @@ pub struct Settings {
     /// source. Not songs: never scanned as projects.
     #[serde(default)]
     pub beat_folders: Vec<String>,
+    /// The Digger may send a short, low-quality excerpt of each picked beat
+    /// to Gemini (off by default; disclosed in the UI).
+    #[serde(default)]
+    pub dig_send_audio: bool,
 }
 
 fn default_caption_language() -> String {
@@ -162,6 +166,7 @@ impl Default for Settings {
             ffmpeg_path: None,
             ui_language: default_ui_language(),
             beat_folders: Vec::new(),
+            dig_send_audio: false,
         }
     }
 }

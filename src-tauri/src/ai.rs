@@ -100,7 +100,7 @@ fn valid_model(model: &str) -> bool {
 }
 
 /// All text parts of the first candidate (skipping thought summaries).
-fn extract_text(v: &Value) -> Option<String> {
+pub(crate) fn extract_text(v: &Value) -> Option<String> {
     let parts = v.pointer("/candidates/0/content/parts")?.as_array()?;
     let text: String = parts
         .iter()
@@ -111,7 +111,7 @@ fn extract_text(v: &Value) -> Option<String> {
 }
 
 /// Why there's no answer when the response was 200 but empty.
-fn empty_reason(v: &Value) -> String {
+pub(crate) fn empty_reason(v: &Value) -> String {
     if let Some(r) = v.pointer("/promptFeedback/blockReason").and_then(Value::as_str) {
         return format!("Gemini declined the request (blocked: {r}).");
     }
@@ -331,11 +331,6 @@ async fn generate_json(
     schema: Value,
     temperature: Option<f32>,
 ) -> Result<AiAnswer, String> {
-    let (key, _) = api_key(app).ok_or("No Gemini API key yet. Add a free one in Settings → AI.")?;
-    let model = model.map(|m| m.trim().to_string()).filter(|m| !m.is_empty()).unwrap_or_else(|| DEFAULT_MODEL.to_string());
-    if !valid_model(&model) {
-        return Err(format!("\"{model}\" isn't a valid model name."));
-    }
     let body = json!({
         "systemInstruction": { "parts": [{ "text": system }] },
         "contents": [{ "role": "user", "parts": [{ "text": prompt }] }],
@@ -345,22 +340,40 @@ async fn generate_json(
             "responseSchema": schema,
         },
     });
+    let (used, v) = generate_raw(app, model, &body).await?;
+    let text = extract_text(&v).ok_or_else(|| empty_reason(&v))?;
+    let data = serde_json::from_str(&text).map_err(|e| format!("Gemini's answer wasn't valid JSON ({e}). Try again."))?;
+    Ok(AiAnswer { model: used, data })
+}
+
+/// The transport for callers that build their own request body in Rust (the
+/// Digger: audio parts, the Google Search tool). Retries, the backup model
+/// and the 2-minute deadline included. Returns the model that answered and
+/// Gemini's raw 200 answer.
+pub(crate) async fn generate_raw(app: &AppHandle, model: Option<String>, body: &Value) -> Result<(String, Value), String> {
+    let (key, _) = api_key(app).ok_or("No Gemini API key yet. Add a free one in Settings → AI.")?;
+    generate_raw_with_key(&key, model, body).await
+}
+
+pub(crate) async fn generate_raw_with_key(key: &str, model: Option<String>, body: &Value) -> Result<(String, Value), String> {
+    let model = model.map(|m| m.trim().to_string()).filter(|m| !m.is_empty()).unwrap_or_else(|| DEFAULT_MODEL.to_string());
+    if !valid_model(&model) {
+        return Err(format!("\"{model}\" isn't a valid model name."));
+    }
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(90))
         .build()
         .map_err(|e| format!("could not start the HTTP client: {e}"))?;
 
     // Retries on a busy free tier can add up: never leave the button spinning.
-    let (used, result) = tokio::time::timeout(DEADLINE, generate_with_fallback(&client, ENDPOINT, &key, &model, &body))
+    let (used, result) = tokio::time::timeout(DEADLINE, generate_with_fallback(&client, ENDPOINT, &key, &model, body))
         .await
         .map_err(|_| "Gemini didn't answer within 2 minutes (busy or rate-limited). Try again later.".to_string())?;
     let v = result.map_err(|f| match f {
         Failure::Http(status, v) => explain_error(status, &v, &model),
         Failure::Other(message) => message,
     })?;
-    let text = extract_text(&v).ok_or_else(|| empty_reason(&v))?;
-    let data = serde_json::from_str(&text).map_err(|e| format!("Gemini's answer wasn't valid JSON ({e}). Try again."))?;
-    Ok(AiAnswer { model: used, data })
+    Ok((used, v))
 }
 
 // ------------------------------------------------------------- Launch Kit calls

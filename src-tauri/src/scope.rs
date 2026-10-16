@@ -24,12 +24,12 @@ pub struct Scope {
     /// Beats folders (the Digger), as saved and resolved. Separate from the
     /// project folders: beats are never projects, songs never beats.
     beat_folders: Vec<PathBuf>,
-    #[allow(dead_code)] // read by `beat`, first called by the dig command
     beat_roots: Vec<PathBuf>,
     fl_studio: Option<String>,
     ffmpeg: Option<String>,
     pub render_format: String,
     pub ai_include_notes: bool,
+    pub dig_send_audio: bool,
 }
 
 /// `path` with symlinks and `..` resolved. A path that doesn't exist yet
@@ -73,6 +73,7 @@ impl Scope {
             ffmpeg: s.ffmpeg_path.clone(),
             render_format: s.render_format.clone(),
             ai_include_notes: s.ai_include_notes,
+            dig_send_audio: s.dig_send_audio,
         }
     }
 
@@ -134,7 +135,6 @@ impl Scope {
     }
 
     /// A beat (an audio file) inside a beats folder (the Digger).
-    #[allow(dead_code)] // first caller: the dig command
     pub fn beat(&self, path: &str) -> Result<PathBuf, String> {
         let real = resolve(Path::new(path))
             .filter(|p| self.beat_roots.iter().any(|r| inside(p, r)))
@@ -142,7 +142,8 @@ impl Scope {
         if !is_beat_file(&real) || !real.is_file() {
             return Err(format!("not a beat (mp3, wav, ogg or flac): {path}"));
         }
-        Ok(PathBuf::from(path))
+        // The resolved path: what was checked is what gets opened.
+        Ok(real)
     }
 
     /// The beats folders, as saved.

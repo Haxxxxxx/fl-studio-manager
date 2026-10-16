@@ -24,13 +24,17 @@ pub struct BeatFile {
 const MAX_DEPTH: usize = 4;
 /// Enough for any crew's beats; protects against a whole drive picked by mistake.
 const MAX_BEATS: usize = 5_000;
+/// Entries looked at, beats or not: a huge folder can't stall the scan.
+const MAX_VISITED: usize = 100_000;
 
 pub fn list_beats(folders: &[std::path::PathBuf]) -> Vec<BeatFile> {
     let mut out = Vec::new();
-    for root in folders {
+    let mut visited = 0usize;
+    'roots: for root in folders {
         for e in WalkDir::new(root).max_depth(MAX_DEPTH).into_iter().filter_map(|e| e.ok()) {
-            if out.len() >= MAX_BEATS {
-                break;
+            visited += 1;
+            if out.len() >= MAX_BEATS || visited > MAX_VISITED {
+                break 'roots;
             }
             let p = e.path();
             if !e.file_type().is_file() || !is_beat_file(p) || is_hidden(p) {

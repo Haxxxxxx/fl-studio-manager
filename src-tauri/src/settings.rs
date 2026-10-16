@@ -56,6 +56,7 @@ fn apply_preferences(saved: &mut Settings, from: Settings) {
     saved.ai_model = from.ai_model;
     saved.ai_language = from.ai_language;
     saved.ai_include_notes = from.ai_include_notes;
+    saved.dig_send_audio = from.dig_send_audio;
     if matches!(from.caption_language.as_str(), "fr" | "en") {
         saved.caption_language = from.caption_language;
     }
@@ -128,6 +129,9 @@ pub fn remove_watched_folder(app: AppHandle, folder: String) -> Result<Settings,
 #[tauri::command]
 pub async fn pick_beat_folder(app: AppHandle) -> Result<Settings, String> {
     let Some(folder) = pick(&app, true).await? else { return load(&app) };
+    if too_broad_for_beats(&folder, app.path().home_dir().ok().as_deref()) {
+        return Err("Pick the folder where your beats are, not a whole drive or your home folder: the app can play every file in it.".to_string());
+    }
     let folder = usable_folder(&folder)?;
     let mut saved = load(&app)?;
     if !saved.beat_folders.contains(&folder) {
@@ -135,6 +139,16 @@ pub async fn pick_beat_folder(app: AppHandle) -> Result<Settings, String> {
         store(&app, &saved)?;
     }
     Ok(saved)
+}
+
+/// The webview may read every file in a beats folder (to play the beats), so
+/// a drive root, the home folder or anything above it is refused.
+fn too_broad_for_beats(folder: &Path, home: Option<&Path>) -> bool {
+    let real = folder.canonicalize().unwrap_or_else(|_| folder.to_path_buf());
+    if real.parent().is_none() {
+        return true;
+    }
+    home.map(|h| h.canonicalize().unwrap_or_else(|_| h.to_path_buf())).is_some_and(|h| h.starts_with(&real))
 }
 
 /// Removes a beats folder (only ever shrinks what the app may touch).
@@ -476,5 +490,18 @@ mod tests {
         for d in ["FL Studio", "Studio One", "REAPER", "Ableton Live", "Cubase", "Bitwig Studio", "Pro Tools"] {
             assert!(daws.contains(d), "{d}");
         }
+    }
+
+    #[test]
+    fn a_beats_folder_is_never_a_drive_or_the_home_folder() {
+        let home = std::env::temp_dir().join(format!("hivo-home-{}", std::process::id()));
+        let beats = home.join("Music").join("Beats");
+        std::fs::create_dir_all(&beats).unwrap();
+        assert!(too_broad_for_beats(Path::new("/"), Some(&home)));
+        assert!(too_broad_for_beats(&home, Some(&home)));
+        assert!(too_broad_for_beats(home.parent().unwrap(), Some(&home)));
+        assert!(!too_broad_for_beats(&beats, Some(&home)));
+        assert!(!too_broad_for_beats(&beats, None));
+        let _ = std::fs::remove_dir_all(home);
     }
 }
