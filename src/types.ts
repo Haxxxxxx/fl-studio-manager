@@ -500,3 +500,18 @@ export interface BeatFile {
   sizeBytes: number;
   modifiedAtMs: number;
 }
+
+export interface YoutubeStatus {
+  configured: boolean;
+  source: "env" | "settings" | null;
+}
+
+/** One YouTube search result. `url` and `thumbnail` are rebuilt in Rust from a checked video ID. */
+export interface YoutubeVideo {
+  id: string;
+  title: string;
+  channel: string;
+  publishedAt: string;
+  url: string;
+  thumbnail: string;
+}
