@@ -1,3 +1,4 @@
+mod beats;
 mod actions;
 mod ai;
 mod audio;
@@ -33,6 +34,9 @@ pub fn run() {
             settings::link_detected_folder,
             settings::remove_watched_folder,
             settings::pick_output_folder,
+            settings::pick_beat_folder,
+            settings::remove_beat_folder,
+            beats::scan_beats,
             settings::pick_fl_studio,
             settings::use_detected_fl_studio,
             settings::pick_ffmpeg,

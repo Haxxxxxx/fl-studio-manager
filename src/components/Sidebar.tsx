@@ -1,4 +1,4 @@
-import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, Plus, Rocket, Settings as SettingsIcon, Users } from "lucide-react";
+import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, Plus, Rocket, Settings as SettingsIcon, Shovel, Users } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { btnPrimary, engrave, Wordmark } from "../ui";
 import { CrewSection } from "./CrewSection";
@@ -52,6 +52,8 @@ export function Sidebar() {
     { id: "dashboard" as const, label: t.dashboard, icon: LayoutDashboard },
     { id: "library" as const, label: t.library, icon: Library, badge: songCount },
     { id: "pipeline" as const, label: t.pipeline, icon: KanbanSquare },
+    // Raw beats and finding similar ones: fuel for the Creation stage.
+    { id: "digger" as const, label: "Digger", icon: Shovel },
     { id: "albums" as const, label: t.releases, icon: Disc3, badge: albums.length },
     { id: "calendar" as const, label: t.calendar, icon: CalendarDays },
     // Solo: People (credits, collaborators) moves down the list, see below.

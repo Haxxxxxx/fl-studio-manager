@@ -21,6 +21,11 @@ pub struct Scope {
     roots: Vec<PathBuf>,
     /// The export folder (renders, packages, Launch Kits): as saved, resolved.
     output: Option<(PathBuf, PathBuf)>,
+    /// Beats folders (the Digger), as saved and resolved. Separate from the
+    /// project folders: beats are never projects, songs never beats.
+    beat_folders: Vec<PathBuf>,
+    #[allow(dead_code)] // read by `beat`, first called by the dig command
+    beat_roots: Vec<PathBuf>,
     fl_studio: Option<String>,
     ffmpeg: Option<String>,
     pub render_format: String,
@@ -46,6 +51,12 @@ fn inside(path: &Path, root: &Path) -> bool {
     path.starts_with(root)
 }
 
+/// Audio Hivo can decode (symphonia: wav, mp3, ogg, flac).
+pub fn is_beat_file(path: &Path) -> bool {
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    matches!(ext.as_str(), "wav" | "mp3" | "ogg" | "flac")
+}
+
 fn denied(what: &str, path: &str) -> String {
     format!("{what} isn't inside a folder linked in Settings: {path}")
 }
@@ -56,6 +67,8 @@ impl Scope {
             folders: s.watched_folders.iter().map(PathBuf::from).filter(|f| resolve(f).is_some()).collect(),
             roots: s.watched_folders.iter().filter_map(|f| resolve(Path::new(f))).collect(),
             output: s.output_folder.as_deref().and_then(|f| Some((PathBuf::from(f), resolve(Path::new(f))?))),
+            beat_folders: s.beat_folders.iter().map(PathBuf::from).filter(|f| resolve(f).is_some()).collect(),
+            beat_roots: s.beat_folders.iter().filter_map(|f| resolve(Path::new(f))).collect(),
             fl_studio: s.fl_studio_path.clone(),
             ffmpeg: s.ffmpeg_path.clone(),
             render_format: s.render_format.clone(),
@@ -118,6 +131,23 @@ impl Scope {
             return Err(format!("not a mixdown: {path}"));
         }
         Ok(p)
+    }
+
+    /// A beat (an audio file) inside a beats folder (the Digger).
+    #[allow(dead_code)] // first caller: the dig command
+    pub fn beat(&self, path: &str) -> Result<PathBuf, String> {
+        let real = resolve(Path::new(path))
+            .filter(|p| self.beat_roots.iter().any(|r| inside(p, r)))
+            .ok_or_else(|| format!("That beat isn't inside a beats folder linked in Settings: {path}"))?;
+        if !is_beat_file(&real) || !real.is_file() {
+            return Err(format!("not a beat (mp3, wav, ogg or flac): {path}"));
+        }
+        Ok(PathBuf::from(path))
+    }
+
+    /// The beats folders, as saved.
+    pub fn beat_folders(&self) -> &[PathBuf] {
+        &self.beat_folders
     }
 
     /// The export folder from Settings, as saved.

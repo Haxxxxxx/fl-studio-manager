@@ -15,6 +15,7 @@ import type {
   Snippet,
   TemplateInfo,
   Workspace,
+  BeatFile,
 } from "../types";
 
 /** Scans the linked folders and export folder saved in Settings (Rust reads them). */
@@ -40,6 +41,10 @@ export const pickWatchedFolder = (): Promise<Settings> => invoke("pick_watched_f
 export const linkDetectedFolder = (path: string): Promise<Settings> => invoke("link_detected_folder", { path });
 export const removeWatchedFolder = (folder: string): Promise<Settings> => invoke("remove_watched_folder", { folder });
 export const pickOutputFolder = (): Promise<Settings> => invoke("pick_output_folder");
+/** Beats folders (the Digger), picked natively like project folders. */
+export const pickBeatFolder = (): Promise<Settings> => invoke("pick_beat_folder");
+export const removeBeatFolder = (folder: string): Promise<Settings> => invoke("remove_beat_folder", { folder });
+export const scanBeats = (): Promise<BeatFile[]> => invoke("scan_beats");
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
 export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
 export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");

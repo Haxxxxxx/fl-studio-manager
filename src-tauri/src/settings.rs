@@ -124,6 +124,28 @@ pub fn remove_watched_folder(app: AppHandle, folder: String) -> Result<Settings,
     Ok(saved)
 }
 
+/// Adds a beats folder the user picks (the Digger's source).
+#[tauri::command]
+pub async fn pick_beat_folder(app: AppHandle) -> Result<Settings, String> {
+    let Some(folder) = pick(&app, true).await? else { return load(&app) };
+    let folder = usable_folder(&folder)?;
+    let mut saved = load(&app)?;
+    if !saved.beat_folders.contains(&folder) {
+        saved.beat_folders.push(folder);
+        store(&app, &saved)?;
+    }
+    Ok(saved)
+}
+
+/// Removes a beats folder (only ever shrinks what the app may touch).
+#[tauri::command]
+pub fn remove_beat_folder(app: AppHandle, folder: String) -> Result<Settings, String> {
+    let mut saved = load(&app)?;
+    saved.beat_folders.retain(|f| f != &folder);
+    store(&app, &saved)?;
+    Ok(saved)
+}
+
 #[tauri::command]
 pub async fn pick_output_folder(app: AppHandle) -> Result<Settings, String> {
     let Some(folder) = pick(&app, true).await? else { return load(&app) };

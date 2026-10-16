@@ -1,3 +1,4 @@
+import { DiggerView } from "./components/DiggerView";
 import { applyLang, dict, resolveLang, tr } from "./i18n";
 import { CrewBoardView, CrewMembersView, CrewReleasesView, CrewSettingsView } from "./components/CrewViews";
 import { useEffect } from "react";
@@ -130,6 +131,7 @@ export default function App() {
       {view === "launch" && <LaunchKitView />}
       {view === "calendar" && <CalendarView />}
       {view === "settings" && <SettingsView />}
+      {view === "digger" && <DiggerView />}
       {view === "crewBoard" && <CrewBoardView />}
       {view === "crewReleases" && <CrewReleasesView />}
       {view === "crewMembers" && <CrewMembersView />}
