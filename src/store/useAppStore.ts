@@ -52,6 +52,8 @@ export type View =
   | "calendar"
   | "settings"
   // The crew section of the menu (CrewSection).
+  // Raw beats + finding similar ones (DiggerView).
+  | "digger"
   | "crewBoard"
   | "crewReleases"
   | "crewMembers"
@@ -139,6 +141,9 @@ interface AppState {
   /** Link one detected folder (the user confirmed it) and scan it. */
   linkDetected: (path: string) => Promise<void>;
   removeWatchedFolder: (folder: string) => Promise<void>;
+  /** Beats folders (the Digger). */
+  addBeatFolder: () => Promise<void>;
+  removeBeatFolder: (folder: string) => Promise<void>;
   pickOutputFolder: () => Promise<void>;
   pickFlStudio: () => Promise<void>;
   /** Fill in the FL Studio found on this machine; false if none was found. */
@@ -305,8 +310,8 @@ export const useAppStore = create<AppState>((set, get) => {
   /** Take the path settings Rust saved; keep this session's other preferences
    * (sample-data favorites stay in memory). */
   function keepPaths(saved: Settings) {
-    const { watchedFolders, flStudioPath, outputFolder, ffmpegPath } = saved;
-    set((s) => ({ settings: { ...s.settings, watchedFolders, flStudioPath, outputFolder, ffmpegPath } }));
+    const { watchedFolders, flStudioPath, outputFolder, ffmpegPath, beatFolders } = saved;
+    set((s) => ({ settings: { ...s.settings, watchedFolders, flStudioPath, outputFolder, ffmpegPath, beatFolders } }));
   }
 
   /** A folder was linked: leave sample data if needed, then scan. */
@@ -467,6 +472,9 @@ export const useAppStore = create<AppState>((set, get) => {
       // Unlinking a detected folder makes it a proposal again.
       await get().detectFolders();
     },
+
+    addBeatFolder: async () => keepPaths(await api.pickBeatFolder()),
+    removeBeatFolder: async (folder) => keepPaths(await api.removeBeatFolder(folder)),
 
     pickOutputFolder: async () => {
       const before = get().settings.outputFolder;

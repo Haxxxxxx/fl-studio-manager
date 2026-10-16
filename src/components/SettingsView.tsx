@@ -312,6 +312,8 @@ export function SettingsView() {
           </div>
         </section>
 
+        <BeatFoldersSection />
+
         <section>
           <h2 className="text-sm font-semibold text-cream">{t.detectTitle}</h2>
           <p className="mt-1 text-xs text-engrave">{t.detectHint}</p>
@@ -651,3 +653,50 @@ function CoverSettings() {
     </section>
   );
 }
+
+const T_BEATS = dict(
+  {
+    title: "Beats folders",
+    hint: "Raw beats (mp3, wav… often downloaded from YouTube), no vocals on top. They only show up in the Digger, never in your songs, stats or the crew.",
+    add: "Add a beats folder",
+    remove: (f: string) => `Remove ${f}`,
+  },
+  {
+    title: "Dossiers de prods",
+    hint: "Des prods brutes (mp3, wav… souvent récupérées sur YouTube), sans voix dessus. Elles n'apparaissent que dans le Digger, jamais dans tes sons, tes stats ni le crew.",
+    add: "Ajouter un dossier de prods",
+    remove: (f: string) => `Retirer ${f}`,
+  },
+);
+
+/** Beats folders (the Digger's source), next to the project folders. */
+function BeatFoldersSection() {
+  const folders = useAppStore((s) => s.settings.beatFolders ?? []);
+  const add = useAppStore((s) => s.addBeatFolder);
+  const remove = useAppStore((s) => s.removeBeatFolder);
+  const t = tr(T_BEATS);
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
+      <p className="mt-1 text-xs text-engrave">{t.hint}</p>
+      <div className="mt-3 flex flex-col gap-2">
+        {folders.map((folder) => (
+          <div key={folder} className="flex items-center justify-between gap-2 rounded-md border border-rule bg-raised px-3 py-2 text-sm text-body">
+            <span className="truncate">{folder}</span>
+            <button onClick={() => void remove(folder)} aria-label={t.remove(folder)} className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-red-300">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() => void add()}
+          className="flex items-center justify-center gap-2 rounded-md border border-dashed border-rule-strong py-2.5 text-sm text-engrave hover:border-orange-400/40 hover:text-orange-300"
+        >
+          <FolderPlus size={15} />
+          {t.add}
+        </button>
+      </div>
+    </section>
+  );
+}
+

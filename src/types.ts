@@ -103,6 +103,8 @@ export interface Settings {
   captionLanguage: CaptionLang;
   /** The app's language: follow the system, or French / English. */
   uiLanguage?: "system" | "fr" | "en";
+  /** Folders of raw beats (the Digger). Changed only through the Rust picker. */
+  beatFolders?: string[];
   /** ffmpeg for shorts; null = found automatically. */
   ffmpegPath: string | null;
 }
@@ -487,4 +489,14 @@ export interface CrewSummary {
   name: string;
   role: "owner" | "member";
   displayName: string;
+}
+
+/** A raw beat in a beats folder (src-tauri/src/beats.rs). */
+export interface BeatFile {
+  path: string;
+  /** File name without extension. */
+  name: string;
+  folder: string;
+  sizeBytes: number;
+  modifiedAtMs: number;
 }
