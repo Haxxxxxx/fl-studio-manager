@@ -9,6 +9,9 @@ import { aiDisclosure } from "../lib/ai";
 import type { CaptionLang, RenderFormat, YoutubeStatus } from "../types";
 import { dict, tr } from "../i18n";
 
+// A stable empty list: a fresh [] in a store selector re-renders forever.
+const NO_FOLDERS: string[] = [];
+
 const T = dict(
   {
     needPaths: "Set both the FL Studio path and output folder first.",
@@ -782,7 +785,7 @@ const T_BEATS = dict(
 
 /** Beats folders (the Digger's source), next to the project folders. */
 function BeatFoldersSection() {
-  const folders = useAppStore((s) => s.settings.beatFolders ?? []);
+  const folders = useAppStore((s) => s.settings.beatFolders ?? NO_FOLDERS);
   const add = useAppStore((s) => s.addBeatFolder);
   const remove = useAppStore((s) => s.removeBeatFolder);
   const t = tr(T_BEATS);
