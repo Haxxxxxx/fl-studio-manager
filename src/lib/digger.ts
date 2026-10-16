@@ -9,6 +9,21 @@ export function youtubeSearchUrl(query: string): string {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(query.trim().replace(/\s+/g, " "))}`;
 }
 
+/** A Google search page for `query` (the searches behind the dig's web links). */
+export function googleSearchUrl(query: string): string {
+  return `https://www.google.com/search?q=${encodeURIComponent(query.trim().replace(/\s+/g, " "))}`;
+}
+
+/** "140 BPM · Am · 3:05" for one analysed beat; "≈" marks an estimated tempo. */
+export function beatFactsLine(f: { bpm: number | null; bpmSource: string | null; key: string | null; durationSec: number }): string {
+  const parts: string[] = [];
+  if (f.bpm) parts.push(`${f.bpmSource === "audio" ? "≈" : ""}${Math.round(f.bpm)} BPM`);
+  if (f.key) parts.push(f.key);
+  const s = Math.round(f.durationSec);
+  parts.push(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+  return parts.join(" · ");
+}
+
 /** Noise YouTube uploaders put in beat titles. */
 const NOISE = /\b(free|for profit|non profit|download|hq|hd|official|audio|instrumental|\d{2,3}\s?bpm|20\d\d)\b/gi;
 

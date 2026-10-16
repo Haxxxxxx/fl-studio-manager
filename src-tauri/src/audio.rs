@@ -65,7 +65,7 @@ pub struct Snippet {
 /// `on_chunk` returns false to stop early. Returns the stored bit depth.
 /// Mixdowns come from crewmates, so a decoder panic on a malformed file is
 /// caught and becomes an error for that file (release builds unwind).
-fn decode(path: &Path, mut on_chunk: impl FnMut(&[f32], usize, u32) -> bool) -> Result<Option<u32>, String> {
+pub(crate) fn decode(path: &Path, mut on_chunk: impl FnMut(&[f32], usize, u32) -> bool) -> Result<Option<u32>, String> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode_unguarded(path, &mut on_chunk))).unwrap_or_else(|_| {
         let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         Err(format!("{name} couldn't be decoded (damaged or unusual audio file)"))

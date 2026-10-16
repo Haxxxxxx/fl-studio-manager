@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { MAX_QUERY_CHARS, beatQuery, youtubeSearchUrl } from "./digger";
+import { MAX_QUERY_CHARS, beatFactsLine, beatQuery, googleSearchUrl, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
     expect(youtubeSearchUrl("  dark  trap & rain ")).toBe("https://www.youtube.com/results?search_query=dark%20trap%20%26%20rain");
+  });
+
+  it("builds Google links and a facts line", () => {
+    expect(googleSearchUrl("dark trap  beat")).toBe("https://www.google.com/search?q=dark%20trap%20beat");
+    expect(beatFactsLine({ bpm: 140, bpmSource: "name", key: "Am", durationSec: 185.4 })).toBe("140 BPM · Am · 3:05");
+    expect(beatFactsLine({ bpm: 69.5, bpmSource: "audio", key: null, durationSec: 59.6 })).toBe("≈70 BPM · 1:00");
   });
 
   it("turns beat file names into searches", () => {

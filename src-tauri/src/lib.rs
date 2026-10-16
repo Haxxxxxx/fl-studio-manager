@@ -3,6 +3,7 @@ mod actions;
 mod ai;
 mod audio;
 mod daws;
+mod digger;
 mod cover;
 mod files;
 mod key;
@@ -38,6 +39,7 @@ pub fn run() {
             settings::pick_beat_folder,
             settings::remove_beat_folder,
             beats::scan_beats,
+            digger::dig_beats,
             settings::pick_fl_studio,
             settings::use_detected_fl_studio,
             settings::pick_ffmpeg,

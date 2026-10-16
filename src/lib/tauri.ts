@@ -18,6 +18,7 @@ import type {
   BeatFile,
   YoutubeStatus,
   YoutubeVideo,
+  DigResult,
 } from "../types";
 
 /** Scans the linked folders and export folder saved in Settings (Rust reads them). */
@@ -53,6 +54,8 @@ export const youtubeStatus = (): Promise<YoutubeStatus> => invoke("youtube_statu
 export const setYoutubeKey = (key: string | null): Promise<void> => invoke("set_youtube_key", { key });
 /** YouTube music-video search (Rust side, cached for a few hours). */
 export const youtubeSearch = (query: string): Promise<YoutubeVideo[]> => invoke("youtube_search", { query });
+/** The dig: Rust checks the beats, analyses them and builds the Gemini prompts. */
+export const digBeats = (beats: string[], language: "fr" | "en"): Promise<DigResult> => invoke("dig_beats", { request: { beats, language } });
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
 export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
 export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");

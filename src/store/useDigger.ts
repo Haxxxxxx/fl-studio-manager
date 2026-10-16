@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import * as api from "../lib/tauri";
-import type { BeatFile, YoutubeVideo } from "../types";
+import type { BeatFile, DigResult, YoutubeVideo } from "../types";
 
 // The Digger: raw beats from the beats folders, up to 5 picked to dig for
 // similar ones (docs/GUARDRAILS.md: a deliberate addition for the Creation
@@ -28,6 +28,13 @@ interface DiggerState {
   searchedFor: string | null;
   setWebQuery: (q: string) => void;
   searchYoutube: (q: string) => Promise<void>;
+  /** The AI dig over the picks (Rust: digger.rs). */
+  dig: DigResult | null;
+  /** The picks the current `dig` is about. */
+  dugFor: string[];
+  digging: boolean;
+  digError: string | null;
+  runDig: (language: "fr" | "en", youtube: boolean) => Promise<void>;
 }
 
 export const useDigger = create<DiggerState>((set, get) => ({
@@ -75,7 +82,35 @@ export const useDigger = create<DiggerState>((set, get) => ({
       if (get().webQuery === query) set({ searching: false });
     }
   },
+  dig: null,
+  dugFor: [],
+  digging: false,
+  digError: null,
+  runDig: async (language, youtube) => {
+    const picks = get().picked;
+    if (!picks.length || get().digging) return;
+    set({ digging: true, digError: null });
+    try {
+      const dig = await api.digBeats(picks, language);
+      set({ dig, dugFor: picks });
+      // Start the first AI search right away; the others are one click.
+      const first = dig.analysis.queries[0];
+      if (first) {
+        set({ webQuery: first });
+        if (youtube) void get().searchYoutube(first);
+      }
+    } catch (e) {
+      set({ digError: e instanceof Error ? e.message : String(e) });
+    } finally {
+      set({ digging: false });
+    }
+  },
 }));
+
+/** Whether the picks changed since the last dig. */
+export function digIsStale(picked: string[], dugFor: string[]): boolean {
+  return picked.length !== dugFor.length || picked.some((p) => !dugFor.includes(p));
+}
 
 /** Beats matching a search (name or folder), every word must match. */
 export function filterBeats(beats: BeatFile[], query: string): BeatFile[] {

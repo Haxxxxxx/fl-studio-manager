@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Search } from "lucide-react";
-import { useDigger } from "../store/useDigger";
+import { ExternalLink, Search, Sparkles } from "lucide-react";
+import { digIsStale, useDigger } from "../store/useDigger";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
-import { MAX_QUERY_CHARS, beatQuery, youtubeSearchUrl } from "../lib/digger";
-import { dict, tr } from "../i18n";
+import { MAX_QUERY_CHARS, beatFactsLine, beatQuery, googleSearchUrl, youtubeSearchUrl } from "../lib/digger";
+import { currentLang, dict, tr } from "../i18n";
 import type { YoutubeStatus } from "../types";
 
-// The right side of the Digger: the picked beats, then the dig: searches
-// built from them, YouTube results (with a key) and links that always work.
+// The right side of the Digger: the picked beats, the AI dig (what they
+// share, searches, beats found on the web), then the YouTube search.
 // Links only: nothing is ever downloaded (docs/GUARDRAILS.md).
 
 const NB = " ";
@@ -16,7 +16,22 @@ const T = dict(
   {
     title: "Picked",
     none: "Pick the beats that have the vibe you want (up to 5).",
-    dig: "Find similar beats",
+    dig: "Dig",
+    digging: "Listening and digging…",
+    digTitle: "What they share",
+    needAi: "The dig uses Gemini (free). Add a key in",
+    listen: "Let Gemini listen (30 seconds of each beat)",
+    disclosure: (audio: boolean) =>
+      "Sends the beats' file names, tempo, key, loudness and length to Google Gemini" +
+      (audio ? ", plus a 30-second, low-quality excerpt of each beat" : "") +
+      `. Never file paths${audio ? "" : " or audio"}. On the free tier Google may use what it receives to improve its products.`,
+    stale: "Your picks changed since this dig. Dig again to update it.",
+    heard: "Gemini listened to the excerpts.",
+    aiSearches: "Searches from the dig",
+    web: "Found on the web",
+    googled: "Google searches behind these links",
+    openLink: (site: string) => `Open ${site}`,
+    find: "Find similar beats",
     ideas: "Searches from your picks",
     search: "Search",
     searchLabel: "Search YouTube for beats",
@@ -32,7 +47,22 @@ const T = dict(
   {
     title: "Choisies",
     none: "Choisis les prods qui ont le vibe que tu cherches (5 max).",
-    dig: "Trouver des prods proches",
+    dig: "Creuser",
+    digging: "Écoute et recherche…",
+    digTitle: "Ce qu'elles ont en commun",
+    needAi: "Le Digger utilise Gemini (gratuit). Ajoute une clé dans les",
+    listen: "Faire écouter à Gemini (30 secondes de chaque prod)",
+    disclosure: (audio: boolean) =>
+      "Envoie à Google Gemini le nom des fichiers, le tempo, la tonalité, le volume et la durée des prods" +
+      (audio ? ", plus un extrait de 30 secondes, en basse qualité, de chaque prod" : "") +
+      `. Jamais les chemins de fichiers${audio ? "" : " ni l'audio"}. Avec l'offre gratuite, Google peut utiliser ce qu'il reçoit pour améliorer ses produits.`,
+    stale: "Tes choix ont changé depuis. Creuse à nouveau pour mettre à jour.",
+    heard: "Gemini a écouté les extraits.",
+    aiSearches: "Recherches tirées de l'analyse",
+    web: "Trouvé sur le web",
+    googled: "Recherches Google derrière ces liens",
+    openLink: (site: string) => `Ouvrir ${site}`,
+    find: "Trouver des prods proches",
     ideas: "Recherches tirées de tes choix",
     search: "Chercher",
     searchLabel: "Chercher des prods sur YouTube",
@@ -47,10 +77,18 @@ const T = dict(
   },
 );
 
+const label = "font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave";
+const chip = (on: boolean) =>
+  `rounded border px-2 py-0.5 text-left text-xs ${on ? "border-cream bg-cream text-chassis" : "border-rule-strong text-body hover:border-cream"}`;
+
 export function DigPanel() {
   const t = tr(T);
-  const { picked, beats, webQuery, results, searching, searchError, searchedFor, setWebQuery, searchYoutube } = useDigger();
+  const d = useDigger();
+  const { picked, beats, webQuery, results, searching, searchError, searchedFor, setWebQuery, searchYoutube } = d;
   const setView = useAppStore((s) => s.setView);
+  const aiStatus = useAppStore((s) => s.aiStatus);
+  const sendAudio = useAppStore((s) => !!s.settings.digSendAudio);
+  const updateSettings = useAppStore((s) => s.updateSettings);
   const [yt, setYt] = useState<YoutubeStatus | null>(null);
   const byPath = useMemo(() => new Map(beats.map((b) => [b.path, b])), [beats]);
   const ideas = useMemo(() => {
@@ -71,10 +109,12 @@ export function DigPanel() {
     setWebQuery(query);
     if (yt?.configured && query.trim()) void searchYoutube(query);
   };
+  const dig = d.dig;
+  const stale = !!dig && digIsStale(picked, d.dugFor);
 
   return (
     <aside className="flex w-[380px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-rule p-4" aria-label={t.title}>
-      <h2 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">{t.title}</h2>
+      <h2 className={label}>{t.title}</h2>
       {picked.length === 0 ? (
         <p className="text-sm text-engrave">{t.none}</p>
       ) : (
@@ -88,16 +128,103 @@ export function DigPanel() {
         </ol>
       )}
 
-      <section aria-label={t.dig} className="mt-2 flex flex-col gap-2 border-t border-rule pt-3">
-        <h2 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">{t.dig}</h2>
+      {picked.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {aiStatus && !aiStatus.configured ? (
+            <p className="text-[11px] leading-relaxed text-engrave">
+              {t.needAi}{" "}
+              <button onClick={() => setView("settings")} className="underline hover:text-cream">
+                {t.setUp}
+              </button>
+              .
+            </p>
+          ) : (
+            <button
+              onClick={() => void d.runDig(currentLang(), !!yt?.configured)}
+              disabled={d.digging}
+              className="flex items-center justify-center gap-2 rounded bg-hot px-4 py-2 font-display text-[15px] font-bold uppercase tracking-[0.06em] text-chassis hover:bg-hot-hover disabled:opacity-50"
+            >
+              <Sparkles size={15} aria-hidden /> {d.digging ? t.digging : t.dig}
+            </button>
+          )}
+          <label className="flex cursor-pointer items-start gap-2 text-xs text-body">
+            <input type="checkbox" checked={sendAudio} onChange={(e) => void updateSettings({ digSendAudio: e.target.checked })} className="mt-0.5 accent-orange-500" />
+            {t.listen}
+          </label>
+          <p className="text-[11px] leading-relaxed text-engrave">{t.disclosure(sendAudio)}</p>
+          {d.digError && <div role="alert" className="rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{d.digError}</div>}
+        </div>
+      )}
+
+      {dig && (
+        <section aria-label={t.digTitle} className="flex flex-col gap-2 border-t border-rule pt-3">
+          <h2 className={label}>{t.digTitle}</h2>
+          {stale && <p className="text-[11px] text-warn">{t.stale}</p>}
+          <p className="text-sm leading-relaxed text-cream">{dig.analysis.summary}</p>
+          {(dig.analysis.traits.length > 0 || dig.analysis.tempo) && (
+            <ul className="flex flex-wrap gap-1.5">
+              {dig.analysis.tempo && <li className="rounded bg-raised px-2 py-0.5 font-mono text-[11px] text-cream">{dig.analysis.tempo}</li>}
+              {dig.analysis.traits.map((tag) => (
+                <li key={tag} className="rounded bg-raised px-2 py-0.5 text-[11px] text-body">
+                  {tag}
+                </li>
+              ))}
+            </ul>
+          )}
+          <ul className="flex flex-col gap-0.5">
+            {dig.beats.map((b, i) => (
+              <li key={i} className="flex gap-2 text-[11px]">
+                <span className="min-w-0 flex-1 truncate text-engrave">{b.name}</span>
+                <span className="shrink-0 font-mono text-body">{beatFactsLine(b)}</span>
+              </li>
+            ))}
+          </ul>
+          {dig.audioSent && <p className="text-[11px] text-engrave">{t.heard}</p>}
+          {dig.analysis.queries.length > 0 && (
+            <div className="flex flex-wrap gap-1.5" aria-label={t.aiSearches}>
+              {dig.analysis.queries.map((s) => (
+                <button key={s} onClick={() => run(s)} className={chip(s === q)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+          <h3 className={`${label} mt-1`}>{t.web}</h3>
+          {dig.web.length > 0 && (
+            <ul className="flex flex-col gap-1" aria-label={t.web}>
+              {dig.web.map((l) => (
+                <li key={l.url}>
+                  <button onClick={() => void api.openExternal(l.url)} aria-label={t.openLink(l.site || l.text)} className="flex w-full items-start gap-2 rounded p-1 text-left hover:bg-raised">
+                    <ExternalLink size={12} className="mt-0.5 shrink-0 text-engrave" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      {l.text && <span className="line-clamp-2 text-xs text-cream">{l.text}</span>}
+                      <span className="block truncate font-mono text-[10.5px] text-engrave">{l.site}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {dig.webError && <p className="text-[11px] text-engrave">{dig.webError}</p>}
+          {dig.webSearches.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5" aria-label={t.googled}>
+              <span className="text-[11px] text-engrave">Google:</span>
+              {dig.webSearches.map((s) => (
+                <button key={s} onClick={() => void api.openExternal(googleSearchUrl(s))} className={chip(false)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section aria-label={t.find} className="flex flex-col gap-2 border-t border-rule pt-3">
+        <h2 className={label}>{t.find}</h2>
         {ideas.length > 0 && (
           <div className="flex flex-wrap gap-1.5" aria-label={t.ideas}>
             {ideas.map((idea) => (
-              <button
-                key={idea}
-                onClick={() => run(idea)}
-                className={`rounded border px-2 py-0.5 text-left text-xs ${idea === q ? "border-cream bg-cream text-chassis" : "border-rule-strong text-body hover:border-cream"}`}
-              >
+              <button key={idea} onClick={() => run(idea)} className={chip(idea === q)}>
                 {idea}
               </button>
             ))}
@@ -122,7 +249,7 @@ export function DigPanel() {
             />
           </label>
           {yt?.configured && (
-            <button type="submit" disabled={!q || searching} className="rounded bg-hot px-2.5 py-1.5 text-xs font-semibold text-chassis hover:bg-hot-hover disabled:opacity-40">
+            <button type="submit" disabled={!q || searching} className="rounded border border-rule-strong px-2.5 py-1.5 text-xs font-semibold text-cream hover:border-cream disabled:opacity-40">
               {t.search}
             </button>
           )}
@@ -157,7 +284,14 @@ export function DigPanel() {
                   aria-label={t.openVideo(v.title)}
                   className="flex w-full items-center gap-2.5 rounded p-1 text-left hover:bg-raised"
                 >
-                  <img src={v.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = "hidden")} className="h-[45px] w-20 shrink-0 rounded-sm bg-raised object-cover" />
+                  <img
+                    src={v.thumbnail}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+                    className="h-[45px] w-20 shrink-0 rounded-sm bg-raised object-cover"
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 text-xs text-cream">{v.title}</span>
                     <span className="block truncate font-mono text-[10.5px] text-engrave">

@@ -105,6 +105,8 @@ export interface Settings {
   uiLanguage?: "system" | "fr" | "en";
   /** Folders of raw beats (the Digger). Changed only through the Rust picker. */
   beatFolders?: string[];
+  /** The Digger sends a 30 s low-quality excerpt of each picked beat to Gemini (off by default). */
+  digSendAudio?: boolean;
   /** ffmpeg for shorts; null = found automatically. */
   ffmpegPath: string | null;
 }
@@ -514,4 +516,33 @@ export interface YoutubeVideo {
   publishedAt: string;
   url: string;
   thumbnail: string;
+}
+
+/** What the dig measured on one beat (src-tauri/src/digger.rs BeatFacts). */
+export interface BeatFacts {
+  name: string;
+  durationSec: number;
+  bpm: number | null;
+  /** "name" = written in the file name, "audio" = estimated (may be half or double). */
+  bpmSource: "name" | "audio" | null;
+  key: string | null;
+  loudnessDb: number | null;
+  hitsPerSec: number | null;
+}
+
+export interface WebLink {
+  url: string;
+  site: string;
+  text: string;
+}
+
+/** The dig: what the picked beats share, searches, and beats found on the web. */
+export interface DigResult {
+  model: string;
+  audioSent: boolean;
+  beats: BeatFacts[];
+  analysis: { summary: string; traits: string[]; tempo: string; queries: string[] };
+  web: WebLink[];
+  webSearches: string[];
+  webError: string | null;
 }

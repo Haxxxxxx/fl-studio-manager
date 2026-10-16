@@ -12,6 +12,9 @@ import { DigPanel } from "./DigPanel";
 // the web for similar ones to start a new song on (DigPanel).
 
 const NB = " ";
+// A stable empty list: a fresh [] in a store selector re-renders forever.
+const NO_FOLDERS: string[] = [];
+
 const T = dict(
   {
     title: "Digger",
@@ -49,7 +52,7 @@ const T = dict(
 
 export function DiggerView() {
   const t = tr(T);
-  const folders = useAppStore((s) => s.settings.beatFolders ?? []);
+  const folders = useAppStore((s) => s.settings.beatFolders ?? NO_FOLDERS);
   const addBeatFolder = useAppStore((s) => s.addBeatFolder);
   const { beats, loading, error, picked, query, load, toggle, clearPicks, setQuery } = useDigger();
   const [playing, setPlaying] = useState<string | null>(null);
