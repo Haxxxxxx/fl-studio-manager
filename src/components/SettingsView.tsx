@@ -6,7 +6,7 @@ import { CrewPanel } from "./CrewPanel";
 import { DetectedFolders } from "./DetectedFolders";
 import { canRenderInApp } from "../lib/daws";
 import { aiDisclosure } from "../lib/ai";
-import type { CaptionLang, RenderFormat } from "../types";
+import type { CaptionLang, RenderFormat, YoutubeStatus } from "../types";
 import { dict, tr } from "../i18n";
 
 const T = dict(
@@ -330,6 +330,8 @@ export function SettingsView() {
 
         <CoverSettings />
 
+        <YoutubeSettings />
+
         <section>
           <h2 className="text-sm font-semibold text-cream">{t.flExe}</h2>
           <p className="mt-1 text-xs text-engrave">{t.flExeHint}</p>
@@ -650,6 +652,115 @@ function CoverSettings() {
       </div>
       {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
       <p className="mt-2 text-[11px] leading-relaxed text-engrave">{t.coverPrivacy}</p>
+    </section>
+  );
+}
+
+const T_YT = dict(
+  {
+    title: "YouTube search (Digger, free)",
+    intro:
+      "Shows YouTube results inside the Digger. The free quota is about 100 searches a day (repeat searches are remembered for a few hours). In the",
+    link: "Google Cloud console",
+    steps: ", turn on YouTube Data API v3, then create an API key under Credentials. Without a key, the Digger still opens YouTube searches in your browser.",
+    off: "No key: searches open in your browser.",
+    env: "Using YOUTUBE_API_KEY from the environment.",
+    on: "Key saved. Results show inside the Digger.",
+    paste: "Paste a YouTube Data API key",
+    newKey: "Paste a new key to replace it",
+    label: "YouTube API key",
+    save: "Save",
+    remove: "Remove",
+    saved: "Key saved.",
+    removed: "Key removed.",
+    privacy:
+      "The key stays on this computer (its own owner-only file in the app config folder, not settings.json) and is never shown again. Only the search words go to YouTube. Nothing is ever downloaded.",
+  },
+  {
+    title: "Recherche YouTube (Digger, gratuit)",
+    intro:
+      "Affiche les résultats YouTube dans le Digger. Le quota gratuit permet environ 100 recherches par jour (une même recherche est gardée en mémoire quelques heures). Dans la",
+    link: "console Google Cloud",
+    steps: ", active YouTube Data API v3, puis crée une clé API dans Credentials. Sans clé, le Digger ouvre quand même les recherches YouTube dans ton navigateur.",
+    off: "Pas de clé : les recherches s'ouvrent dans ton navigateur.",
+    env: "Utilise YOUTUBE_API_KEY de l'environnement.",
+    on: "Clé enregistrée. Les résultats s'affichent dans le Digger.",
+    paste: "Colle une clé YouTube Data API",
+    newKey: "Colle une nouvelle clé pour la remplacer",
+    label: "Clé API YouTube",
+    save: "Enregistrer",
+    remove: "Retirer",
+    saved: "Clé enregistrée.",
+    removed: "Clé retirée.",
+    privacy:
+      "La clé reste sur cet ordi (dans son propre fichier, réservé à ton compte, du dossier de config de l'appli, pas dans settings.json) et ne s'affiche plus jamais. Seuls les mots de la recherche partent vers YouTube. Rien n'est jamais téléchargé.",
+  },
+);
+
+const YT_CONSOLE_URL = "https://console.cloud.google.com/apis/library/youtube.googleapis.com";
+
+/** YouTube Data API key for the Digger's search (write-only from here). */
+function YoutubeSettings() {
+  const [status, setStatus] = useState<YoutubeStatus | null>(null);
+  const [key, setKey] = useState("");
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const t = tr(T_YT);
+
+  useEffect(() => {
+    let live = true;
+    api.youtubeStatus().then((s) => live && setStatus(s)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function save(value: string | null) {
+    setMessage(null);
+    try {
+      await api.setYoutubeKey(value);
+      setStatus(await api.youtubeStatus());
+      setKey("");
+      setMessage({ kind: "ok", text: value ? t.saved : t.removed });
+    } catch (e) {
+      setMessage({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  const line = !status?.configured ? t.off : status.source === "env" ? t.env : t.on;
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
+      <p className="mt-1 text-xs leading-relaxed text-engrave">
+        {t.intro}{" "}
+        <button onClick={() => api.openExternal(YT_CONSOLE_URL)} className="text-orange-300 underline">
+          {t.link}
+        </button>
+        {t.steps}
+      </p>
+      <div className={`mt-3 text-xs ${status?.configured ? "text-emerald-300" : "text-engrave"}`}>{line}</div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder={status?.configured ? t.newKey : t.paste}
+          aria-label={t.label}
+          autoComplete="off"
+          spellCheck={false}
+          className={field}
+        />
+        <button onClick={() => save(key)} disabled={!key.trim()} className="rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-chassis hover:bg-orange-400 disabled:opacity-40">
+          {t.save}
+        </button>
+        {status?.source === "settings" && (
+          <button onClick={() => save(null)} className="rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised">
+            {t.remove}
+          </button>
+        )}
+      </div>
+      {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
+      <p className="mt-2 text-[11px] leading-relaxed text-engrave">{t.privacy}</p>
     </section>
   );
 }

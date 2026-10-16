@@ -90,7 +90,7 @@ fn valid_token(token: &str) -> bool {
 /// Writes `bytes` readable by the owner only, from the moment the file
 /// exists (no world-readable window). On Windows the per-user %APPDATA% ACL
 /// is what protects it.
-fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let mut options = fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
