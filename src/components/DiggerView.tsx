@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, FolderPlus, Pause, Play, RefreshCw, Search, Shovel } from "lucide-react";
+import { Check, FolderPlus, Pause, Play, RefreshCw, Search, Shovel, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { MAX_PICKS, filterBeats, useDigger } from "../store/useDigger";
 import { audioSrc } from "../lib/tauri";
@@ -127,7 +127,7 @@ export function DiggerView() {
         <div role="status" className="mx-6 mt-3 flex items-start gap-3 rounded-md border border-rule-strong bg-raised px-3 py-2 text-xs text-cream">
           <span className="flex-1">{t.dropped}</span>
           <button onClick={() => setDropHint(false)} aria-label={t.dismiss} className="shrink-0 text-engrave hover:text-cream">
-            ✕
+            <X size={14} />
           </button>
         </div>
       )}
@@ -178,7 +178,7 @@ export function DiggerView() {
                             <span className="block truncate font-mono text-[10.5px] text-engrave">{b.folder}</span>
                           </span>
                         </label>
-                        <span className="hidden shrink-0 text-xs text-engrave xl:inline">{formatRelative(b.modifiedAtMs)}</span>
+                        <span className="hidden shrink-0 text-xs text-engrave lg:inline">{formatRelative(b.modifiedAtMs)}</span>
                         <span className="w-16 shrink-0 text-right font-mono text-[11px] text-engrave">{formatBytes(b.sizeBytes)}</span>
                         {on && <Check size={14} className="shrink-0 text-hot" aria-hidden />}
                       </li>

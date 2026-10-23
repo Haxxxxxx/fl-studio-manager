@@ -13,8 +13,10 @@ export function isFileDrag(types: readonly string[] | DOMStringList | null | und
 export function installDropGuard(target: Pick<Window, "addEventListener" | "removeEventListener"> = window): () => void {
   const block = (e: DragEvent) => {
     if (!isFileDrag(e.dataTransfer?.types)) return;
+    // Cancelling dragover makes the window a drop target, so `drop` still
+    // fires (views can explain what to do); cancelling drop stops the
+    // navigation. A "none" dropEffect would swallow the drop event instead.
     e.preventDefault();
-    if (e.type === "dragover" && e.dataTransfer) e.dataTransfer.dropEffect = "none";
   };
   target.addEventListener("dragover", block);
   target.addEventListener("drop", block);

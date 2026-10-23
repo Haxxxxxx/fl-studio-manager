@@ -21,6 +21,7 @@ describe("drop guard", () => {
     expect(isFileDrag(["Files"])).toBe(true);
     expect(isFileDrag(["application/x-song"])).toBe(false);
     expect(isFileDrag(null)).toBe(false);
+    expect(isFileDrag(undefined)).toBe(false);
   });
 
   it("refuses dropped files so the webview never navigates to them", () => {
@@ -31,8 +32,17 @@ describe("drop guard", () => {
     target.listeners.get("dragover")!(over);
     target.listeners.get("drop")!(drop);
     expect(over.preventDefault).toHaveBeenCalled();
-    expect(over.dataTransfer!.dropEffect).toBe("none");
+    // Left alone: "none" would make the browser skip the drop event.
+    expect(over.dataTransfer!.dropEffect).toBe("move");
     expect(drop.preventDefault).toHaveBeenCalled();
+  });
+
+  it("ignores drags without a dataTransfer", () => {
+    const target = fakeTarget();
+    installDropGuard(target as never);
+    const e = { type: "drop", preventDefault: vi.fn(), dataTransfer: null } as unknown as DragEvent & { preventDefault: ReturnType<typeof vi.fn> };
+    target.listeners.get("drop")!(e);
+    expect(e.preventDefault).not.toHaveBeenCalled();
   });
 
   it("leaves in-app drags alone and cleans up", () => {
