@@ -133,7 +133,7 @@ export function DigPanel() {
           {aiStatus && !aiStatus.configured ? (
             <p className="text-[11px] leading-relaxed text-engrave">
               {t.needAi}{" "}
-              <button onClick={() => setView("settings")} className="underline hover:text-cream">
+              <button onClick={() => setView("settings", "ai")} className="underline hover:text-cream">
                 {t.setUp}
               </button>
               .
@@ -267,7 +267,7 @@ export function DigPanel() {
         {yt && !yt.configured && (
           <p className="text-[11px] leading-relaxed text-engrave">
             {t.noKey}{" "}
-            <button onClick={() => setView("settings")} className="underline hover:text-cream">
+            <button onClick={() => setView("settings", "youtube")} className="underline hover:text-cream">
               {t.setUp}
             </button>
           </p>

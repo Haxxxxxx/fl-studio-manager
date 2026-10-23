@@ -55,7 +55,6 @@ export function CalendarView() {
   const workspace = useAppStore((s) => s.workspace);
   const openAlbum = useAppStore((s) => s.openAlbum);
   const openLaunchKit = useAppStore((s) => s.openLaunchKit);
-  const setView = useAppStore((s) => s.setView);
   const [showAllPast, setShowAllPast] = useState(false);
   const t = tr(T);
 
@@ -83,7 +82,7 @@ export function CalendarView() {
           <div>
             <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">{t.title}</h1>
           </div>
-          <button onClick={() => setView("albums")} className={`${btn} ml-auto`}>
+          <button onClick={() => openAlbum(null)} className={`${btn} ml-auto`}>
             <Plus size={14} /> {t.planRelease}
           </button>
         </header>
@@ -95,7 +94,7 @@ export function CalendarView() {
             <div className="max-w-sm text-xs text-body">
               {t.noDatesHint}
             </div>
-            <button onClick={() => setView("albums")} className={btnPrimary}>
+            <button onClick={() => openAlbum(null)} className={btnPrimary}>
               {t.planRelease}
             </button>
           </div>

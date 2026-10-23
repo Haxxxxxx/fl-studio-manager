@@ -191,11 +191,35 @@ export function SettingsView() {
   const detectFlStudio = useAppStore((s) => s.detectFlStudio);
   const pickFlStudio = useAppStore((s) => s.pickFlStudio);
   const pickOutputFolder = useAppStore((s) => s.pickOutputFolder);
+  const section = useAppStore((s) => s.settingsSection);
+  const clearSettingsSection = useAppStore((s) => s.clearSettingsSection);
   const [detecting, setDetecting] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const [testState, setTestState] = useState<
     { status: "idle" } | { status: "running" } | { status: "done"; path: string } | { status: "error"; message: string }
   >({ status: "idle" });
   const t = tr(T);
+
+  // Sent here for one section (setView("settings", id)): scroll to it once.
+  useEffect(() => {
+    if (!section) return;
+    const el = document.getElementById(section);
+    if (el) {
+      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    }
+    clearSettingsSection();
+  }, [section, clearSettingsSection]);
+
+  async function handleAddFolder() {
+    setFolderError(null);
+    await addWatchedFolder().catch((e) => setFolderError(e instanceof Error ? e.message : String(e)));
+  }
+
+  async function handleRemoveFolder(folder: string) {
+    setFolderError(null);
+    await removeWatchedFolder(folder).catch((e) => setFolderError(e instanceof Error ? e.message : String(e)));
+  }
 
   async function handleDetect() {
     setDetecting(true);
@@ -287,7 +311,7 @@ export function SettingsView() {
           </button>
         </section>
 
-        <section>
+        <section id="folders">
           <h2 className="text-sm font-semibold text-cream">{t.projectFolders}</h2>
           <p className="mt-1 text-xs text-engrave">{t.projectFoldersHint}</p>
           <div className="mt-3 flex flex-col gap-2">
@@ -298,7 +322,7 @@ export function SettingsView() {
               >
                 <span className="truncate">{folder}</span>
                 <button
-                  onClick={() => removeWatchedFolder(folder)}
+                  onClick={() => handleRemoveFolder(folder)}
                   className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-red-300"
                 >
                   <Trash2 size={14} />
@@ -306,13 +330,14 @@ export function SettingsView() {
               </div>
             ))}
             <button
-              onClick={addWatchedFolder}
+              onClick={handleAddFolder}
               className="flex items-center justify-center gap-2 rounded-md border border-dashed border-rule-strong py-2.5 text-sm text-engrave hover:border-orange-400/40 hover:text-orange-300"
             >
               <FolderPlus size={15} />
               {t.addFolder}
             </button>
           </div>
+          {folderError && <div className="mt-2 text-xs text-missing">{folderError}</div>}
         </section>
 
         <BeatFoldersSection />
@@ -325,7 +350,9 @@ export function SettingsView() {
           </div>
         </section>
 
-        <CrewPanel />
+        <div id="crew">
+          <CrewPanel />
+        </div>
 
         <AiSettings />
 
@@ -335,7 +362,7 @@ export function SettingsView() {
 
         <YoutubeSettings />
 
-        <section>
+        <section id="fl">
           <h2 className="text-sm font-semibold text-cream">{t.flExe}</h2>
           <p className="mt-1 text-xs text-engrave">{t.flExeHint}</p>
           <div className="mt-3 flex items-center gap-2">
@@ -363,7 +390,7 @@ export function SettingsView() {
           </div>
         </section>
 
-        <section>
+        <section id="export">
           <h2 className="text-sm font-semibold text-cream">{t.export}</h2>
           <p className="mt-1 text-xs text-engrave">{t.exportHint}</p>
           <div className="mt-3 flex items-center gap-2">
@@ -445,7 +472,7 @@ function ShortsSettings() {
   const t = tr(T);
 
   return (
-    <section>
+    <section id="ffmpeg">
       <h2 className="text-sm font-semibold text-cream">Shorts (ffmpeg)</h2>
       <p className="mt-1 text-xs text-engrave">
         {t.shortsIntro}{" "}
@@ -503,7 +530,7 @@ function AiSettings() {
   const status = !aiStatus?.configured ? t.aiOff : aiStatus.source === "env" ? t.aiEnv : t.aiSaved;
 
   return (
-    <section>
+    <section id="ai">
       <h2 className="text-sm font-semibold text-cream">{t.aiTitle}</h2>
       <p className="mt-1 text-xs text-engrave">
         {t.aiIntro}{" "}
@@ -605,7 +632,7 @@ function CoverSettings() {
   // Use REST API, Account ID and Create a Workers AI API Token are the
   // dashboard's own (English) labels.
   return (
-    <section>
+    <section id="cover">
       <h2 className="text-sm font-semibold text-cream">{t.coverTitle}</h2>
       <p className="mt-1 text-xs leading-relaxed text-engrave">
         {t.coverIntro}{" "}
@@ -732,7 +759,7 @@ function YoutubeSettings() {
   const line = !status?.configured ? t.off : status.source === "env" ? t.env : t.on;
 
   return (
-    <section>
+    <section id="youtube">
       <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
       <p className="mt-1 text-xs leading-relaxed text-engrave">
         {t.intro}{" "}
@@ -788,28 +815,36 @@ function BeatFoldersSection() {
   const folders = useAppStore((s) => s.settings.beatFolders ?? NO_FOLDERS);
   const add = useAppStore((s) => s.addBeatFolder);
   const remove = useAppStore((s) => s.removeBeatFolder);
+  const [error, setError] = useState<string | null>(null);
   const t = tr(T_BEATS);
+
+  function run(action: Promise<void>) {
+    setError(null);
+    void action.catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }
+
   return (
-    <section>
+    <section id="beats">
       <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
       <p className="mt-1 text-xs text-engrave">{t.hint}</p>
       <div className="mt-3 flex flex-col gap-2">
         {folders.map((folder) => (
           <div key={folder} className="flex items-center justify-between gap-2 rounded-md border border-rule bg-raised px-3 py-2 text-sm text-body">
             <span className="truncate">{folder}</span>
-            <button onClick={() => void remove(folder)} aria-label={t.remove(folder)} className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-red-300">
+            <button onClick={() => run(remove(folder))} aria-label={t.remove(folder)} className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-red-300">
               <Trash2 size={14} />
             </button>
           </div>
         ))}
         <button
-          onClick={() => void add()}
+          onClick={() => run(add())}
           className="flex items-center justify-center gap-2 rounded-md border border-dashed border-rule-strong py-2.5 text-sm text-engrave hover:border-orange-400/40 hover:text-orange-300"
         >
           <FolderPlus size={15} />
           {t.add}
         </button>
       </div>
+      {error && <div className="mt-2 text-xs text-missing">{error}</div>}
     </section>
   );
 }
