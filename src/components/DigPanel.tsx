@@ -113,16 +113,16 @@ export function DigPanel() {
   const stale = !!dig && digIsStale(picked, d.dugFor);
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-rule p-4" aria-label={t.title}>
+    <aside className="flex min-h-0 w-[clamp(320px,38%,460px)] shrink-0 flex-col gap-3 overflow-y-auto border-l border-rule p-4" aria-label={t.title}>
       <h2 className={label}>{t.title}</h2>
       {picked.length === 0 ? (
         <p className="text-sm text-engrave">{t.none}</p>
       ) : (
         <ol className="flex flex-col gap-1">
           {picked.map((p, i) => (
-            <li key={p} className="flex items-center gap-2 text-sm">
-              <span className="w-4 font-mono text-[11px] text-engrave">{i + 1}</span>
-              <span className="truncate text-cream">{byPath.get(p)?.name ?? p}</span>
+            <li key={p} className="flex items-start gap-2 text-sm">
+              <span className="w-4 shrink-0 pt-0.5 font-mono text-[11px] text-engrave">{i + 1}</span>
+              <span title={byPath.get(p)?.name ?? p} className="line-clamp-2 min-w-0 break-words text-cream">{byPath.get(p)?.name ?? p}</span>
             </li>
           ))}
         </ol>

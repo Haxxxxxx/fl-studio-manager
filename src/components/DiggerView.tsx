@@ -150,11 +150,11 @@ export function DiggerView() {
                         <label className={`flex min-w-0 flex-1 items-center gap-3 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                           <input type="checkbox" checked={on} disabled={disabled} onChange={() => toggle(b.path)} aria-label={t.pick(b.name)} className="accent-orange-500" />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm text-cream">{b.name}</span>
+                            <span title={b.name} className="block truncate text-sm text-cream">{b.name}</span>
                             <span className="block truncate font-mono text-[10.5px] text-engrave">{b.folder}</span>
                           </span>
                         </label>
-                        <span className="shrink-0 text-xs text-engrave">{formatRelative(b.modifiedAtMs)}</span>
+                        <span className="hidden shrink-0 text-xs text-engrave xl:inline">{formatRelative(b.modifiedAtMs)}</span>
                         <span className="w-16 shrink-0 text-right font-mono text-[11px] text-engrave">{formatBytes(b.sizeBytes)}</span>
                         {on && <Check size={14} className="shrink-0 text-hot" aria-hidden />}
                       </li>
