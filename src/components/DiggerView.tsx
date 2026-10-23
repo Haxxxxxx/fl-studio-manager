@@ -4,6 +4,7 @@ import { useAppStore } from "../store/useAppStore";
 import { MAX_PICKS, filterBeats, useDigger } from "../store/useDigger";
 import { audioSrc } from "../lib/tauri";
 import { formatBytes, formatRelative } from "../lib/format";
+import { isFileDrag } from "../lib/dropGuard";
 import { dict, tr } from "../i18n";
 import type { BeatFile } from "../types";
 import { DigPanel } from "./DigPanel";
@@ -31,6 +32,8 @@ const T = dict(
     pause: (name: string) => `Pause ${name}`,
     pick: (name: string) => `Pick ${name}`,
     loading: "Looking for beats…",
+    dropped: "Dropping files doesn't add them. Put the beat in one of your beats folders (Settings), tick it here, then tick \"Let Gemini listen\" and Dig.",
+    dismiss: "Dismiss",
   },
   {
     title: "Digger",
@@ -47,6 +50,8 @@ const T = dict(
     pause: (name: string) => `Pause ${name}`,
     pick: (name: string) => `Choisir ${name}`,
     loading: "Recherche des prods…",
+    dropped: `Glisser un fichier ne l'ajoute pas. Mets la prod dans un de tes dossiers de prods (Réglages), coche-la ici, puis coche «${NB}Faire écouter à Gemini${NB}» et Creuse.`,
+    dismiss: "Fermer",
   },
 );
 
@@ -60,6 +65,16 @@ export function DiggerView() {
   const shown = useMemo(() => filterBeats(beats, query), [beats, query]);
   const full = picked.length >= MAX_PICKS;
   const folderKey = folders.join("|");
+  const [dropHint, setDropHint] = useState(false);
+
+  // dropGuard.ts refuses the drop itself; here we say what to do instead.
+  useEffect(() => {
+    const onDrop = (e: DragEvent) => {
+      if (isFileDrag(e.dataTransfer?.types)) setDropHint(true);
+    };
+    window.addEventListener("drop", onDrop);
+    return () => window.removeEventListener("drop", onDrop);
+  }, []);
 
   useEffect(() => {
     if (folderKey) void load();
@@ -107,6 +122,15 @@ export function DiggerView() {
           </>
         )}
       </div>
+
+      {dropHint && (
+        <div role="status" className="mx-6 mt-3 flex items-start gap-3 rounded-md border border-rule-strong bg-raised px-3 py-2 text-xs text-cream">
+          <span className="flex-1">{t.dropped}</span>
+          <button onClick={() => setDropHint(false)} aria-label={t.dismiss} className="shrink-0 text-engrave hover:text-cream">
+            ✕
+          </button>
+        </div>
+      )}
 
       {folders.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
