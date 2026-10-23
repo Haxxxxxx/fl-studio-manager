@@ -20,7 +20,7 @@ export interface LandingCopy {
   privacy: { title: string; lead: string; travels: string; travelItems: string[]; stays: string; stayItems: string[]; note: string };
   status: { kicker: string; title: string; lead: string; ready: string; readyItems: string[]; limits: string; limitItems: string[]; next: string; nextItems: string[]; labels: [string, string, string] };
   faq: { title: string; items: Pair[] };
-  signin: { title: string; lead: string; app: string };
+  signin: { title: string; lead: string; app: string; mac: string; windows: string; firstRun: string };
   footer: { tagline: string; data: string; nav: string };
 }
 
@@ -136,7 +136,7 @@ const en: LandingCopy = {
       "Library and scanning for 7 DAWs",
       "Pipeline, release calendar, crew board and website",
       "Launch Kit: metadata, snippets, shorts, captions, cover concepts, export",
-      "Installers for Mac (Apple Silicon and Intel) and Windows",
+      "Download for Mac (Apple Silicon and Intel) and Windows, with in-app updates",
     ],
     limits: "Known limits",
     limitItems: [
@@ -156,7 +156,7 @@ const en: LandingCopy = {
       ["Does my audio go anywhere?", "No. Audio, project files, samples, notes and track names stay on your computer. Only the facts of songs you choose to share reach the crew."],
       ["Do I need internet?", "No. The app works fully offline; crew sharing catches up the next time you're online."],
       ["Mac or Windows?", "Both: Mac (Apple Silicon and Intel) and Windows 10/11, and crew members can mix the two."],
-      ["How do I get the app?", "It's crew-only for now. Your crew lead adds your email, sends you the installer and an invite code."],
+      ["How do I get the app?", "Download it below, for Mac or Windows. It's crew-only for now: your crew lead adds your email and sends you an invite code."],
       ["Is it in French?", "Yes: the app, this website and the crew dashboard are in French and English (pick in the app's Settings, or FR | EN here). Captions and the kit README can be either, per kit."],
       ["Can I use it on my own?", "Yes. The library, pipeline and Launch Kit work without a crew; sharing is optional."],
     ],
@@ -164,7 +164,10 @@ const en: LandingCopy = {
   signin: {
     title: "Crew only.",
     lead: "Hivo is invite-only for now. Your crew lead adds your email, then you sign in here with a 6-digit code (no password) and enter your crew's invite code.",
-    app: "The desktop app (Mac and Windows) comes from your crew lead too.",
+    app: "The desktop app is free, for Mac and Windows. It updates itself.",
+    mac: "Download for Mac",
+    windows: "Download for Windows",
+    firstRun: "Mac: right-click → Open the first time. Windows: More info → Run anyway.",
   },
   footer: { tagline: "made with and for the crew", data: "crew data: EU (Ireland) · audio: never leaves your machine", nav: "Footer" },
 };
@@ -281,7 +284,7 @@ const fr: LandingCopy = {
       "Bibliothèque et scan de 7 DAWs",
       "Pipeline, calendrier des sorties, tableau du crew et site",
       "Launch Kit : métadonnées, extraits, shorts, textes, idées de cover, export",
-      "Installeurs pour Mac (Apple Silicon et Intel) et Windows",
+      "Téléchargement pour Mac (Apple Silicon et Intel) et Windows, avec mises à jour depuis l'appli",
     ],
     limits: "Limites connues",
     limitItems: [
@@ -301,7 +304,7 @@ const fr: LandingCopy = {
       ["Mon audio part quelque part ?", "Non. L'audio, les fichiers de projet, les samples, les notes et les noms de pistes restent sur ton ordi. Seules les infos des sons que tu choisis de partager arrivent au crew."],
       ["Il faut internet ?", "Non. L'appli marche entièrement hors ligne ; le partage avec le crew se rattrape à ta prochaine connexion."],
       ["Mac ou Windows ?", "Les deux : Mac (Apple Silicon et Intel) et Windows 10/11, et le crew peut mélanger les deux."],
-      ["Comment j'ai l'appli ?", "Pour l'instant c'est réservé au crew. Le responsable ajoute ton email, puis t'envoie l'installeur et un code d'invitation."],
+      ["Comment j'ai l'appli ?", "Télécharge-la plus bas, pour Mac ou Windows. Pour l'instant c'est réservé au crew : le responsable ajoute ton email et t'envoie un code d'invitation."],
       ["C'est en français ?", "Oui : l'appli, ce site et le tableau du crew sont en français et en anglais (au choix dans les Réglages de l'appli, ou FR | EN ici). Les textes des posts et le README du kit, l'un ou l'autre, kit par kit."],
       ["Je peux l'utiliser seul ?", "Oui. La bibliothèque, le pipeline et le Launch Kit marchent sans crew ; le partage est optionnel."],
     ],
@@ -309,7 +312,10 @@ const fr: LandingCopy = {
   signin: {
     title: "Réservé au crew.",
     lead: "Hivo fonctionne sur invitation pour l'instant. Le responsable du crew ajoute ton email, puis tu te connectes ici avec un code à 6 chiffres (sans mot de passe) et tu entres le code d'invitation du crew.",
-    app: "L'appli (Mac et Windows), c'est aussi le responsable du crew qui te l'envoie.",
+    app: "L'appli est gratuite, pour Mac et Windows. Elle se met à jour toute seule.",
+    mac: "Télécharger pour Mac",
+    windows: "Télécharger pour Windows",
+    firstRun: "Mac : clic droit → Ouvrir la première fois. Windows : Informations complémentaires → Exécuter quand même.",
   },
   footer: { tagline: "fait avec et pour le crew", data: "données du crew : UE (Irlande) · audio : ne quitte jamais ton ordi", nav: "Pied de page" },
 };
