@@ -104,21 +104,26 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Lockfile-only checks: nothing is installed or executed.
+      # Lockfile-only checks: nothing is installed or executed. Each one runs
+      # even if an earlier one failed, so a run reports every problem.
       - name: npm audit (desktop)
         run: npm audit --audit-level=high
       - name: npm audit (web)
+        if: ${{ !cancelled() }}
         working-directory: web
         run: npm audit --audit-level=high
       - name: Lockfiles only pull from the npm registry
+        if: ${{ !cancelled() }}
         run: |
           bad=$(grep -hoE '"resolved": "[^"]+"' package-lock.json web/package-lock.json | grep -v '"https://registry.npmjs.org/' || true)
           if [ -n "$bad" ]; then echo "::error::Non-registry package sources:"; echo "$bad"; exit 1; fi
 
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        if: ${{ !cancelled() }}
         with:
           toolchain: stable
       - name: cargo audit
+        if: ${{ !cancelled() }}
         run: |
           cargo install cargo-audit --locked
           cargo audit --file src-tauri/Cargo.lock
