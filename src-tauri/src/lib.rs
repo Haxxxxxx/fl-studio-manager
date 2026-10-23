@@ -40,6 +40,7 @@ pub fn run() {
             settings::remove_beat_folder,
             beats::scan_beats,
             digger::dig_beats,
+            digger::dig_deeper,
             settings::pick_fl_studio,
             settings::use_detected_fl_studio,
             settings::pick_ffmpeg,
