@@ -93,10 +93,10 @@ export function SavedLeads({ beats, playingBeat, onPlayBeat }: Props) {
   );
 }
 
-/** The raw video address with a "Copy link" button; when the clipboard is
- * refused the address is shown selected, ready for ⌘C. */
-function CopyLink({ url }: { url: string }) {
-  const t = tr(T);
+/** Copying the raw video address: the button sits in the actions row (left
+ * of Convert), the address itself is shown as text; when the clipboard is
+ * refused the address is selected, ready for ⌘C. */
+function useCopyLink(url: string) {
   const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
   const field = useRef<HTMLInputElement>(null);
   const copy = async () => {
@@ -109,29 +109,18 @@ function CopyLink({ url }: { url: string }) {
       window.setTimeout(() => field.current?.select(), 0);
     }
   };
-  return (
-    <div className="mt-1 flex items-center gap-2">
-      <input
-        ref={field}
-        readOnly
-        value={url}
-        onFocus={(e) => e.currentTarget.select()}
-        aria-label={t.link}
-        className="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-engrave focus:text-cream focus:outline-none"
-      />
-      <button type="button" onClick={() => void copy()} className="flex shrink-0 items-center gap-1 text-[11px] text-body hover:text-cream">
-        {state === "copied" ? <Check size={11} aria-hidden /> : <Copy size={11} aria-hidden />}
-        {state === "copied" ? t.copied : state === "manual" ? t.copyManual : t.copyLink}
-      </button>
-    </div>
-  );
+  return { state, field, copy };
 }
+
+/** The main action's look (orange), same shape as the other row buttons. */
+const primary = "rounded bg-hot px-2.5 py-1.5 text-xs font-semibold text-chassis hover:bg-hot-hover";
 
 function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; beat: BeatFile | null; playingBeat: string | null; onPlayBeat: (b: BeatFile) => void }) {
   const t = tr(T);
   const setPlaying = useDigger((s) => s.setPlaying);
   const deleteLead = useDigger((s) => s.deleteLead);
   const id = lead.url ? youtubeId(lead.url) : null;
+  const link = useCopyLink(lead.url);
   const facts = [
     lead.producer,
     lead.year,
@@ -158,7 +147,18 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
           <div className="truncate text-[11px] text-engrave">{facts.join(" · ")}</div>
           {lead.traits.length > 0 && <div className="truncate text-[11px] text-body">{lead.traits.join(" · ")}</div>}
           {lead.summary && <p className="mt-1 line-clamp-2 text-xs text-body">{lead.summary}</p>}
-          {lead.url ? <CopyLink url={lead.url} /> : <p className="mt-1 text-[11px] text-engrave">{t.noLink}</p>}
+          {lead.url ? (
+            <input
+              ref={link.field}
+              readOnly
+              value={lead.url}
+              onFocus={(e) => e.currentTarget.select()}
+              aria-label={t.link}
+              className="mt-1 w-full bg-transparent font-mono text-[11px] text-engrave focus:text-cream focus:outline-none"
+            />
+          ) : (
+            <p className="mt-1 text-[11px] text-engrave">{t.noLink}</p>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -181,6 +181,12 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
         {lead.url && (
           <button type="button" onClick={() => void api.openExternal(lead.url)} aria-label={t.openTitle(lead.title)} className={`${secondary} flex items-center gap-1`}>
             <ExternalLink size={11} aria-hidden /> {t.open}
+          </button>
+        )}
+        {lead.url && (
+          <button type="button" onClick={() => void link.copy()} aria-label={t.copyLink} className={`${primary} flex items-center gap-1`}>
+            {link.state === "copied" ? <Check size={11} aria-hidden /> : <Copy size={11} aria-hidden />}
+            {link.state === "copied" ? t.copied : link.state === "manual" ? t.copyManual : t.copyLink}
           </button>
         )}
         {lead.url && <ConvertButton url={lead.url} />}
