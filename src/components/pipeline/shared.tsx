@@ -1,5 +1,5 @@
-import { createContext, useContext, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { createContext, useContext, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { usePipelineView, type PipelineScope, type PipelineViewKind } from "../../store/usePipelineView";
 import { stageColor, stageLabel, STAGE_ORDER, NAME_MAX } from "../../lib/pipeline";
 import type { PipelineColumn, SongStatus } from "../../types";
@@ -15,6 +15,13 @@ export const T_PIPELINE = dict(
     table: "Table",
     filterPlaceholder: "Filter songs, #tags, key",
     filterLabel: "Filter songs",
+    clearFilter: "Clear filter",
+    matching: (shown: number, total: number) => `${shown} of ${total} songs match`,
+    clear: "Clear",
+    noMatch: "No songs match your search",
+    emptyMine: "No songs yet. Link a folder in Settings or create a song.",
+    emptyCrew: "Nothing shared yet. Share a song from its panel.",
+    dismiss: "Dismiss",
     viewLabel: "View",
     // List and table headers
     song: "Song",
@@ -76,6 +83,13 @@ export const T_PIPELINE = dict(
     table: "Table",
     filterPlaceholder: "Filtrer sons, #tags, tonalité",
     filterLabel: "Filtrer les sons",
+    clearFilter: "Effacer le filtre",
+    matching: (shown: number, total: number) => `${shown} son${shown > 1 ? "s" : ""} sur ${total}`,
+    clear: "Effacer",
+    noMatch: "Aucun son ne correspond à ta recherche",
+    emptyMine: "Pas encore de son. Relie un dossier dans Réglages ou crée un son.",
+    emptyCrew: "Rien de partagé pour l'instant. Partage un son depuis son panneau.",
+    dismiss: "Fermer",
     viewLabel: "Vue",
     song: "Son",
     column: "Colonne",
@@ -162,6 +176,9 @@ export interface PipelineSource {
   scope: PipelineScope;
   groups: PipelineGroup[];
   query: string;
+  /** Songs on the pipeline, and how many the query lets through. */
+  total: number;
+  shown: number;
   /** Columns can be renamed, added, removed, reordered here. */
   editable: boolean;
   canRemove: (columnId: string) => boolean;
@@ -175,6 +192,7 @@ export interface PipelineSource {
   newSong?: () => void;
   /** Shown above the views (a refused move, a failed save). */
   error?: string | null;
+  clearError?: () => void;
 }
 
 const SourceContext = createContext<PipelineSource | null>(null);
@@ -184,6 +202,18 @@ export function useSource(): PipelineSource {
   if (!s) throw new Error("pipeline views need a PipelineSourceProvider");
   return s;
 }
+
+/** Enter and Space open a card like a click (cards are divs and rows, not buttons). */
+export function openOnKey(open?: () => void) {
+  return (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    if (e.key === " ") e.preventDefault();
+    open?.();
+  };
+}
+
+/** The visible focus ring of a card or row reached with the keyboard. */
+export const CARD_FOCUS = "focus-visible:outline-2 focus-visible:outline-cream";
 
 // ---- Drag rules (HTML5 drag and drop; Tauri's own file drop is off) ----
 
@@ -487,7 +517,16 @@ export function DropLine() {
 
 /** A source's error, above the views. */
 export function SourceError() {
-  const { error } = useSource();
+  const { error, clearError } = useSource();
   if (!error) return null;
-  return <div className="mx-4 mt-3 rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{error}</div>;
+  return (
+    <div className="mx-4 mt-3 flex items-center gap-2 rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">
+      <span className="min-w-0 flex-1">{error}</span>
+      {clearError && (
+        <button onClick={clearError} aria-label={tr(T_PIPELINE).dismiss} className="shrink-0 rounded p-0.5 text-engrave hover:text-cream">
+          <X size={12} />
+        </button>
+      )}
+    </div>
+  );
 }

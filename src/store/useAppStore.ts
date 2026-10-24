@@ -89,6 +89,8 @@ interface AppState {
   /** The last workspace save failed (cleared by the next successful save). */
   saveError: string | null;
   dismissErrors: () => void;
+  /** Try the failed save (or the failed workspace read) again. */
+  retrySave: () => Promise<void>;
   /** FL's default projects folder when found and nothing is linked yet. */
   /** DAW default folders found on this computer; null = not looked yet. */
   detectedFolders: DetectedFolder[] | null;
@@ -128,9 +130,15 @@ interface AppState {
   /** Song shown in the Launch Kit view. */
   launchPath: string | null;
   newProject: NewProjectDraft | null;
+  /** Settings section to scroll to on arrival (SettingsView clears it). */
+  settingsSection: string | null;
 
-  setView: (view: View) => void;
+  /** A different view closes the song drawer; `section` deep-links into Settings. */
+  setView: (view: View, section?: string) => void;
+  clearSettingsSection: () => void;
   setSearch: (search: string) => void;
+  /** Back to the whole library (search, stage, tag, plugin and toggle filters). */
+  resetLibraryFilters: () => void;
   init: () => Promise<void>;
 /** Preferences only: paths go through the pickers below (Rust owns them). */
   updateSettings: (patch: Partial<Omit<Settings, "watchedFolders" | "flStudioPath" | "outputFolder" | "ffmpegPath">>) => Promise<void>;
@@ -348,6 +356,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const stored = await api.getWorkspace();
       const { workspace, changed } = stored ? migrateWorkspace(stored) : { workspace: EMPTY_WORKSPACE, changed: false };
       set({ workspace, workspaceWritable: true });
+      if (get().startupError?.startsWith("Couldn't read your workspace")) set({ startupError: null });
       // Save the upgraded shape once, so the migration doesn't rerun.
       if (changed) await api.saveWorkspace(workspace).catch((e) => console.error("saving migrated workspace failed", e));
     } catch (e) {
@@ -368,6 +377,15 @@ export const useAppStore = create<AppState>((set, get) => {
     startupError: null,
     saveError: null,
     dismissErrors: () => set({ startupError: null, saveError: null }),
+    retrySave: async () => {
+      // Unreadable at startup: read it again rather than write over it (see
+      // loadWorkspace). Once it reads, saves resume on the stored copy.
+      if (!get().workspaceWritable) {
+        await loadWorkspace();
+        return;
+      }
+      await persistWorkspace();
+    },
     detectedFolders: null,
     workspace: EMPTY_WORKSPACE,
     workspaceWritable: false,
@@ -398,9 +416,19 @@ export const useAppStore = create<AppState>((set, get) => {
     openPersonId: null,
     launchPath: null,
     newProject: null,
+    settingsSection: null,
 
-    setView: (view) => set({ view }),
+    setView: (view, section) =>
+      set((s) => ({
+        view,
+        settingsSection: section ?? null,
+        // Only an actual change of screen closes the drawer.
+        detailPath: s.view === view ? s.detailPath : null,
+      })),
+    clearSettingsSection: () => set({ settingsSection: null }),
     setSearch: (search) => set({ search }),
+    resetLibraryFilters: () =>
+      set({ search: "", statusFilter: null, tagFilter: null, pluginFilter: null, problemsOnly: false, favoritesOnly: false, showArchived: false }),
 
     init: async () => {
       let settings: Settings;

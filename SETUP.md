@@ -6,7 +6,7 @@ Two ways to get Hivo running: **install a build** someone shared with you (5 min
 
 **Easiest:** download the latest installer from the repo's **Releases** page on GitHub: `Hivo_<version>_x64-setup.exe` for Windows, the `.dmg` for macOS (universal: Apple Silicon and Intel). They're built in the cloud by `.github/workflows/release.yml` and already point at the crew server.
 
-To publish a new one: push a version tag (`git tag v0.2.0 && git push origin v0.2.0`) or run **Actions → Release builds → Run workflow**, then open **Releases**, check the draft and **Publish**. The crew server settings come from the repo variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Settings → Secrets and variables → Actions → Variables).
+To publish a new one: push a version tag (`git tag v0.2.0 && git push origin v0.2.0`) or run **Actions → Release builds → Run workflow**, then open **Releases**, check the draft and **Publish**. The crew server settings come from the repo variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Settings → Secrets and variables → Actions → Variables); `VITE_FEEDBACK_EMAIL` is the address behind the sidebar's "Report a bug or send feedback" button (the button is hidden when it's unset).
 
 Local builds are made with `npm run tauri build` (see below) and end up in `src-tauri/target/release/bundle/`:
 

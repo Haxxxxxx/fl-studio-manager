@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   /** The project's public anon key. Never the service_role key. */
   readonly VITE_SUPABASE_ANON_KEY?: string;
+  /** Where the sidebar's "Report a bug" button writes. Optional: the button is hidden without it. */
+  readonly VITE_FEEDBACK_EMAIL?: string;
 }
 
 interface ImportMeta {

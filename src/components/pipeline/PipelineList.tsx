@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { useCollapsed } from "../../store/usePipelineView";
 import { formatRelative } from "../../lib/format";
 import { formatBpm } from "../../lib/songs";
-import { AddColumn, beforeKeyFor, ColumnHeader, ConflictDot, DropLine, SourceError, startSongDrag, T_PIPELINE, usePipelineDrop, useSource } from "./shared";
+import { AddColumn, beforeKeyFor, CARD_FOCUS, ColumnHeader, ConflictDot, DropLine, openOnKey, SourceError, startSongDrag, T_PIPELINE, usePipelineDrop, useSource } from "./shared";
 import { tr } from "../../i18n";
 
 const ROW = "grid grid-cols-[minmax(0,1fr)_7rem_4.5rem_3.5rem_minmax(0,10rem)_7rem] items-center gap-3";
@@ -43,18 +43,21 @@ export function PipelineList() {
             >
               <ColumnHeader column={column} count={items.length} view="list" collapsed={isCollapsed} className="px-3 py-2" />
               {!isCollapsed && (
-                <div role="list" className="flex flex-col gap-px px-1.5 pb-1.5">
-                  {items.length === 0 && <div className="px-3 py-2 text-xs text-engrave">{t.emptyColumn}</div>}
+                <div className="flex flex-col gap-px px-1.5 pb-1.5">
+                  {items.length === 0 && <div className="px-3 py-2 text-xs text-engrave">{query ? t.noMatch : t.emptyColumn}</div>}
                   {items.map((item, i) => (
                     <Fragment key={item.key}>
                       {dnd.spot?.columnId === column.id && dnd.spot.beforeKey === item.key && <DropLine />}
                       <div
-                        role="listitem"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={item.title}
                         draggable
                         onDragStart={(e) => startSongDrag(e, item.key)}
                         onDragOver={(e) => dnd.over(e, column.id, query ? null : beforeKeyFor(e, items, i))}
                         onClick={item.open}
-                        className={`${ROW} cursor-grab rounded px-3 py-1.5 text-sm active:cursor-grabbing ${
+                        onKeyDown={openOnKey(item.open)}
+                        className={`${ROW} cursor-grab rounded px-3 py-1.5 text-sm active:cursor-grabbing ${CARD_FOCUS} ${
                           item.selected ? "bg-raised ring-1 ring-orange-400/40" : "hover:bg-raised"
                         }`}
                       >

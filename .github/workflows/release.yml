@@ -15,6 +15,14 @@
 # The crew server settings (public URL + public anon key) come from the
 # repository variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. They're
 # public by design: row-level security in the database protects the data.
+#
+# Hardening (this runs on a personal machine):
+# - Only this repo's tags and manual runs from main start it. PR checks
+#   live in ci.yml on GitHub's runners, so fork code never reaches the Mac.
+# - The write token exists only in the "Draft release" step: dependency
+#   install scripts and build tools never see it.
+# - `npm ci --ignore-scripts`: dependency install scripts never run.
+# - Actions pinned to full commit SHAs.
 name: Release builds
 
 on:
@@ -23,7 +31,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -31,14 +39,17 @@ concurrency:
 
 jobs:
   build:
+    if: github.repository == 'Haxxxxxx/fl-studio-manager' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main')
     runs-on: [self-hosted, macOS, hivo]
     timeout-minutes: 60
+    permissions:
+      contents: write
     env:
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The write token isn't left in .git/config while dependency
           # install scripts run.
@@ -56,7 +67,15 @@ jobs:
           node -v && npm -v && cargo -V && cargo xwin --version && makensis -VERSION
           rustup target add aarch64-apple-darwin x86_64-apple-darwin x86_64-pc-windows-msvc
 
-      - run: npm ci
+      # A release tag must point at a commit on main, so a tag pushed from a
+      # side branch can't ship unreviewed code.
+      - name: Tag is on main
+        if: github.ref_type == 'tag'
+        run: |
+          git fetch --no-tags --depth=1000 origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
+
+      - run: npm ci --ignore-scripts
 
       - run: npm test
 
@@ -71,6 +90,7 @@ jobs:
 
       - name: Draft release
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
