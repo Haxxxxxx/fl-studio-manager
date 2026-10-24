@@ -9,6 +9,7 @@ import { CrewPanel } from "./CrewPanel";
 import { DetectedFolders } from "./DetectedFolders";
 import { canRenderInApp } from "../lib/daws";
 import { aiDisclosure } from "../lib/ai";
+import { converterTemplateFor } from "../lib/converters";
 import type { CaptionLang, RenderFormat, YoutubeStatus } from "../types";
 import { dict, tr } from "../i18n";
 
@@ -811,8 +812,14 @@ const T_DIGGER = dict(
     placeholder: "https://example.com/convert?u={url}",
     save: "Save",
     remove: "Remove",
-    saved: "Link saved. Each YouTube result in the Digger gets a Convert button.",
+    saved: "Link saved. Each YouTube result in the Digger gets a Convert button, with the video address pre-filled.",
+    savedPaste: "Link saved. Each YouTube result in the Digger gets a Convert button; Hivo opens the page and copies the video address for you to paste.",
+    recognizedExample: "Video link found inside the address and replaced by {url}: the address will be pre-filled on the site.",
+    recognizedKnown: (site: string) => `${site} recognized: its link format is known, the video address will be pre-filled.`,
+    knownPaste: (site: string) => `${site} recognized: no pre-fill format is known for it, so Hivo opens the page and copies the video address for you to paste.`,
     removed: "Link removed.",
+    howTo:
+      "The converter page's address. Hivo can't type into another site's page, so the video address is pre-filled only when the site reads it from its own link. Easiest: paste a video link on the site once, then copy the browser's address bar here; if the video link is in it, Hivo swaps it for {url} itself. Otherwise Hivo opens the page and copies the video address for you to paste.",
     disclosure:
       "Hivo opens this link with the video address and nothing else. The site, its terms and what you do with the file are between you and it; Hivo never downloads audio.",
   },
@@ -822,8 +829,14 @@ const T_DIGGER = dict(
     placeholder: "https://example.com/convert?u={url}",
     save: "Enregistrer",
     remove: "Retirer",
-    saved: "Lien enregistré. Chaque résultat YouTube du Digger a un bouton Convertir.",
+    saved: "Lien enregistré. Chaque résultat YouTube du Digger a un bouton Convertir, avec l'adresse de la vidéo pré-remplie.",
+    savedPaste: "Lien enregistré. Chaque résultat YouTube du Digger a un bouton Convertir ; Hivo ouvre la page et copie l'adresse de la vidéo pour que tu la colles.",
+    recognizedExample: "Lien de vidéo trouvé dans l'adresse et remplacé par {url} : l'adresse sera pré-remplie sur le site.",
+    recognizedKnown: (site: string) => `${site} reconnu : son format de lien est connu, l'adresse de la vidéo sera pré-remplie.`,
+    knownPaste: (site: string) => `${site} reconnu : aucun format de pré-remplissage connu pour lui, donc Hivo ouvre la page et copie l'adresse de la vidéo pour que tu la colles.`,
     removed: "Lien retiré.",
+    howTo:
+      "L'adresse de la page de conversion. Hivo ne peut pas écrire dans la page d'un autre site : l'adresse de la vidéo n'est pré-remplie que si le site la lit dans son propre lien. Le plus simple : colle un lien de vidéo sur le site une fois, puis copie ici la barre d'adresse du navigateur ; si le lien de la vidéo s'y trouve, Hivo le remplace par {url} tout seul. Sinon Hivo ouvre la page et copie l'adresse de la vidéo pour que tu la colles.",
     disclosure:
       "Hivo ouvre ce lien avec l'adresse de la vidéo et rien d'autre. Le site, ses conditions et ce que tu fais du fichier, c'est entre toi et lui ; Hivo ne télécharge jamais d'audio.",
   },
@@ -847,9 +860,25 @@ function DiggerSettings() {
 
   async function save(next: string | null) {
     setMessage(null);
+    // An example address (with a video link inside) or a known site's home
+    // page becomes the {url} template; anything else is saved as typed.
+    const raw = next?.trim() ?? "";
+    const pick = raw ? converterTemplateFor(raw) : null;
+    const template = pick?.template ?? "";
     try {
-      await updateSettings({ converterUrlTemplate: next?.trim() || undefined });
-      setMessage({ kind: "ok", text: next?.trim() ? t.saved : t.removed });
+      await updateSettings({ converterUrlTemplate: template || undefined });
+      const text = !template
+        ? t.removed
+        : pick?.recognized === "example"
+          ? t.recognizedExample
+          : pick?.recognized === "known" && pick.site
+            ? t.recognizedKnown(pick.site.name)
+            : pick?.site && !template.includes("{url}")
+              ? t.knownPaste(pick.site.name)
+              : template.includes("{url}")
+                ? t.saved
+                : t.savedPaste;
+      setMessage({ kind: "ok", text });
     } catch (e) {
       // Rust cleared it: keep the store in step, then say why.
       await updateSettings({ converterUrlTemplate: undefined }).catch(() => {});
@@ -863,6 +892,7 @@ function DiggerSettings() {
       <label className="mt-3 block text-xs text-body" htmlFor="converter-link">
         {t.converter}
       </label>
+      <p className="mt-1 text-[11px] leading-relaxed text-engrave">{t.howTo}</p>
       <form
         className="mt-1 flex items-center gap-2"
         onSubmit={(e) => {

@@ -3,7 +3,7 @@ import { ExternalLink, Play, Search, X } from "lucide-react";
 import { useDigger, type Playing } from "../store/useDigger";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
-import { MAX_LIKED, MAX_QUERY_CHARS, converterLink, embedUrl, googleSearchUrl, leadFacts, leadHash, seedList, youtubeId, youtubeSearchUrl } from "../lib/digger";
+import { MAX_LIKED, MAX_QUERY_CHARS, converterLink, converterNeedsPaste, embedUrl, googleSearchUrl, leadFacts, leadHash, seedList, youtubeId, youtubeSearchUrl } from "../lib/digger";
 import { dict, tr } from "../i18n";
 import type { Lead, WebLink, YoutubeStatus } from "../types";
 
@@ -49,6 +49,9 @@ const T = dict(
     savedTitle: "Saved in your beats folder (_leads). Click to show the file.",
     convert: "Convert",
     convertTitle: "Opens your converter link in the browser with this video's address. Hivo never downloads audio.",
+    convertPasteTitle: "Opens your converter page in the browser and copies this video's address: paste it there. Hivo never downloads audio.",
+    copied: "Address copied. Paste it on the page.",
+    copyFailed: (url: string) => `Couldn't copy. Paste this on the page: ${url}`,
     hint: "Opens in your browser. Leasing a beat stays between you and the producer: the Digger downloads nothing.",
   },
   {
@@ -81,6 +84,9 @@ const T = dict(
     savedTitle: "Enregistré dans ton dossier de prods (_leads). Clique pour afficher le fichier.",
     convert: "Convertir",
     convertTitle: "Ouvre ton lien de conversion dans le navigateur avec l'adresse de cette vidéo. Hivo ne télécharge jamais d'audio.",
+    convertPasteTitle: `Ouvre ta page de conversion dans le navigateur et copie l'adresse de cette vidéo${NB}: colle-la là-bas. Hivo ne télécharge jamais d'audio.`,
+    copied: "Adresse copiée. Colle-la sur la page.",
+    copyFailed: (url: string) => `Copie impossible. Colle ça sur la page${NB}: ${url}`,
     hint: `S'ouvre dans ton navigateur. La licence d'une prod se règle entre toi et le beatmaker${NB}: le Digger ne télécharge rien.`,
   },
 );
@@ -90,6 +96,43 @@ export const chip = (on: boolean) =>
   `rounded border px-2 py-0.5 text-left text-xs ${on ? "border-cream bg-cream text-chassis" : "border-rule-strong text-body hover:border-cream"}`;
 export const secondary = "rounded border border-rule-strong px-2.5 py-1.5 text-xs font-semibold text-cream hover:border-cream disabled:opacity-40";
 const playBtn = "shrink-0 rounded-full border border-rule-strong p-1.5 text-cream hover:border-hot";
+
+/** "Convert": opens the user's converter link in the browser. With a `{url}`
+ * slot the address goes in the link; without one the page opens as is and
+ * the address is put on the clipboard to paste there. Nothing is shown when
+ * no link is set. Hivo never calls the site and never downloads audio. */
+export function ConvertButton({ url, className = "" }: { url: string; className?: string }) {
+  const t = tr(T);
+  const converter = useAppStore((s) => s.settings.converterUrlTemplate);
+  const [note, setNote] = useState<string | null>(null);
+  const link = converterLink(converter, url);
+  if (!link) return null;
+  const paste = converterNeedsPaste(converter);
+  const click = async () => {
+    if (paste) {
+      try {
+        await navigator.clipboard.writeText(url);
+        setNote(t.copied);
+      } catch {
+        setNote(t.copyFailed(url));
+      }
+      window.setTimeout(() => setNote(null), 4000);
+    }
+    await api.openExternal(link);
+  };
+  return (
+    <>
+      <button onClick={() => void click()} title={paste ? t.convertPasteTitle : t.convertTitle} className={`${secondary} flex items-center gap-1 ${className}`}>
+        <ExternalLink size={12} aria-hidden /> {t.convert}
+      </button>
+      {note && (
+        <span role="status" className="text-[11px] text-engrave">
+          {note}
+        </span>
+      )}
+    </>
+  );
+}
 
 /** The "Use for next dig" toggle on a card or a link (`id`: video id or url). */
 export function LikeChip({ id, title }: { id: string; title: string }) {
@@ -186,7 +229,6 @@ interface Props {
 export function DigResults({ yt, round, setRound, fill }: Props) {
   const t = tr(T);
   const { dig, rounds, webQuery, roundResults, searching, searchError, leadError, setWebQuery, searchYoutube } = useDigger();
-  const converter = useAppStore((s) => s.settings.converterUrlTemplate);
   const facts = useLeadFacts();
   // Shared with the Saved prods tab (DiggerView), which plays into this dock.
   const playing = useDigger((s) => s.playing);
@@ -293,7 +335,6 @@ export function DigResults({ yt, round, setRound, fill }: Props) {
         {videos.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 @[900px]:grid-cols-2 @[1200px]:grid-cols-3" aria-label="YouTube">
             {videos.map((v) => {
-              const convert = converterLink(converter, v.url);
               return (
                 <li key={v.id} className="flex flex-col gap-2 rounded border border-rule bg-panel p-2">
                   <img
@@ -318,11 +359,7 @@ export function DigResults({ yt, round, setRound, fill }: Props) {
                     <button onClick={() => void api.openExternal(v.url)} aria-label={t.openVideo(v.title)} className={`${secondary} flex items-center gap-1 font-normal text-body`}>
                       <ExternalLink size={12} aria-hidden /> {t.open}
                     </button>
-                    {convert && (
-                      <button onClick={() => void api.openExternal(convert)} title={t.convertTitle} className={`${secondary} flex items-center gap-1 font-normal text-body`}>
-                        <ExternalLink size={12} aria-hidden /> {t.convert}
-                      </button>
-                    )}
+                    <ConvertButton url={v.url} className="font-normal text-body" />
                     <LikeChip id={v.id} title={v.title} />
                     <SaveChip lead={{ url: v.url, title: v.title, producer: v.channel, year: v.publishedAt.slice(0, 4), source: "youtube", ...facts }} />
                   </div>
