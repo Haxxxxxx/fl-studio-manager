@@ -17,6 +17,8 @@ import { RenderPanel } from "./components/RenderPanel";
 import { PackageConfirm, PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
+import { FeedbackModal } from "./components/FeedbackModal";
+import { supabase } from "./lib/supabase";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
 import { useCrewStore, useInCrew } from "./store/useCrewStore";
 import { StatusDot, btnPrimary, btnQuiet } from "./ui";
@@ -33,6 +35,7 @@ const T = dict(
     browserBefore: "This is the app's UI in a browser tab, so nothing can load or save here (no folders, settings or AI key). Run",
     browserAfter: "and use the Hivo window that opens.",
     dismiss: "Dismiss",
+    reportThis: "Report this",
     updateReady: (v: string) => `Hivo ${v} is ready`,
     updateDownloading: (v: string, pct: number | null) => `Downloading Hivo ${v}${pct === null ? "…" : ` · ${pct}%`}`,
     updateRestarting: (v: string) => `Hivo ${v} is installed, restarting…`,
@@ -53,6 +56,7 @@ const T = dict(
       "C'est l'interface de l'app dans un onglet de navigateur, donc rien ne peut se charger ni s'enregistrer ici (pas de dossiers, de réglages ni de clé IA). Lance",
     browserAfter: "et utilise la fenêtre Hivo qui s'ouvre.",
     dismiss: "Fermer",
+    reportThis: "Signaler",
     updateReady: (v: string) => `Hivo ${v} est prêt`,
     updateDownloading: (v: string, pct: number | null) => `Téléchargement de Hivo ${v}${pct === null ? "…" : ` · ${pct} %`}`,
     updateRestarting: (v: string) => `Hivo ${v} est installé, redémarrage…`,
@@ -170,6 +174,7 @@ export default function App() {
   const startupError = useAppStore((s) => s.startupError);
   const saveError = useAppStore((s) => s.saveError);
   const dismissErrors = useAppStore((s) => s.dismissErrors);
+  const openFeedback = useAppStore((s) => s.openFeedback);
   // The app's language. Set before rendering; the root is keyed on it, so a
   // change remounts every screen in the new language (src/i18n).
   const lang = resolveLang(useAppStore((s) => s.settings.uiLanguage));
@@ -239,6 +244,7 @@ export default function App() {
       {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
       {view !== "settings" && view !== "launch" && <ProjectDrawer key={detailPath ?? ""} />}
       <NewProjectModal />
+      <FeedbackModal />
       <RenderPanel />
       <PackagePanel />
       <PackageConfirm />
@@ -252,6 +258,15 @@ export default function App() {
       {(startupError || saveError) && (
         <div role="alert" className="absolute left-1/2 top-3 z-40 flex max-w-xl -translate-x-1/2 items-start gap-3 rounded-md border border-red-500/40 bg-[#2a1215] px-4 py-2 text-xs text-red-200 shadow-xl">
           <span>{saveError ?? startupError}</span>
+          {/* The in-app form, with this error as the message (only when this build has a backend). */}
+          {supabase && (
+            <button
+              onClick={() => openFeedback({ category: "bug", message: saveError ?? startupError ?? "" })}
+              className="shrink-0 whitespace-nowrap text-red-200/70 underline hover:text-red-100"
+            >
+              {tr(T).reportThis}
+            </button>
+          )}
           <button onClick={dismissErrors} aria-label={tr(T).dismiss} className="shrink-0 text-red-200/70 hover:text-red-100">
             ✕
           </button>
