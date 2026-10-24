@@ -137,6 +137,28 @@ export function embedUrl(id: string): string | null {
   return /^[A-Za-z0-9_-]{11}$/.test(id) ? `${EMBED_PAGE}?v=${id}` : null;
 }
 
+/** Letters and digits only, lowercased, single spaces: what a title and a
+ * file name share once a converter or a download has mangled punctuation. */
+export function titleKey(s: string): string {
+  return s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+/** The beat in the user's folders that is this lead, if one is: the same
+ * title, or one that contains the other (a downloaded file is usually named
+ * after the video, sometimes with a suffix or a prefix). Short keys never
+ * match by containment. */
+export function matchBeat<B extends { name: string }>(lead: { title: string }, beats: B[]): B | null {
+  const key = titleKey(lead.title);
+  if (!key) return null;
+  const exact = beats.find((b) => titleKey(b.name) === key);
+  if (exact) return exact;
+  if (key.length < 12) return null;
+  return beats.find((b) => {
+    const k = titleKey(b.name);
+    return k.length >= 12 && (k.includes(key) || key.includes(k));
+  }) ?? null;
+}
+
 /** Same limit as `MAX_LEAD_SLUG` in src-tauri/src/leads.rs (the file name's title part). */
 export const MAX_LEAD_SLUG = 60;
 

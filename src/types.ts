@@ -577,10 +577,15 @@ export interface Lead {
   summary: string | null;
 }
 
-/** A lead on disk: the url hash in its file name (`leadHash`) and its path. */
-export interface SavedLead {
+/** A lead on disk: the url hash in its file name (`leadHash`), its path, and
+ * its facts read back from the file (`url` is "" when the file holds no https
+ * link any more). */
+export interface SavedLead extends Lead {
   hash: string;
   path: string;
+  modifiedAtMs: number;
+  /** "YYYY-MM-DD" as written when saved, or "". */
+  savedOn: string;
 }
 
 /** One "Go deeper" round: more web links, seeded by the dig's analysis, or

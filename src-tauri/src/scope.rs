@@ -134,6 +134,16 @@ impl Scope {
             .ok_or_else(|| denied("That file", path))
     }
 
+    /// A lead file in a beats folder's `_leads` (the one file the app may
+    /// delete there).
+    pub fn lead_file(&self, path: &str) -> Result<PathBuf, String> {
+        let real = resolve(Path::new(path)).filter(|p| self.in_beat_leads(p)).ok_or_else(|| denied("That lead", path))?;
+        if real.extension().and_then(|e| e.to_str()) != Some("md") || !real.is_file() {
+            return Err(format!("not a lead file: {path}"));
+        }
+        Ok(real)
+    }
+
     /// An audio file (a mixdown) in a linked folder or the export folder.
     pub fn audio(&self, path: &str) -> Result<PathBuf, String> {
         let p = self.known_file(path)?;

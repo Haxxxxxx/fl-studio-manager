@@ -10,6 +10,7 @@ import { dict, tr } from "../i18n";
 import type { BeatFile, YoutubeStatus } from "../types";
 import { DigPanel } from "./DigPanel";
 import { DigResults } from "./DigResults";
+import { SavedLeads } from "./SavedLeads";
 
 // The Digger: your raw beats (Settings → Beats folders). Pick up to 5 and dig
 // the web for similar ones to start a new song on (DigPanel). Once a dig or a
@@ -19,6 +20,8 @@ import { DigResults } from "./DigResults";
 const NB = " ";
 // A stable empty list: a fresh [] in a store selector re-renders forever.
 const NO_FOLDERS: string[] = [];
+const tabClass = (on: boolean) =>
+  `rounded border px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.14em] ${on ? "border-cream bg-cream text-chassis" : "border-rule-strong text-engrave hover:text-cream"}`;
 
 const T = dict(
   {
@@ -38,6 +41,8 @@ const T = dict(
     loading: "Looking for beats…",
     dropped: "Dropping files doesn't add them. Put the beat in one of your beats folders (Settings), tick it here, then tick \"Let Gemini listen\" and Dig.",
     dismiss: "Dismiss",
+    tabBeats: "Your beats",
+    tabSaved: (n: number) => `Saved prods · ${n}`,
   },
   {
     title: "Digger",
@@ -56,6 +61,8 @@ const T = dict(
     loading: "Recherche des prods…",
     dropped: `Glisser un fichier ne l'ajoute pas. Mets la prod dans un de tes dossiers de prods (Réglages), coche-la ici, puis coche «${NB}Faire écouter à Gemini${NB}» et Creuse.`,
     dismiss: "Fermer",
+    tabBeats: "Tes prods",
+    tabSaved: (n: number) => `Prods enregistrées · ${n}`,
   },
 );
 
@@ -66,6 +73,9 @@ export function DiggerView() {
   const { beats, loading, error, picked, query, load, loadLeads, toggle, clearPicks, setQuery, dig, webQuery, searchedFor, searching, clearUnseen, shownRound, setShownRound } = useDigger();
   const [playing, setPlaying] = useState<string | null>(null);
   const [yt, setYt] = useState<YoutubeStatus | null>(null);
+  // The top block shows the beats to pick from, or the saved prods.
+  const [tab, setTab] = useState<"beats" | "saved">("beats");
+  const leadCount = useDigger((s) => s.leads.length);
   // The results section is always there (its search box is the only way to
   // search YouTube); it takes its share of the height once it has something.
   const showResults = !!dig || searchedFor !== null || searching || webQuery.trim() !== "";
@@ -166,18 +176,32 @@ export function DiggerView() {
         <div className="flex min-h-0 flex-1">
           <div className="@container flex min-w-0 flex-1 flex-col overflow-hidden">
             <div className={`flex flex-col overflow-hidden ${showResults ? "min-h-[160px] basis-[40%]" : "min-h-0 flex-1"}`}>
-              <div className="flex items-center gap-3 border-b border-rule px-6 py-2 text-xs">
-                <span className={picked.length ? "text-cream" : "text-engrave"}>{t.picked(picked.length)}</span>
-                {picked.length > 0 && (
-                  <button onClick={clearPicks} className="text-engrave underline hover:text-cream">
-                    {t.clear}
+              <div className="flex flex-wrap items-center gap-3 border-b border-rule px-6 py-2 text-xs">
+                <div role="tablist" className="flex items-center gap-1.5">
+                  <button role="tab" aria-selected={tab === "beats"} onClick={() => setTab("beats")} className={tabClass(tab === "beats")}>
+                    {t.tabBeats}
                   </button>
+                  <button role="tab" aria-selected={tab === "saved"} onClick={() => setTab("saved")} className={tabClass(tab === "saved")}>
+                    {t.tabSaved(leadCount)}
+                  </button>
+                </div>
+                {tab === "beats" && (
+                  <>
+                    <span className={picked.length ? "text-cream" : "text-engrave"}>{t.picked(picked.length)}</span>
+                    {picked.length > 0 && (
+                      <button onClick={clearPicks} className="text-engrave underline hover:text-cream">
+                        {t.clear}
+                      </button>
+                    )}
+                    {full && <span className="text-engrave">{t.full}</span>}
+                  </>
                 )}
-                {full && <span className="text-engrave">{t.full}</span>}
               </div>
               {error && <div role="alert" className="mx-6 mt-3 rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{error}</div>}
               <div className="flex-1 overflow-y-auto px-4 py-2">
-                {loading && beats.length === 0 ? (
+                {tab === "saved" ? (
+                  <SavedLeads beats={beats} playingBeat={playing} onPlayBeat={playToggle} />
+                ) : loading && beats.length === 0 ? (
                   <p className="p-4 text-sm text-engrave">{t.loading}</p>
                 ) : shown.length === 0 ? (
                   <p className="p-4 text-sm text-engrave">{t.empty}</p>
