@@ -171,7 +171,7 @@ export function ShortsPanel({
                 {t.onMac}
                 <code className="rounded bg-black/30 px-1">winget install Gyan.FFmpeg</code>
                 {t.onWindows}
-                <button onClick={() => setView("settings")} className="underline">
+                <button onClick={() => setView("settings", "ffmpeg")} className="underline">
                   {t.setPath}
                 </button>
                 .

@@ -17,6 +17,7 @@ import { RenderPanel } from "./components/RenderPanel";
 import { PackageConfirm, PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
+import { StatusDot } from "./components/ui";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
 import { useCrewStore } from "./store/useCrewStore";
 
@@ -32,6 +33,8 @@ const T = dict(
     browserBefore: "This is the app's UI in a browser tab, so nothing can load or save here (no folders, settings or AI key). Run",
     browserAfter: "and use the Hivo window that opens.",
     dismiss: "Dismiss",
+    notSaving: "Changes aren't being saved",
+    retry: "Retry",
   },
   {
     kept: (n: number) =>
@@ -44,8 +47,28 @@ const T = dict(
       "C'est l'interface de l'app dans un onglet de navigateur, donc rien ne peut se charger ni s'enregistrer ici (pas de dossiers, de réglages ni de clé IA). Lance",
     browserAfter: "et utilise la fenêtre Hivo qui s'ouvre.",
     dismiss: "Fermer",
+    notSaving: "Les modifications ne sont pas enregistrées",
+    retry: "Réessayer",
   },
 );
+
+/** Stays up while the workspace can't be read or saved (the red banner
+ * above is one-off and dismissable; this one isn't). */
+function NotSavingStrip() {
+  const writable = useAppStore((s) => s.workspaceWritable);
+  const saveError = useAppStore((s) => s.saveError);
+  const retrySave = useAppStore((s) => s.retrySave);
+  if (writable && !saveError) return null;
+  return (
+    <div role="status" className="flex shrink-0 items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-1.5 text-xs text-cream">
+      <StatusDot color="var(--color-warn)" size={6} />
+      <span className="flex-1">{tr(T).notSaving}</span>
+      <button onClick={() => void retrySave()} className="rounded border border-rule-strong px-2 py-0.5 text-body hover:bg-raised hover:text-cream">
+        {tr(T).retry}
+      </button>
+    </div>
+  );
+}
 
 /** After a scan: which songs kept their stage, notes, crew share… across a rename/move. */
 function RelinkNotice() {
@@ -123,19 +146,22 @@ export default function App() {
   return (
     <div key={lang} className="relative flex h-screen bg-chassis text-cream">
       <Sidebar />
-      {view === "dashboard" && <Dashboard />}
-      {view === "library" && <LibraryView />}
-      {view === "pipeline" && <PipelineView />}
-      {view === "albums" && <AlbumsView />}
-      {view === "people" && <PeopleView />}
-      {view === "launch" && <LaunchKitView />}
-      {view === "calendar" && <CalendarView />}
-      {view === "settings" && <SettingsView />}
-      {view === "digger" && <DiggerView />}
-      {view === "crewBoard" && <CrewBoardView />}
-      {view === "crewReleases" && <CrewReleasesView />}
-      {view === "crewMembers" && <CrewMembersView />}
-      {view === "crewSettings" && <CrewSettingsView />}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <NotSavingStrip />
+        {view === "dashboard" && <Dashboard />}
+        {view === "library" && <LibraryView />}
+        {view === "pipeline" && <PipelineView />}
+        {view === "albums" && <AlbumsView />}
+        {view === "people" && <PeopleView />}
+        {view === "launch" && <LaunchKitView />}
+        {view === "calendar" && <CalendarView />}
+        {view === "settings" && <SettingsView />}
+        {view === "digger" && <DiggerView />}
+        {view === "crewBoard" && <CrewBoardView />}
+        {view === "crewReleases" && <CrewReleasesView />}
+        {view === "crewMembers" && <CrewMembersView />}
+        {view === "crewSettings" && <CrewSettingsView />}
+      </div>
       {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
       {view !== "settings" && view !== "launch" && <ProjectDrawer key={detailPath ?? ""} />}
       <NewProjectModal />

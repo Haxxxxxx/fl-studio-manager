@@ -99,7 +99,7 @@ export function CrewCards({ songs }: { songs: ProjectInfo[] }) {
         ) : (
           <div className="text-xs text-engrave">
             {t.nothingDated}{" "}
-            <button onClick={() => setView("albums")} className="underline hover:text-cream">
+            <button onClick={() => openAlbum(null)} className="underline hover:text-cream">
               {t.planRelease}
             </button>
           </div>
