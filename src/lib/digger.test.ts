@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, converterLink, deeperExclude, foundKey, foundTitles, googleSearchUrl, leadFacts, leadHash, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
+import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, converterLink, deeperExclude, embedUrl, foundKey, foundTitles, googleSearchUrl, leadFacts, leadHash, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
@@ -65,6 +65,13 @@ describe("digger links", () => {
     expect(searchesDone([{ queries: ["a", " b "] }, { queries: ["b", "", "c"] }])).toEqual(["a", "b", "c"]);
     expect(searchesDone(Array.from({ length: 9 }, (_, i) => ({ queries: Array.from({ length: 8 }, (_, j) => `q${i}-${j}`) }))).length).toBe(50);
     expect(searchesDone([])).toEqual([]);
+  });
+
+  it("frames the website's player page with a strict video id only", () => {
+    expect(embedUrl("dQw4w9WgXcQ")).toBe("https://www.hi-vo.fr/embed.html?v=dQw4w9WgXcQ");
+    expect(embedUrl("dQw4w9WgXcQ&autoplay=0")).toBeNull();
+    expect(embedUrl("../x")).toBeNull();
+    expect(embedUrl("")).toBeNull();
   });
 
   it("reads the video ID of YouTube links only", () => {
