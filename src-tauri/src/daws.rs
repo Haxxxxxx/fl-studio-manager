@@ -703,9 +703,11 @@ fn read_song(path: &Path) -> Result<FlpMetadata, ReadError> {
     // Plugins (best-effort): <Attributes x:id="deviceData" name="Serum"/> in Devices/*.xml.
     let device_files: Vec<String> = archive
         .file_names()
+        // A name that doesn't decode is skipped, like any unreadable device.
+        .filter_map(Result::ok)
         .filter(|n| n.starts_with("Devices/") && n.ends_with(".xml"))
         .take(MAX_DEVICE_FILES)
-        .map(String::from)
+        .map(|n| n.into_owned())
         .collect();
     for name in device_files {
         // Best-effort: an oversized device file is skipped, not fatal.
