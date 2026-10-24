@@ -47,6 +47,9 @@ jobs:
           cache: npm
 
       - run: npm ci --ignore-scripts
+      # npm packages and Rust crates of Tauri must share a major.minor, or
+      # `tauri build` refuses on the release runner.
+      - run: npm run check:tauri
       - run: npm test
       # tsc + vite; also produces ../dist, which the Rust crate embeds.
       - run: npm run build
