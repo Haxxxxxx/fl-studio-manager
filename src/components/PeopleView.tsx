@@ -7,6 +7,7 @@ import { lastSaveMs, statusInfo } from "../lib/songs";
 import type { Person, ProjectInfo } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { OUTCOMES, roleLabel } from "./SongPeople";
+import { Profiles } from "./ProfileLookup";
 import { ConfirmButton, StatusDot, TagEditor, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { Avatar } from "../ui";
 import { dict, tr } from "../i18n";
@@ -225,7 +226,11 @@ function PersonDetail({ person }: { person: Person }) {
         </button>
 
         <div className="mt-4 flex items-center gap-4">
-          <Avatar name={person.name} size={56} />
+          {person.spotify?.imageUrl ? (
+            <img src={person.spotify.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
+          ) : (
+            <Avatar name={person.name} size={56} />
+          )}
           <input
             value={person.name}
             onChange={(e) => updatePerson(person.id, { name: e.target.value })}
@@ -249,6 +254,8 @@ function PersonDetail({ person }: { person: Person }) {
             />
           </div>
         </div>
+
+        <Profiles person={person} />
 
         <div className={`${sectionLabel} mt-6 mb-2`}>{t.notes}</div>
         <textarea
