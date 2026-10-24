@@ -136,7 +136,7 @@ const en: LandingCopy = {
       "Library and scanning for 7 DAWs",
       "Pipeline, release calendar, crew board and website",
       "Launch Kit: metadata, snippets, shorts, captions, cover concepts, export",
-      "Installers for Mac (Apple Silicon and Intel) and Windows",
+      "Installers for Mac (Apple Silicon and Intel) and Windows, sent by your crew lead",
     ],
     limits: "Known limits",
     limitItems: [
@@ -281,7 +281,7 @@ const fr: LandingCopy = {
       "Bibliothèque et scan de 7 DAWs",
       "Pipeline, calendrier des sorties, tableau du crew et site",
       "Launch Kit : métadonnées, extraits, shorts, textes, idées de cover, export",
-      "Installeurs pour Mac (Apple Silicon et Intel) et Windows",
+      "Installeurs pour Mac (Apple Silicon et Intel) et Windows, envoyés par le responsable du crew",
     ],
     limits: "Limites connues",
     limitItems: [

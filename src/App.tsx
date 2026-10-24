@@ -19,7 +19,7 @@ import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { StatusDot } from "./components/ui";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
-import { useCrewStore } from "./store/useCrewStore";
+import { useCrewStore, useInCrew } from "./store/useCrewStore";
 
 const fileName = (p: string) => p.split(/[/\\]/).pop() ?? p;
 
@@ -100,6 +100,8 @@ function RelinkNotice() {
 export default function App() {
   const init = useAppStore((s) => s.init);
   const view = useAppStore((s) => s.view);
+  const setView = useAppStore((s) => s.setView);
+  const inCrew = useInCrew();
   const settingsLoaded = useAppStore((s) => s.settingsLoaded);
   const detailPath = useAppStore((s) => s.detailPath);
   const startupError = useAppStore((s) => s.startupError);
@@ -114,6 +116,12 @@ export default function App() {
     init();
     void useCrewStore.getState().init();
   }, [init]);
+
+  // Left or removed from the crew (or signed out) while on a crew page: that
+  // page has nothing to show any more.
+  useEffect(() => {
+    if (!inCrew && view.startsWith("crew")) setView("dashboard");
+  }, [inCrew, view, setView]);
 
   // Closing the window right after an edit: write the pending save first.
   useEffect(() => {

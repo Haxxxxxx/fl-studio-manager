@@ -60,8 +60,8 @@ const TEXT = {
     fr: "Ta connexion a expiré. Reconnecte-toi.",
   },
   ownThree: {
-    en: "You already own 3 crews. Hand one over or delete one first.",
-    fr: "Tu possèdes déjà 3 crews. Passe-en un à quelqu'un d'autre ou supprime-en un d'abord.",
+    en: "You already own 3 crews. Hand one over first.",
+    fr: "Tu possèdes déjà 3 crews. Passe-en un à quelqu'un d'autre d'abord.",
   },
   inTen: {
     en: "You're already in 10 crews. Leave one first.",
