@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { isTauri } from "@tauri-apps/api/core";
 import { dict, tr } from "../i18n";
 import * as api from "../lib/tauri";
 import * as updater from "../lib/updater";
