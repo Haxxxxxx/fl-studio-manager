@@ -15,12 +15,16 @@ export function PipelineBoard() {
   const toggleCollapsed = usePipelineView((s) => s.toggleCollapsed);
   const dnd = usePipelineDrop();
 
-  // Nothing on the pipeline at all: one line instead of six empty columns.
+  // Nothing on the pipeline at all: one line instead of six empty columns,
+  // but columns stay editable (AddColumn renders nothing where they aren't).
   if (source.total === 0 && !query) {
     return (
       <>
         <SourceError />
-        <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-engrave">{scope === "crew" ? tr(T_PIPELINE).emptyCrew : tr(T_PIPELINE).emptyMine}</div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center text-sm text-engrave">
+          <span>{scope === "crew" ? tr(T_PIPELINE).emptyCrew : tr(T_PIPELINE).emptyMine}</span>
+          <AddColumn compact />
+        </div>
       </>
     );
   }

@@ -82,6 +82,7 @@ describe("feedback", () => {
 
   it("tells a rate limit, a network failure and anything else apart", () => {
     expect(feedbackErrorKind({ code: "P0001", message: "too many messages today" })).toBe("rate-limited");
+    expect(feedbackErrorKind({ code: "P0001", message: "too many messages right now" })).toBe("rate-limited");
     expect(feedbackErrorKind({ code: "", message: "TypeError: Failed to fetch" })).toBe("network");
     expect(feedbackErrorKind(new TypeError("Load failed"))).toBe("failed");
     expect(feedbackErrorKind(new TypeError("NetworkError when attempting to fetch resource."))).toBe("network");

@@ -129,6 +129,8 @@ export class FeedbackError extends Error {
 export function feedbackErrorKind(e: unknown): FeedbackErrorKind {
   const err = (typeof e === "object" && e !== null ? e : {}) as { message?: unknown; code?: unknown };
   const message = typeof err.message === "string" ? err.message : String(e ?? "");
+  // "too many messages today" (10 a day per install) and "too many messages
+  // right now" (200 an hour across every install) both mean: wait.
   if (/too many messages/i.test(message)) return "rate-limited";
   // supabase-js reports a failed request with an empty code and the fetch error as the message.
   if (err.code === "" || /fetch|network|offline|ECONN|ENOTFOUND|timed? ?out/i.test(message)) return "network";

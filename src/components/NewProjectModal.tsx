@@ -144,8 +144,10 @@ export function NewProjectModal() {
       });
       setName("");
       // Land where the new song shows: the Library (no drawer on Settings or
-      // the Launch Kit), with no filter hiding it.
-      if (useAppStore.getState().view === "settings" || useAppStore.getState().view === "launch") setView("library");
+      // the Launch Kit; the drawer would squeeze the Digger's panels), with
+      // no filter hiding it.
+      const view = useAppStore.getState().view;
+      if (view === "settings" || view === "launch" || view === "digger") setView("library");
       resetLibraryFilters();
       openDetail(path);
       if (openAfter) {

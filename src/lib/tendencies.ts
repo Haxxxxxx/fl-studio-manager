@@ -26,6 +26,11 @@ const metaOf = (ws: Workspace, p: ProjectInfo): SongMeta | undefined => ws.songs
 // ---- 1. Tempo & key ----
 
 export const BPM_BIN = 10;
+/** FL's tempo range, the clamp flp_metadata.rs and crewSync.ts use. A corrupt
+ * tempo from another DAW's file (REAPER, Ableton) is skipped, not binned:
+ * one 99999999 BPM song would otherwise make millions of empty bins. */
+const BPM_MIN = 10;
+const BPM_MAX = 522;
 
 export interface BpmBin {
   /** Inclusive lower edge ("140" for 140–149.9). */
@@ -49,7 +54,7 @@ export interface TempoKeyTendencies {
 export function tempoKeyTendencies(songs: ProjectInfo[], ws: Workspace): TempoKeyTendencies {
   const counts = new Map<number, number>();
   for (const p of songs) {
-    if (p.tempoBpm == null || !Number.isFinite(p.tempoBpm) || p.tempoBpm <= 0) continue;
+    if (p.tempoBpm == null || !Number.isFinite(p.tempoBpm) || p.tempoBpm < BPM_MIN || p.tempoBpm > BPM_MAX) continue;
     const from = Math.floor(p.tempoBpm / BPM_BIN) * BPM_BIN;
     counts.set(from, (counts.get(from) ?? 0) + 1);
   }
@@ -187,10 +192,14 @@ export interface YourSound {
 export const RECENT_SONGS = 10;
 const DROPPED_MIN_SONGS = 3;
 
-/** The folder a sample sits in, by name only: "Kicks" for ".../Drums/Kicks/kick 01.wav". */
+/** The folder a sample sits in, by name only: "Kicks" for ".../Drums/Kicks/kick 01.wav".
+ * Null when the parent is a drive root ("C:"), the filesystem root or a home
+ * directory name (fewer than 3 segments): those say nothing about the sound. */
 export function sampleFolder(path: string): string | null {
   const parts = path.split(/[/\\]/).filter(Boolean);
-  return parts.length >= 2 ? parts[parts.length - 2] : null;
+  if (parts.length < 3) return null;
+  const parent = parts[parts.length - 2];
+  return /^[A-Za-z]:$/.test(parent) ? null : parent;
 }
 
 function distinctPer(songs: ProjectInfo[], items: (p: ProjectInfo) => Iterable<string>): Map<string, Set<string>> {
