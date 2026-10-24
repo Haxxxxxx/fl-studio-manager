@@ -141,6 +141,10 @@ pub struct Settings {
     /// to Gemini (off by default; disclosed in the UI).
     #[serde(default)]
     pub dig_send_audio: bool,
+    /// A uuid made once on this install: the feedback form's rate-limit
+    /// key, nothing else. Kept once set.
+    #[serde(default)]
+    pub install_id: Option<String>,
 }
 
 fn default_caption_language() -> String {
@@ -167,6 +171,7 @@ impl Default for Settings {
             ui_language: default_ui_language(),
             beat_folders: Vec::new(),
             dig_send_audio: false,
+            install_id: None,
         }
     }
 }
