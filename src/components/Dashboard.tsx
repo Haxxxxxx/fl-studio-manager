@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type React from "react";
 import {
   AlertTriangle,
@@ -26,16 +26,30 @@ import {
   statusInfo,
 } from "../lib/songs";
 import { EmptyLibrary, useVisibleSongs } from "./LibraryView";
-import { CrewCards } from "./CrewCards";
+import { CrewWhoCard, NextReleaseCard, StalledCard } from "./CrewCards";
 import { AttentionCarousel } from "./AttentionCarousel";
+import { AddBlockTray, BlockFrame, EmptyBlock, T_LAYOUT, VariantSwitch, useBlockDrag } from "./DashboardEdit";
+import {
+  defaultLayout,
+  hideBlock,
+  moveBlock,
+  normalizeLayout,
+  setSize,
+  setVariant,
+  showBlock,
+  sizeOf,
+  variantOf,
+  visibleBlocks,
+  type DashboardBlockId,
+} from "../lib/dashboardLayout";
 import { attentionItems } from "../lib/attention";
 import { useCrewStore, useInCrew } from "../store/useCrewStore";
 import { crewStats, RECENT_DAYS } from "../lib/crewStats";
 import { STALLED_DAYS } from "../lib/crew";
 import { pathsByShareId } from "../lib/crewSync";
 import { ProgressBar } from "./AlbumsView";
-import { StatusDot, btn, btnPrimary } from "./ui";
-import { Card, HeroStat, SongLines, StatTile } from "../ui";
+import { ConfirmButton, StatusDot, btn, btnPrimary, btnQuiet } from "./ui";
+import { Card, HeroStat, SongLines, StatTile, engrave } from "../ui";
 import { areaPath, monotonePath } from "../lib/curve";
 import { dict, locale, tr } from "../i18n";
 
@@ -47,6 +61,8 @@ const STORAGE_COLORS = ["#f2efe8", "#8d897f", "#5a5850", "#c98500"];
 // a hairline grid (charts stay neutral; orange is for "needs you").
 const DAY = 24 * 60 * 60 * 1000;
 const ACTIVITY_WEEKS = 53;
+// Heatmap variant: the same cream, from unlit to full.
+const HEAT = ["#1f1f1c", "rgba(242,239,232,0.25)", "rgba(242,239,232,0.5)", "rgba(242,239,232,0.75)", "#f2efe8"];
 /** Drawing space of the curve; the SVG is stretched to the card's width. */
 const CURVE_W = 1000;
 const CURVE_H = 150;
@@ -75,6 +91,21 @@ const T = dict(
     pickUp: "Pick up where you left off",
     open: "Open",
     studioActivity: "Studio activity — saves per week, last 12 months",
+    studioHeatmap: "Studio activity — saves per day, last 12 months",
+    weekdays: ["Mon", "", "Wed", "", "Fri", "", ""].join(","),
+    less: "Less",
+    more: "More",
+    // Block looks (the segmented control in a card's header)
+    curve: "Curve",
+    heatmap: "Heatmap",
+    bars: "Bars",
+    counts: "Counts",
+    card: "Card",
+    countdown: "Countdown",
+    tiles: "Tiles",
+    hero: "Hero",
+    statsLine: (inProgress: number, finished: number, releases: number) =>
+      `${inProgress} in progress · ${finished} finished · ${releases} release${s(releases)}`,
     pipeline: "Pipeline",
     nothingTriaged: "Nothing triaged yet — open the Pipeline board and drag songs into stages.",
     willOpen: "Will this computer open your songs?",
@@ -153,6 +184,20 @@ const T = dict(
     pickUp: "Reprends là où tu t'es arrêté",
     open: "Ouvrir",
     studioActivity: "Activité studio — sauvegardes par semaine, 12 derniers mois",
+    studioHeatmap: "Activité studio — sauvegardes par jour, 12 derniers mois",
+    weekdays: ["Lun", "", "Mer", "", "Ven", "", ""].join(","),
+    less: "Moins",
+    more: "Plus",
+    curve: "Courbe",
+    heatmap: "Grille",
+    bars: "Barres",
+    counts: "Nombres",
+    card: "Carte",
+    countdown: "Compte à rebours",
+    tiles: "Tuiles",
+    hero: "Un chiffre",
+    statsLine: (inProgress: number, finished: number, releases: number) =>
+      `${inProgress} en cours · ${finished} fini${s(finished)} · ${releases} sortie${s(releases)}`,
     pipeline: "Pipeline",
     nothingTriaged: "Rien de classé pour l'instant — ouvre le tableau Pipeline et glisse tes sons dans les étapes.",
     willOpen: "Cet ordi va-t-il ouvrir tes sons ?",
@@ -216,8 +261,9 @@ const T = dict(
   },
 );
 
-function MyDashboard() {
+function MyDashboard({ editing }: { editing: boolean }) {
   const songs = useVisibleSongs();
+  const inCrew = useInCrew();
   const workspace = useAppStore((s) => s.workspace);
   const demoMode = useAppStore((s) => s.demoMode);
   const loadDemoData = useAppStore((s) => s.loadDemoData);
@@ -227,9 +273,26 @@ function MyDashboard() {
   const openAlbum = useAppStore((s) => s.openAlbum);
   const setStatusFilter = useAppStore((s) => s.setStatusFilter);
   const resetLibraryFilters = useAppStore((s) => s.resetLibraryFilters);
+  const setDashboardLayout = useAppStore((s) => s.setDashboardLayout);
   const watchedFolders = useAppStore((s) => s.settings.watchedFolders);
   const scanning = useAppStore((s) => s.scanning);
   const t = tr(T);
+
+  // Sample data always shows the default arrangement (nothing is saved in
+  // demo mode anyway). In a crew the three crew cards share a row.
+  const layout = useMemo(
+    () => (demoMode ? defaultLayout(inCrew) : normalizeLayout(workspace.dashboard, defaultLayout(inCrew))),
+    [workspace.dashboard, demoMode, inCrew],
+  );
+  const drag = useBlockDrag((id, spot) => {
+    const order = visibleBlocks(layout);
+    const from = order.indexOf(id);
+    const target = order.indexOf(spot.id);
+    if (from < 0 || target < 0) return;
+    // Index after the dragged block is taken out, before or after the target.
+    const to = target + (spot.before ? 0 : 1) - (from < target ? 1 : 0);
+    setDashboardLayout(moveBlock(layout, id, to));
+  });
 
   const statusOf = (path: string) => workspace.songs[path]?.status;
 
@@ -256,6 +319,7 @@ function MyDashboard() {
   );
 
   const attention = useMemo(() => attentionItems(songs, workspace), [songs, workspace]);
+  const hasPitches = useMemo(() => Object.values(workspace.songs).some((m) => m.pitches?.length), [workspace.songs]);
 
   const storage = useMemo(() => {
     const sum = (f: (p: (typeof songs)[number]) => number) => songs.reduce((t, p) => t + f(p), 0);
@@ -295,93 +359,152 @@ function MyDashboard() {
     );
   }
 
-  return (
-    <div className="min-w-0 flex-1 overflow-auto px-8 py-7">
-      <div className="mx-auto flex max-w-5xl flex-col gap-5">
-        {demoMode && (
-          <div className="flex items-center justify-between rounded-md border border-orange-400/30 bg-orange-500/10 px-4 py-2.5 text-sm text-orange-200">
-            <span>{t.showingSample}</span>
-            <button onClick={exitDemoMode} className="rounded border border-orange-400/40 px-2.5 py-1 text-xs font-medium hover:bg-orange-500/20">
-              {t.exitDemo}
-            </button>
-          </div>
-        )}
+  /** The A/B control of a block, in its card header (in and out of edit mode). */
+  const variantSwitch = (id: DashboardBlockId, options: { id: string; label: string }[]) => (
+    <VariantSwitch label={tr(T_LAYOUT).look} options={options} value={variantOf(layout, id)} onChange={(v) => setDashboardLayout(setVariant(layout, id, v))} />
+  );
 
-        <div className="grid grid-cols-4 gap-3">
-          <StatTile icon={<Music2 size={15} />} label={t.songs} value={songs.length} />
-          <StatTile icon={<Sparkles size={15} />} label={t.inProgress} value={inProgress} />
-          <StatTile icon={<Trophy size={15} />} label={t.finished} value={finished} />
-          <StatTile icon={<Disc3 size={15} />} label={t.releases} value={workspace.albums.length} />
-        </div>
+  // Blocks with nothing to draw stay off the grid, except in edit mode,
+  // where their frame shows so they can still be moved or hidden.
+  const available: Partial<Record<DashboardBlockId, boolean>> = {
+    crewWho: inCrew,
+    pitches: hasPitches,
+    releases: workspace.albums.length > 0,
+  };
 
-        <Card title={t.pickUp}>
-          <div className="grid grid-cols-4 gap-2">
-            {continueWith.map((p) => {
-              const s = statusInfo(statusOf(p.path));
-              return (
-                <div
-                  key={p.path}
-                  onClick={() => openDetail(p.path)}
-                  className="group cursor-pointer rounded-lg border border-rule bg-raised p-3 hover:border-rule-strong"
-                >
-                  <div className="truncate text-sm font-medium text-cream">{p.name}</div>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-body">
-                    <StatusDot color={s.color} size={6} /> {s.label}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-engrave">
-                    <span>{formatRelative(p.modifiedAtMs)}</span>
-                    {!demoMode && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openInFlStudio(p.path).catch((err) => console.error("couldn't open the project", err));
-                        }}
-                        className="flex items-center gap-1 text-engrave opacity-0 hover:text-orange-300 group-hover:opacity-100"
-                      >
-                        <PlayCircle size={13} /> {t.open}
-                      </button>
-                    )}
-                  </div>
+  const block = (id: DashboardBlockId): ReactNode => {
+    switch (id) {
+      case "stats": {
+        const control = variantSwitch("stats", [
+          { id: "tiles", label: t.tiles },
+          { id: "hero", label: t.hero },
+        ]);
+        if (variantOf(layout, "stats") === "hero") {
+          return (
+            <div className="h-full rounded border border-rule bg-panel px-5 py-4 shadow-panel">
+              <div className="flex items-center justify-between">
+                <div className={`flex items-center gap-1.5 ${engrave}`}>
+                  <Music2 size={15} />
+                  <span>{t.songs}</span>
                 </div>
-              );
-            })}
+                {control}
+              </div>
+              <div className="mt-2 font-display text-5xl font-semibold leading-[0.9] tabular-nums text-cream">{songs.length}</div>
+              <div className="mt-2 text-xs text-body">{t.statsLine(inProgress, finished, workspace.albums.length)}</div>
+            </div>
+          );
+        }
+        return (
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-end">{control}</div>
+            <div className="grid grid-cols-4 gap-3">
+              <StatTile icon={<Music2 size={15} />} label={t.songs} value={songs.length} />
+              <StatTile icon={<Sparkles size={15} />} label={t.inProgress} value={inProgress} />
+              <StatTile icon={<Trophy size={15} />} label={t.finished} value={finished} />
+              <StatTile icon={<Disc3 size={15} />} label={t.releases} value={workspace.albums.length} />
+            </div>
           </div>
-        </Card>
-
-        <CrewCards songs={songs} />
-
-        <Card title={t.studioActivity}>
-          <ActivityCurve />
-        </Card>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Card title={t.pipeline}>
-            <div className="flex flex-col gap-1.5">
-              {pipeline.map((s) => {
-                const max = Math.max(1, ...pipeline.map((x) => x.count));
+        );
+      }
+      case "pickUp":
+        return (
+          <Card title={t.pickUp} className="h-full">
+            <div className="grid grid-cols-4 gap-2">
+              {continueWith.map((p) => {
+                const s = statusInfo(statusOf(p.path));
                 return (
-                  <button
-                    key={s.label}
-                    onClick={() => {
-                      resetLibraryFilters();
-                      setStatusFilter(s.id ?? "unsorted");
-                      setView("library");
-                    }}
-                    className="group flex items-center gap-3 rounded px-1 py-0.5 text-left hover:bg-panel"
+                  <div
+                    key={p.path}
+                    onClick={() => openDetail(p.path)}
+                    className="group cursor-pointer rounded-lg border border-rule bg-raised p-3 hover:border-rule-strong"
                   >
-                    <span className="flex w-24 shrink-0 items-center gap-1.5 text-xs text-body">
-                      <StatusDot color={s.color} /> {s.label}
-                    </span>
+                    <div className="truncate text-sm font-medium text-cream">{p.name}</div>
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-body">
+                      <StatusDot color={s.color} size={6} /> {s.label}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[11px] text-engrave">
+                      <span>{formatRelative(p.modifiedAtMs)}</span>
+                      {!demoMode && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openInFlStudio(p.path).catch((err) => console.error("couldn't open the project", err));
+                          }}
+                          className="flex items-center gap-1 text-engrave opacity-0 hover:text-orange-300 group-hover:opacity-100"
+                        >
+                          <PlayCircle size={13} /> {t.open}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        );
+      case "nextRelease":
+        return (
+          <NextReleaseCard
+            variant={variantOf(layout, "nextRelease") as "card" | "countdown"}
+            control={variantSwitch("nextRelease", [
+              { id: "card", label: t.card },
+              { id: "countdown", label: t.countdown },
+            ])}
+          />
+        );
+      case "stalled":
+        return <StalledCard songs={songs} />;
+      case "crewWho":
+        return <CrewWhoCard songs={songs} />;
+      case "activity": {
+        const heat = variantOf(layout, "activity") === "heatmap";
+        return (
+          <Card
+            title={heat ? t.studioHeatmap : t.studioActivity}
+            className="h-full"
+            action={variantSwitch("activity", [
+              { id: "curve", label: t.curve },
+              { id: "heatmap", label: t.heatmap },
+            ])}
+          >
+            {heat ? <ActivityHeatmap /> : <ActivityCurve />}
+          </Card>
+        );
+      }
+      case "pipeline": {
+        const counts = variantOf(layout, "pipeline") === "counts";
+        const max = Math.max(1, ...pipeline.map((x) => x.count));
+        const show = (s: (typeof pipeline)[number]) => {
+          resetLibraryFilters();
+          setStatusFilter(s.id ?? "unsorted");
+          setView("library");
+        };
+        return (
+          <Card
+            title={t.pipeline}
+            className="h-full"
+            action={variantSwitch("pipeline", [
+              { id: "bars", label: t.bars },
+              { id: "counts", label: t.counts },
+            ])}
+          >
+            <div className="flex flex-col gap-1.5">
+              {pipeline.map((s) => (
+                <button key={s.label} onClick={() => show(s)} className="group flex items-center gap-3 rounded px-1 py-0.5 text-left hover:bg-panel">
+                  <span className={`flex shrink-0 items-center gap-1.5 text-xs text-body ${counts ? "flex-1" : "w-24"}`}>
+                    <StatusDot color={s.color} /> {s.label}
+                  </span>
+                  {!counts && (
                     <span className="flex h-4 flex-1 items-center">
                       <span
                         className="h-full rounded-r"
                         style={{ width: `${(s.count / max) * 100}%`, minWidth: s.count ? 3 : 0, background: s.color }}
                       />
                     </span>
-                    <span className="w-8 text-right text-xs tabular-nums text-body">{s.count}</span>
-                  </button>
-                );
-              })}
+                  )}
+                  <span className="w-8 text-right text-xs tabular-nums text-body">{s.count}</span>
+                </button>
+              ))}
             </div>
             {pipeline[0].count === songs.length && (
               <div className="mt-3 text-xs text-engrave">
@@ -389,18 +512,23 @@ function MyDashboard() {
               </div>
             )}
           </Card>
-
-          <Card title={t.willOpen}>
+        );
+      }
+      case "openCleanly":
+        return (
+          <Card title={t.willOpen} className="h-full">
             <HealthCard />
           </Card>
-        </div>
-
-        <Card title={t.needsAttention}>
-          <AttentionCarousel items={attention} label={(i) => songLabel(i.song, songs)} onOpen={openDetail} />
-        </Card>
-
-        <div>
-          <Card title={t.storage(formatBytes(storageTotal))}>
+        );
+      case "attention":
+        return (
+          <Card title={t.needsAttention} className="h-full">
+            <AttentionCarousel items={attention} label={(i) => songLabel(i.song, songs)} onOpen={openDetail} />
+          </Card>
+        );
+      case "storage":
+        return (
+          <Card title={t.storage(formatBytes(storageTotal))} className="h-full">
             <div className="flex h-4 gap-[2px]">
               {storage.map((s, i) =>
                 s.bytes ? (
@@ -424,12 +552,12 @@ function MyDashboard() {
             </div>
             <BackupHogs />
           </Card>
-        </div>
-
-        <PitchesCard />
-
-        {workspace.albums.length > 0 && (
-          <Card title={t.releases}>
+        );
+      case "pitches":
+        return <PitchesCard />;
+      case "releases":
+        return (
+          <Card title={t.releases} className="h-full">
             <div className="flex flex-col gap-3">
               {workspace.albums.map((a) => {
                 const done = a.trackPaths.filter((p) => isFinished(statusOf(p))).length;
@@ -451,7 +579,42 @@ function MyDashboard() {
               })}
             </div>
           </Card>
+        );
+    }
+  };
+
+  const shown = visibleBlocks(layout).filter((id) => editing || available[id] !== false);
+  return (
+    <div className="min-w-0 flex-1 overflow-auto px-8 py-7">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5">
+        {demoMode && (
+          <div className="flex items-center justify-between rounded-md border border-orange-400/30 bg-orange-500/10 px-4 py-2.5 text-sm text-orange-200">
+            <span>{t.showingSample}</span>
+            <button onClick={exitDemoMode} className="rounded border border-orange-400/40 px-2.5 py-1 text-xs font-medium hover:bg-orange-500/20">
+              {t.exitDemo}
+            </button>
+          </div>
         )}
+
+        <div className="grid grid-cols-12 gap-x-4 gap-y-5">
+          {shown.map((id, i) => (
+            <BlockFrame
+              key={id}
+              id={id}
+              size={sizeOf(layout, id)}
+              editing={editing}
+              index={i}
+              count={shown.length}
+              drag={drag}
+              onMove={(to) => setDashboardLayout(moveBlock(layout, id, to))}
+              onSize={(size) => setDashboardLayout(setSize(layout, id, size))}
+              onHide={() => setDashboardLayout(hideBlock(layout, id))}
+            >
+              {available[id] === false ? <EmptyBlock /> : block(id)}
+            </BlockFrame>
+          ))}
+          {editing && <AddBlockTray hidden={layout.hidden} onShow={(id) => setDashboardLayout(showBlock(layout, id))} />}
+        </div>
       </div>
     </div>
   );
@@ -475,16 +638,13 @@ function MyDashboard() {
   }
 }
 
-/** GitHub-style calendar: every save (current file + each backup) is a
- * real work session, so this shows when you actually made music. */
-function ActivityCurve() {
+/** Every save (current file + each backup) is a real work session, bucketed
+ * by calendar day over the last ACTIVITY_WEEKS weeks, with the streaks. The
+ * curve and the heatmap both draw from this. */
+function useStudioDays() {
   const songs = useVisibleSongs();
-  const openDetail = useAppStore((s) => s.openDetail);
-  const [hover, setHover] = useState<number | null>(null);
-  const t = tr(T);
-
   const lastSave = useMemo(() => Math.max(0, ...songs.map((p) => p.modifiedAtMs)), [songs]);
-  const { weeks, max, activeDays, streak, longest, busiest, months } = useMemo(() => {
+  const stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     // The series starts on the Monday ACTIVITY_WEEKS weeks back.
@@ -520,8 +680,54 @@ function ActivityCurve() {
       longest = Math.max(longest, run);
     }
     const busiest = days.reduce((a, b) => (b.saves > a.saves ? b : a), days[0]);
-    // One point per week (Monday to Sunday, the last one ending today).
-    const weeks = Array.from({ length: Math.ceil(total / 7) }, (_, w) => {
+    // Month label at the first week containing the 1st of that month.
+    const months: (string | null)[] = Array.from({ length: Math.ceil(total / 7) }, (_, w) => {
+      const firstOfMonth = days.slice(w * 7, w * 7 + 7).find((d) => d.date.getDate() === 1);
+      return firstOfMonth ? firstOfMonth.date.toLocaleDateString(locale(), { month: "short" }) : null;
+    });
+    return {
+      days,
+      activeDays: days.filter((d) => d.saves > 0).length,
+      streak,
+      longest,
+      busiest,
+      months,
+    };
+  }, [songs]);
+  return { songs, lastSave, ...stats };
+}
+
+/** The figures beside the curve or the heatmap. */
+function StudioStats({ activeDays, streak, longest, busiest, lastSave }: Pick<ReturnType<typeof useStudioDays>, "activeDays" | "streak" | "longest" | "busiest" | "lastSave">) {
+  const t = tr(T);
+  return (
+    <div className="flex shrink-0 flex-col justify-center gap-2 text-xs">
+      <HeroStat label={t.activeDays} value={activeDays} />
+      {streak > 0 ? (
+        <HeroStat label={t.currentStreak} value={t.streakDays(streak)} />
+      ) : (
+        lastSave > 0 && <HeroStat label={t.lastSession} value={formatRelative(lastSave)} />
+      )}
+      {longest > 1 && <HeroStat label={t.longestStreak} value={t.longestDays(longest)} />}
+      {busiest.saves > 0 && (
+        <div className="text-[11px] text-engrave">
+          {t.busiest(busiest.date.toLocaleDateString(locale(), { month: "short", day: "numeric" }), busiest.saves)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Saves per week as one curve over the last year. */
+function ActivityCurve() {
+  const openDetail = useAppStore((s) => s.openDetail);
+  const [hover, setHover] = useState<number | null>(null);
+  const t = tr(T);
+  const { songs, days, months, ...stats } = useStudioDays();
+
+  // One point per week (Monday to Sunday, the last one ending today).
+  const { weeks, max } = useMemo(() => {
+    const weeks = Array.from({ length: Math.ceil(days.length / 7) }, (_, w) => {
       const slice = days.slice(w * 7, w * 7 + 7);
       const names = new Set<string>();
       let saves = 0;
@@ -531,21 +737,8 @@ function ActivityCurve() {
       }
       return { start: slice[0].date, end: slice[slice.length - 1].date, saves, songs: names };
     });
-    // Month label under the first week containing the 1st of that month.
-    const months: (string | null)[] = weeks.map((_, w) => {
-      const firstOfMonth = days.slice(w * 7, w * 7 + 7).find((d) => d.date.getDate() === 1);
-      return firstOfMonth ? firstOfMonth.date.toLocaleDateString(locale(), { month: "short" }) : null;
-    });
-    return {
-      weeks,
-      max: Math.max(1, ...weeks.map((w) => w.saves)),
-      activeDays: days.filter((d) => d.saves > 0).length,
-      streak,
-      longest,
-      busiest,
-      months,
-    };
-  }, [songs]);
+    return { weeks, max: Math.max(1, ...weeks.map((w) => w.saves)) };
+  }, [days]);
 
   const xAt = (i: number) => (weeks.length > 1 ? i / (weeks.length - 1) : 0);
   const points = weeks.map((w, i) => ({ x: xAt(i) * CURVE_W, y: CURVE_PAD + (1 - w.saves / max) * (CURVE_H - CURVE_PAD) }));
@@ -620,20 +813,83 @@ function ActivityCurve() {
           </div>
         )}
       </div>
-      <div className="flex shrink-0 flex-col justify-center gap-2 text-xs">
-        <HeroStat label={t.activeDays} value={activeDays} />
-        {streak > 0 ? (
-          <HeroStat label={t.currentStreak} value={t.streakDays(streak)} />
-        ) : (
-          lastSave > 0 && <HeroStat label={t.lastSession} value={formatRelative(lastSave)} />
-        )}
-        {longest > 1 && <HeroStat label={t.longestStreak} value={t.longestDays(longest)} />}
-        {busiest.saves > 0 && (
-          <div className="text-[11px] text-engrave">
-            {t.busiest(busiest.date.toLocaleDateString(locale(), { month: "short", day: "numeric" }), busiest.saves)}
+      <StudioStats {...stats} />
+    </div>
+  );
+}
+
+/** GitHub-style calendar: one cell per day, lit by how many saves it had. */
+function ActivityHeatmap() {
+  const openDetail = useAppStore((s) => s.openDetail);
+  const [hover, setHover] = useState<{ day: number; x: number; y: number } | null>(null);
+  const t = tr(T);
+  const { songs, days, months, ...stats } = useStudioDays();
+
+  const max = Math.max(1, ...days.map((d) => d.saves));
+  const level = (n: number) => (n === 0 ? 0 : Math.min(4, 1 + Math.floor(((n - 1) / max) * 4)));
+  const weeks = Math.ceil(days.length / 7);
+  const hovered = hover ? days[hover.day] : null;
+
+  return (
+    <div className="relative">
+      <div className="flex gap-4">
+        <div className="flex gap-[2px] overflow-x-auto pb-1">
+          <div className="mr-1 flex flex-col gap-[2px] pt-[15px] text-[9px] leading-[11px] text-engrave">
+            {t.weekdays.split(",").map((d, i) => (
+              <span key={i} className="h-[11px]">{d}</span>
+            ))}
           </div>
-        )}
+          {Array.from({ length: weeks }, (_, w) => (
+            <div key={w} className="flex flex-col gap-[2px]">
+              <span className="h-[13px] w-[11px] overflow-visible whitespace-nowrap text-[9px] leading-[11px] text-engrave">
+                {months[w]}
+              </span>
+              {days.slice(w * 7, w * 7 + 7).map((d, i) => (
+                <div
+                  key={d.date.getTime()}
+                  onMouseEnter={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const parent = e.currentTarget.closest(".relative")!.getBoundingClientRect();
+                    setHover({ day: w * 7 + i, x: r.left - parent.left + r.width / 2, y: r.top - parent.top });
+                  }}
+                  onMouseLeave={() => setHover(null)}
+                  onClick={() => {
+                    const name = [...d.songs][0];
+                    const p = songs.find((s) => s.name === name);
+                    if (p) openDetail(p.path);
+                  }}
+                  className={`h-[11px] w-[11px] rounded-[2px] ${d.saves ? "cursor-pointer" : ""} ${hover?.day === w * 7 + i ? "ring-1 ring-cream" : ""}`}
+                  style={{ background: HEAT[level(d.saves)] }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+        <StudioStats {...stats} />
       </div>
+      <div className="mt-2 flex items-center gap-1 text-[10px] text-engrave">
+        {t.less}
+        {HEAT.map((c) => (
+          <span key={c} className="h-[10px] w-[10px] rounded-[2px]" style={{ background: c }} />
+        ))}
+        {t.more}
+      </div>
+      {hover && hovered && (
+        <div
+          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-rule bg-chassis px-2.5 py-1.5 text-[11px] shadow-xl"
+          style={{ left: hover.x, top: hover.y - 6 }}
+        >
+          <div className="text-engrave">
+            {hovered.date.toLocaleDateString(locale(), { weekday: "short", month: "short", day: "numeric" })}
+          </div>
+          <div className="font-medium text-cream">
+            {t.saves(hovered.saves)}
+          </div>
+          {hovered.songs.size > 0 && (
+            <div className="max-w-[200px] truncate text-body">{[...hovered.songs].join(", ")}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -832,34 +1088,60 @@ function HealthCard() {
 type Scope = "me" | "crew";
 
 /** "Me" = this computer's songs and studio habits. "Crew" = group stats from
- * shared songs only (roadmap 1a). The switch appears once you're in a crew. */
+ * shared songs only (roadmap 1a). The switch appears once you're in a crew.
+ * The Me dashboard's blocks can be rearranged: "Edit layout" at the right. */
 export function Dashboard() {
   const inCrew = useInCrew();
   const crewName = useCrewStore((s) => s.crews.find((c) => c.id === s.activeCrewId)?.name ?? tr(T).crew);
   const hasLocal = useAppStore((s) => s.projects.length > 0 || s.settings.watchedFolders.length > 0);
+  const hasSongs = useAppStore((s) => s.projects.length > 0);
+  const demoMode = useAppStore((s) => s.demoMode);
+  const resetDashboardLayout = useAppStore((s) => s.resetDashboardLayout);
   const [picked, setPicked] = useState<Scope | null>(null);
+  const [editing, setEditing] = useState(false);
   // Members with no FL folders of their own land on the crew view.
   const scope: Scope = inCrew ? (picked ?? (hasLocal ? "me" : "crew")) : "me";
+  // Sample data keeps the default arrangement, so there's nothing to edit.
+  const canEdit = scope === "me" && hasSongs && !demoMode;
+  const tl = tr(T_LAYOUT);
 
-  if (!inCrew) return <MyDashboard />;
+  if (!inCrew && !canEdit) return <MyDashboard editing={false} />;
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex justify-center border-b border-rule px-8 pb-2 pt-4">
-        <div role="tablist" aria-label={tr(T).scope} className="flex rounded-md border border-rule p-0.5 text-xs">
-          {(["me", "crew"] as const).map((s) => (
-            <button
-              key={s}
-              role="tab"
-              aria-selected={scope === s}
-              onClick={() => setPicked(s)}
-              className={`rounded px-3 py-1 ${scope === s ? "bg-rule text-cream" : "text-engrave hover:text-cream"}`}
-            >
-              {s === "me" ? tr(T).me : crewName}
-            </button>
-          ))}
-        </div>
+      <div className={`relative flex min-h-[46px] items-center justify-center px-8 pb-2 pt-4 ${inCrew ? "border-b border-rule" : ""}`}>
+        {inCrew && (
+          <div role="tablist" aria-label={tr(T).scope} className="flex rounded-md border border-rule p-0.5 text-xs">
+            {(["me", "crew"] as const).map((s) => (
+              <button
+                key={s}
+                role="tab"
+                aria-selected={scope === s}
+                onClick={() => setPicked(s)}
+                className={`rounded px-3 py-1 ${scope === s ? "bg-rule text-cream" : "text-engrave hover:text-cream"}`}
+              >
+                {s === "me" ? tr(T).me : crewName}
+              </button>
+            ))}
+          </div>
+        )}
+        {canEdit && (
+          <div className="absolute right-8 top-1/2 flex -translate-y-1/2 items-center gap-2 pt-1">
+            {editing ? (
+              <>
+                <ConfirmButton label={tl.resetLayout} confirmLabel={tl.resetConfirm} onConfirm={resetDashboardLayout} className={btn} />
+                <button onClick={() => setEditing(false)} className={btnPrimary}>
+                  {tl.done}
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setEditing(true)} className={btnQuiet}>
+                {tl.editLayout}
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      {scope === "me" ? <MyDashboard /> : <CrewDashboard />}
+      {scope === "me" ? <MyDashboard editing={editing && canEdit} /> : <CrewDashboard />}
     </div>
   );
 }
