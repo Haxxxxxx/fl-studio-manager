@@ -4,6 +4,18 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "regions": ["dub1"],
+  "redirects": [
+    {
+      "source": "/download/mac",
+      "destination": "https://chrbpaoljulntuvousnz.supabase.co/storage/v1/object/public/releases/latest/Hivo.dmg",
+      "permanent": false
+    },
+    {
+      "source": "/download/windows",
+      "destination": "https://chrbpaoljulntuvousnz.supabase.co/storage/v1/object/public/releases/latest/Hivo-setup.exe",
+      "permanent": false
+    }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
