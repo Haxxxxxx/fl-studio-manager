@@ -63,6 +63,10 @@ fn apply_preferences(saved: &mut Settings, from: Settings) {
     if matches!(from.ui_language.as_str(), "system" | "fr" | "en") {
         saved.ui_language = from.ui_language;
     }
+    // Set once by the feedback form, then kept: it's the rate-limit key.
+    if saved.install_id.is_none() {
+        saved.install_id = from.install_id.filter(|id| id.len() == 36);
+    }
 }
 
 /// Runs a native picker off the main thread. None = cancelled.
@@ -420,6 +424,20 @@ mod tests {
         assert_eq!(saved.render_format, "wav", "unknown formats are ignored");
         assert!(saved.ai_include_notes);
         assert_eq!(saved.ai_language.as_deref(), Some("French"));
+    }
+
+    #[test]
+    fn install_id_is_set_once_then_kept() {
+        let mut saved = Settings::default();
+        apply_preferences(&mut saved, Settings { install_id: Some("nope".into()), ..Settings::default() });
+        assert_eq!(saved.install_id, None, "a malformed id is ignored");
+        let first = "11111111-2222-4333-8444-555555555555".to_string();
+        apply_preferences(&mut saved, Settings { install_id: Some(first.clone()), ..Settings::default() });
+        assert_eq!(saved.install_id.as_deref(), Some(first.as_str()));
+        apply_preferences(&mut saved, Settings { install_id: Some("99999999-2222-4333-8444-555555555555".into()), ..Settings::default() });
+        assert_eq!(saved.install_id.as_deref(), Some(first.as_str()), "a later id never replaces the first");
+        apply_preferences(&mut saved, Settings::default());
+        assert_eq!(saved.install_id.as_deref(), Some(first.as_str()), "a save without it keeps it");
     }
 
     #[test]

@@ -7,6 +7,7 @@ import { CrewSection } from "./CrewSection";
 import { useCrewStore, useInCrew } from "../store/useCrewStore";
 import { currentLang, dict, tr } from "../i18n";
 import { FEEDBACK_EMAIL, feedbackMailto, osFromUserAgent } from "../lib/feedback";
+import { supabase } from "../lib/supabase";
 import { openExternal } from "../lib/tauri";
 
 const T = dict(
@@ -55,11 +56,15 @@ export function Sidebar() {
   const peopleCount = useAppStore((s) => s.workspace.people.length);
   const inCrew = useInCrew();
   const crewEnabled = useCrewStore((s) => s.enabled);
+  const openFeedback = useAppStore((s) => s.openFeedback);
   const t = tr(T);
 
-  // Opens the mail app with the version, OS and current view filled in
-  // (src/lib/feedback.ts). Hidden when no address was set at build time.
+  // The in-app form (FeedbackModal) when this build has a backend; else the
+  // mail app with the version, OS and current view filled in
+  // (src/lib/feedback.ts). Hidden when neither was set at build time.
+  const feedbackAvailable = !!supabase || !!FEEDBACK_EMAIL;
   const sendFeedback = async () => {
+    if (supabase) return openFeedback();
     if (!FEEDBACK_EMAIL) return;
     const version = isTauri() ? await getVersion().catch(() => "dev") : "dev";
     const url = feedbackMailto(FEEDBACK_EMAIL, { version, os: osFromUserAgent(navigator.userAgent), view, lang: currentLang() });
@@ -166,7 +171,7 @@ export function Sidebar() {
         </div>
       )}
 
-      {FEEDBACK_EMAIL && (
+      {feedbackAvailable && (
         <div className="mt-auto px-2 pb-3 pt-2">
           <button
             onClick={() => void sendFeedback()}
