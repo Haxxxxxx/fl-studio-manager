@@ -1,0 +1,146 @@
+# Checks every pull request and every push to main: unit tests, type-checked
+# builds (desktop + web), Rust tests, dependency audits and the database
+# tests.
+#
+# GitHub-hosted runners only, never the self-hosted `hivo` Mac: the repo is
+# public, so this workflow runs code from forks, and that must not reach a
+# personal machine. Hosted minutes are free for public repos.
+#
+# Hardening:
+# - Read-only token, no secrets, `pull_request` only (never
+#   `pull_request_target`, which would hand fork code a write token).
+# - Actions pinned to full commit SHAs (a moved tag can't swap the code);
+#   Dependabot keeps the pins fresh.
+# - `npm ci --ignore-scripts`: dependency install scripts never run, which
+#   is how the 2026 npm worms (Shai-Hulud, keyv) executed their payload.
+# - Checkout leaves no token behind in .git/config.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  app:
+    name: Desktop app (tests, build, Rust)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      # tsc + vite; also produces ../dist, which the Rust crate embeds.
+      - run: npm run build
+
+      - name: Linux libraries for Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libsoup-3.0-dev libssl-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src-tauri
+
+      - name: Rust tests
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+
+  web:
+    name: Web dashboard (build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # web/ imports the pure modules in src/ through @shared.
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Lockfile-only checks: nothing is installed or executed. Each one runs
+      # even if an earlier one failed, so a run reports every problem.
+      - name: npm audit (desktop)
+        run: npm audit --audit-level=high
+      - name: npm audit (web)
+        if: ${{ !cancelled() }}
+        working-directory: web
+        run: npm audit --audit-level=high
+      - name: Lockfiles only pull from the npm registry
+        if: ${{ !cancelled() }}
+        run: |
+          bad=$(grep -hoE '"resolved": "[^"]+"' package-lock.json web/package-lock.json | grep -v '"https://registry.npmjs.org/' || true)
+          if [ -n "$bad" ]; then echo "::error::Non-registry package sources:"; echo "$bad"; exit 1; fi
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        if: ${{ !cancelled() }}
+        with:
+          toolchain: stable
+      - name: cargo audit
+        if: ${{ !cancelled() }}
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit --file src-tauri/Cargo.lock
+
+  database:
+    name: Database (pgTAP)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+
+      # Local throwaway stack: no project secrets, nothing leaves the runner.
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - run: supabase test db
