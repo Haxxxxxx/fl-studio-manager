@@ -6,6 +6,7 @@ import * as updater from "../lib/updater";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
 import { addColumn, moveCard, moveColumn, removeColumn, renameColumn } from "../lib/pipeline";
+import type { DashboardLayout } from "../lib/dashboardLayout";
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
 import { canRenderInApp, dawOf, splitRenderable } from "../lib/daws";
 import type {
@@ -245,6 +246,11 @@ interface AppState {
   movePipelineColumn: (id: string, toIndex: number) => void;
   /** `songs` = the songs on the board (for the column's current order). */
   movePipelineCard: (songs: ProjectInfo[], path: string, columnId: string, beforePath: string | null) => void;
+
+  // Dashboard layout (the "Me" dashboard's blocks: order, hidden, looks, widths)
+  setDashboardLayout: (layout: DashboardLayout) => void;
+  /** Back to the default arrangement (drops the stored layout). */
+  resetDashboardLayout: () => void;
 
   // Albums
   createAlbum: (title: string) => string;
@@ -880,6 +886,14 @@ export const useAppStore = create<AppState>((set, get) => {
     removePipelineColumn: (id) => mutateWorkspace((ws) => removeColumn(ws, id)),
     movePipelineColumn: (id, toIndex) => mutateWorkspace((ws) => moveColumn(ws, id, toIndex)),
     movePipelineCard: (songs, path, columnId, beforePath) => mutateWorkspace((ws) => moveCard(ws, songs, path, columnId, beforePath)),
+
+    setDashboardLayout: (layout) => mutateWorkspace((ws) => ({ ...ws, dashboard: layout })),
+    resetDashboardLayout: () =>
+      mutateWorkspace((ws) => {
+        const next = { ...ws };
+        delete next.dashboard;
+        return next;
+      }),
 
     setStatus: (paths, status) =>
       mutateWorkspace((ws) => {

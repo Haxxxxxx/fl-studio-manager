@@ -239,9 +239,9 @@ export function Input({ className = "", ...props }: React.InputHTMLAttributes<HT
 }
 
 /** A panel with an engraved title. `action` sits at the right of the title row. */
-export function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+export function Card({ title, action, className = "", children }: { title: string; action?: React.ReactNode; className?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded border border-rule bg-panel p-5 shadow-panel">
+    <div className={`rounded border border-rule bg-panel p-5 shadow-panel ${className}`}>
       <div className="mb-3 flex items-center justify-between">
         <div className={engrave}>{title}</div>
         {action}
