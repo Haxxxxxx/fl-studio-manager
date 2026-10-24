@@ -84,15 +84,16 @@ export function useCrewSource(): PipelineSource {
         open: path ? () => openDetail(path) : undefined,
       };
     };
+    const shown = songs.filter((s) => matches(s, query));
     return {
       scope: "crew",
       query,
+      total: songs.length,
+      shown: shown.length,
       editable: owner,
       error,
-      groups: groupCrewSongs(
-        songs.filter((s) => matches(s, query)),
-        cfg,
-      ).map((g) => ({ column: g.column, items: g.songs.map(item) })),
+      clearError: () => setError(null),
+      groups: groupCrewSongs(shown, cfg).map((g) => ({ column: g.column, items: g.songs.map(item) })),
       canRemove: (id) => crewEdits.canRemove(cfg, id),
       rename: (id, name) => save(crewEdits.rename(cfg, id, name)),
       add: (name, stage) => save(crewEdits.add(cfg, name, stage, newUuid())),
