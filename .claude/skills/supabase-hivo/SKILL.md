@@ -13,9 +13,10 @@ Use the generic `supabase` skill for API/SQL knowledge; this file is what's
 specific here.
 
 ## Layout
-- `supabase/migrations/<YYYYMMDDHHMMSS>_<topic>.sql`, one topic per file, in
+- `supabase/migrations/<YYYYMMDD><HHMMSS>_<topic>.sql`, one topic per file, in
   order: crew → hardening → quota upsert → closed signup invites → stage versions
-  → crew columns → member update columns → releases bucket.
+  → crew columns → member update columns → releases bucket → feedback (`…120000`)
+  → feedback global cap.
 - `supabase/tests/database/<topic>.test.sql`: pgTAP, one file per migration
   topic, same style as the existing ones (plan, helper setup, `is`/`ok`/`throws_ok`,
   finish). A migration without a test is not done.
@@ -27,8 +28,10 @@ specific here.
   directly on the hosted project (`supabase db query`, MCP `execute_sql`, the
   dashboard editor), even for "a quick fix": it leaves the migration history
   and local stack out of sync.
-- Migration files are hand-named `<YYYYMMDD>000000_<topic>.sql` (one per day
-  and topic), not `supabase migration new` timestamps, so the order reads.
+- Migration files are hand-named `<YYYYMMDD><HHMMSS>_<topic>.sql`, ordered by
+  day then time (`000000` for the day's first, a later time such as `120000`
+  for a second topic the same day), not `supabase migration new` timestamps,
+  so the order reads.
 - The apps ship the legacy anon key on purpose (pinned in the CSPs and
   `web/vercel.json`); switching to a publishable key is a deliberate change
   of all three places plus `.env.local`, not a drive-by.

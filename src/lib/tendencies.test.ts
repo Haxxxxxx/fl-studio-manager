@@ -70,6 +70,15 @@ describe("tempo & key tendencies", () => {
     expect(tempoKeyTendencies(many, meta).keys).toHaveLength(5);
   });
 
+  it("skips tempos outside FL's 10–522 range instead of binning them", () => {
+    // A corrupt tempo in a REAPER or Ableton file must not create millions of empty bins.
+    const songs = [song("a", { tempoBpm: 99999999 }), song("b", { tempoBpm: 5 }), song("c", { tempoBpm: 140 })];
+    const out = tempoKeyTendencies(songs, ws());
+    expect(out.bins).toEqual([{ from: 140, count: 1 }]);
+    expect(out.withBpm).toBe(1);
+    expect(tempoKeyTendencies([song("a", { tempoBpm: 99999999 })], ws()).bins).toEqual([]);
+  });
+
   it("names a key for the headline", () => {
     expect(keyName("Am", "minor", "major")).toBe("A minor");
     expect(keyName("F#", "minor", "major")).toBe("F# major");
@@ -135,6 +144,14 @@ describe("your sound", () => {
       { name: "808s", songs: 1 },
     ]);
     expect(sampleFolder("loose.wav")).toBeNull();
+  });
+
+  it("names no folder for a sample at a drive root, the filesystem root or a home directory", () => {
+    expect(sampleFolder("C:\\kick.wav")).toBeNull();
+    expect(sampleFolder("/kick.wav")).toBeNull();
+    expect(sampleFolder("/Users/kick.wav")).toBeNull();
+    expect(sampleFolder("C:\\Packs\\kick.wav")).toBe("Packs");
+    expect(sampleFolder("/Users/x/Packs/Kicks/kick.wav")).toBe("Kicks");
   });
 
   it("splits regulars (half of the last 10 saved songs) from what was dropped (3+ songs, none recent)", () => {
