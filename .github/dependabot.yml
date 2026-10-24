@@ -21,6 +21,10 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    # Tauri plugins come in pairs (npm package + Rust crate) that must share a
+    # major.minor (`npm run check:tauri`); bump them by hand, both halves at once.
+    ignore:
+      - dependency-name: "@tauri-apps/*"
     groups:
       minor-and-patch:
         update-types: [minor, patch]
@@ -43,6 +47,9 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "tauri"
+      - dependency-name: "tauri-*"
     groups:
       minor-and-patch:
         update-types: [minor, patch]
