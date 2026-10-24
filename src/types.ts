@@ -107,6 +107,9 @@ export interface Settings {
   uiLanguage?: "system" | "fr" | "en";
   /** Folders of raw beats (the Digger). Changed only through the Rust picker. */
   beatFolders?: string[];
+  /** Sample libraries (packs, Splice…): the scanner finds samples stored
+   * under another path in there by file name. Changed only through the Rust picker. */
+  sampleFolders?: string[];
   /** The Digger sends a 30 s low-quality excerpt of each picked beat to Gemini (off by default). */
   digSendAudio?: boolean;
   /** ffmpeg for shorts; null = found automatically. */

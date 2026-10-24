@@ -3,7 +3,7 @@ import { ArrowLeft, Plus, Send, Sparkles, Trash2, Users } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
 import { songsOf, suggestedPeople } from "../lib/people";
-import { statusInfo } from "../lib/songs";
+import { lastSaveMs, statusInfo } from "../lib/songs";
 import type { Person, ProjectInfo } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { OUTCOMES, roleLabel } from "./SongPeople";
@@ -281,7 +281,7 @@ function PersonDetail({ person }: { person: Person }) {
                 <span className="flex w-28 items-center gap-1.5 text-xs text-body">
                   <StatusDot color={s.color} size={6} /> {s.label}
                 </span>
-                <span className="w-24 text-right text-xs text-engrave">{formatRelative(song.modifiedAtMs)}</span>
+                <span className="w-24 text-right text-xs text-engrave">{formatRelative(lastSaveMs(song))}</span>
               </button>
             );
           })}

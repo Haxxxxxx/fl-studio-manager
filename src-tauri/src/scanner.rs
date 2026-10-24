@@ -154,6 +154,17 @@ fn index_exports(output_folder: Option<&str>) -> HashMap<String, Vec<FileEntry>>
     index
 }
 
+/// `stem` is the song's name, or the name followed by a separator ("Envy",
+/// "Envy (master)", "Envy_v2", "Envy - final"). `name` is lowercased already;
+/// "Envyous" is another song.
+fn named_after(stem: &str, name: &str) -> bool {
+    let stem = stem.to_lowercase();
+    match stem.strip_prefix(name) {
+        Some(rest) => rest.is_empty() || rest.starts_with(|c: char| !c.is_alphanumeric()),
+        None => false,
+    }
+}
+
 #[cfg(test)]
 fn scan(folders: &[String], output_folder: Option<&str>) -> Vec<ProjectInfo> {
     scan_with(folders, output_folder, Resolver::new(crate::settings::detect_fl_studio()))
@@ -310,7 +321,7 @@ fn scan_with(folders: &[String], output_folder: Option<&str>, mut resolver: Reso
             let split_are_stems = split.len() >= 2;
             let mut renders: Vec<FileEntry> = siblings
                 .iter()
-                .filter(|p| has_ext(p, AUDIO_EXTS) && stem_of(p).to_lowercase().starts_with(&name))
+                .filter(|p| has_ext(p, AUDIO_EXTS) && named_after(&stem_of(p), &name))
                 .filter(|p| !(split_are_stems && stem_of(p).to_lowercase().starts_with(&split_prefix)))
                 .filter_map(|p| file_entry(p))
                 .collect();
@@ -323,7 +334,7 @@ fn scan_with(folders: &[String], output_folder: Option<&str>, mut resolver: Reso
                 renders.extend(
                     read_files(&dir.join(sub))
                         .iter()
-                        .filter(|p| has_ext(p, AUDIO_EXTS) && (alone || stem_of(p).to_lowercase().starts_with(&name)))
+                        .filter(|p| has_ext(p, AUDIO_EXTS) && (alone || named_after(&stem_of(p), &name)))
                         .filter_map(|p| file_entry(p)),
                 );
             }
@@ -466,8 +477,10 @@ pub async fn scan_projects(app: AppHandle) -> Result<Vec<ProjectInfo>, String> {
         let _ = assets.allow_directory(folder, true);
     }
     let (fl, user_data) = crate::settings::fl_paths(&app);
+    let sample_folders = scope.sample_folders().to_vec();
     let projects = tauri::async_runtime::spawn_blocking(move || {
-        scan_with(&folders, output_folder.as_deref(), Resolver::new(fl).with_user_data(user_data))
+        let resolver = Resolver::new(fl).with_user_data(user_data).with_sample_folders(&sample_folders);
+        scan_with(&folders, output_folder.as_deref(), resolver)
     })
         .await
         .map_err(|e| format!("scan failed: {e}"))?;
@@ -588,6 +601,9 @@ mod tests {
         fs::create_dir_all(song.join("Audio")).unwrap();
         fs::write(song.join("Envy.flp"), b"not really an flp").unwrap();
         fs::write(song.join("Envy.wav"), b"x").unwrap();
+        fs::write(song.join("Envy (master).mp3"), b"x").unwrap();
+        // Another song that happens to start with the same letters.
+        fs::write(song.join("Envyous.wav"), b"x").unwrap();
         fs::write(song.join("Other.wav"), b"x").unwrap();
         fs::write(song.join("Backup/Envy (overwritten at 16h12).flp"), b"x").unwrap();
         fs::write(song.join("Backup/Envy (autosaved at 16h43)_2.flp"), b"x").unwrap();
@@ -600,7 +616,8 @@ mod tests {
         let p = &projects[0];
         assert_eq!(p.name, "Envy");
         assert_eq!(p.backups.len(), 2);
-        assert_eq!(p.renders.len(), 1);
+        assert_eq!(p.renders.len(), 2, "{:?}", p.renders);
+        assert!(named_after("Envy_v2", "envy") && named_after("ENVY", "envy") && !named_after("Envyous", "envy"));
         assert_eq!(p.recordings_count, 1);
         assert_eq!(p.recordings_bytes, 3);
         assert!(p.stems.is_none());

@@ -105,8 +105,9 @@ fn plan_one(resolver: &mut Resolver, project: &Path) -> Result<PackagePlan, Stri
 pub async fn package_preview(app: AppHandle, project_paths: Vec<String>) -> Result<Vec<PackagePlan>, String> {
     let scope = crate::scope::Scope::load(&app)?;
     let (fl, user_data) = crate::settings::fl_paths(&app);
+    let sample_folders = scope.sample_folders().to_vec();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut resolver = Resolver::new(fl).with_user_data(user_data);
+        let mut resolver = Resolver::new(fl).with_user_data(user_data).with_sample_folders(&sample_folders);
         project_paths
             .iter()
             .map(|p| {
@@ -243,8 +244,9 @@ pub async fn package_projects(
         out_dir.push(sub);
     }
     let (fl, user_data) = crate::settings::fl_paths(&app);
+    let sample_folders = scope.sample_folders().to_vec();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut resolver = Resolver::new(fl).with_user_data(user_data);
+        let mut resolver = Resolver::new(fl).with_user_data(user_data).with_sample_folders(&sample_folders);
         let results: Vec<PackageResult> = project_paths
             .iter()
             .enumerate()

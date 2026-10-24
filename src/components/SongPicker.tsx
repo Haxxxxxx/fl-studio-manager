@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Disc3, Search, Sparkles } from "lucide-react";
 import { formatRelative } from "../lib/format";
-import { formatBpm, renderFreshness, songLabel, stageRank, statusInfo } from "../lib/songs";
+import { formatBpm, lastSaveMs, renderFreshness, songLabel, stageRank, statusInfo } from "../lib/songs";
 import type { ProjectInfo, Workspace } from "../types";
 import { StatusDot } from "./ui";
 import { dict, tr } from "../i18n";
@@ -132,7 +132,7 @@ export function SongPicker({
     return GROUPS.map((id) => ({
       id,
       ...groupText(id),
-      songs: matches.filter((s) => renderFreshness(s) === id).sort((a, b) => rank(a) - rank(b) || b.modifiedAtMs - a.modifiedAtMs),
+      songs: matches.filter((s) => renderFreshness(s) === id).sort((a, b) => rank(a) - rank(b) || lastSaveMs(b) - lastSaveMs(a)),
     })).filter((g) => g.songs.length);
   }, [songs, workspace.songs, query]);
   const flat = groups.flatMap((g) => g.songs);
@@ -251,7 +251,7 @@ export function SongPicker({
                     >
                       <div className="flex items-center gap-2">
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-cream">{songLabel(s, songs)}</span>
-                        <span className="shrink-0 text-[11px] text-engrave">{t.saved(formatRelative(s.modifiedAtMs))}</span>
+                        <span className="shrink-0 text-[11px] text-engrave">{t.saved(formatRelative(lastSaveMs(s)))}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-engrave">
                         <span className="flex items-center gap-1.5">
