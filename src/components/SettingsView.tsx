@@ -814,7 +814,7 @@ const T_DIGGER = dict(
     saved: "Link saved. Each YouTube result in the Digger gets a Convert button.",
     removed: "Link removed.",
     howTo:
-      "The converter page's address. If the site takes the video address in its own link, put {url} where it goes; otherwise Hivo opens the page and copies the video address for you to paste there.",
+      "The converter page's address. Hivo can't type into another site's page, so the video address is pre-filled only when the site reads it from its own link: paste an address on the site once, and if it then shows up in the browser's address bar, put {url} in its place here. Otherwise Hivo opens the page and copies the video address for you to paste.",
     disclosure:
       "Hivo opens this link with the video address and nothing else. The site, its terms and what you do with the file are between you and it; Hivo never downloads audio.",
   },
@@ -827,7 +827,7 @@ const T_DIGGER = dict(
     saved: "Lien enregistré. Chaque résultat YouTube du Digger a un bouton Convertir.",
     removed: "Lien retiré.",
     howTo:
-      "L'adresse de la page de conversion. Si le site prend l'adresse de la vidéo dans son propre lien, mets {url} à sa place ; sinon Hivo ouvre la page et copie l'adresse de la vidéo pour que tu la colles là-bas.",
+      "L'adresse de la page de conversion. Hivo ne peut pas écrire dans la page d'un autre site : l'adresse de la vidéo n'est pré-remplie que si le site la lit dans son propre lien. Colle une adresse sur le site une fois ; si elle apparaît ensuite dans la barre d'adresse du navigateur, mets {url} à sa place ici. Sinon Hivo ouvre la page et copie l'adresse de la vidéo pour que tu la colles.",
     disclosure:
       "Hivo ouvre ce lien avec l'adresse de la vidéo et rien d'autre. Le site, ses conditions et ce que tu fais du fichier, c'est entre toi et lui ; Hivo ne télécharge jamais d'audio.",
   },

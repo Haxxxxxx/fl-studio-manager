@@ -1,4 +1,5 @@
-import { ExternalLink, FolderOpen, Pause, Play } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, Copy, ExternalLink, FolderOpen, Pause, Play } from "lucide-react";
 import { useDigger } from "../store/useDigger";
 import * as api from "../lib/tauri";
 import { matchBeat, youtubeId } from "../lib/digger";
@@ -30,6 +31,10 @@ const T = dict(
     remove: "Remove",
     confirmRemove: "Delete the lead file?",
     noLink: "The file has no https link any more.",
+    link: "Video link",
+    copyLink: "Copy link",
+    copied: "Copied",
+    copyManual: "Selected: press ⌘C / Ctrl+C",
     savedOn: (when: string) => `Saved ${when}`,
     bpm: (n: number) => `${Math.round(n)} BPM`,
   },
@@ -48,6 +53,10 @@ const T = dict(
     remove: "Retirer",
     confirmRemove: "Supprimer le fichier de la prod ?",
     noLink: "Le fichier n'a plus de lien https.",
+    link: "Lien de la vidéo",
+    copyLink: "Copier le lien",
+    copied: "Copié",
+    copyManual: "Sélectionné : fais ⌘C / Ctrl+C",
     savedOn: (when: string) => `Enregistrée ${when}`,
     bpm: (n: number) => `${Math.round(n)} BPM`,
   },
@@ -84,6 +93,40 @@ export function SavedLeads({ beats, playingBeat, onPlayBeat }: Props) {
   );
 }
 
+/** The raw video address with a "Copy link" button; when the clipboard is
+ * refused the address is shown selected, ready for ⌘C. */
+function CopyLink({ url }: { url: string }) {
+  const t = tr(T);
+  const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
+  const field = useRef<HTMLInputElement>(null);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setState("copied");
+      window.setTimeout(() => setState("idle"), 3000);
+    } catch {
+      setState("manual");
+      window.setTimeout(() => field.current?.select(), 0);
+    }
+  };
+  return (
+    <div className="mt-1 flex items-center gap-2">
+      <input
+        ref={field}
+        readOnly
+        value={url}
+        onFocus={(e) => e.currentTarget.select()}
+        aria-label={t.link}
+        className="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-engrave focus:text-cream focus:outline-none"
+      />
+      <button type="button" onClick={() => void copy()} className="flex shrink-0 items-center gap-1 text-[11px] text-body hover:text-cream">
+        {state === "copied" ? <Check size={11} aria-hidden /> : <Copy size={11} aria-hidden />}
+        {state === "copied" ? t.copied : state === "manual" ? t.copyManual : t.copyLink}
+      </button>
+    </div>
+  );
+}
+
 function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; beat: BeatFile | null; playingBeat: string | null; onPlayBeat: (b: BeatFile) => void }) {
   const t = tr(T);
   const setPlaying = useDigger((s) => s.setPlaying);
@@ -115,7 +158,7 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
           <div className="truncate text-[11px] text-engrave">{facts.join(" · ")}</div>
           {lead.traits.length > 0 && <div className="truncate text-[11px] text-body">{lead.traits.join(" · ")}</div>}
           {lead.summary && <p className="mt-1 line-clamp-2 text-xs text-body">{lead.summary}</p>}
-          {!lead.url && <p className="mt-1 text-[11px] text-engrave">{t.noLink}</p>}
+          {lead.url ? <CopyLink url={lead.url} /> : <p className="mt-1 text-[11px] text-engrave">{t.noLink}</p>}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
