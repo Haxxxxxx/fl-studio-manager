@@ -105,7 +105,6 @@ interface AppState {
   dismissErrors: () => void;
   /** Try the failed save (or the failed workspace read) again. */
   retrySave: () => Promise<void>;
-  /** FL's default projects folder when found and nothing is linked yet. */
   /** DAW default folders found on this computer; null = not looked yet. */
   detectedFolders: DetectedFolder[] | null;
   workspace: Workspace;
@@ -344,8 +343,6 @@ export const useAppStore = create<AppState>((set, get) => {
     realFavorites = null;
   }
 
-  /** Rescan after a folder change; a failure shows in the error banner
-   * (these run from buttons, so nobody else would catch it). */
   /** Take the path settings Rust saved; keep this session's other preferences
    * (sample-data favorites stay in memory). */
   function keepPaths(saved: Settings) {
@@ -799,8 +796,9 @@ export const useAppStore = create<AppState>((set, get) => {
     setFavoritesOnly: (value) => set({ favoritesOnly: value }),
     setShowTemplates: (value) => set({ showTemplates: value }),
     openDetail: (detailPath) => set({ detailPath }),
-    openAlbum: (openAlbumId) => set({ openAlbumId, view: "albums" }),
-    openPerson: (openPersonId) => set({ openPersonId, view: "people" }),
+    // Same rule as setView: an actual change of screen closes the song drawer.
+    openAlbum: (openAlbumId) => set((s) => ({ openAlbumId, view: "albums", settingsSection: null, detailPath: s.view === "albums" ? s.detailPath : null })),
+    openPerson: (openPersonId) => set((s) => ({ openPersonId, view: "people", settingsSection: null, detailPath: s.view === "people" ? s.detailPath : null })),
     openLaunchKit: (launchPath) => set({ launchPath, view: "launch", detailPath: null }),
 
     setKitEdit: (path, id, value) => {

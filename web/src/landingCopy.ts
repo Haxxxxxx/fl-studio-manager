@@ -167,7 +167,7 @@ const en: LandingCopy = {
     app: "The desktop app is free, for Mac and Windows. It updates itself.",
     mac: "Download for Mac",
     windows: "Download for Windows",
-    firstRun: "Mac: right-click → Open the first time. Windows: More info → Run anyway.",
+    firstRun: "Mac: if it says it can't verify the developer, go to System Settings → Privacy & Security and click Open Anyway. Windows: More info → Run anyway.",
   },
   footer: { tagline: "made with and for the crew", data: "crew data: EU (Ireland) · audio: never leaves your machine", nav: "Footer" },
 };
@@ -315,7 +315,7 @@ const fr: LandingCopy = {
     app: "L'appli est gratuite, pour Mac et Windows. Elle se met à jour toute seule.",
     mac: "Télécharger pour Mac",
     windows: "Télécharger pour Windows",
-    firstRun: "Mac : clic droit → Ouvrir la première fois. Windows : Informations complémentaires → Exécuter quand même.",
+    firstRun: "Mac : s'il dit ne pas pouvoir vérifier le développeur, va dans Réglages Système → Confidentialité et sécurité et clique Ouvrir quand même. Windows : Informations complémentaires → Exécuter quand même.",
   },
   footer: { tagline: "fait avec et pour le crew", data: "données du crew : UE (Irlande) · audio : ne quitte jamais ton ordi", nav: "Pied de page" },
 };
