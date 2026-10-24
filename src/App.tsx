@@ -71,7 +71,7 @@ function UpdateNotice() {
   const { status, version } = update;
   if (!version || status === "idle" || status === "checking") return null;
   const pct = update.progress === undefined ? null : Math.round(update.progress * 100);
-  const led = status === "error" ? "#FF4040" : status === "available" ? "#FF5A1F" : "#3DDC84";
+  const led = status === "error" ? "var(--color-missing)" : status === "available" ? "var(--color-hot)" : "var(--color-ok)";
   const text =
     status === "available"
       ? tr(T).updateReady(version)
@@ -83,7 +83,7 @@ function UpdateNotice() {
   return (
     <div role="status" className="flex shrink-0 items-center gap-3 border-b border-rule bg-panel px-5 py-2 text-xs">
       <StatusDot color={led} size={7} />
-      <span className={`min-w-0 flex-1 truncate ${status === "error" ? "text-[#FF4040]" : "text-cream"}`} title={text}>
+      <span className={`min-w-0 flex-1 truncate ${status === "error" ? "text-missing" : "text-cream"}`} title={text}>
         {text}
       </span>
       {status === "downloading" && pct !== null && (
