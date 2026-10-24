@@ -21,7 +21,9 @@ Use the generic `tauri-v2` skill for the framework; this is what's decided here.
 
 ## CSP
 - `tauri.conf.json` → `security.csp` **and** `devCsp` are the source of truth and
-  must say the same thing apart from the dev server/local Supabase hosts. Every
+  must say the same thing apart from the dev server/local Supabase hosts and
+  `'unsafe-inline'` in `devCsp`'s `script-src` (the Vite dev server needs it;
+  the hosts are otherwise identical). Every
   host is pinned (the Supabase project ref, `i.ytimg.com`, the YouTube no-cookie
   embed in `frame-src`); never `'unsafe-eval'`, never a wildcard. Fonts are
   bundled (`@fontsource`), so no Google Fonts host anywhere.

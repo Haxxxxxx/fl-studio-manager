@@ -75,5 +75,6 @@ The Digger (left menu) is a deliberate, user-approved exception to rules 1-2: it
 - Scope is fixed: raw beats from Settings -> Beats folders, pick up to 5, the AI describes what they share and finds similar beats on the web (YouTube Data API if a key is set, Gemini search grounding, plain YouTube search links).
 - Beats live ONLY in the Digger: never in Library, stats, calendar or the crew backend.
 - NO downloading from YouTube or anywhere (terms of service). Leasing or buying a beat is a human hand-off: the Digger only opens links.
+- The official YouTube embedded player inside the app (nocookie host, play only) was approved by the user on 2026-10-24; downloading stays forbidden.
 - Audio sent to the AI is opt-in (a Settings toggle), short excerpts only, disclosed in the UI.
 - Anything beyond this (a beat store, auto-download, producer outreach, beat stats): STOP and flag, rule 0 applies.

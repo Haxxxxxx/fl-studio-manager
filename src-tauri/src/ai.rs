@@ -248,7 +248,8 @@ fn retry_delay_hint(v: &Value) -> Option<Duration> {
         .find_map(|d| d.get("retryDelay")?.as_str())
         .and_then(|s| s.trim().trim_end_matches('s').parse::<f64>().ok())
         .filter(|s| s.is_finite() && *s >= 0.0)
-        .map(Duration::from_secs_f64)
+        // An absurd hint ("1e30s") must not panic: it falls back to backoff().
+        .and_then(|s| Duration::try_from_secs_f64(s).ok())
 }
 
 enum Failure {
@@ -835,6 +836,8 @@ mod tests {
         ] } });
         assert_eq!(retry_delay_hint(&v), Some(Duration::from_secs(17)));
         assert_eq!(retry_delay_hint(&json!({ "error": {} })), None);
+        let absurd = json!({ "error": { "details": [{ "retryDelay": "1e30s" }] } });
+        assert_eq!(retry_delay_hint(&absurd), None);
     }
 
     #[test]
