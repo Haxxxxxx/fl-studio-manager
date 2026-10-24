@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as api from "../lib/tauri";
-import { deeperExclude } from "../lib/digger";
+import { deeperExclude, foundTitles, searchesDone } from "../lib/digger";
+import { useAppStore } from "./useAppStore";
 import type { BeatFile, DigResult, WebLink, YoutubeVideo } from "../types";
 
 // The Digger: raw beats from the beats folders, up to 5 picked to dig for
@@ -8,6 +9,12 @@ import type { BeatFile, DigResult, WebLink, YoutubeVideo } from "../types";
 // stage). Nothing here is saved: the beats live in their folders.
 
 export const MAX_PICKS = 5;
+
+/** One "Go deeper" round: web links (Google Search) or new YouTube searches (without it). */
+export interface DeeperRound {
+  links: WebLink[];
+  queries: string[];
+}
 
 interface DiggerState {
   beats: BeatFile[];
@@ -36,11 +43,19 @@ interface DiggerState {
   digging: boolean;
   digError: string | null;
   runDig: (language: "fr" | "en", youtube: boolean) => Promise<void>;
-  /** "Go deeper" rounds after the dig: one list of web links per round. */
-  deeper: WebLink[][];
+  /** "Go deeper" rounds after the dig, in order. */
+  rounds: DeeperRound[];
   diggingDeeper: boolean;
   deeperError: string | null;
-  runDeeper: (language: "fr" | "en") => Promise<void>;
+  runDeeper: (language: "fr" | "en", youtube: boolean) => Promise<void>;
+  /** A dig or round finished while another view was open (Sidebar LED). */
+  unseen: boolean;
+  clearUnseen: () => void;
+}
+
+/** A dig finished: flag it unless the Digger is on screen. */
+function markUnseen(set: (s: Partial<DiggerState>) => void) {
+  if (useAppStore.getState().view !== "digger") set({ unseen: true });
 }
 
 export const useDigger = create<DiggerState>((set, get) => ({
@@ -98,7 +113,8 @@ export const useDigger = create<DiggerState>((set, get) => ({
     set({ digging: true, digError: null });
     try {
       const dig = await api.digBeats(picks, language);
-      set({ dig, dugFor: picks, deeper: [], deeperError: null });
+      set({ dig, dugFor: picks, rounds: [], deeperError: null });
+      markUnseen(set);
       // Start the first AI search right away; the others are one click.
       const first = dig.analysis.queries[0];
       if (first) {
@@ -111,25 +127,39 @@ export const useDigger = create<DiggerState>((set, get) => ({
       set({ digging: false });
     }
   },
-  deeper: [],
+  rounds: [],
   diggingDeeper: false,
   deeperError: null,
-  runDeeper: async (language) => {
-    const { dig, deeper, diggingDeeper } = get();
+  runDeeper: async (language, youtube) => {
+    const { dig, rounds, results, diggingDeeper } = get();
     if (!dig || diggingDeeper) return;
     set({ diggingDeeper: true, deeperError: null });
     try {
-      const round = await api.digDeeper(dig.analysis, deeperExclude(dig.web, deeper), language);
+      const links = rounds.map((r) => r.links);
+      // Everything already on screen, so the new searches go elsewhere.
+      const shown = foundTitles([...dig.web, ...links.flat()].map((l) => l.text).concat(results.map((v) => v.title)));
+      const round = await api.digDeeper(dig.analysis, deeperExclude(dig.web, links), shown, searchesDone(rounds), language);
       // A new dig meanwhile made this round about the wrong picks.
       if (get().dig !== dig) return;
-      if (round.web.length) set({ deeper: [...get().deeper, round.web] });
+      const brought = round.web.length > 0 || round.queries.length > 0;
+      if (brought) set({ rounds: [...get().rounds, { links: round.web, queries: round.queries }] });
       if (round.webError) set({ deeperError: round.webError });
+      // The menu dot means "something new to look at", not "a round ran".
+      if (brought) markUnseen(set);
+      // Same as runDig: the first new search runs right away.
+      const first = round.queries[0];
+      if (first) {
+        set({ webQuery: first });
+        if (youtube) void get().searchYoutube(first);
+      }
     } catch (e) {
       set({ deeperError: e instanceof Error ? e.message : String(e) });
     } finally {
       set({ diggingDeeper: false });
     }
   },
+  unseen: false,
+  clearUnseen: () => set({ unseen: false }),
 }));
 
 /** Whether the picks changed since the last dig. */

@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Play, Search, Sparkles, X } from "lucide-react";
+import { useMemo } from "react";
+import { Sparkles } from "lucide-react";
 import { digIsStale, useDigger } from "../store/useDigger";
 import { useAppStore } from "../store/useAppStore";
-import * as api from "../lib/tauri";
-import { MAX_QUERY_CHARS, beatFactsLine, beatQuery, googleSearchUrl, youtubeId, youtubeSearchUrl } from "../lib/digger";
+import { beatFactsLine, beatQuery } from "../lib/digger";
 import { currentLang, dict, tr } from "../i18n";
-import type { WebLink, YoutubeStatus } from "../types";
+import type { YoutubeStatus } from "../types";
+import { chip, label, secondary } from "./DigResults";
 
 // The right side of the Digger: the picked beats, the AI dig (what they
-// share, searches, beats found on the web, "Go deeper" rounds), then the
-// YouTube search. YouTube links play in YouTube's own embedded player (one
-// at a time). Links only: nothing is ever downloaded (docs/GUARDRAILS.md).
+// share, what Gemini heard, the searches, "Go deeper"). The results live
+// in the main area (DigResults). Links only: nothing is ever downloaded
+// (docs/GUARDRAILS.md).
 
 const NB = " ";
 const T = dict(
@@ -27,29 +27,16 @@ const T = dict(
       (audio ? ", plus a 30-second, low-quality excerpt of each beat" : "") +
       `. Never file paths${audio ? "" : " or audio"}. On the free tier Google may use what it receives to improve its products.`,
     stale: "Your picks changed since this dig. Dig again to update it.",
-    heard: "Gemini listened to the excerpts.",
+    heardTitle: "What Gemini heard",
+    namesOnly: "Based on names, tempo and key only. Tick \"Let Gemini listen\" for the sound itself.",
     aiSearches: "Searches from the dig",
-    web: "Found on the web",
-    googled: "Google searches behind these links",
-    openLink: (site: string) => `Open ${site}`,
+    round: (n: number) => `Round ${n}`,
     deeper: "Go deeper",
     deeperRunning: "Digging deeper…",
-    round: (n: number) => `Round ${n}`,
-    play: (title: string) => `Play ${title}`,
-    player: "YouTube player",
-    closePlayer: "Close the player",
     find: "Find similar beats",
     ideas: "Searches from your picks",
-    search: "Search",
-    searchLabel: "Search YouTube for beats",
-    placeholder: "e.g. dark trap type beat",
-    open: "Open on YouTube",
-    searching: "Searching…",
-    noResults: "No results. Try other words.",
-    noKey: "Add a YouTube key in Settings to see results here. The button opens the search in your browser.",
+    noKey: "Add a YouTube key in Settings to see results in the app. Without one, searches open in your browser.",
     setUp: "Settings",
-    openVideo: (title: string) => `Open ${title} on YouTube`,
-    hint: "Opens in your browser. Leasing a beat stays between you and the producer: the Digger downloads nothing.",
   },
   {
     title: "Choisies",
@@ -64,95 +51,38 @@ const T = dict(
       (audio ? ", plus un extrait de 30 secondes, en basse qualité, de chaque prod" : "") +
       `. Jamais les chemins de fichiers${audio ? "" : " ni l'audio"}. Avec l'offre gratuite, Google peut utiliser ce qu'il reçoit pour améliorer ses produits.`,
     stale: "Tes choix ont changé depuis. Creuse à nouveau pour mettre à jour.",
-    heard: "Gemini a écouté les extraits.",
+    heardTitle: "Ce que Gemini a entendu",
+    namesOnly: `D'après les noms, le tempo et la tonalité seulement. Coche «${NB}Faire écouter à Gemini${NB}» pour le son lui-même.`,
     aiSearches: "Recherches tirées de l'analyse",
-    web: "Trouvé sur le web",
-    googled: "Recherches Google derrière ces liens",
-    openLink: (site: string) => `Ouvrir ${site}`,
+    round: (n: number) => `Tour ${n}`,
     deeper: "Creuser plus loin",
     deeperRunning: "On creuse…",
-    round: (n: number) => `Tour ${n}`,
-    play: (title: string) => `Écouter ${title}`,
-    player: "Lecteur YouTube",
-    closePlayer: "Fermer le lecteur",
     find: "Trouver des prods proches",
     ideas: "Recherches tirées de tes choix",
-    search: "Chercher",
-    searchLabel: "Chercher des prods sur YouTube",
-    placeholder: "ex. dark trap type beat",
-    open: "Ouvrir sur YouTube",
-    searching: "Recherche…",
-    noResults: "Aucun résultat. Essaie d'autres mots.",
-    noKey: "Ajoute une clé YouTube dans les Réglages pour voir les résultats ici. Le bouton ouvre la recherche dans ton navigateur.",
+    noKey: "Ajoute une clé YouTube dans les Réglages pour voir les résultats dans l'app. Sans clé, les recherches s'ouvrent dans ton navigateur.",
     setUp: "Réglages",
-    openVideo: (title: string) => `Ouvrir ${title} sur YouTube`,
-    hint: `S'ouvre dans ton navigateur. La licence d'une prod se règle entre toi et le beatmaker${NB}: le Digger ne télécharge rien.`,
   },
 );
 
-const label = "font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave";
-const chip = (on: boolean) =>
-  `rounded border px-2 py-0.5 text-left text-xs ${on ? "border-cream bg-cream text-chassis" : "border-rule-strong text-body hover:border-cream"}`;
-const playBtn = "shrink-0 rounded-full border border-rule-strong p-1.5 text-cream hover:border-hot";
-const secondary = "rounded border border-rule-strong px-2.5 py-1.5 text-xs font-semibold text-cream hover:border-cream disabled:opacity-40";
-
-/** What the embedded player is on: a checked YouTube ID and a title. */
-interface Playing {
-  id: string;
-  title: string;
+interface Props {
+  yt: YoutubeStatus | null;
+  /** The round on screen (DigResults): its new searches are shown here. */
+  round: number;
 }
 
-function WebLinks({ links, label: name, onPlay }: { links: WebLink[]; label: string; onPlay: (p: Playing) => void }) {
-  const t = tr(T);
-  return (
-    <ul className="flex flex-col gap-1" aria-label={name}>
-      {links.map((l) => {
-        const id = youtubeId(l.url);
-        const title = l.text || l.site;
-        return (
-          <li key={l.url} className="flex items-center gap-1">
-            {id && (
-              <button onClick={() => onPlay({ id, title })} aria-label={t.play(title)} className={playBtn}>
-                <Play size={12} />
-              </button>
-            )}
-            <button onClick={() => void api.openExternal(l.url)} aria-label={t.openLink(l.site || l.text)} className="flex min-w-0 flex-1 items-start gap-2 rounded p-1 text-left hover:bg-raised">
-              <ExternalLink size={12} className="mt-0.5 shrink-0 text-engrave" aria-hidden />
-              <span className="min-w-0 flex-1">
-                {l.text && <span className="line-clamp-2 text-xs text-cream">{l.text}</span>}
-                <span className="block truncate font-mono text-[10.5px] text-engrave">{l.site}</span>
-              </span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-export function DigPanel() {
+export function DigPanel({ yt, round }: Props) {
   const t = tr(T);
   const d = useDigger();
-  const { picked, beats, webQuery, results, searching, searchError, searchedFor, setWebQuery, searchYoutube } = d;
-  const [playing, setPlaying] = useState<Playing | null>(null);
+  const { picked, beats, webQuery, rounds, setWebQuery, searchYoutube } = d;
   const setView = useAppStore((s) => s.setView);
   const aiStatus = useAppStore((s) => s.aiStatus);
   const sendAudio = useAppStore((s) => !!s.settings.digSendAudio);
   const updateSettings = useAppStore((s) => s.updateSettings);
-  const [yt, setYt] = useState<YoutubeStatus | null>(null);
   const byPath = useMemo(() => new Map(beats.map((b) => [b.path, b])), [beats]);
   const ideas = useMemo(() => {
     const qs = picked.map((p) => beatQuery(byPath.get(p)?.name ?? "")).filter(Boolean);
     return [...new Set(qs.map((q) => q.toLowerCase()))].map((l) => qs.find((q) => q.toLowerCase() === l)!);
   }, [picked, byPath]);
-
-  useEffect(() => {
-    let live = true;
-    api.youtubeStatus().then((s) => live && setYt(s)).catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, []);
 
   const q = webQuery.trim();
   const run = (query: string) => {
@@ -161,6 +91,10 @@ export function DigPanel() {
   };
   const dig = d.dig;
   const stale = !!dig && digIsStale(picked, d.dugFor);
+  const roundQueries = round > 0 ? (rounds[round - 1]?.queries ?? []) : [];
+  // The picks' own searches matter until the dig writes better ones.
+  const showIdeas = !dig && ideas.length > 0;
+  const showNoKey = !!yt && !yt.configured;
 
   return (
     <aside className="flex min-h-0 w-[clamp(320px,38%,460px)] shrink-0 flex-col gap-3 overflow-y-auto border-l border-rule p-4" aria-label={t.title}>
@@ -180,6 +114,10 @@ export function DigPanel() {
 
       {picked.length > 0 && (
         <div className="flex flex-col gap-2">
+          <label className="flex cursor-pointer items-start gap-2 text-xs text-body">
+            <input type="checkbox" checked={sendAudio} onChange={(e) => void updateSettings({ digSendAudio: e.target.checked })} className="mt-0.5 accent-orange-500" />
+            {t.listen}
+          </label>
           {aiStatus && !aiStatus.configured ? (
             <p className="text-[11px] leading-relaxed text-engrave">
               {t.needAi}{" "}
@@ -197,32 +135,8 @@ export function DigPanel() {
               <Sparkles size={15} aria-hidden /> {d.digging ? t.digging : t.dig}
             </button>
           )}
-          <label className="flex cursor-pointer items-start gap-2 text-xs text-body">
-            <input type="checkbox" checked={sendAudio} onChange={(e) => void updateSettings({ digSendAudio: e.target.checked })} className="mt-0.5 accent-orange-500" />
-            {t.listen}
-          </label>
           <p className="text-[11px] leading-relaxed text-engrave">{t.disclosure(sendAudio)}</p>
           {d.digError && <div role="alert" className="rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{d.digError}</div>}
-        </div>
-      )}
-
-      {playing && (
-        <div className="flex flex-col gap-1 border-t border-rule pt-3" aria-label={t.player}>
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-xs text-cream" title={playing.title}>
-              {playing.title}
-            </span>
-            <button onClick={() => setPlaying(null)} aria-label={t.closePlayer} className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-cream">
-              <X size={14} />
-            </button>
-          </div>
-          <iframe
-            key={playing.id}
-            src={`https://www.youtube-nocookie.com/embed/${playing.id}?autoplay=1`}
-            allow="autoplay; encrypted-media"
-            title={playing.title}
-            className="aspect-video w-full rounded bg-chassis"
-          />
         </div>
       )}
 
@@ -249,132 +163,68 @@ export function DigPanel() {
               </li>
             ))}
           </ul>
-          {dig.audioSent && <p className="text-[11px] text-engrave">{t.heard}</p>}
+          {dig.audioSent && dig.analysis.heard ? (
+            <div className="flex flex-col gap-1">
+              <h3 className={label}>{t.heardTitle}</h3>
+              <p className="text-sm leading-relaxed text-body">{dig.analysis.heard}</p>
+            </div>
+          ) : (
+            !dig.audioSent && <p className="text-[11px] leading-relaxed text-engrave">{t.namesOnly}</p>
+          )}
           {dig.analysis.queries.length > 0 && (
-            <div className="flex flex-wrap gap-1.5" aria-label={t.aiSearches}>
-              {dig.analysis.queries.map((s) => (
-                <button key={s} onClick={() => run(s)} className={chip(s === q)}>
-                  {s}
-                </button>
-              ))}
+            <div className="flex flex-col gap-1">
+              <h3 className={label}>{t.aiSearches}</h3>
+              <div className="flex flex-wrap gap-1.5" aria-label={t.aiSearches}>
+                {dig.analysis.queries.map((s) => (
+                  <button key={s} onClick={() => run(s)} className={chip(s === q)}>
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-          <h3 className={`${label} mt-1`}>{t.web}</h3>
-          {dig.web.length > 0 && <WebLinks links={dig.web} label={t.web} onPlay={setPlaying} />}
+          {roundQueries.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <h3 className={label}>{t.round(round + 1)}</h3>
+              <div className="flex flex-wrap gap-1.5" aria-label={t.round(round + 1)}>
+                {roundQueries.map((s) => (
+                  <button key={s} onClick={() => run(s)} className={chip(s === q)}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {dig.webError && <p className="text-[11px] text-engrave">{dig.webError}</p>}
-          {dig.webSearches.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5" aria-label={t.googled}>
-              <span className="text-[11px] text-engrave">Google:</span>
-              {dig.webSearches.map((s) => (
-                <button key={s} onClick={() => void api.openExternal(googleSearchUrl(s))} className={chip(false)}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-          {d.deeper.map((links, i) => (
-            <div key={i} className="flex flex-col gap-1">
-              <h3 className={`${label} mt-1`}>{t.round(i + 2)}</h3>
-              <WebLinks links={links} label={t.round(i + 2)} onPlay={setPlaying} />
-            </div>
-          ))}
           {d.deeperError && <p className="text-[11px] text-engrave">{d.deeperError}</p>}
-          <button onClick={() => void d.runDeeper(currentLang())} disabled={d.diggingDeeper || d.digging} className={`${secondary} self-start`}>
+          <button onClick={() => void d.runDeeper(currentLang(), !!yt?.configured)} disabled={d.diggingDeeper || d.digging} className={`${secondary} self-start`}>
             {d.diggingDeeper ? t.deeperRunning : t.deeper}
           </button>
         </section>
       )}
 
-      <section aria-label={t.find} className="flex flex-col gap-2 border-t border-rule pt-3">
-        <h2 className={label}>{t.find}</h2>
-        {ideas.length > 0 && (
-          <div className="flex flex-wrap gap-1.5" aria-label={t.ideas}>
-            {ideas.map((idea) => (
-              <button key={idea} onClick={() => run(idea)} className={chip(idea === q)}>
-                {idea}
-              </button>
-            ))}
-          </div>
-        )}
-        <form
-          className="flex items-center gap-1.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            run(webQuery);
-          }}
-        >
-          <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-rule bg-chassis px-2 py-1.5 text-xs focus-within:border-hot">
-            <Search size={12} className="shrink-0 text-engrave" aria-hidden />
-            <input
-              value={webQuery}
-              onChange={(e) => setWebQuery(e.target.value)}
-              maxLength={MAX_QUERY_CHARS}
-              placeholder={t.placeholder}
-              aria-label={t.searchLabel}
-              className="min-w-0 flex-1 bg-transparent text-cream placeholder:text-engrave focus:outline-none"
-            />
-          </label>
-          {yt?.configured && (
-            <button type="submit" disabled={!q || searching} className={secondary}>
-              {t.search}
-            </button>
+      {(showIdeas || showNoKey) && (
+        <section aria-label={t.find} className="flex flex-col gap-2 border-t border-rule pt-3">
+          <h2 className={label}>{t.find}</h2>
+          {showIdeas && (
+            <div className="flex flex-wrap gap-1.5" aria-label={t.ideas}>
+              {ideas.map((idea) => (
+                <button key={idea} onClick={() => run(idea)} className={chip(idea === q)}>
+                  {idea}
+                </button>
+              ))}
+            </div>
           )}
-          <button
-            type="button"
-            onClick={() => void api.openExternal(youtubeSearchUrl(q))}
-            disabled={!q}
-            title={t.open}
-            aria-label={t.open}
-            className="flex items-center gap-1 rounded border border-rule-strong px-2 py-1.5 text-xs text-body hover:border-cream disabled:opacity-40"
-          >
-            <ExternalLink size={12} aria-hidden /> {yt?.configured ? "" : t.open}
-          </button>
-        </form>
-        {yt && !yt.configured && (
-          <p className="text-[11px] leading-relaxed text-engrave">
-            {t.noKey}{" "}
-            <button onClick={() => setView("settings", "youtube")} className="underline hover:text-cream">
-              {t.setUp}
-            </button>
-          </p>
-        )}
-        {searchError && <div role="alert" className="rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{searchError}</div>}
-        {searching && <p className="text-xs text-engrave">{t.searching}</p>}
-        {!searching && searchedFor !== null && searchedFor === q && results.length === 0 && <p className="text-xs text-engrave">{t.noResults}</p>}
-        {results.length > 0 && (
-          <ul className="flex flex-col gap-1" aria-label="YouTube">
-            {results.map((v) => (
-              <li key={v.id} className="flex items-center gap-1">
-                <button onClick={() => setPlaying({ id: v.id, title: v.title })} aria-label={t.play(v.title)} className={playBtn}>
-                  <Play size={12} />
-                </button>
-                <button
-                  onClick={() => void api.openExternal(v.url)}
-                  aria-label={t.openVideo(v.title)}
-                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded p-1 text-left hover:bg-raised"
-                >
-                  <img
-                    src={v.thumbnail}
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-                    className="h-[45px] w-20 shrink-0 rounded-sm bg-raised object-cover"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-xs text-cream">{v.title}</span>
-                    <span className="block truncate font-mono text-[10.5px] text-engrave">
-                      {v.channel}
-                      {v.publishedAt ? ` · ${v.publishedAt.slice(0, 4)}` : ""}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="text-[11px] leading-relaxed text-engrave">{t.hint}</p>
-      </section>
+          {showNoKey && (
+            <p className="text-[11px] leading-relaxed text-engrave">
+              {t.noKey}{" "}
+              <button onClick={() => setView("settings", "youtube")} className="underline hover:text-cream">
+                {t.setUp}
+              </button>
+            </p>
+          )}
+        </section>
+      )}
     </aside>
   );
 }

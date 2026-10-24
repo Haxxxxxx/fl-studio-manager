@@ -2,15 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, FolderPlus, Pause, Play, RefreshCw, Search, Shovel, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { MAX_PICKS, filterBeats, useDigger } from "../store/useDigger";
+import * as api from "../lib/tauri";
 import { audioSrc } from "../lib/tauri";
 import { formatBytes, formatRelative } from "../lib/format";
 import { isFileDrag } from "../lib/dropGuard";
 import { dict, tr } from "../i18n";
-import type { BeatFile } from "../types";
+import type { BeatFile, YoutubeStatus } from "../types";
 import { DigPanel } from "./DigPanel";
+import { DigResults } from "./DigResults";
 
 // The Digger: your raw beats (Settings → Beats folders). Pick up to 5 and dig
-// the web for similar ones to start a new song on (DigPanel).
+// the web for similar ones to start a new song on (DigPanel). Once a dig or a
+// search exists, the main area splits: beats on top, results below
+// (DigResults).
 
 const NB = " ";
 // A stable empty list: a fresh [] in a store selector re-renders forever.
@@ -59,8 +63,15 @@ export function DiggerView() {
   const t = tr(T);
   const folders = useAppStore((s) => s.settings.beatFolders ?? NO_FOLDERS);
   const addBeatFolder = useAppStore((s) => s.addBeatFolder);
-  const { beats, loading, error, picked, query, load, toggle, clearPicks, setQuery } = useDigger();
+  const { beats, loading, error, picked, query, load, toggle, clearPicks, setQuery, dig, rounds, webQuery, searchedFor, searching, clearUnseen } = useDigger();
   const [playing, setPlaying] = useState<string | null>(null);
+  const [yt, setYt] = useState<YoutubeStatus | null>(null);
+  // The round on screen (DigResults + DigPanel): back to the latest one
+  // whenever a dig or a round arrives.
+  const [selectedRound, setSelectedRound] = useState(0);
+  // The results section is always there (its search box is the only way to
+  // search YouTube); it takes its share of the height once it has something.
+  const showResults = !!dig || searchedFor !== null || searching || webQuery.trim() !== "";
   const audio = useRef<HTMLAudioElement>(null);
   const shown = useMemo(() => filterBeats(beats, query), [beats, query]);
   const full = picked.length >= MAX_PICKS;
@@ -79,6 +90,23 @@ export function DiggerView() {
   useEffect(() => {
     if (folderKey) void load();
   }, [folderKey, load]);
+
+  // A dig that finished while another view was open has been seen now.
+  useEffect(() => {
+    clearUnseen();
+  }, [clearUnseen]);
+
+  useEffect(() => {
+    let live = true;
+    api.youtubeStatus().then((s) => live && setYt(s)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedRound(rounds.length);
+  }, [dig, rounds.length]);
 
   const playToggle = (b: BeatFile) => {
     const el = audio.current;
@@ -141,54 +169,57 @@ export function DiggerView() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1">
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-rule px-6 py-2 text-xs">
-              <span className={picked.length ? "text-cream" : "text-engrave"}>{t.picked(picked.length)}</span>
-              {picked.length > 0 && (
-                <button onClick={clearPicks} className="text-engrave underline hover:text-cream">
-                  {t.clear}
-                </button>
-              )}
-              {full && <span className="text-engrave">{t.full}</span>}
+          <div className="@container flex min-w-0 flex-1 flex-col overflow-hidden">
+            <div className={`flex flex-col overflow-hidden ${showResults ? "min-h-[160px] basis-[40%]" : "min-h-0 flex-1"}`}>
+              <div className="flex items-center gap-3 border-b border-rule px-6 py-2 text-xs">
+                <span className={picked.length ? "text-cream" : "text-engrave"}>{t.picked(picked.length)}</span>
+                {picked.length > 0 && (
+                  <button onClick={clearPicks} className="text-engrave underline hover:text-cream">
+                    {t.clear}
+                  </button>
+                )}
+                {full && <span className="text-engrave">{t.full}</span>}
+              </div>
+              {error && <div role="alert" className="mx-6 mt-3 rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{error}</div>}
+              <div className="flex-1 overflow-y-auto px-4 py-2">
+                {loading && beats.length === 0 ? (
+                  <p className="p-4 text-sm text-engrave">{t.loading}</p>
+                ) : shown.length === 0 ? (
+                  <p className="p-4 text-sm text-engrave">{t.empty}</p>
+                ) : (
+                  <ul className="flex flex-col gap-px" aria-label={t.title}>
+                    {shown.map((b) => {
+                      const on = picked.includes(b.path);
+                      const disabled = !on && full;
+                      return (
+                        <li key={b.path} className={`flex items-center gap-3 rounded px-2 py-1.5 ${on ? "bg-raised ring-1 ring-hot/40" : "hover:bg-raised"}`}>
+                          <button
+                            onClick={() => playToggle(b)}
+                            aria-label={playing === b.path ? t.pause(b.name) : t.play(b.name)}
+                            className="shrink-0 rounded-full border border-rule-strong p-1.5 text-cream hover:border-hot"
+                          >
+                            {playing === b.path ? <Pause size={12} /> : <Play size={12} />}
+                          </button>
+                          <label className={`flex min-w-0 flex-1 items-center gap-3 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                            <input type="checkbox" checked={on} disabled={disabled} onChange={() => toggle(b.path)} aria-label={t.pick(b.name)} className="accent-orange-500" />
+                            <span className="min-w-0 flex-1">
+                              <span title={b.name} className="block truncate text-sm text-cream">{b.name}</span>
+                              <span className="block truncate font-mono text-[10.5px] text-engrave">{b.folder}</span>
+                            </span>
+                          </label>
+                          <span className="hidden shrink-0 text-xs text-engrave lg:inline">{formatRelative(b.modifiedAtMs)}</span>
+                          <span className="w-16 shrink-0 text-right font-mono text-[11px] text-engrave">{formatBytes(b.sizeBytes)}</span>
+                          {on && <Check size={14} className="shrink-0 text-hot" aria-hidden />}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             </div>
-            {error && <div role="alert" className="mx-6 mt-3 rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{error}</div>}
-            <div className="flex-1 overflow-y-auto px-4 py-2">
-              {loading && beats.length === 0 ? (
-                <p className="p-4 text-sm text-engrave">{t.loading}</p>
-              ) : shown.length === 0 ? (
-                <p className="p-4 text-sm text-engrave">{t.empty}</p>
-              ) : (
-                <ul className="flex flex-col gap-px" aria-label={t.title}>
-                  {shown.map((b) => {
-                    const on = picked.includes(b.path);
-                    const disabled = !on && full;
-                    return (
-                      <li key={b.path} className={`flex items-center gap-3 rounded px-2 py-1.5 ${on ? "bg-raised ring-1 ring-hot/40" : "hover:bg-raised"}`}>
-                        <button
-                          onClick={() => playToggle(b)}
-                          aria-label={playing === b.path ? t.pause(b.name) : t.play(b.name)}
-                          className="shrink-0 rounded-full border border-rule-strong p-1.5 text-cream hover:border-hot"
-                        >
-                          {playing === b.path ? <Pause size={12} /> : <Play size={12} />}
-                        </button>
-                        <label className={`flex min-w-0 flex-1 items-center gap-3 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
-                          <input type="checkbox" checked={on} disabled={disabled} onChange={() => toggle(b.path)} aria-label={t.pick(b.name)} className="accent-orange-500" />
-                          <span className="min-w-0 flex-1">
-                            <span title={b.name} className="block truncate text-sm text-cream">{b.name}</span>
-                            <span className="block truncate font-mono text-[10.5px] text-engrave">{b.folder}</span>
-                          </span>
-                        </label>
-                        <span className="hidden shrink-0 text-xs text-engrave lg:inline">{formatRelative(b.modifiedAtMs)}</span>
-                        <span className="w-16 shrink-0 text-right font-mono text-[11px] text-engrave">{formatBytes(b.sizeBytes)}</span>
-                        {on && <Check size={14} className="shrink-0 text-hot" aria-hidden />}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
+            <DigResults yt={yt} round={selectedRound} setRound={setSelectedRound} fill={showResults} />
           </div>
-          <DigPanel />
+          <DigPanel yt={yt} round={selectedRound} />
         </div>
       )}
     </div>
