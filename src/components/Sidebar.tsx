@@ -4,7 +4,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { useAppStore } from "../store/useAppStore";
 import { btnPrimary, engrave, Wordmark } from "../ui";
 import { CrewSection } from "./CrewSection";
-import { useInCrew } from "../store/useCrewStore";
+import { useCrewStore, useInCrew } from "../store/useCrewStore";
 import { currentLang, dict, tr } from "../i18n";
 import { FEEDBACK_EMAIL, feedbackMailto, osFromUserAgent } from "../lib/feedback";
 import { openExternal } from "../lib/tauri";
@@ -22,6 +22,7 @@ const T = dict(
     tagline: "Session → release",
     newSong: "New song",
     peopleCredits: "People & credits",
+    joinCrew: "Join your crew",
     feedback: "Report a bug or send feedback",
   },
   {
@@ -36,6 +37,7 @@ const T = dict(
     tagline: "Session → sortie",
     newSong: "Nouveau son",
     peopleCredits: "Personnes et crédits",
+    joinCrew: "Rejoindre ton crew",
     feedback: "Signaler un bug ou donner ton avis",
   },
 );
@@ -52,6 +54,7 @@ export function Sidebar() {
   const openPerson = useAppStore((s) => s.openPerson);
   const peopleCount = useAppStore((s) => s.workspace.people.length);
   const inCrew = useInCrew();
+  const crewEnabled = useCrewStore((s) => s.enabled);
   const t = tr(T);
 
   // Opens the mail app with the version, OS and current view filled in
@@ -130,6 +133,17 @@ export function Sidebar() {
       </nav>
 
       <CrewSection />
+      {/* No crew yet (and a crew server in this build): the way in is in Settings. */}
+      {crewEnabled && !inCrew && !demoMode && (
+        <div className="mx-2 mt-3 border-t-2 border-rule-strong pt-3">
+          <button
+            onClick={() => setView("settings", "crew")}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-body transition-colors hover:bg-raised hover:text-cream"
+          >
+            <Users size={16} strokeWidth={2} /> {t.joinCrew}
+          </button>
+        </div>
+      )}
 
       {albums.length > 0 && (
         <div className="mt-2 flex min-h-0 flex-col px-2">

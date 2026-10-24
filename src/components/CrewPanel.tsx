@@ -71,6 +71,7 @@ const T = dict(
     copied: "Copied",
     copy: "Copy",
     inviteValid: "Valid 7 days, up to 10 people.",
+    inviteListNote: "They also need their email added to the crew's sign-in list first (Supabase dashboard → Authentication → Users).",
     becomesOwner: (name: string) => ` ${name} becomes the owner.`,
     lastMember: " You're the last member, so the crew is deleted.",
     leaveConfirm: (crew: string, note: string) => `Leave ${crew}? Your shared songs leave the crew board with you.${note}`,
@@ -98,6 +99,7 @@ const T = dict(
     moveIt: "Move it?",
     onBoard: "On the crew board",
     onlyYou: "Only you see it",
+    shareNote: "Shares title, stage, BPM, key, tags, credits and dates. Never audio, file paths or notes.",
     seesAs: "Crew sees it as",
     titleLabel: "Title the crew sees",
     movedTo: " moved this song to ",
@@ -161,6 +163,7 @@ const T = dict(
     copied: "Copié",
     copy: "Copier",
     inviteValid: "Valable 7 jours, jusqu'à 10 personnes.",
+    inviteListNote: "Il faut aussi d'abord ajouter leur email à la liste de connexion du crew (tableau de bord Supabase → Authentication → Users).",
     becomesOwner: (name: string) => ` ${name} devient propriétaire.`,
     lastMember: " Tu es le dernier membre, donc le crew sera supprimé.",
     leaveConfirm: (crew: string, note: string) => `Quitter ${crew} ? Tes sons partagés quittent le tableau du crew avec toi.${note}`,
@@ -190,6 +193,7 @@ const T = dict(
     moveIt: "Le déplacer ?",
     onBoard: "Sur le tableau du crew",
     onlyYou: "Toi seul le vois",
+    shareNote: "Partage le titre, l'étape, le BPM, la tonalité, les tags, les crédits et les dates. Jamais d'audio, de chemins de fichiers ni de notes.",
     seesAs: "Le crew le voit comme",
     titleLabel: "Titre que voit le crew",
     movedTo: " a déplacé ce son dans ",
@@ -576,6 +580,7 @@ export function CrewInvites() {
           </>
         )}
       </div>
+      <div className="text-[11px] text-engrave">{t.inviteListNote}</div>
       {error && <div className="text-xs text-red-300">{error}</div>}
     </div>
   );
@@ -767,7 +772,7 @@ export function ShareToggle({ path }: { path: string }) {
             // Still waiting to be removed from another crew: finish that removal now, then share here.
             e.target.checked && elsewhere ? void run(() => moveShares([path])) : setShared([path], e.target.checked)
           }
-          className="accent-[#ff5a1f]"
+          className="accent-orange-500"
         />
         <Users size={13} className="text-body" />
         <span className="flex-1 text-body">
@@ -775,6 +780,7 @@ export function ShareToggle({ path }: { path: string }) {
         </span>
         <span className={error ? "text-red-300" : "text-engrave"}>{error ?? (shared ? t.onBoard : t.onlyYou)}</span>
       </label>
+      <div className="px-3 pb-2 text-[11px] text-engrave">{t.shareNote}</div>
       {shared && (
         <label className="flex items-center gap-2 border-t border-rule px-3 py-2 text-engrave">
           <span className="shrink-0">{t.seesAs}</span>
