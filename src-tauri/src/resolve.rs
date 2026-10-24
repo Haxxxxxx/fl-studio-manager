@@ -16,8 +16,28 @@ pub struct Resolver {
     /// Lowercased file stems of every plugin in the standard folders
     /// ("fabfilter pro-ds" for FabFilter Pro-DS.vst3/.dll/.clap).
     installed_plugins: HashSet<String>,
+    /// Every audio file under the user's sample libraries (Settings →
+    /// Sample libraries), by lowercased file name: a pack that lives at
+    /// another path on this computer counts as moved, not missing.
+    sample_libraries: HashMap<String, PathBuf>,
     exists_cache: HashMap<String, bool>,
     folder_files: HashMap<PathBuf, HashMap<String, PathBuf>>,
+}
+
+/// File types FL stores as samples; what the sample-library index keeps.
+const SAMPLE_EXTS: &[&str] = &["wav", "mp3", "ogg", "flac", "aif", "aiff", "wv", "ds", "sf2", "xi"];
+/// Depth and size caps for the sample-library index (a whole pack folder is
+/// walked once per scan; nothing is read inside the files).
+const LIBRARY_DEPTH: usize = 8;
+const LIBRARY_MAX_FILES: usize = 200_000;
+
+/// A stored sample path that's relative to the project folder (`Audio\take.wav`,
+/// `..\Kick.wav`): no root, no Windows drive, no unexpanded FL macro.
+fn is_project_relative(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    !path.is_empty()
+        && !path.starts_with(['/', '\\', '%'])
+        && !(bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':')
 }
 
 /// Paths stored in a .flp use the separators of the OS it was saved on. A
@@ -158,6 +178,7 @@ impl Resolver {
             factory_data: fl_studio_exe.and_then(|p| factory_data_dir(Path::new(&p))),
             user_data: None,
             installed_plugins,
+            sample_libraries: HashMap::new(),
             exists_cache: HashMap::new(),
             folder_files: HashMap::new(),
         }
@@ -167,6 +188,30 @@ impl Resolver {
     /// a `Projects` folder (only if it exists).
     pub fn with_user_data(mut self, user_data: Option<PathBuf>) -> Self {
         self.user_data = user_data.filter(|p| p.is_dir());
+        self
+    }
+
+    /// Indexes the user's sample libraries by file name (first match wins,
+    /// in the order the folders were added).
+    pub fn with_sample_folders(mut self, folders: &[PathBuf]) -> Self {
+        for folder in folders {
+            if is_remote_or_device(&folder.to_string_lossy()) {
+                continue;
+            }
+            for entry in WalkDir::new(folder).max_depth(LIBRARY_DEPTH).into_iter().filter_map(|e| e.ok()) {
+                if self.sample_libraries.len() >= LIBRARY_MAX_FILES {
+                    return self;
+                }
+                let path = entry.path();
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+                if !entry.file_type().is_file() || !SAMPLE_EXTS.contains(&ext.as_str()) {
+                    continue;
+                }
+                if let Some(name) = lower_file_name(path) {
+                    self.sample_libraries.entry(name).or_insert_with(|| path.to_path_buf());
+                }
+            }
+        }
         self
     }
 
@@ -218,7 +263,13 @@ impl Resolver {
         if is_remote_or_device(&path) {
             return (path, SampleStatus::Missing, None);
         }
-        let on_disk = native(&path);
+        let folder = project.parent().unwrap_or(project).to_path_buf();
+        // A relative path is relative to the project's folder, not to
+        // wherever the app happens to run from.
+        let on_disk = match native(&path) {
+            p if is_project_relative(&p) => folder.join(p).to_string_lossy().to_string(),
+            p => p,
+        };
         if self.exists(&on_disk) {
             return (path, SampleStatus::Ok, Some(PathBuf::from(on_disk)));
         }
@@ -229,9 +280,13 @@ impl Resolver {
                 return (path, SampleStatus::Relocated, Some(candidate));
             }
         }
-        let folder = project.parent().unwrap_or(project).to_path_buf();
-        let moved = lower_file_name(Path::new(&on_disk))
-            .and_then(|n| self.files_in_song_folder(&folder).get(&n).cloned());
+        // Moved: the same file name in the song's folder, else in one of the
+        // user's sample libraries.
+        let name = lower_file_name(Path::new(&on_disk));
+        let moved = name
+            .as_ref()
+            .and_then(|n| self.files_in_song_folder(&folder).get(n).cloned())
+            .or_else(|| name.as_ref().and_then(|n| self.sample_libraries.get(n).cloned()));
         match moved {
             Some(p) => (path, SampleStatus::Relocated, Some(p)),
             None => (path, SampleStatus::Missing, None),
@@ -373,6 +428,42 @@ mod tests {
         let statuses: Vec<_> = r.samples(&raw, &project).into_iter().map(|s| s.status).collect();
         let _ = std::fs::remove_dir_all(&root);
         assert_eq!(statuses, vec![SampleStatus::Ok, SampleStatus::Relocated, SampleStatus::Missing]);
+    }
+
+    #[test]
+    fn relative_paths_and_sample_libraries_are_found() {
+        let root = std::env::temp_dir().join(format!("flsm-libs-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let song = root.join("Projects").join("Envy");
+        fs::create_dir_all(song.join("Audio")).unwrap();
+        fs::write(song.join("Audio").join("take.wav"), b"x").unwrap();
+        let lib = root.join("Packs").join("Drums").join("Kicks");
+        fs::create_dir_all(&lib).unwrap();
+        fs::write(lib.join("Kick 808.wav"), b"x").unwrap();
+        fs::write(lib.join("notes.txt"), b"x").unwrap();
+        let project = song.join("Envy.flp");
+
+        let mut r = Resolver::new(None).with_sample_folders(&[root.join("Packs")]);
+        let raw = vec![
+            // Relative to the project folder (FL writes these for files beside the song).
+            "Audio\\take.wav".to_string(),
+            // Saved on Windows, the pack lives elsewhere on this computer.
+            "D:\\Samples\\Drums\\Kicks\\Kick 808.wav".to_string(),
+            "D:\\Samples\\Drums\\Kicks\\notes.txt".to_string(),
+            "D:\\Samples\\Drums\\Snare.wav".to_string(),
+        ];
+        let statuses: Vec<_> = r.samples(&raw, &project).into_iter().map(|s| s.status).collect();
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(
+            statuses,
+            vec![SampleStatus::Ok, SampleStatus::Relocated, SampleStatus::Missing, SampleStatus::Missing]
+        );
+        assert!(is_project_relative("Audio\\take.wav"));
+        assert!(is_project_relative("../kick.wav"));
+        assert!(!is_project_relative("C:\\kick.wav"));
+        assert!(!is_project_relative("/Users/me/kick.wav"));
+        assert!(!is_project_relative("%FLStudioUserData%\\kick.wav"));
+        assert!(!is_project_relative(""));
     }
 
     #[test]

@@ -175,6 +175,9 @@ interface AppState {
   /** Beats folders (the Digger). */
   addBeatFolder: () => Promise<void>;
   removeBeatFolder: (folder: string) => Promise<void>;
+  /** Sample libraries (rescans: sample statuses depend on them). */
+  addSampleFolder: () => Promise<void>;
+  removeSampleFolder: (folder: string) => Promise<void>;
   pickOutputFolder: () => Promise<void>;
   pickFlStudio: () => Promise<void>;
   /** Fill in the FL Studio found on this machine; false if none was found. */
@@ -346,8 +349,8 @@ export const useAppStore = create<AppState>((set, get) => {
   /** Take the path settings Rust saved; keep this session's other preferences
    * (sample-data favorites stay in memory). */
   function keepPaths(saved: Settings) {
-    const { watchedFolders, flStudioPath, outputFolder, ffmpegPath, beatFolders } = saved;
-    set((s) => ({ settings: { ...s.settings, watchedFolders, flStudioPath, outputFolder, ffmpegPath, beatFolders } }));
+    const { watchedFolders, flStudioPath, outputFolder, ffmpegPath, beatFolders, sampleFolders } = saved;
+    set((s) => ({ settings: { ...s.settings, watchedFolders, flStudioPath, outputFolder, ffmpegPath, beatFolders, sampleFolders } }));
   }
 
   /** A folder was linked: leave sample data if needed, then scan. */
@@ -572,6 +575,15 @@ export const useAppStore = create<AppState>((set, get) => {
 
     addBeatFolder: async () => keepPaths(await api.pickBeatFolder()),
     removeBeatFolder: async (folder) => keepPaths(await api.removeBeatFolder(folder)),
+    addSampleFolder: async () => {
+      const before = get().settings.sampleFolders?.length ?? 0;
+      keepPaths(await api.pickSampleFolder());
+      if ((get().settings.sampleFolders?.length ?? 0) !== before) await get().rescan();
+    },
+    removeSampleFolder: async (folder) => {
+      keepPaths(await api.removeSampleFolder(folder));
+      await get().rescan();
+    },
 
     pickOutputFolder: async () => {
       const before = get().settings.outputFolder;

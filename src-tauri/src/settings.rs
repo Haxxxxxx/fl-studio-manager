@@ -193,6 +193,33 @@ pub fn remove_beat_folder(app: AppHandle, folder: String) -> Result<Settings, St
     Ok(saved)
 }
 
+/// Adds a sample library the user picks: the scanner looks up samples a
+/// project stores under another path by file name in there. A whole drive
+/// or the home folder would take ages to walk, so they're refused.
+#[tauri::command]
+pub async fn pick_sample_folder(app: AppHandle) -> Result<Settings, String> {
+    let Some(folder) = pick(&app, true).await? else { return load(&app) };
+    if too_broad_for_beats(&folder, app.path().home_dir().ok().as_deref()) {
+        return Err("Pick the folder where your samples or packs are, not a whole drive or your home folder.".to_string());
+    }
+    let folder = usable_folder(&folder)?;
+    let mut saved = load(&app)?;
+    if !saved.sample_folders.contains(&folder) {
+        saved.sample_folders.push(folder);
+        store(&app, &saved)?;
+    }
+    Ok(saved)
+}
+
+/// Removes a sample library.
+#[tauri::command]
+pub fn remove_sample_folder(app: AppHandle, folder: String) -> Result<Settings, String> {
+    let mut saved = load(&app)?;
+    saved.sample_folders.retain(|f| f != &folder);
+    store(&app, &saved)?;
+    Ok(saved)
+}
+
 #[tauri::command]
 pub async fn pick_output_folder(app: AppHandle) -> Result<Settings, String> {
     let Some(folder) = pick(&app, true).await? else { return load(&app) };

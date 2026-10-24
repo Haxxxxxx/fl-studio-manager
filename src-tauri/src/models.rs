@@ -137,6 +137,11 @@ pub struct Settings {
     /// source. Not songs: never scanned as projects.
     #[serde(default)]
     pub beat_folders: Vec<String>,
+    /// The user's sample libraries (packs, Splice folder…). Only walked by
+    /// the scanner to find samples a project stores under another path:
+    /// nothing in them is ever opened or listed in the UI.
+    #[serde(default)]
+    pub sample_folders: Vec<String>,
     /// The Digger may send a short, low-quality excerpt of each picked beat
     /// to Gemini (off by default; disclosed in the UI).
     #[serde(default)]
@@ -175,6 +180,7 @@ impl Default for Settings {
             ffmpeg_path: None,
             ui_language: default_ui_language(),
             beat_folders: Vec::new(),
+            sample_folders: Vec::new(),
             dig_send_audio: false,
             install_id: None,
             converter_url_template: None,

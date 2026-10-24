@@ -21,7 +21,7 @@ import {
 import { useAppStore } from "../store/useAppStore";
 import { formatBytes, formatDateTime, trashName } from "../lib/format";
 import { audioSrc, backupsOnRiskyVolumes, openInFlStudio, revealInFileManager } from "../lib/tauri";
-import { KEYS, albumsOf, backupsBytes, formatBpm, missingPlugins, renderFreshness } from "../lib/songs";
+import { KEYS, albumsOf, backupsBytes, formatBpm, lastSaveMs, missingPlugins, renderFreshness } from "../lib/songs";
 import type { ProjectInfo } from "../types";
 import { detectKey } from "../lib/people";
 import { SongCredits, SongPitches } from "./SongPeople";
@@ -103,7 +103,10 @@ const T = dict(
     keepsRecent: (n: number) => `Keeps the ${n} most recent.`,
     plugins: (n: number) => `Plugins · ${n}`,
     notInstalled: (names: string) => `Not installed on this computer: ${names}`,
+    pluginsUnknown: (daw: string) => `Whether they're installed here isn't checked for ${daw} projects yet.`,
     noneFound: "None found",
+    librariesHint: "A pack that lives at another path on this computer counts as missing until you add it in Settings → Sample libraries.",
+    librariesLink: "Add sample libraries",
     samples: (n: number) => `Samples · ${n}`,
     found: (n: number) => `${n} found`,
     movedTitle:
@@ -182,6 +185,9 @@ const T = dict(
     plugins: (n: number) => `Plugins · ${n}`,
     notInstalled: (names: string) => `Pas installés sur cet ordi : ${names}`,
     noneFound: "Aucun trouvé",
+    pluginsUnknown: (daw: string) => `Savoir s'ils sont installés ici n'est pas encore vérifié pour les projets ${daw}.`,
+    librariesHint: "Un pack rangé à un autre endroit sur cet ordi compte comme manquant tant qu'il n'est pas ajouté dans Réglages → Banques de samples.",
+    librariesLink: "Ajouter des banques de samples",
     samples: (n: number) => `Samples · ${n}`,
     found: (n: number) => `${n} trouvé${n > 1 ? "s" : ""}`,
     movedTitle:
@@ -436,7 +442,7 @@ export function ProjectDrawer() {
               label={t.timeSig}
               value={project.timeSigNum ? `${project.timeSigNum}/${project.timeSigDenom}` : "—"}
             />
-            <Fact label={t.lastSaved} value={formatDateTime(project.modifiedAtMs)} />
+            <Fact label={t.lastSaved} value={formatDateTime(lastSaveMs(project))} />
             <Fact
               label={t.dawVersion(dawOf(project).label)}
               value={(project.flVersion?.split(".").slice(0, 3).join(".") ?? project.dawVersion?.replace(/^(Ableton Live|Studio One|REAPER)\s*/i, "")) || "—"}
@@ -607,8 +613,13 @@ export function ProjectDrawer() {
 function PluginsAndSamples({ project }: { project: ProjectInfo }) {
   const [showSamples, setShowSamples] = useState(false);
   const missingP = missingPlugins(project);
+  // "installed" is only checked for FL's wrapper plugins; for the other
+  // DAWs every plugin comes back null, which isn't "native".
+  const checksInstalled = dawOf(project).id === "fl-studio";
   const thirdParty = project.plugins.filter((p) => p.installed !== null);
   const native = project.plugins.filter((p) => p.installed === null);
+  const sampleFolders = useAppStore((s) => s.settings.sampleFolders ?? []);
+  const setView = useAppStore((s) => s.setView);
   const counts = { ok: 0, relocated: 0, missing: 0 };
   for (const s of project.samples) counts[s.status]++;
   const problemSamples = project.samples.filter((s) => s.status !== "ok");
@@ -643,6 +654,9 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
           ))}
           {project.plugins.length === 0 && <span className="text-xs text-engrave">{t.noneFound}</span>}
         </div>
+        {!checksInstalled && project.plugins.length > 0 && (
+          <p className="mt-1.5 text-[11px] text-engrave">{t.pluginsUnknown(dawOf(project).label)}</p>
+        )}
       </Section>
 
       <Section label={t.samples(project.samples.length)}>
@@ -661,6 +675,14 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
             </span>
           )}
         </div>
+        {counts.missing > 0 && sampleFolders.length === 0 && (
+          <p className="mt-1.5 text-[11px] text-engrave">
+            {t.librariesHint}{" "}
+            <button onClick={() => setView("settings", "samples")} className="text-body underline-offset-2 hover:text-cream hover:underline">
+              {t.librariesLink}
+            </button>
+          </p>
+        )}
         {problemSamples.length > 0 && (
           <>
             <button onClick={() => setShowSamples(!showSamples)} className="mt-1.5 text-[11px] text-engrave hover:text-body">

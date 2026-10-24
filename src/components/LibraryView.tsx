@@ -31,6 +31,7 @@ import {
   albumsOf,
   formatBpm,
   hasProblems,
+  lastSaveMs,
   missingPlugins,
   missingSamples,
   songLabel,
@@ -80,6 +81,7 @@ const T = dict(
     keyFromTrack: "Found in a mixer track name — set it in the song panel",
     pluginsMissing: (names: string) => `Plugins not installed: ${names}`,
     samplesMissing: (n: number) => `${n} missing sample${n === 1 ? "" : "s"}`,
+    unreadable: (err: string) => `Couldn't be read: ${err}`,
     noFolder: "No project folder linked yet",
     foundFolders: "Found these DAW folders on this computer. Link the ones you use:",
     pointAt:
@@ -131,6 +133,7 @@ const T = dict(
     keyFromTrack: "Trouvée dans un nom de piste du mixer — règle-la dans le panneau du son",
     pluginsMissing: (names: string) => `Plugins pas installés : ${names}`,
     samplesMissing: (n: number) => `${n} sample${n === 1 ? " manquant" : "s manquants"}`,
+    unreadable: (err: string) => `Illisible : ${err}`,
     noFolder: "Aucun dossier de projets lié pour l'instant",
     foundFolders: "On a trouvé ces dossiers de DAW sur cet ordi. Lie ceux que tu utilises :",
     pointAt:
@@ -284,7 +287,7 @@ export function LibraryView() {
         return (KEYS.indexOf(ka) - KEYS.indexOf(kb)) * dir;
       }
       if (sortKey === "versions") return (a.backups.length - b.backups.length) * dir;
-      return (a.modifiedAtMs - b.modifiedAtMs) * dir;
+      return (lastSaveMs(a) - lastSaveMs(b)) * dir;
     });
     // statusOf only reads workspace.songs, which is listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -560,7 +563,7 @@ export function LibraryView() {
                           <span className="text-engrave/50">—</span>
                         ))}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2 font-mono text-[13px] text-body">{formatDate(project.modifiedAtMs)}</td>
+                    <td className="whitespace-nowrap px-2 py-2 font-mono text-[13px] text-body">{formatDate(lastSaveMs(project))}</td>
                     <td className="px-2 py-2 tabular-nums text-engrave">{project.backups.length || "—"}</td>
                     <td className="px-2 py-2">
                       <MixdownBadge project={project} short />
@@ -590,6 +593,7 @@ function ProblemIcon({ project }: { project: ProjectInfo }) {
   const plugins = missingPlugins(project).map((p) => p.name);
   const samples = missingSamples(project).length;
   const lines = [
+    project.readError ? tr(T).unreadable(project.readError) : "",
     plugins.length ? tr(T).pluginsMissing(plugins.join(", ")) : "",
     samples ? tr(T).samplesMissing(samples) : "",
   ].filter(Boolean);
