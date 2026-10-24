@@ -442,8 +442,10 @@ export const useAppStore = create<AppState>((set, get) => {
       if (!version || status === "downloading" || status === "ready") return;
       set({ update: { status: "downloading", version } });
       try {
-        await updater.installUpdate(({ downloaded, total, finished }) =>
-          set({ update: { status: finished ? "ready" : "downloading", version, progress: total ? downloaded / total : undefined } }),
+        await updater.installUpdate(
+          ({ downloaded, total, finished }) =>
+            set({ update: { status: finished ? "ready" : "downloading", version, progress: total ? downloaded / total : undefined } }),
+          flushWorkspace,
         );
       } catch (e) {
         set({ update: { status: "error", version, error: e instanceof Error ? e.message : String(e) } });

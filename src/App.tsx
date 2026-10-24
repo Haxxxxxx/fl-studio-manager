@@ -67,6 +67,7 @@ const T = dict(
 function UpdateNotice() {
   const update = useAppStore((s) => s.update);
   const install = useAppStore((s) => s.installUpdate);
+  const check = useAppStore((s) => s.checkUpdate);
   const dismiss = useAppStore((s) => s.dismissUpdate);
   const { status, version } = update;
   if (!version || status === "idle" || status === "checking") return null;
@@ -96,8 +97,9 @@ function UpdateNotice() {
           {tr(T).updateNow}
         </button>
       )}
+      {/* After a failure the downloaded update is gone: look again first. */}
       {status === "error" && (
-        <button onClick={() => void install()} className={btnPrimary}>
+        <button onClick={() => void check()} className={btnPrimary}>
           {tr(T).retry}
         </button>
       )}

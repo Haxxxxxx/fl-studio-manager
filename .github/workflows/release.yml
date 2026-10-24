@@ -28,6 +28,9 @@
 # and uploaded, with latest.json, to the public `releases` bucket of that
 # project (SUPABASE_SERVICE_ROLE_KEY secret, write-only use). The app checks
 # latest.json on launch; the website's /download/* point at latest/*.
+# Pushing a version tag therefore SHIPS the update: every installed app
+# offers it on its next launch, before the draft GitHub Release is
+# published. Only tag a commit on main that is ready for the crew.
 name: Release builds
 
 on:

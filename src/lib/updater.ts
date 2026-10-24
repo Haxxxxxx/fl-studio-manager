@@ -68,7 +68,7 @@ export async function checkForUpdate(): Promise<AvailableUpdate | null> {
 
 /** Download and install the update the last check found, then restart the
  * app (Windows restarts on its own once the installer runs). */
-export async function installUpdate(onProgress: (progress: UpdateProgress) => void): Promise<void> {
+export async function installUpdate(onProgress: (progress: UpdateProgress) => void, beforeRelaunch?: () => Promise<void>): Promise<void> {
   const update = pending;
   if (!update) throw new UpdateError("install", "No update to install: check for updates first.");
   let downloaded = 0;
@@ -83,6 +83,9 @@ export async function installUpdate(onProgress: (progress: UpdateProgress) => vo
     throw new UpdateError("install", describe(e), { cause: e });
   }
   pending = null;
+  // A pending debounced save would be lost: relaunch skips the window's
+  // close handler, which is where the workspace is normally flushed.
+  await beforeRelaunch?.();
   try {
     await relaunch();
   } catch (e) {
