@@ -25,6 +25,8 @@ pub struct Scope {
     /// project folders: beats are never projects, songs never beats.
     beat_folders: Vec<PathBuf>,
     beat_roots: Vec<PathBuf>,
+    /// Sample libraries, resolved: walked by the scanner's resolver only.
+    sample_folders: Vec<PathBuf>,
     fl_studio: Option<String>,
     ffmpeg: Option<String>,
     pub render_format: String,
@@ -69,6 +71,7 @@ impl Scope {
             output: s.output_folder.as_deref().and_then(|f| Some((PathBuf::from(f), resolve(Path::new(f))?))),
             beat_folders: s.beat_folders.iter().map(PathBuf::from).filter(|f| resolve(f).is_some()).collect(),
             beat_roots: s.beat_folders.iter().filter_map(|f| resolve(Path::new(f))).collect(),
+            sample_folders: s.sample_folders.iter().filter_map(|f| resolve(Path::new(f))).collect(),
             fl_studio: s.fl_studio_path.clone(),
             ffmpeg: s.ffmpeg_path.clone(),
             render_format: s.render_format.clone(),
@@ -156,6 +159,11 @@ impl Scope {
     /// The beats folders, as saved.
     pub fn beat_folders(&self) -> &[PathBuf] {
         &self.beat_folders
+    }
+
+    /// The sample libraries, resolved.
+    pub fn sample_folders(&self) -> &[PathBuf] {
+        &self.sample_folders
     }
 
     /// The export folder from Settings, as saved.

@@ -50,6 +50,9 @@ export const pickOutputFolder = (): Promise<Settings> => invoke("pick_output_fol
 /** Beats folders (the Digger), picked natively like project folders. */
 export const pickBeatFolder = (): Promise<Settings> => invoke("pick_beat_folder");
 export const removeBeatFolder = (folder: string): Promise<Settings> => invoke("remove_beat_folder", { folder });
+/** Sample libraries: where moved packs are looked up by file name. */
+export const pickSampleFolder = (): Promise<Settings> => invoke("pick_sample_folder");
+export const removeSampleFolder = (folder: string): Promise<Settings> => invoke("remove_sample_folder", { folder });
 export const scanBeats = (): Promise<BeatFile[]> => invoke("scan_beats");
 /** Whether a YouTube Data API key is set (the key itself never comes back). */
 export const youtubeStatus = (): Promise<YoutubeStatus> => invoke("youtube_status");

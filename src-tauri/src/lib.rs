@@ -43,6 +43,8 @@ pub fn run() {
             settings::pick_output_folder,
             settings::pick_beat_folder,
             settings::remove_beat_folder,
+            settings::pick_sample_folder,
+            settings::remove_sample_folder,
             beats::scan_beats,
             digger::dig_beats,
             digger::dig_deeper,

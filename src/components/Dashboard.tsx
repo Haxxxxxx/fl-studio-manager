@@ -20,6 +20,7 @@ import {
   UNSORTED,
   backupsBytes,
   hasProblems,
+  lastSaveMs,
   songLabel,
   rendersBytes,
   saveTimestamps,
@@ -424,7 +425,7 @@ function MyDashboard({ editing }: { editing: boolean }) {
                       <StatusDot color={s.color} size={6} /> {s.label}
                     </div>
                     <div className="mt-2 flex items-center justify-between text-[11px] text-engrave">
-                      <span>{formatRelative(p.modifiedAtMs)}</span>
+                      <span>{formatRelative(lastSaveMs(p))}</span>
                       {!demoMode && (
                         <button
                           onClick={(e) => {
@@ -651,7 +652,7 @@ function MyDashboard({ editing }: { editing: boolean }) {
  * curve and the heatmap both draw from this. */
 function useStudioDays() {
   const songs = useVisibleSongs();
-  const lastSave = useMemo(() => Math.max(0, ...songs.map((p) => p.modifiedAtMs)), [songs]);
+  const lastSave = useMemo(() => Math.max(0, ...songs.map(lastSaveMs)), [songs]);
   const stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

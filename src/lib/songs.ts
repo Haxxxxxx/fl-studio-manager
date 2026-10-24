@@ -106,10 +106,12 @@ export const ALBUM_COLORS = ["#c98500", "#199e70", "#d55181", "#9085e9", "#e6676
 
 export const EMPTY_WORKSPACE: Workspace = { version: 2, songs: {}, albums: [], people: [] };
 
+/** Fresh = the newest mixdown is at least as new as the last save, backups
+ * included (an autosave after the render means the mixdown is behind). */
 export function renderFreshness(p: ProjectInfo): RenderFreshness {
   const latest = p.renders[0];
   if (!latest) return "none";
-  return latest.modifiedAtMs >= p.modifiedAtMs ? "fresh" : "stale";
+  return latest.modifiedAtMs >= lastSaveMs(p) ? "fresh" : "stale";
 }
 
 export function backupsBytes(p: ProjectInfo): number {
@@ -153,9 +155,9 @@ export function missingSamples(p: ProjectInfo) {
   return p.samples.filter((s) => s.status === "missing");
 }
 
-/** A song that won't open cleanly on this machine. */
+/** A song that won't open cleanly on this machine, or that couldn't be read. */
 export function hasProblems(p: ProjectInfo): boolean {
-  return missingPlugins(p).length > 0 || missingSamples(p).length > 0;
+  return !!p.readError || missingPlugins(p).length > 0 || missingSamples(p).length > 0;
 }
 
 /** Song name, plus its folder when another song has the same name

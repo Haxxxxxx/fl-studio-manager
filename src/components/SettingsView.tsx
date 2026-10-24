@@ -345,6 +345,8 @@ export function SettingsView() {
           {folderError && <div className="mt-2 text-xs text-missing">{folderError}</div>}
         </section>
 
+        <SampleFoldersSection />
+
         <BeatFoldersSection />
 
         <section>
@@ -924,6 +926,61 @@ function BeatFoldersSection() {
 
   return (
     <section id="beats">
+      <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
+      <p className="mt-1 text-xs text-engrave">{t.hint}</p>
+      <div className="mt-3 flex flex-col gap-2">
+        {folders.map((folder) => (
+          <div key={folder} className="flex items-center justify-between gap-2 rounded-md border border-rule bg-raised px-3 py-2 text-sm text-body">
+            <span className="truncate">{folder}</span>
+            <button onClick={() => run(remove(folder))} aria-label={t.remove(folder)} className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-red-300">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() => run(add())}
+          className="flex items-center justify-center gap-2 rounded-md border border-dashed border-rule-strong py-2.5 text-sm text-engrave hover:border-orange-400/40 hover:text-orange-300"
+        >
+          <FolderPlus size={15} />
+          {t.add}
+        </button>
+      </div>
+      {error && <div className="mt-2 text-xs text-missing">{error}</div>}
+    </section>
+  );
+}
+
+const T_SAMPLES = dict(
+  {
+    title: "Sample libraries",
+    hint: "Where your packs and samples live on this computer (a Splice folder, a Packs drive…). A project saved on another computer stores its own paths; a sample with the same file name found in here counts as moved instead of missing. Nothing in these folders is listed or played.",
+    add: "Add a sample library",
+    remove: (f: string) => `Remove ${f}`,
+  },
+  {
+    title: "Banques de samples",
+    hint: "Là où tes packs et samples sont rangés sur cet ordi (un dossier Splice, un disque de packs…). Un projet sauvé sur un autre ordi garde ses propres chemins ; un sample du même nom trouvé ici compte comme déplacé plutôt que manquant. Rien dans ces dossiers n'est listé ni joué.",
+    add: "Ajouter une banque de samples",
+    remove: (f: string) => `Retirer ${f}`,
+  },
+);
+
+/** Sample libraries: where the scanner looks up samples a project stores
+ * under another path. Adding or removing one rescans. */
+function SampleFoldersSection() {
+  const folders = useAppStore((s) => s.settings.sampleFolders ?? NO_FOLDERS);
+  const add = useAppStore((s) => s.addSampleFolder);
+  const remove = useAppStore((s) => s.removeSampleFolder);
+  const [error, setError] = useState<string | null>(null);
+  const t = tr(T_SAMPLES);
+
+  function run(action: Promise<void>) {
+    setError(null);
+    void action.catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }
+
+  return (
+    <section id="samples">
       <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
       <p className="mt-1 text-xs text-engrave">{t.hint}</p>
       <div className="mt-3 flex flex-col gap-2">
