@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, FolderPlus, Pause, Play, RefreshCw, Search, Shovel } from "lucide-react";
+import { Check, FolderPlus, Pause, Play, RefreshCw, Search, Shovel, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { MAX_PICKS, filterBeats, useDigger } from "../store/useDigger";
 import { audioSrc } from "../lib/tauri";
 import { formatBytes, formatRelative } from "../lib/format";
+import { isFileDrag } from "../lib/dropGuard";
 import { dict, tr } from "../i18n";
 import type { BeatFile } from "../types";
 import { DigPanel } from "./DigPanel";
@@ -31,6 +32,8 @@ const T = dict(
     pause: (name: string) => `Pause ${name}`,
     pick: (name: string) => `Pick ${name}`,
     loading: "Looking for beats…",
+    dropped: "Dropping files doesn't add them. Put the beat in one of your beats folders (Settings), tick it here, then tick \"Let Gemini listen\" and Dig.",
+    dismiss: "Dismiss",
   },
   {
     title: "Digger",
@@ -47,6 +50,8 @@ const T = dict(
     pause: (name: string) => `Pause ${name}`,
     pick: (name: string) => `Choisir ${name}`,
     loading: "Recherche des prods…",
+    dropped: `Glisser un fichier ne l'ajoute pas. Mets la prod dans un de tes dossiers de prods (Réglages), coche-la ici, puis coche «${NB}Faire écouter à Gemini${NB}» et Creuse.`,
+    dismiss: "Fermer",
   },
 );
 
@@ -60,6 +65,16 @@ export function DiggerView() {
   const shown = useMemo(() => filterBeats(beats, query), [beats, query]);
   const full = picked.length >= MAX_PICKS;
   const folderKey = folders.join("|");
+  const [dropHint, setDropHint] = useState(false);
+
+  // dropGuard.ts refuses the drop itself; here we say what to do instead.
+  useEffect(() => {
+    const onDrop = (e: DragEvent) => {
+      if (isFileDrag(e.dataTransfer?.types)) setDropHint(true);
+    };
+    window.addEventListener("drop", onDrop);
+    return () => window.removeEventListener("drop", onDrop);
+  }, []);
 
   useEffect(() => {
     if (folderKey) void load();
@@ -108,6 +123,15 @@ export function DiggerView() {
         )}
       </div>
 
+      {dropHint && (
+        <div role="status" className="mx-6 mt-3 flex items-start gap-3 rounded-md border border-rule-strong bg-raised px-3 py-2 text-xs text-cream">
+          <span className="flex-1">{t.dropped}</span>
+          <button onClick={() => setDropHint(false)} aria-label={t.dismiss} className="shrink-0 text-engrave hover:text-cream">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {folders.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
           <p className="max-w-md text-sm text-body">{t.noFolder}</p>
@@ -150,11 +174,11 @@ export function DiggerView() {
                         <label className={`flex min-w-0 flex-1 items-center gap-3 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                           <input type="checkbox" checked={on} disabled={disabled} onChange={() => toggle(b.path)} aria-label={t.pick(b.name)} className="accent-orange-500" />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm text-cream">{b.name}</span>
+                            <span title={b.name} className="block truncate text-sm text-cream">{b.name}</span>
                             <span className="block truncate font-mono text-[10.5px] text-engrave">{b.folder}</span>
                           </span>
                         </label>
-                        <span className="shrink-0 text-xs text-engrave">{formatRelative(b.modifiedAtMs)}</span>
+                        <span className="hidden shrink-0 text-xs text-engrave lg:inline">{formatRelative(b.modifiedAtMs)}</span>
                         <span className="w-16 shrink-0 text-right font-mono text-[11px] text-engrave">{formatBytes(b.sizeBytes)}</span>
                         {on && <Check size={14} className="shrink-0 text-hot" aria-hidden />}
                       </li>

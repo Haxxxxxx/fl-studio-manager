@@ -5,7 +5,7 @@ import { sortBy, stageColor, stageLabel, type SortKey } from "../../lib/pipeline
 import { formatRelative } from "../../lib/format";
 import { formatBpm } from "../../lib/songs";
 import { StatusDot } from "../ui";
-import { ConflictDot, SourceError, T_PIPELINE, useSource, type PipelineItem } from "./shared";
+import { CARD_FOCUS, ConflictDot, openOnKey, SourceError, T_PIPELINE, useSource, type PipelineItem } from "./shared";
 import type { PipelineColumn } from "../../types";
 import { tr } from "../../i18n";
 
@@ -24,7 +24,7 @@ type Row = { item: PipelineItem; column: PipelineColumn; boardIndex: number };
  * a row to open the song. */
 export function PipelineTable() {
   const source = useSource();
-  const { groups, scope } = source;
+  const { groups, query, scope } = source;
   const { key, dir } = usePipelineView((s) => s.tableSort[scope]);
   const setTableSort = usePipelineView((s) => s.setTableSort);
   const hidden = useCollapsed(scope, "table");
@@ -89,12 +89,20 @@ export function PipelineTable() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-2 py-6 text-center text-xs text-engrave">
-                  {t.noSongs}
+                  {query ? t.noMatch : t.noSongs}
                 </td>
               </tr>
             )}
             {rows.map(({ item, column }) => (
-              <tr key={item.key} onClick={item.open} className={`border-b border-rule ${item.open ? "cursor-pointer" : ""} ${item.selected ? "bg-raised" : "hover:bg-panel"}`}>
+              <tr
+                key={item.key}
+                tabIndex={0}
+                role="button"
+                aria-label={item.title}
+                onClick={item.open}
+                onKeyDown={openOnKey(item.open)}
+                className={`border-b border-rule ${CARD_FOCUS} ${item.open ? "cursor-pointer" : ""} ${item.selected ? "bg-raised" : "hover:bg-panel"}`}
+              >
                 <td className="px-2 py-1.5">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate font-medium text-cream">{item.title}</span>

@@ -222,6 +222,7 @@ function MyDashboard() {
   const openDetail = useAppStore((s) => s.openDetail);
   const openAlbum = useAppStore((s) => s.openAlbum);
   const setStatusFilter = useAppStore((s) => s.setStatusFilter);
+  const resetLibraryFilters = useAppStore((s) => s.resetLibraryFilters);
   const watchedFolders = useAppStore((s) => s.settings.watchedFolders);
   const scanning = useAppStore((s) => s.scanning);
   const t = tr(T);
@@ -277,7 +278,7 @@ function MyDashboard() {
               {t.noProjects}
             </div>
             <div className="mt-2 flex gap-2">
-              <button onClick={() => setView("settings")} className={btnPrimary}>
+              <button onClick={() => setView("settings", "folders")} className={btnPrimary}>
                 {t.openSettings}
               </button>
               <button onClick={loadDemoData} className={btn}>
@@ -358,6 +359,7 @@ function MyDashboard() {
                   <button
                     key={s.label}
                     onClick={() => {
+                      resetLibraryFilters();
                       setStatusFilter(s.id ?? "unsorted");
                       setView("library");
                     }}
@@ -697,9 +699,9 @@ function usePluginStats() {
 function useShowSongsWithPlugin() {
   const setView = useAppStore((s) => s.setView);
   const setPluginFilter = useAppStore((s) => s.setPluginFilter);
-  const setStatusFilter = useAppStore((s) => s.setStatusFilter);
+  const resetLibraryFilters = useAppStore((s) => s.resetLibraryFilters);
   return (name: string) => {
-    setStatusFilter(null);
+    resetLibraryFilters();
     setPluginFilter(name);
     setView("library");
   };
@@ -711,6 +713,7 @@ function HealthCard() {
   const showSongs = useShowSongsWithPlugin();
   const setView = useAppStore((s) => s.setView);
   const setProblemsOnly = useAppStore((s) => s.setProblemsOnly);
+  const resetLibraryFilters = useAppStore((s) => s.resetLibraryFilters);
   const missingPlugins = stats.filter((s) => s.missing);
   const t = tr(T);
   const samples = useMemo(() => {
@@ -753,6 +756,7 @@ function HealthCard() {
         {affected > 0 && (
           <button
             onClick={() => {
+              resetLibraryFilters();
               setProblemsOnly(true);
               setView("library");
             }}

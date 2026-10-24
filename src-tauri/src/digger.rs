@@ -515,7 +515,9 @@ pub async fn dig_beats(app: AppHandle, request: DigRequest) -> Result<DigResult,
             }
             // A 429 (quota, or busy every retry) is the free tier; anything
             // else (offline, a bad key) is shown as is and not remembered.
-            Err(e) if e.contains("quota") || e.contains("busy") => {
+            // Matched on the 429 texts only: a timeout (also "busy") is a
+            // jammed model, not a missing quota, and must not pause the search.
+            Err(e) if e.contains("quota") || e.contains("this minute") => {
                 pause_web_search();
                 (Vec::new(), Vec::new(), Some(WEB_OFF.to_string()))
             }
