@@ -79,8 +79,10 @@ export const digDeeper = (
 /** Writes `<first beats folder>/_leads/<slug>-<hash>.md` (text only, never
  * audio); returns the file's path. Saving the same url again overwrites it. */
 export const saveLead = (lead: Lead): Promise<string> => invoke("save_lead", { lead });
-/** The leads saved in the beats folders' `_leads` (url hash + path). */
+/** The leads saved in the beats folders' `_leads`, newest first, with their facts. */
 export const listLeads = (): Promise<SavedLead[]> => invoke("list_leads");
+/** Deletes one lead file (must be inside a beats folder's `_leads`). */
+export const deleteLead = (path: string): Promise<void> => invoke("delete_lead", { path });
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
 export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
 export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ExternalLink, Play, Search, X } from "lucide-react";
-import { useDigger } from "../store/useDigger";
+import { useDigger, type Playing } from "../store/useDigger";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import { MAX_LIKED, MAX_QUERY_CHARS, converterLink, embedUrl, googleSearchUrl, leadFacts, leadHash, seedList, youtubeId, youtubeSearchUrl } from "../lib/digger";
@@ -91,14 +91,8 @@ export const chip = (on: boolean) =>
 export const secondary = "rounded border border-rule-strong px-2.5 py-1.5 text-xs font-semibold text-cream hover:border-cream disabled:opacity-40";
 const playBtn = "shrink-0 rounded-full border border-rule-strong p-1.5 text-cream hover:border-hot";
 
-/** What the embedded player is on: a checked YouTube ID and a title. */
-interface Playing {
-  id: string;
-  title: string;
-}
-
 /** The "Use for next dig" toggle on a card or a link (`id`: video id or url). */
-function LikeChip({ id, title }: { id: string; title: string }) {
+export function LikeChip({ id, title }: { id: string; title: string }) {
   const t = tr(T);
   const liked = useDigger((s) => s.liked);
   const toggleLiked = useDigger((s) => s.toggleLiked);
@@ -194,7 +188,9 @@ export function DigResults({ yt, round, setRound, fill }: Props) {
   const { dig, rounds, webQuery, roundResults, searching, searchError, leadError, setWebQuery, searchYoutube } = useDigger();
   const converter = useAppStore((s) => s.settings.converterUrlTemplate);
   const facts = useLeadFacts();
-  const [playing, setPlaying] = useState<Playing | null>(null);
+  // Shared with the Saved prods tab (DiggerView), which plays into this dock.
+  const playing = useDigger((s) => s.playing);
+  const setPlaying = useDigger((s) => s.setPlaying);
   const q = webQuery.trim();
   const run = (query: string) => {
     setWebQuery(query);

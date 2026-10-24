@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, converterLink, deeperExclude, embedUrl, foundKey, foundTitles, googleSearchUrl, leadFacts, leadHash, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
+import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, converterLink, deeperExclude, embedUrl, foundKey, matchBeat, titleKey, foundTitles, googleSearchUrl, leadFacts, leadHash, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
@@ -65,6 +65,23 @@ describe("digger links", () => {
     expect(searchesDone([{ queries: ["a", " b "] }, { queries: ["b", "", "c"] }])).toEqual(["a", "b", "c"]);
     expect(searchesDone(Array.from({ length: 9 }, (_, i) => ({ queries: Array.from({ length: 8 }, (_, j) => `q${i}-${j}`) }))).length).toBe(50);
     expect(searchesDone([])).toEqual([]);
+  });
+
+  it("matches a saved lead to a downloaded beat by title", () => {
+    const beats = [
+      { name: "[FREE] Dark Trap Type Beat - Night (prod. X)" },
+      { name: "Night_Dark_Trap_Type_Beat_prod_X_FREE_128k" },
+      { name: "Kick 808" },
+      { name: "Sun" },
+    ];
+    expect(matchBeat({ title: '[FREE] Dark Trap Type Beat - "Night" (prod. X)' }, beats)).toBe(beats[0]);
+    expect(matchBeat({ title: "Dark Trap Type Beat - Night" }, beats)).toBe(beats[0]);
+    expect(matchBeat({ title: "Kick 808" }, beats)).toBe(beats[2]);
+    // Short keys only match exactly: "Sun" is not "Sunday Beat".
+    expect(matchBeat({ title: "Sun" }, [{ name: "Sunday Beat" }])).toBeNull();
+    expect(matchBeat({ title: "Something else entirely" }, beats)).toBeNull();
+    expect(matchBeat({ title: "" }, beats)).toBeNull();
+    expect(titleKey("Éclair_Prod (2024)!")).toBe("éclair prod 2024");
   });
 
   it("frames the website's player page with a strict video id only", () => {
