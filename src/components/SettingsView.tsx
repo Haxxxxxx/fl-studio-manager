@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
@@ -191,11 +192,35 @@ export function SettingsView() {
   const detectFlStudio = useAppStore((s) => s.detectFlStudio);
   const pickFlStudio = useAppStore((s) => s.pickFlStudio);
   const pickOutputFolder = useAppStore((s) => s.pickOutputFolder);
+  const section = useAppStore((s) => s.settingsSection);
+  const clearSettingsSection = useAppStore((s) => s.clearSettingsSection);
   const [detecting, setDetecting] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const [testState, setTestState] = useState<
     { status: "idle" } | { status: "running" } | { status: "done"; path: string } | { status: "error"; message: string }
   >({ status: "idle" });
   const t = tr(T);
+
+  // Sent here for one section (setView("settings", id)): scroll to it once.
+  useEffect(() => {
+    if (!section) return;
+    const el = document.getElementById(section);
+    if (el) {
+      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    }
+    clearSettingsSection();
+  }, [section, clearSettingsSection]);
+
+  async function handleAddFolder() {
+    setFolderError(null);
+    await addWatchedFolder().catch((e) => setFolderError(e instanceof Error ? e.message : String(e)));
+  }
+
+  async function handleRemoveFolder(folder: string) {
+    setFolderError(null);
+    await removeWatchedFolder(folder).catch((e) => setFolderError(e instanceof Error ? e.message : String(e)));
+  }
 
   async function handleDetect() {
     setDetecting(true);
@@ -270,6 +295,8 @@ export function SettingsView() {
           </select>
         </section>
 
+        <UpdatesSection />
+
         <section className="flex items-center justify-between rounded-lg border border-rule bg-panel px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold text-cream">{t.sampleData}</h2>
@@ -287,7 +314,7 @@ export function SettingsView() {
           </button>
         </section>
 
-        <section>
+        <section id="folders">
           <h2 className="text-sm font-semibold text-cream">{t.projectFolders}</h2>
           <p className="mt-1 text-xs text-engrave">{t.projectFoldersHint}</p>
           <div className="mt-3 flex flex-col gap-2">
@@ -298,7 +325,7 @@ export function SettingsView() {
               >
                 <span className="truncate">{folder}</span>
                 <button
-                  onClick={() => removeWatchedFolder(folder)}
+                  onClick={() => handleRemoveFolder(folder)}
                   className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-red-300"
                 >
                   <Trash2 size={14} />
@@ -306,13 +333,14 @@ export function SettingsView() {
               </div>
             ))}
             <button
-              onClick={addWatchedFolder}
+              onClick={handleAddFolder}
               className="flex items-center justify-center gap-2 rounded-md border border-dashed border-rule-strong py-2.5 text-sm text-engrave hover:border-orange-400/40 hover:text-orange-300"
             >
               <FolderPlus size={15} />
               {t.addFolder}
             </button>
           </div>
+          {folderError && <div className="mt-2 text-xs text-missing">{folderError}</div>}
         </section>
 
         <BeatFoldersSection />
@@ -325,7 +353,9 @@ export function SettingsView() {
           </div>
         </section>
 
-        <CrewPanel />
+        <div id="crew">
+          <CrewPanel />
+        </div>
 
         <AiSettings />
 
@@ -335,7 +365,7 @@ export function SettingsView() {
 
         <YoutubeSettings />
 
-        <section>
+        <section id="fl">
           <h2 className="text-sm font-semibold text-cream">{t.flExe}</h2>
           <p className="mt-1 text-xs text-engrave">{t.flExeHint}</p>
           <div className="mt-3 flex items-center gap-2">
@@ -363,7 +393,7 @@ export function SettingsView() {
           </div>
         </section>
 
-        <section>
+        <section id="export">
           <h2 className="text-sm font-semibold text-cream">{t.export}</h2>
           <p className="mt-1 text-xs text-engrave">{t.exportHint}</p>
           <div className="mt-3 flex items-center gap-2">
@@ -445,7 +475,7 @@ function ShortsSettings() {
   const t = tr(T);
 
   return (
-    <section>
+    <section id="ffmpeg">
       <h2 className="text-sm font-semibold text-cream">Shorts (ffmpeg)</h2>
       <p className="mt-1 text-xs text-engrave">
         {t.shortsIntro}{" "}
@@ -503,7 +533,7 @@ function AiSettings() {
   const status = !aiStatus?.configured ? t.aiOff : aiStatus.source === "env" ? t.aiEnv : t.aiSaved;
 
   return (
-    <section>
+    <section id="ai">
       <h2 className="text-sm font-semibold text-cream">{t.aiTitle}</h2>
       <p className="mt-1 text-xs text-engrave">
         {t.aiIntro}{" "}
@@ -605,7 +635,7 @@ function CoverSettings() {
   // Use REST API, Account ID and Create a Workers AI API Token are the
   // dashboard's own (English) labels.
   return (
-    <section>
+    <section id="cover">
       <h2 className="text-sm font-semibold text-cream">{t.coverTitle}</h2>
       <p className="mt-1 text-xs leading-relaxed text-engrave">
         {t.coverIntro}{" "}
@@ -732,7 +762,7 @@ function YoutubeSettings() {
   const line = !status?.configured ? t.off : status.source === "env" ? t.env : t.on;
 
   return (
-    <section>
+    <section id="youtube">
       <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
       <p className="mt-1 text-xs leading-relaxed text-engrave">
         {t.intro}{" "}
@@ -788,28 +818,131 @@ function BeatFoldersSection() {
   const folders = useAppStore((s) => s.settings.beatFolders ?? NO_FOLDERS);
   const add = useAppStore((s) => s.addBeatFolder);
   const remove = useAppStore((s) => s.removeBeatFolder);
+  const [error, setError] = useState<string | null>(null);
   const t = tr(T_BEATS);
+
+  function run(action: Promise<void>) {
+    setError(null);
+    void action.catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }
+
   return (
-    <section>
+    <section id="beats">
       <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
       <p className="mt-1 text-xs text-engrave">{t.hint}</p>
       <div className="mt-3 flex flex-col gap-2">
         {folders.map((folder) => (
           <div key={folder} className="flex items-center justify-between gap-2 rounded-md border border-rule bg-raised px-3 py-2 text-sm text-body">
             <span className="truncate">{folder}</span>
-            <button onClick={() => void remove(folder)} aria-label={t.remove(folder)} className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-red-300">
+            <button onClick={() => run(remove(folder))} aria-label={t.remove(folder)} className="shrink-0 rounded p-1 text-engrave hover:bg-rule hover:text-red-300">
               <Trash2 size={14} />
             </button>
           </div>
         ))}
         <button
-          onClick={() => void add()}
+          onClick={() => run(add())}
           className="flex items-center justify-center gap-2 rounded-md border border-dashed border-rule-strong py-2.5 text-sm text-engrave hover:border-orange-400/40 hover:text-orange-300"
         >
           <FolderPlus size={15} />
           {t.add}
         </button>
       </div>
+      {error && <div className="mt-2 text-xs text-missing">{error}</div>}
+    </section>
+  );
+}
+
+const T_UPDATES = dict(
+  {
+    hint: "Checked once at launch. An update downloads, installs and restarts the app in one click.",
+    check: "Check for updates",
+    checking: "Checking…",
+    upToDate: "You're up to date.",
+    available: (v: string) => `Hivo ${v} is available.`,
+    install: "Update and restart",
+    downloading: (pct: number | null) => `Downloading…${pct === null ? "" : ` ${pct}%`}`,
+    restarting: "Installed, restarting…",
+  },
+  {
+    hint: "Vérifié une fois au lancement. Une mise à jour se télécharge, s'installe et relance l'appli en un clic.",
+    check: "Vérifier les mises à jour",
+    checking: "Vérification…",
+    upToDate: "Tu as la dernière version.",
+    available: (v: string) => `Hivo ${v} est disponible.`,
+    install: "Mettre à jour et redémarrer",
+    downloading: (pct: number | null) => `Téléchargement…${pct === null ? "" : ` ${pct} %`}`,
+    restarting: "Installé, redémarrage…",
+  },
+);
+
+/** The running version and a manual update check (the store owns the state,
+ * so the strip in App.tsx and this line never disagree). */
+function UpdatesSection() {
+  const update = useAppStore((s) => s.update);
+  const checkUpdate = useAppStore((s) => s.checkUpdate);
+  const installUpdate = useAppStore((s) => s.installUpdate);
+  const [version, setVersion] = useState<string | null>(null);
+  // Nothing to say before the first click (the startup check is silent).
+  const [checked, setChecked] = useState(false);
+  const t = tr(T_UPDATES);
+
+  useEffect(() => {
+    let live = true;
+    // A browser tab has no app version to show.
+    getVersion().then((v) => live && setVersion(v)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function check() {
+    await checkUpdate();
+    setChecked(true);
+  }
+
+  const { status } = update;
+  const pct = update.progress === undefined ? null : Math.round(update.progress * 100);
+  const line =
+    status === "available" && update.version
+      ? t.available(update.version)
+      : status === "downloading"
+        ? t.downloading(pct)
+        : status === "ready"
+          ? t.restarting
+          : status === "error"
+            ? (update.error ?? "")
+            : checked && status === "idle"
+              ? t.upToDate
+              : null;
+
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-cream">Hivo{version ? ` ${version}` : ""}</h2>
+          <p className="mt-0.5 text-xs text-engrave">{t.hint}</p>
+        </div>
+        <button
+          onClick={() => void check()}
+          disabled={status === "checking" || status === "downloading" || status === "ready"}
+          className="shrink-0 rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {status === "checking" ? t.checking : t.check}
+        </button>
+      </div>
+      {line !== null && (
+        <div className="mt-2 flex items-center gap-3 text-xs">
+          <span className={status === "error" ? "text-red-300" : status === "available" ? "text-cream" : "text-emerald-300"}>{line}</span>
+          {status === "available" && (
+            <button
+              onClick={() => void installUpdate()}
+              className="shrink-0 rounded-md border border-rule-strong px-3 py-1.5 text-xs text-cream hover:bg-raised"
+            >
+              {t.install}
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }

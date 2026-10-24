@@ -25,6 +25,8 @@ const T = dict(
     none: "None",
     openAfter: "Open in FL Studio after creating",
     demo: "Link a real project folder to create songs.",
+    noFolder: "Link a project folder in Settings first.",
+    openSettings: "Open Settings",
     cancel: "Cancel",
     creating: "Creating…",
     create: "Create song",
@@ -48,6 +50,8 @@ const T = dict(
     none: "Aucune",
     openAfter: "Ouvrir dans FL Studio après la création",
     demo: "Lie un vrai dossier de projets pour créer des sons.",
+    noFolder: "Lie d'abord un dossier de projets dans les Réglages.",
+    openSettings: "Ouvrir les réglages",
     cancel: "Annuler",
     creating: "Création…",
     create: "Créer le son",
@@ -63,6 +67,8 @@ export function NewProjectModal() {
   const demoMode = useAppStore((s) => s.demoMode);
   const createProject = useAppStore((s) => s.createProject);
   const openDetail = useAppStore((s) => s.openDetail);
+  const setView = useAppStore((s) => s.setView);
+  const resetLibraryFilters = useAppStore((s) => s.resetLibraryFilters);
 
   const [name, setName] = useState("");
   const [factory, setFactory] = useState<TemplateInfo[]>([]);
@@ -85,22 +91,30 @@ export function NewProjectModal() {
     setError(null);
   }, [draft, folders]);
 
+  // Apply the draft once per opening (a new draft object each time). Not on
+  // every rescan: a window-focus scan must not reset the stage and release
+  // picked meanwhile.
   useEffect(() => {
     if (!draft) return;
     setStatus(draft.status);
     setAlbumId(draft.albumId ?? "");
+  }, [draft]);
+
+  useEffect(() => {
+    if (!draft) return;
     let cancelled = false;
     Promise.all([api.listTemplates(), api.defaultTemplate()])
       .then(([list, fallback]) => {
         if (cancelled) return;
         setFactory(list);
-        setTemplatePath((current) => current || fallback || userTemplates[0]?.path || list[0]?.path || "");
+        const userTemplate = useAppStore.getState().projects.find((p) => p.isTemplate)?.path;
+        setTemplatePath((current) => current || fallback || userTemplate || list[0]?.path || "");
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [draft, settings.flStudioPath, userTemplates]);
+  }, [draft, settings.flStudioPath]);
 
   const byCategory = useMemo(() => {
     const groups = new Map<string, TemplateInfo[]>();
@@ -129,6 +143,10 @@ export function NewProjectModal() {
         status,
       });
       setName("");
+      // Land where the new song shows: the Library (no drawer on Settings or
+      // the Launch Kit), with no filter hiding it.
+      if (useAppStore.getState().view === "settings" || useAppStore.getState().view === "launch") setView("library");
+      resetLibraryFilters();
       openDetail(path);
       if (openAfter) {
         try {
@@ -206,6 +224,21 @@ export function NewProjectModal() {
               </option>
             ))}
           </select>
+          {!demoMode && folders.length === 0 && (
+            <div className="mt-1 flex items-center gap-2 text-xs text-engrave">
+              {L.noFolder}
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  setView("settings", "folders");
+                }}
+                className="underline hover:text-cream"
+              >
+                {L.openSettings}
+              </button>
+            </div>
+          )}
           {trimmed && parentFolder && (
             <div className="mt-1 truncate text-[11px] text-engrave">
               {parentFolder}

@@ -64,11 +64,14 @@ export function useMineSource(): PipelineSource {
         selected: detailPath === song.path,
       };
     };
+    const shown = filterSongs(songs, workspace, query);
     return {
       scope: "mine",
       query,
+      total: songs.length,
+      shown: shown.length,
       editable: true,
-      groups: groupSongs(filterSongs(songs, workspace, query), workspace, cfg).map((g) => ({ column: g.column, items: g.songs.map(item) })),
+      groups: groupSongs(shown, workspace, cfg).map((g) => ({ column: g.column, items: g.songs.map(item) })),
       canRemove: (id) => canRemoveColumn(cfg, id),
       rename,
       add,

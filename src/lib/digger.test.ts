@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_QUERY_CHARS, beatFactsLine, beatQuery, googleSearchUrl, youtubeSearchUrl } from "./digger";
+import { MAX_EXCLUDE, MAX_QUERY_CHARS, beatFactsLine, beatQuery, deeperExclude, foundKey, googleSearchUrl, youtubeId, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
@@ -19,5 +19,31 @@ describe("digger links", () => {
     expect(beatQuery("Melodic Drill Instrumental prod. by Someone")).toBe("Melodic Drill type beat");
     expect(beatQuery("[FREE] (prod. X)")).toBe("");
     expect(beatQuery("x".repeat(300)).length).toBeLessThanOrEqual(MAX_QUERY_CHARS);
+  });
+
+  it("lists the beats a deeper round must skip by title and site, once each, capped", () => {
+    const l = (text: string, site = "BeatStars") => ({ text, site });
+    expect(foundKey(l(" Night Drive ", " beatstars.com "))).toBe("night drive | beatstars.com");
+    expect(foundKey(l("x".repeat(300))).length).toBe(120);
+    expect(deeperExclude([l("A"), l("B")], [[l("b"), l("C")], [l("D")]])).toEqual(["a | beatstars", "b | beatstars", "c | beatstars", "d | beatstars"]);
+    const many = Array.from({ length: 70 }, (_, i) => l(`Beat ${i}`));
+    expect(deeperExclude(many, []).length).toBe(MAX_EXCLUDE);
+    expect(deeperExclude([], [])).toEqual([]);
+  });
+
+  it("reads the video ID of YouTube links only", () => {
+    expect(youtubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(youtubeId("https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s&list=PL1")).toBe("dQw4w9WgXcQ");
+    expect(youtubeId("https://m.youtube.com/watch?feature=share&v=dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(youtubeId("https://youtu.be/dQw4w9WgXcQ?si=abc")).toBe("dQw4w9WgXcQ");
+    expect(youtubeId("https://www.youtube.com/shorts/dQw4w9WgXcQ?feature=share")).toBe("dQw4w9WgXcQ");
+    expect(youtubeId("https://www.youtube.com/results?search_query=beat")).toBeNull();
+    expect(youtubeId("https://www.youtube.com/watch?v=too-short")).toBeNull();
+    expect(youtubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ/../x")).toBeNull();
+    expect(youtubeId("http://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+    expect(youtubeId("https://notyoutube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+    expect(youtubeId("https://www.beatstars.com/beat/night-123")).toBeNull();
+    expect(youtubeId("javascript:alert(1)")).toBeNull();
+    expect(youtubeId("")).toBeNull();
   });
 });

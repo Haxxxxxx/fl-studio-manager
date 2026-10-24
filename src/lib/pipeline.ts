@@ -254,9 +254,13 @@ export function moveCard(
   const to = cfg.columns.find((c) => c.id === toColumnId);
   if (!to || !songs.some((s) => s.path === path) || beforePath === path) return ws;
   const meta = ws.songs[path] ?? {};
-  const current = groupSongs(songs, ws, cfg).find((g) => g.column.id === to.id)!.songs.map((s) => s.path).filter((p) => p !== path);
+  const shown = groupSongs(songs, ws, cfg).find((g) => g.column.id === to.id)!.songs.map((s) => s.path);
+  const current = shown.filter((p) => p !== path);
   const at = beforePath ? current.indexOf(beforePath) : -1;
   current.splice(at < 0 ? current.length : at, 0, path);
+  // Dropped where it already sits: nothing changes, so nothing gets pinned
+  // or hand-sorted (an accidental drag mustn't leave a mark).
+  if (columnOf(meta, cfg).id === to.id && shown.length === current.length && shown.every((p, i) => p === current[i])) return ws;
 
   const stageChanged = (meta.status ?? null) !== to.stage;
   const nextMeta: SongMeta = { ...meta, column: to.id };

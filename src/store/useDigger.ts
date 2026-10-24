@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as api from "../lib/tauri";
-import type { BeatFile, DigResult, YoutubeVideo } from "../types";
+import { deeperExclude } from "../lib/digger";
+import type { BeatFile, DigResult, WebLink, YoutubeVideo } from "../types";
 
 // The Digger: raw beats from the beats folders, up to 5 picked to dig for
 // similar ones (docs/GUARDRAILS.md: a deliberate addition for the Creation
@@ -35,6 +36,11 @@ interface DiggerState {
   digging: boolean;
   digError: string | null;
   runDig: (language: "fr" | "en", youtube: boolean) => Promise<void>;
+  /** "Go deeper" rounds after the dig: one list of web links per round. */
+  deeper: WebLink[][];
+  diggingDeeper: boolean;
+  deeperError: string | null;
+  runDeeper: (language: "fr" | "en") => Promise<void>;
 }
 
 export const useDigger = create<DiggerState>((set, get) => ({
@@ -92,7 +98,7 @@ export const useDigger = create<DiggerState>((set, get) => ({
     set({ digging: true, digError: null });
     try {
       const dig = await api.digBeats(picks, language);
-      set({ dig, dugFor: picks });
+      set({ dig, dugFor: picks, deeper: [], deeperError: null });
       // Start the first AI search right away; the others are one click.
       const first = dig.analysis.queries[0];
       if (first) {
@@ -103,6 +109,25 @@ export const useDigger = create<DiggerState>((set, get) => ({
       set({ digError: e instanceof Error ? e.message : String(e) });
     } finally {
       set({ digging: false });
+    }
+  },
+  deeper: [],
+  diggingDeeper: false,
+  deeperError: null,
+  runDeeper: async (language) => {
+    const { dig, deeper, diggingDeeper } = get();
+    if (!dig || diggingDeeper) return;
+    set({ diggingDeeper: true, deeperError: null });
+    try {
+      const round = await api.digDeeper(dig.analysis, deeperExclude(dig.web, deeper), language);
+      // A new dig meanwhile made this round about the wrong picks.
+      if (get().dig !== dig) return;
+      if (round.web.length) set({ deeper: [...get().deeper, round.web] });
+      if (round.webError) set({ deeperError: round.webError });
+    } catch (e) {
+      set({ deeperError: e instanceof Error ? e.message : String(e) });
+    } finally {
+      set({ diggingDeeper: false });
     }
   },
 }));

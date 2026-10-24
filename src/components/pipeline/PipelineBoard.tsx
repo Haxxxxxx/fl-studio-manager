@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { useCollapsed, usePipelineView } from "../../store/usePipelineView";
 import { stageColor } from "../../lib/pipeline";
 import { StatusDot } from "../ui";
-import { AddColumn, beforeKeyFor, ColumnHeader, ConflictDot, DropLine, SourceError, startSongDrag, T_PIPELINE, usePipelineDrop, useSource } from "./shared";
+import { AddColumn, beforeKeyFor, CARD_FOCUS, ColumnHeader, ConflictDot, DropLine, openOnKey, SourceError, startSongDrag, T_PIPELINE, usePipelineDrop, useSource } from "./shared";
 import { tr } from "../../i18n";
 
 /** Kanban: one column per pipeline column. Drag cards between and within
@@ -14,6 +14,16 @@ export function PipelineBoard() {
   const collapsed = useCollapsed(scope, "board");
   const toggleCollapsed = usePipelineView((s) => s.toggleCollapsed);
   const dnd = usePipelineDrop();
+
+  // Nothing on the pipeline at all: one line instead of six empty columns.
+  if (source.total === 0 && !query) {
+    return (
+      <>
+        <SourceError />
+        <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-engrave">{scope === "crew" ? tr(T_PIPELINE).emptyCrew : tr(T_PIPELINE).emptyMine}</div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -55,9 +65,13 @@ export function PipelineBoard() {
                         <div onDragOver={(e) => dnd.over(e, column.id, query ? null : beforeKeyFor(e, items, i))}>
                           <div
                             draggable
+                            tabIndex={0}
+                            role="button"
+                            aria-label={item.title}
                             onDragStart={(e) => startSongDrag(e, item.key)}
                             onClick={item.open}
-                            className={`cursor-grab rounded-md border px-3 py-2 active:cursor-grabbing ${
+                            onKeyDown={openOnKey(item.open)}
+                            className={`cursor-grab rounded-md border px-3 py-2 active:cursor-grabbing ${CARD_FOCUS} ${
                               item.selected ? "border-orange-400/40 bg-raised" : "border-rule bg-raised hover:border-rule-strong"
                             }`}
                           >

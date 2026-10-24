@@ -324,7 +324,15 @@ export function LibraryView() {
             className="w-full rounded-md border border-rule bg-raised py-2 pl-9 pr-3 text-sm text-cream placeholder:text-engrave focus:border-orange-400/50 focus:outline-none"
           />
         </div>
-        <button onClick={() => rescan()} disabled={scanning || demoMode} className={btn} title={t.rescan}>
+        <button
+          onClick={() => {
+            setError(null);
+            rescan().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+          }}
+          disabled={scanning || demoMode}
+          className={btn}
+          title={t.rescan}
+        >
           <RefreshCw size={14} className={scanning ? "animate-spin" : ""} />
         </button>
         <Toggle active={favoritesOnly} onClick={() => setFavoritesOnly(!favoritesOnly)}>

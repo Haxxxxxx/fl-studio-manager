@@ -26,6 +26,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             scanner::scan_projects,
             settings::get_settings,
@@ -40,6 +42,7 @@ pub fn run() {
             settings::remove_beat_folder,
             beats::scan_beats,
             digger::dig_beats,
+            digger::dig_deeper,
             settings::pick_fl_studio,
             settings::use_detected_fl_studio,
             settings::pick_ffmpeg,

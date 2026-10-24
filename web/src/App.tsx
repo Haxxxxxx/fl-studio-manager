@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Wordmark } from "./LogoMark";
 import { CalendarDays, CheckCircle2, Disc3, KanbanSquare, LogOut, Users } from "lucide-react";
-import { STATUSES, UNSORTED, statusInfo } from "@shared/lib/songs";
+import { STATUSES, UNSORTED, isFinished, statusInfo } from "@shared/lib/songs";
 import { formatRelative } from "@shared/lib/format";
 import { crewPipeline, groupCrewSongs } from "@shared/lib/crewBoard";
 import { releaseTracks, sortCrewReleases } from "@shared/lib/crewSync";
@@ -84,7 +84,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function SignIn({ lang }: { lang: Lang }) {
   const t = SIGN_IN[lang];
-  const { sendCode, verifyCode } = useWeb();
+  const { sendCode, verifyCode, error: storeError } = useWeb();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -92,6 +92,8 @@ function SignIn({ lang }: { lang: Lang }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-xl font-semibold">{t.title}</h2>
+      {/* No crew server in this deployment (missing env vars): say so before anyone types. */}
+      {storeError && <p role="alert" className="text-sm text-red-300">{storeError}</p>}
       {!sentTo ? (
         <form
           className="flex flex-col gap-3"
@@ -100,7 +102,7 @@ function SignIn({ lang }: { lang: Lang }) {
             void run(() => sendCode(email)).then((ok) => ok && setSentTo(email.trim()));
           }}
         >
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.email} autoComplete="email" className={input} />
+          <input type="email" name="email" id="signin-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.email} autoComplete="email" autoCapitalize="none" spellCheck={false} className={input} />
           <button disabled={busy || !/^\S+@\S+\.\S+$/.test(email.trim())} className={primary}>
             {busy ? t.sending : t.send}
           </button>
@@ -219,7 +221,7 @@ function Join({ another = false, onDone }: { another?: boolean; onDone?: () => v
 }
 
 function Dashboard({ topError }: { topError: string | null }) {
-  const { crews, activeCrewId, selectCrew, signOut, songs } = useWeb();
+  const { crews, activeCrewId, selectCrew, signOut, songs, live } = useWeb();
   const [tab, setTab] = useState<Tab>("board");
   const active = crews.find((c) => c.id === activeCrewId) ?? crews[0];
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -230,8 +232,9 @@ function Dashboard({ topError }: { topError: string | null }) {
   ];
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex items-center gap-3 border-b border-rule px-4 py-3 sm:px-6">
+      <header className="flex flex-wrap items-center gap-3 border-b border-rule px-4 py-3 sm:px-6">
         <Logo />
+        {!live && <span role="status" className="order-last basis-full text-[11px] text-warn">{tr(W).livePaused}</span>}
         <div className="ml-auto flex items-center gap-2">
           {crews.length > 1 ? (
             <select value={active.id} onChange={(e) => void selectCrew(e.target.value)} aria-label={tr(W).activeCrew} className="rounded-md border border-rule bg-raised px-2 py-1.5 text-sm">
@@ -471,7 +474,7 @@ function Releases() {
     <div className="mx-auto grid w-full max-w-5xl gap-4 p-4 sm:p-6 md:grid-cols-2">
       {list.map((r) => {
         const tracks = releaseTracks(r, songs);
-        const done = tracks.filter((t) => t.stage === "prep" || t.stage === "release" || t.stage === "promotion").length;
+        const done = tracks.filter((t) => isFinished(t.stage ?? undefined)).length;
         const dateMs = r.release_date ? new Date(`${r.release_date}T00:00:00`).getTime() : null;
         return (
           <article key={r.id} aria-label={r.title} className="rounded-xl border border-rule bg-panel p-4">
@@ -520,8 +523,13 @@ function Calendar() {
       return { s, date: new Date(y, m - 1, d) };
     })
     .sort((a, b) => a.date.getTime() - b.date.getTime());
-  const upcoming = dated.filter((x) => x.date.getTime() >= todayMs);
-  const past = dated.filter((x) => x.date.getTime() < todayMs).reverse();
+  // "Released" means the date has passed AND the song moved on to Release or
+  // Promotion. A past date on an earlier stage is a dropped ball: it stays in
+  // the upcoming list (first, since it's overdue) with a warning, like the
+  // desktop calendar's "still in Prep" check.
+  const released = (x: { s: CrewSongRow; date: Date }) => x.date.getTime() < todayMs && (x.s.stage === "release" || x.s.stage === "promotion");
+  const upcoming = dated.filter((x) => !released(x));
+  const past = dated.filter(released).reverse();
 
   if (dated.length === 0) return <div className="p-8 text-center text-sm text-body">{tr(W).noDates}</div>;
   const Row = ({ s, date }: { s: CrewSongRow; date: Date }) => (
@@ -536,6 +544,7 @@ function Calendar() {
         <div className="text-xs text-body">
           {s.owner_id === userId ? tr(W).you : (names.get(s.owner_id) ?? tr(W).crewmate)} · {statusInfo(s.stage ?? undefined).label}
           {s.kit_accepted ? tr(W).kitReady : ""}
+          {date.getTime() < todayMs && !released({ s, date }) && <span className="text-warn">{tr(W).stillIn(statusInfo(s.stage ?? undefined).label)}</span>}
         </div>
       </div>
       <span className="shrink-0 text-xs text-body">{formatRelative(date.getTime())}</span>

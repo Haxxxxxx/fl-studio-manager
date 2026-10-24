@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Columns3, List, Search, Table2 } from "lucide-react";
+import { Columns3, List, Search, Table2, X } from "lucide-react";
 import { usePipelineView, type PipelineViewKind } from "../../store/usePipelineView";
 import { PipelineBoard } from "./PipelineBoard";
 import { PipelineList } from "./PipelineList";
@@ -38,6 +38,11 @@ export function PipelinePage({ title, sub, source, empty }: { title: string; sub
             aria-label={t.filterLabel}
             className="w-44 bg-transparent text-cream placeholder:text-engrave focus:outline-none"
           />
+          {source.query && (
+            <button type="button" onClick={() => setQuery(source.scope, "")} aria-label={t.clearFilter} className="rounded text-engrave hover:text-cream">
+              <X size={12} />
+            </button>
+          )}
         </label>
         <div className="flex rounded-md border border-rule p-0.5 text-xs" role="tablist" aria-label={t.viewLabel}>
           {VIEWS.map(({ id, icon: Icon }) => (
@@ -53,6 +58,15 @@ export function PipelinePage({ title, sub, source, empty }: { title: string; sub
           ))}
         </div>
       </div>
+      {source.query && (
+        <div className="flex items-center gap-1.5 border-b border-rule px-6 py-1.5 text-xs text-engrave">
+          <span>{t.matching(source.shown, source.total)}</span>
+          <span aria-hidden>·</span>
+          <button type="button" onClick={() => setQuery(source.scope, "")} className="underline hover:text-cream">
+            {t.clear}
+          </button>
+        </div>
+      )}
       <PipelineSourceProvider value={source}>
         {empty ?? (view === "list" ? <PipelineList /> : view === "table" ? <PipelineTable /> : <PipelineBoard />)}
       </PipelineSourceProvider>
