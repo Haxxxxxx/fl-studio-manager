@@ -216,6 +216,11 @@ fn backup_for(model: &str) -> &'static str {
 const MAX_WAIT: Duration = Duration::from_secs(20);
 /// Hard cap on one AI action, retries and fallback included.
 const DEADLINE: Duration = Duration::from_secs(120);
+/// One request. Answers take seconds; when the free tier is overloaded
+/// Google can hold a request in its queue for minutes (132 s seen on
+/// gemini-3.8-flash), so give up early enough to leave the backup model
+/// most of the deadline.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Transient per Google's guidance: rate limits, timeouts, server errors.
 fn retryable(status: u16) -> bool {
@@ -248,6 +253,9 @@ fn retry_delay_hint(v: &Value) -> Option<Duration> {
 
 enum Failure {
     Http(u16, Value),
+    /// No answer within REQUEST_TIMEOUT: an overloaded model, so the backup
+    /// is tried (not the same model again: it would queue again).
+    Timeout,
     Other(String),
 }
 
@@ -267,7 +275,7 @@ async fn generate(client: &reqwest::Client, endpoint: &str, key: &str, model: &s
                 let status = res.status().as_u16();
                 (status, res.json().await.unwrap_or(Value::Null))
             }
-            Err(e) if e.is_timeout() => return Err(Failure::Other("Gemini took too long to answer. Try again.".to_string())),
+            Err(e) if e.is_timeout() => return Err(Failure::Timeout),
             Err(e) if e.is_connect() && attempt < retries => {
                 tokio::time::sleep(backoff(attempt)).await;
                 attempt += 1;
@@ -305,7 +313,8 @@ async fn generate_with_fallback(client: &reqwest::Client, endpoint: &str, key: &
         return (backup.to_string(), generate(client, endpoint, key, backup, body, FALLBACK_RETRIES).await);
     }
     let result = generate(client, endpoint, key, model, body, MAX_RETRIES).await;
-    if matches!(&result, Err(Failure::Http(s, _)) if *s >= 500 || *s == 429) && !is_exhausted(endpoint, backup) {
+    let overloaded = matches!(&result, Err(Failure::Http(s, _)) if *s >= 500 || *s == 429) || matches!(&result, Err(Failure::Timeout));
+    if overloaded && !is_exhausted(endpoint, backup) {
         if let ok @ Ok(_) = generate(client, endpoint, key, backup, body, FALLBACK_RETRIES).await {
             return (backup.to_string(), ok);
         }
@@ -361,7 +370,7 @@ pub(crate) async fn generate_raw_with_key(key: &str, model: Option<String>, body
         return Err(format!("\"{model}\" isn't a valid model name."));
     }
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(90))
+        .timeout(REQUEST_TIMEOUT)
         .build()
         .map_err(|e| format!("could not start the HTTP client: {e}"))?;
 
@@ -371,6 +380,7 @@ pub(crate) async fn generate_raw_with_key(key: &str, model: Option<String>, body
         .map_err(|_| "Gemini didn't answer within 2 minutes (busy or rate-limited). Try again later.".to_string())?;
     let v = result.map_err(|f| match f {
         Failure::Http(status, v) => explain_error(status, &v, &model),
+        Failure::Timeout => "Gemini's servers are too busy to answer right now (the backup model too). Try again in a few minutes.".to_string(),
         Failure::Other(message) => message,
     })?;
     Ok((used, v))
@@ -676,6 +686,8 @@ mod tests {
         let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let log = seen.clone();
         std::thread::spawn(move || {
+            // Status 0: read the request, never answer (a jammed model).
+            let mut held = Vec::new();
             for (status, body) in responses {
                 let Ok((mut stream, _)) = listener.accept() else { return };
                 let mut buf = Vec::new();
@@ -699,6 +711,10 @@ mod tests {
                 }
                 let request_line = String::from_utf8_lossy(&buf).lines().next().unwrap_or("").to_string();
                 log.lock().unwrap().push(request_line);
+                if status == 0 {
+                    held.push(stream);
+                    continue;
+                }
                 let body = body.to_string();
                 let reply = format!(
                     "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -749,6 +765,28 @@ mod tests {
         let seen = seen.lock().unwrap();
         assert!(seen.last().unwrap().contains(FALLBACK_MODEL), "last call: {}", seen.last().unwrap());
         assert_eq!(seen.len(), 2 + MAX_RETRIES as usize);
+    }
+
+    #[test]
+    fn a_model_that_never_answers_goes_to_the_backup() {
+        let (base, seen) = mock_gemini(vec![(0, Value::Null), (200, answer("{\"ok\":true}"))]);
+        // Short client timeout so the jammed model times out fast here.
+        let client = reqwest::Client::builder().timeout(Duration::from_millis(300)).build().unwrap();
+        let (model, result) = tauri::async_runtime::block_on(generate_with_fallback(&client, &base, "k", DEFAULT_MODEL, &json!({})));
+        assert!(result.is_ok(), "the backup should answer");
+        assert_eq!(model, FALLBACK_MODEL);
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 2, "a timeout is not retried on the same model: {seen:?}");
+        assert!(seen[1].contains(FALLBACK_MODEL), "{seen:?}");
+    }
+
+    #[test]
+    fn both_models_jammed_says_so() {
+        let (base, _) = mock_gemini(vec![(0, Value::Null), (0, Value::Null)]);
+        // Short client timeout so the jammed model times out fast here.
+        let client = reqwest::Client::builder().timeout(Duration::from_millis(300)).build().unwrap();
+        let (_, result) = tauri::async_runtime::block_on(generate_with_fallback(&client, &base, "k", "gemini-test-jam", &json!({})));
+        assert!(matches!(result, Err(Failure::Timeout)));
     }
 
     #[test]

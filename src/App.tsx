@@ -18,7 +18,7 @@ import { PackageConfirm, PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
-import { useCrewStore } from "./store/useCrewStore";
+import { useCrewStore, useInCrew } from "./store/useCrewStore";
 import { StatusDot, btnPrimary, btnQuiet } from "./ui";
 
 const fileName = (p: string) => p.split(/[/\\]/).pop() ?? p;
@@ -40,6 +40,7 @@ const T = dict(
     updateNow: "Update and restart",
     retry: "Retry",
     later: "Later",
+    notSaving: "Changes aren't being saved",
   },
   {
     kept: (n: number) =>
@@ -59,6 +60,7 @@ const T = dict(
     updateNow: "Mettre à jour et redémarrer",
     retry: "Réessayer",
     later: "Plus tard",
+    notSaving: "Les modifications ne sont pas enregistrées",
   },
 );
 
@@ -112,6 +114,25 @@ function UpdateNotice() {
   );
 }
 
+
+/** Stays up while the workspace can't be read or saved (the red banner
+ * above is one-off and dismissable; this one isn't). */
+function NotSavingStrip() {
+  const writable = useAppStore((s) => s.workspaceWritable);
+  const saveError = useAppStore((s) => s.saveError);
+  const retrySave = useAppStore((s) => s.retrySave);
+  if (writable && !saveError) return null;
+  return (
+    <div role="status" className="flex shrink-0 items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-1.5 text-xs text-cream">
+      <StatusDot color="var(--color-warn)" size={6} />
+      <span className="flex-1">{tr(T).notSaving}</span>
+      <button onClick={() => void retrySave()} className="rounded border border-rule-strong px-2 py-0.5 text-body hover:bg-raised hover:text-cream">
+        {tr(T).retry}
+      </button>
+    </div>
+  );
+}
+
 /** After a scan: which songs kept their stage, notes, crew share… across a rename/move. */
 function RelinkNotice() {
   const relinked = useAppStore((s) => s.relinked);
@@ -142,6 +163,8 @@ function RelinkNotice() {
 export default function App() {
   const init = useAppStore((s) => s.init);
   const view = useAppStore((s) => s.view);
+  const setView = useAppStore((s) => s.setView);
+  const inCrew = useInCrew();
   const settingsLoaded = useAppStore((s) => s.settingsLoaded);
   const detailPath = useAppStore((s) => s.detailPath);
   const startupError = useAppStore((s) => s.startupError);
@@ -156,6 +179,12 @@ export default function App() {
     init();
     void useCrewStore.getState().init();
   }, [init]);
+
+  // Left or removed from the crew (or signed out) while on a crew page: that
+  // page has nothing to show any more.
+  useEffect(() => {
+    if (!inCrew && view.startsWith("crew")) setView("dashboard");
+  }, [inCrew, view, setView]);
 
   // Closing the window right after an edit: write the pending save first.
   useEffect(() => {
@@ -188,10 +217,11 @@ export default function App() {
   return (
     <div key={lang} className="relative flex h-screen bg-chassis text-cream">
       <Sidebar />
-      {/* A column, so the update strip sits above the view (every view is
-          flex-1 with its own overflow, so it still scrolls). */}
+      {/* A column, so the strips sit above the view (every view is flex-1
+          with its own overflow, so it still scrolls). */}
       <div className="flex min-w-0 flex-1 flex-col">
         <UpdateNotice />
+        <NotSavingStrip />
         {view === "dashboard" && <Dashboard />}
         {view === "library" && <LibraryView />}
         {view === "pipeline" && <PipelineView />}

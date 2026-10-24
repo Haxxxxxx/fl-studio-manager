@@ -5,6 +5,8 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { CrewColumnRow, CrewMemberRow, CrewReleaseRow, CrewSongRow, CrewSummary, SongStatus } from "@shared/types";
 import { applyCardMove, crewMove, crewPipeline, restoreSongs } from "@shared/lib/crewBoard";
 import { errorMessage, supabase } from "./supabase";
+import { tr } from "@shared/i18n";
+import { W } from "./dashboardCopy";
 
 // The web dashboard's state: session, crews, the active crew's shared songs
 // and members, live updates. Same rules as the desktop app; no local files.
@@ -27,6 +29,8 @@ interface WebState {
   /** Releases shared with the crew (from the app). */
   releases: CrewReleaseRow[];
   error: string | null;
+  /** Realtime is connected; false after a channel error or timeout, until it reconnects. */
+  live: boolean;
 
   init: () => Promise<void>;
   sendCode: (email: string) => Promise<void>;
@@ -151,6 +155,9 @@ export const useWeb = create<WebState>((set, get) => {
         if (status === "SUBSCRIBED") {
           if (joinedOnce) refresh();
           joinedOnce = true;
+          set({ live: true });
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          set({ live: false });
         }
       });
   }
@@ -167,11 +174,12 @@ export const useWeb = create<WebState>((set, get) => {
     releases: [],
     members: [],
     error: null,
+    live: true,
 
     init: async () => {
       if (initialized) return;
       initialized = true;
-      if (!supabase) return set({ ready: true, error: "This site isn't connected to a crew server yet." });
+      if (!supabase) return set({ ready: true, error: tr(W).notConnected });
       try {
         const { data } = await supabase.auth.getSession();
         set({ userId: data.session?.user.id ?? null, email: data.session?.user.email ?? null });
@@ -196,13 +204,13 @@ export const useWeb = create<WebState>((set, get) => {
     },
 
     sendCode: async (email) => {
-      if (!supabase) return;
+      if (!supabase) throw new Error(tr(W).notConnected);
       const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false } });
       if (error) throw new Error(errorMessage(error));
     },
 
     verifyCode: async (email, code) => {
-      if (!supabase) return;
+      if (!supabase) throw new Error(tr(W).notConnected);
       const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "email" });
       if (error) throw new Error(errorMessage(error));
     },

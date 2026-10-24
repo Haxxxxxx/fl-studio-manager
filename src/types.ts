@@ -546,3 +546,10 @@ export interface DigResult {
   webSearches: string[];
   webError: string | null;
 }
+
+/** One "Go deeper" round: more web links, seeded by the dig's analysis. */
+export interface DigDeeperResult {
+  web: WebLink[];
+  webSearches: string[];
+  webError: string | null;
+}

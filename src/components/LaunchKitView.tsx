@@ -503,7 +503,7 @@ function AiPanel({ path, input, fields }: { path: string; input: KitInput; field
       <div className="flex items-center gap-3 rounded-lg border border-dashed border-rule-strong bg-panel p-4 text-sm">
         <Sparkles size={16} className="shrink-0 text-body" />
         <span className="flex-1 text-body">{t.aiOff}</span>
-        <button onClick={() => setView("settings")} className={btn}>
+        <button onClick={() => setView("settings", "ai")} className={btn}>
           {t.addKey}
         </button>
       </div>

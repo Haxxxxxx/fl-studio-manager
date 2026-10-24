@@ -85,6 +85,23 @@ describe("crew board", () => {
     expect(crewMove(songs, cfg, true, "a", U(4), "a")).toEqual({ kind: "none" });
   });
 
+  it("a drop that changes nothing is no move at all (no call to the server)", () => {
+    const { cfg } = crewPipeline(SERVER);
+    const songs = [
+      song("a", "production", { column_id: U(4), board_order: 1 }),
+      song("b", "production", { column_id: U(4), board_order: 2 }),
+      // Nobody placed c: it shows last.
+      song("c", "production", { column_id: U(4) }),
+    ];
+    expect(crewMove(songs, cfg, true, "a", U(4), "b")).toEqual({ kind: "none" });
+    expect(crewMove(songs, cfg, true, "b", U(4), "c")).toEqual({ kind: "none" });
+    expect(crewMove(songs, cfg, true, "c", U(4), null)).toEqual({ kind: "none" });
+    // A real move still goes through.
+    expect(crewMove(songs, cfg, true, "b", U(4), "a")).toMatchObject({ kind: "card", songId: "b" });
+    // Same spot in the stage's other column is a move (the column changes).
+    expect(crewMove(songs, cfg, true, "a", U(3), null)).toMatchObject({ kind: "card", columnId: U(3) });
+  });
+
   it("among cards nobody placed, the whole column is placed as shown", () => {
     const { cfg } = crewPipeline(SERVER);
     // Fresh crew: nothing placed; shown latest move first: c, b, a.

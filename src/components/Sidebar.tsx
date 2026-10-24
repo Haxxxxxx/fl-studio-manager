@@ -1,9 +1,13 @@
-import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, Plus, Rocket, Settings as SettingsIcon, Shovel, Users } from "lucide-react";
+import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, MessageSquare, Plus, Rocket, Settings as SettingsIcon, Shovel, Users } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
+import { isTauri } from "@tauri-apps/api/core";
 import { useAppStore } from "../store/useAppStore";
 import { btnPrimary, engrave, Wordmark } from "../ui";
 import { CrewSection } from "./CrewSection";
-import { useInCrew } from "../store/useCrewStore";
-import { dict, tr } from "../i18n";
+import { useCrewStore, useInCrew } from "../store/useCrewStore";
+import { currentLang, dict, tr } from "../i18n";
+import { FEEDBACK_EMAIL, feedbackMailto, osFromUserAgent } from "../lib/feedback";
+import { openExternal } from "../lib/tauri";
 
 const T = dict(
   {
@@ -18,6 +22,8 @@ const T = dict(
     tagline: "Session → release",
     newSong: "New song",
     peopleCredits: "People & credits",
+    joinCrew: "Join your crew",
+    feedback: "Report a bug or send feedback",
   },
   {
     dashboard: "Tableau de bord",
@@ -31,6 +37,8 @@ const T = dict(
     tagline: "Session → sortie",
     newSong: "Nouveau son",
     peopleCredits: "Personnes et crédits",
+    joinCrew: "Rejoindre ton crew",
+    feedback: "Signaler un bug ou donner ton avis",
   },
 );
 
@@ -46,7 +54,17 @@ export function Sidebar() {
   const openPerson = useAppStore((s) => s.openPerson);
   const peopleCount = useAppStore((s) => s.workspace.people.length);
   const inCrew = useInCrew();
+  const crewEnabled = useCrewStore((s) => s.enabled);
   const t = tr(T);
+
+  // Opens the mail app with the version, OS and current view filled in
+  // (src/lib/feedback.ts). Hidden when no address was set at build time.
+  const sendFeedback = async () => {
+    if (!FEEDBACK_EMAIL) return;
+    const version = isTauri() ? await getVersion().catch(() => "dev") : "dev";
+    const url = feedbackMailto(FEEDBACK_EMAIL, { version, os: osFromUserAgent(navigator.userAgent), view, lang: currentLang() });
+    await openExternal(url).catch(() => window.open(url, "_blank"));
+  };
 
   const items = [
     { id: "dashboard" as const, label: t.dashboard, icon: LayoutDashboard },
@@ -115,6 +133,17 @@ export function Sidebar() {
       </nav>
 
       <CrewSection />
+      {/* No crew yet (and a crew server in this build): the way in is in Settings. */}
+      {crewEnabled && !inCrew && !demoMode && (
+        <div className="mx-2 mt-3 border-t-2 border-rule-strong pt-3">
+          <button
+            onClick={() => setView("settings", "crew")}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-body transition-colors hover:bg-raised hover:text-cream"
+          >
+            <Users size={16} strokeWidth={2} /> {t.joinCrew}
+          </button>
+        </div>
+      )}
 
       {albums.length > 0 && (
         <div className="mt-2 flex min-h-0 flex-col px-2">
@@ -137,6 +166,16 @@ export function Sidebar() {
         </div>
       )}
 
+      {FEEDBACK_EMAIL && (
+        <div className="mt-auto px-2 pb-3 pt-2">
+          <button
+            onClick={() => void sendFeedback()}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-engrave transition-colors hover:bg-raised hover:text-cream"
+          >
+            <MessageSquare size={13} strokeWidth={2} /> {t.feedback}
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

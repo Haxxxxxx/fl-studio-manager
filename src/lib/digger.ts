@@ -14,6 +14,47 @@ export function googleSearchUrl(query: string): string {
   return `https://www.google.com/search?q=${encodeURIComponent(query.trim().replace(/\s+/g, " "))}`;
 }
 
+/** Same limit as `MAX_EXCLUDE` in src-tauri/src/digger.rs. */
+export const MAX_EXCLUDE = 50;
+
+/** Same limit as `MAX_KEY_CHARS` in src-tauri/src/digger.rs. */
+const MAX_KEY_CHARS = 120;
+
+/** How a found beat is remembered between rounds: "title | site", lowercased
+ * (same as `found_key` in Rust). Not the url: Google Search grounding hands
+ * out a fresh redirect link for the same page every time. */
+export function foundKey(link: { text: string; site: string }): string {
+  return `${link.text.trim()} | ${link.site.trim()}`.toLowerCase().slice(0, MAX_KEY_CHARS);
+}
+
+/** The beats a "Go deeper" round must skip: the first dig's, then every round's, deduplicated. */
+export function deeperExclude(first: { text: string; site: string }[], rounds: { text: string; site: string }[][]): string[] {
+  return [...new Set([first, ...rounds].flat().map(foundKey))].slice(0, MAX_EXCLUDE);
+}
+
+/**
+ * The video ID of a YouTube link (watch?v=, youtu.be/, /shorts/), or null for
+ * anything else. Only an ID ever reaches the embedded player.
+ */
+export function youtubeId(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:") return null;
+  const host = u.hostname.replace(/^www\.|^m\./, "");
+  let id: string | null = null;
+  if (host === "youtube.com") {
+    if (u.pathname === "/watch") id = u.searchParams.get("v");
+    else if (u.pathname.startsWith("/shorts/")) id = u.pathname.slice("/shorts/".length).split("/")[0];
+  } else if (host === "youtu.be") {
+    id = u.pathname.slice(1).split("/")[0];
+  }
+  return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+}
+
 /** "140 BPM · Am · 3:05" for one analysed beat; "≈" marks an estimated tempo. */
 export function beatFactsLine(f: { bpm: number | null; bpmSource: string | null; key: string | null; durationSec: number }): string {
   const parts: string[] = [];
