@@ -4,6 +4,8 @@ import {
   AlertTriangle,
   ArrowUpDown,
   CheckSquare,
+  ChevronRight,
+  Folder,
   Download,
   FolderSearch,
   LayoutTemplate,
@@ -22,6 +24,7 @@ import { useCrewStore } from "../store/useCrewStore";
 import { useCanShare } from "./CrewPanel";
 import { detectKey } from "../lib/people";
 import { dawOf } from "../lib/daws";
+import { buildFolderTree, folderPath, inFolder, type FolderNode } from "../lib/folderTree";
 import { formatDate } from "../lib/format";
 import { dict, tr } from "../i18n";
 import {
@@ -82,6 +85,11 @@ const T = dict(
     pluginsMissing: (names: string) => `Plugins not installed: ${names}`,
     samplesMissing: (n: number) => `${n} missing sample${n === 1 ? "" : "s"}`,
     unreadable: (err: string) => `Couldn't be read: ${err}`,
+    folders: "Folders",
+    allSongs: "All songs",
+    fold: (name: string) => `Fold ${name}`,
+    unfold: (name: string) => `Unfold ${name}`,
+    folderIssues: (n: number) => `${n} song${n === 1 ? "" : "s"} with issues`,
     noFolder: "No project folder linked yet",
     foundFolders: "Found these DAW folders on this computer. Link the ones you use:",
     pointAt:
@@ -134,6 +142,11 @@ const T = dict(
     pluginsMissing: (names: string) => `Plugins pas installés : ${names}`,
     samplesMissing: (n: number) => `${n} sample${n === 1 ? " manquant" : "s manquants"}`,
     unreadable: (err: string) => `Illisible : ${err}`,
+    folders: "Dossiers",
+    allSongs: "Tous les sons",
+    fold: (name: string) => `Replier ${name}`,
+    unfold: (name: string) => `Déplier ${name}`,
+    folderIssues: (n: number) => `${n} son${n === 1 ? "" : "s"} avec des soucis`,
     noFolder: "Aucun dossier de projets lié pour l'instant",
     foundFolders: "On a trouvé ces dossiers de DAW sur cet ordi. Lie ceux que tu utilises :",
     pointAt:
@@ -216,6 +229,11 @@ export function LibraryView() {
   const setPluginFilter = useAppStore((s) => s.setPluginFilter);
   const problemsOnly = useAppStore((s) => s.problemsOnly);
   const setProblemsOnly = useAppStore((s) => s.setProblemsOnly);
+  const folderFilter = useAppStore((s) => s.folderFilter);
+  const setFolderFilter = useAppStore((s) => s.setFolderFilter);
+  // The folder tree of the songs shown (empty when there's nothing to branch into).
+  const tree = useMemo(() => buildFolderTree(songs), [songs]);
+  const crumbs = useMemo(() => (folderFilter ? folderPath(tree, folderFilter) : []), [tree, folderFilter]);
   const updateSong = useAppStore((s) => s.updateSong);
   const setStatus = useAppStore((s) => s.setStatus);
   const addTracks = useAppStore((s) => s.addTracks);
@@ -260,6 +278,9 @@ export function LibraryView() {
         );
       });
     }
+    if (folderFilter) {
+      list = list.filter((p) => inFolder(p, folderFilter));
+    }
     if (pluginFilter) {
       list = list.filter((p) => p.plugins.some((x) => x.name === pluginFilter));
     }
@@ -291,9 +312,10 @@ export function LibraryView() {
     });
     // statusOf only reads workspace.songs, which is listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [songs, workspace.songs, search, statusFilter, tagFilter, pluginFilter, problemsOnly, favoritesOnly, settings.favorites, sortKey, sortDir]);
+  }, [songs, workspace.songs, search, statusFilter, tagFilter, pluginFilter, problemsOnly, favoritesOnly, folderFilter, settings.favorites, sortKey, sortDir]);
 
   const problemCount = useMemo(() => songs.filter(hasProblems).length, [songs]);
+  const filteredByFolderCount = useMemo(() => (folderFilter ? songs.filter((p) => inFolder(p, folderFilter)).length : songs.length), [songs, folderFilter]);
 
   const { can: canShare, crewName } = useCanShare();
   const setShared = useCrewStore((s) => s.setShared);
@@ -360,8 +382,23 @@ export function LibraryView() {
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-6 py-2">
+        {crumbs.length > 0 && (
+          <nav aria-label={t.folders} className="mr-2 flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.08em]">
+            <button onClick={() => setFolderFilter(null)} className="text-engrave hover:text-cream">
+              {t.allSongs}
+            </button>
+            {crumbs.map((n, i) => (
+              <span key={n.path} className="flex items-center gap-1">
+                <ChevronRight size={11} className="text-engrave" aria-hidden />
+                <button onClick={() => setFolderFilter(n.path)} className={i === crumbs.length - 1 ? "text-cream" : "text-engrave hover:text-cream"}>
+                  {n.name}
+                </button>
+              </span>
+            ))}
+          </nav>
+        )}
         <Chip active={statusFilter === null} onClick={() => setStatusFilter(null)}>
-          {t.all} <span className="text-engrave">{songs.length}</span>
+          {t.all} <span className="text-engrave">{folderFilter ? filteredByFolderCount : songs.length}</span>
         </Chip>
         {[{ id: "unsorted" as const, ...UNSORTED }, ...STATUSES].map((s) => {
           const count = statusCounts.get(s.id) ?? 0;
@@ -463,7 +500,9 @@ export function LibraryView() {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto px-4 py-2">
+      <div className="flex min-h-0 flex-1">
+        {tree.length > 0 && <FolderPane tree={tree} selected={folderFilter} onSelect={setFolderFilter} />}
+        <div className="min-w-0 flex-1 overflow-auto px-4 py-2">
         {filtered.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-engrave">
             <Music2 size={28} />
@@ -584,8 +623,75 @@ export function LibraryView() {
             </tbody>
           </table>
         )}
+        </div>
       </div>
     </div>
+  );
+}
+
+/** The folder tree on the Library's left: the watched roots and the folders
+ * that hold two or more songs. Clicking a folder scopes the table to that
+ * branch; the chevron folds it. Roots and their first level start open. */
+function FolderPane({ tree, selected, onSelect }: { tree: FolderNode[]; selected: string | null; onSelect: (path: string | null) => void }) {
+  const t = tr(T);
+  const [folded, setFolded] = useState<Set<string>>(() => {
+    const deep = new Set<string>();
+    const walk = (nodes: FolderNode[]) =>
+      nodes.forEach((n) => {
+        if (n.depth >= 1 && n.children.length) deep.add(n.path);
+        walk(n.children);
+      });
+    walk(tree);
+    return deep;
+  });
+  const toggle = (path: string) =>
+    setFolded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+
+  const row = (n: FolderNode) => {
+    const on = selected !== null && selected === n.path;
+    const open = !folded.has(n.path);
+    return (
+      <li key={n.path}>
+        <div
+          className={`flex items-center gap-1 rounded py-1 pr-2 text-xs ${on ? "bg-cream text-chassis" : "text-body hover:bg-raised"}`}
+          style={{ paddingLeft: 6 + n.depth * 12 }}
+        >
+          {n.children.length > 0 ? (
+            <button onClick={() => toggle(n.path)} aria-label={open ? t.fold(n.name) : t.unfold(n.name)} className={`shrink-0 rounded p-0.5 ${on ? "text-chassis" : "text-engrave hover:text-cream"}`}>
+              <ChevronRight size={12} className={`transition-transform ${open ? "rotate-90" : ""}`} />
+            </button>
+          ) : (
+            <span className="w-[20px] shrink-0" />
+          )}
+          <button onClick={() => onSelect(on ? null : n.path)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left" title={n.path}>
+            <Folder size={12} className="shrink-0" aria-hidden />
+            <span className="truncate">{n.name}</span>
+            {n.issues > 0 && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-missing" title={t.folderIssues(n.issues)} />}
+            <span className={`ml-auto shrink-0 font-mono text-[10.5px] ${on ? "text-chassis/70" : "text-engrave"}`}>{n.count}</span>
+          </button>
+        </div>
+        {open && n.children.length > 0 && <ul>{n.children.map(row)}</ul>}
+      </li>
+    );
+  };
+
+  return (
+    <aside className="flex w-56 shrink-0 flex-col overflow-y-auto border-r border-rule py-2 pl-2 pr-1" aria-label={t.folders}>
+      <div className="mb-1 px-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave">{t.folders}</div>
+      <ul className="flex flex-col gap-px">
+        <li>
+          <button onClick={() => onSelect(null)} className={`flex w-full items-center gap-1.5 rounded py-1 pl-[26px] pr-2 text-left text-xs ${selected === null ? "bg-cream text-chassis" : "text-body hover:bg-raised"}`}>
+            <span className="truncate">{t.allSongs}</span>
+          </button>
+        </li>
+        {tree.map(row)}
+      </ul>
+    </aside>
   );
 }
 

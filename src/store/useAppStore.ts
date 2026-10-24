@@ -162,6 +162,9 @@ interface AppState {
   setSearch: (search: string) => void;
   /** Back to the whole library (search, stage, tag, plugin and toggle filters). */
   resetLibraryFilters: () => void;
+  /** The Library's folder tree: the branch shown (a folder path), or all. */
+  folderFilter: string | null;
+  setFolderFilter: (folder: string | null) => void;
   init: () => Promise<void>;
 /** Preferences only: paths go through the pickers below (Rust owns them). */
   updateSettings: (patch: Partial<Omit<Settings, "watchedFolders" | "flStudioPath" | "outputFolder" | "ffmpegPath">>) => Promise<void>;
@@ -498,7 +501,9 @@ export const useAppStore = create<AppState>((set, get) => {
     clearSettingsSection: () => set({ settingsSection: null }),
     setSearch: (search) => set({ search }),
     resetLibraryFilters: () =>
-      set({ search: "", statusFilter: null, tagFilter: null, pluginFilter: null, problemsOnly: false, favoritesOnly: false, showArchived: false }),
+      set({ search: "", statusFilter: null, tagFilter: null, pluginFilter: null, problemsOnly: false, favoritesOnly: false, showArchived: false, folderFilter: null }),
+    folderFilter: null,
+    setFolderFilter: (folderFilter) => set({ folderFilter }),
 
     init: async () => {
       let settings: Settings;
