@@ -28,6 +28,7 @@ const T = dict(
     source: (s: string) => (s === "spotify" ? "Spotify" : "MusicBrainz"),
     followers: (n: number) => `${new Intl.NumberFormat().format(n)} followers`,
     popularity: (n: number) => `popularity ${n}/100`,
+    noStats: "Spotify profile found. Follower and popularity numbers aren't shared with this app (Spotify keeps them from newer apps in development mode).",
     spotifyOff: "Spotify search and stats need app credentials:",
     spotifySettings: "add them in Settings",
     spotifyOffShort: "Spotify stats need credentials in Settings.",
@@ -56,6 +57,7 @@ const T = dict(
     source: (s: string) => (s === "spotify" ? "Spotify" : "MusicBrainz"),
     followers: (n: number) => `${new Intl.NumberFormat("fr-FR").format(n)} abonnés`,
     popularity: (n: number) => `popularité ${n}/100`,
+    noStats: "Profil Spotify trouvé. Les abonnés et la popularité ne sont pas partagés avec cette appli (Spotify les garde pour les applis récentes en mode développement).",
     spotifyOff: "La recherche et les stats Spotify demandent des identifiants d'appli :",
     spotifySettings: "ajoute-les dans Réglages",
     spotifyOffShort: "Les stats Spotify demandent des identifiants dans Réglages.",
@@ -118,9 +120,15 @@ export function Profiles({ person }: { person: Person }) {
         <div className="mb-3 flex items-center gap-3 rounded-md border border-rule bg-panel px-3 py-2">
           {person.spotify.imageUrl && <img src={person.spotify.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />}
           <div className="min-w-0 text-xs text-body">
-            <div className="text-cream">
-              {t.followers(person.spotify.followers)} · {t.popularity(person.spotify.popularity)}
-            </div>
+            {person.spotify.followers != null || person.spotify.popularity != null ? (
+              <div className="text-cream">
+                {[person.spotify.followers != null ? t.followers(person.spotify.followers) : "", person.spotify.popularity != null ? t.popularity(person.spotify.popularity) : ""]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
+            ) : (
+              <div className="text-engrave">{t.noStats}</div>
+            )}
             {person.spotify.genres.length > 0 && <div className="truncate text-engrave">{person.spotify.genres.join(" · ")}</div>}
           </div>
         </div>

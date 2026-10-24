@@ -892,7 +892,52 @@ const csvCell = (s: string) => `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"
 /** The text files of an exported kit. Always English (bar the README and
  * captions, which follow the kit's language): build `fields` and `extra`
  * inside `inEnglish` so their check messages are too. */
-export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[], lang: KitLang = "en", masterExt: string | null = "wav"): { name: string; content: string }[] {
+/** A credited person's profile IDs for the kit (People → Profiles). */
+export interface KitArtist {
+  name: string;
+  /** The credit roles, joined ("Artist, Producer"). */
+  roles: string;
+  /** Platform label → id and link; empty when nothing was looked up. */
+  profiles: { label: string; id: string; url: string }[];
+}
+
+/** The song's credited people with their looked-up profile IDs, in credit
+ * order; people without profiles are kept (listed as "not looked up") so
+ * the gap is visible before uploading. Nothing without an id is included. */
+export function kitArtists(meta: SongMeta, people: Person[]): KitArtist[] {
+  const out: KitArtist[] = [];
+  for (const credit of meta.credits ?? []) {
+    const person = people.find((p) => p.id === credit.personId);
+    if (!person) continue;
+    const existing = out.find((a) => a.name === person.name);
+    if (existing) {
+      if (!existing.roles.split(", ").includes(credit.role)) existing.roles += `, ${credit.role}`;
+      continue;
+    }
+    out.push({
+      name: person.name,
+      roles: credit.role,
+      profiles: (person.links ?? []).filter((l) => l.id).map((l) => ({ label: l.label, id: l.id!, url: l.url })),
+    });
+  }
+  return out;
+}
+
+function artistIdsMarkdown(title: string, artists: KitArtist[]): string {
+  const lines = [`# Artist IDs: "${title}"`, "", "Paste these when the distributor asks to link a track to an existing artist profile (Spotify artist ID, Apple Music ID…). Looked up in Hivo → People → Profiles.", ""];
+  for (const a of artists) {
+    lines.push(`## ${a.name} (${a.roles})`);
+    if (a.profiles.length === 0) {
+      lines.push("- (no profiles looked up yet: People → this person → Look up profiles)");
+    } else {
+      for (const p of a.profiles) lines.push(`- ${p.label}: ${p.id}  (${p.url})`);
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[], lang: KitLang = "en", masterExt: string | null = "wav", artists: KitArtist[] | null = null): { name: string; content: string }[] {
   const get = (id: KitFieldId) => fields.find((f) => f.id === id)?.value ?? "";
   const meta = METADATA_FIELDS.concat("releaseDate", DISTRIBUTION_FIELDS);
   const aiFlags: Check[] = fields.flatMap((f) =>
@@ -905,6 +950,7 @@ export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]
     ...Object.fromEntries(meta.map((id) => [id, get(id)])),
     snippets: snippets.map((s) => ({ file: `snippets/${s.label}.wav`, startSec: s.startSec, lengthSec: s.lengthSec })),
     openChecks: open.map((c) => `${c.level}: ${c.message}`),
+    ...(artists ? { artists: artists.map((a) => ({ name: a.name, roles: a.roles, profiles: a.profiles })) } : {}),
     generatedAt: new Date().toISOString(),
   };
   const guide = kitGuide(lang, {
@@ -920,7 +966,8 @@ export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]
       // BOM so Excel reads accented names (é, ñ) as UTF-8.
       content: "﻿" + [meta.map((id) => csvCell(LABELS[id])).join(","), meta.map((id) => csvCell(get(id))).join(",")].join("\n") + "\n",
     },
-    { name: "distributor-sheet.md", content: distributorSheet(get, snippets, open, masterBaseName(fields, get("title"))) },
+    { name: "distributor-sheet.md", content: distributorSheet(get, snippets, open, masterBaseName(fields, get("title")), artists) },
+    ...(artists ? [{ name: "artist-ids.md", content: artistIdsMarkdown(get("title"), artists) }] : []),
     { name: "cover-brief.md", content: get("coverBrief") + "\n" },
     { name: "captions.md", content: get("captions") + "\n" },
     {
@@ -935,7 +982,7 @@ export function kitFiles(fields: KitField[], snippets: Snippet[], extra: Check[]
 
 /** Every value in the order distributors' upload forms ask for it, ready to
  * copy field by field (DistroKid, TuneCore, CD Baby, Amuse…). */
-function distributorSheet(get: (id: KitFieldId) => string, snippets: Snippet[], open: Check[], master: string): string {
+function distributorSheet(get: (id: KitFieldId) => string, snippets: Snippet[], open: Check[], master: string, artists: KitArtist[] | null = null): string {
   const or = (v: string, empty: string) => v.trim() || empty;
   const hook = snippets.find((s) => /hook/i.test(s.label)) ?? snippets[0];
   const writers = get("songwriters")
@@ -968,6 +1015,13 @@ function distributorSheet(get: (id: KitFieldId) => string, snippets: Snippet[], 
     hook ? `- Preview / TikTok start: ${formatDuration(hook.startSec)} (the ${hook.label} snippet)` : null,
     `- BPM / key: ${[get("bpm"), get("key")].filter(Boolean).join(" / ") || "(not needed)"}`,
     `- Duration: ${get("duration")}`,
+    ...(artists
+      ? [
+          "",
+          "## Artist profiles (link the track to existing profiles)",
+          ...artists.map((a) => `- ${a.name} (${a.roles}): ${a.profiles.length ? a.profiles.map((p) => `${p.label} ${p.id}`).join(" · ") : "(no profiles looked up yet)"}`),
+        ]
+      : []),
     "",
     "## Files",
     `- Audio: "${master}" in this folder. Distributors want WAV, 16 or 24-bit, 44.1 kHz.`,
