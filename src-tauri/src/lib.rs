@@ -8,6 +8,7 @@ mod cover;
 mod files;
 mod key;
 mod leads;
+mod lookup;
 mod location;
 mod flp_metadata;
 mod models;
@@ -51,6 +52,10 @@ pub fn run() {
             leads::save_lead,
             leads::list_leads,
             leads::delete_lead,
+            lookup::lookup_artists,
+            lookup::lookup_profile,
+            lookup::spotify_status,
+            lookup::set_spotify_credentials,
             settings::pick_fl_studio,
             settings::use_detected_fl_studio,
             settings::pick_ffmpeg,

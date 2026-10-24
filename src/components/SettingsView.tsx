@@ -10,7 +10,7 @@ import { DetectedFolders } from "./DetectedFolders";
 import { canRenderInApp } from "../lib/daws";
 import { aiDisclosure } from "../lib/ai";
 import { converterTemplateFor } from "../lib/converters";
-import type { CaptionLang, RenderFormat, YoutubeStatus } from "../types";
+import type { CaptionLang, RenderFormat, SpotifyStatus, YoutubeStatus } from "../types";
 import { dict, tr } from "../i18n";
 
 // A stable empty list: a fresh [] in a store selector re-renders forever.
@@ -369,6 +369,7 @@ export function SettingsView() {
         <CoverSettings />
 
         <YoutubeSettings />
+        <SpotifySettings />
 
         <DiggerSettings />
 
@@ -795,6 +796,125 @@ function YoutubeSettings() {
         </button>
         {status?.source === "settings" && (
           <button onClick={() => save(null)} className="rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised">
+            {t.remove}
+          </button>
+        )}
+      </div>
+      {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
+      <p className="mt-2 text-[11px] leading-relaxed text-engrave">{t.privacy}</p>
+    </section>
+  );
+}
+
+const T_SPOTIFY = dict(
+  {
+    title: "Spotify (People, free)",
+    intro: "Lets \"Look up profiles\" on a person search Spotify and show followers, genres, popularity and the artist picture. Without it, the Spotify artist ID still comes from MusicBrainz when it has the link. In the",
+    link: "Spotify developer dashboard",
+    steps: ", create an app (any name, redirect URI unused) and copy its Client ID and Client secret.",
+    off: "No credentials: MusicBrainz only.",
+    env: "Using SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET from the environment.",
+    on: "Credentials saved. Lookups search Spotify too.",
+    clientId: "Client ID",
+    clientSecret: "Client secret",
+    newPair: "Paste a new pair to replace it",
+    save: "Save",
+    remove: "Remove",
+    saved: "Credentials saved.",
+    removed: "Credentials removed.",
+    privacy:
+      "Stored on this computer in their own owner-only file, never shown again. Only the artist name searched goes to Spotify. Nothing is written to your Spotify account.",
+  },
+  {
+    title: "Spotify (Personnes, gratuit)",
+    intro: "Permet à « Chercher les profils » sur une personne de chercher sur Spotify et d'afficher abonnés, genres, popularité et photo d'artiste. Sans ça, l'ID artiste Spotify vient quand même de MusicBrainz quand il a le lien. Dans le",
+    link: "tableau de bord développeur Spotify",
+    steps: ", crée une appli (n'importe quel nom, l'URI de redirection ne sert pas) et copie son Client ID et son Client secret.",
+    off: "Pas d'identifiants : MusicBrainz seulement.",
+    env: "Utilise SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET de l'environnement.",
+    on: "Identifiants enregistrés. Les recherches passent aussi par Spotify.",
+    clientId: "Client ID",
+    clientSecret: "Client secret",
+    newPair: "Colle une nouvelle paire pour la remplacer",
+    save: "Enregistrer",
+    remove: "Retirer",
+    saved: "Identifiants enregistrés.",
+    removed: "Identifiants retirés.",
+    privacy:
+      "Gardés sur cet ordi dans leur propre fichier réservé à ton compte, jamais réaffichés. Seul le nom d'artiste cherché part vers Spotify. Rien n'est écrit sur ton compte Spotify.",
+  },
+);
+
+const SPOTIFY_DASHBOARD_URL = "https://developer.spotify.com/dashboard";
+
+/** Spotify app credentials for People lookups (write-only from here). */
+function SpotifySettings() {
+  const [status, setStatus] = useState<SpotifyStatus | null>(null);
+  const [clientId, setClientId] = useState("");
+  const [secret, setSecret] = useState("");
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const t = tr(T_SPOTIFY);
+
+  useEffect(() => {
+    let live = true;
+    api.spotifyStatus().then((s) => live && setStatus(s)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function save(clear: boolean) {
+    setMessage(null);
+    try {
+      await api.setSpotifyCredentials(clear ? null : clientId, clear ? null : secret);
+      setStatus(await api.spotifyStatus());
+      setClientId("");
+      setSecret("");
+      setMessage({ kind: "ok", text: clear ? t.removed : t.saved });
+    } catch (e) {
+      setMessage({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  const line = !status?.configured ? t.off : status.source === "env" ? t.env : t.on;
+
+  return (
+    <section id="spotify">
+      <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
+      <p className="mt-1 text-xs leading-relaxed text-engrave">
+        {t.intro}{" "}
+        <button onClick={() => api.openExternal(SPOTIFY_DASHBOARD_URL)} className="text-orange-300 underline">
+          {t.link}
+        </button>
+        {t.steps}
+      </p>
+      <div className={`mt-3 text-xs ${status?.configured ? "text-emerald-300" : "text-engrave"}`}>{line}</div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <input
+          type="password"
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          placeholder={status?.configured ? t.newPair : t.clientId}
+          aria-label={t.clientId}
+          autoComplete="off"
+          spellCheck={false}
+          className={`${field} min-w-[200px] flex-1`}
+        />
+        <input
+          type="password"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          placeholder={t.clientSecret}
+          aria-label={t.clientSecret}
+          autoComplete="off"
+          spellCheck={false}
+          className={`${field} min-w-[200px] flex-1`}
+        />
+        <button onClick={() => save(false)} disabled={!clientId.trim() || !secret.trim()} className="rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-chassis hover:bg-orange-400 disabled:opacity-40">
+          {t.save}
+        </button>
+        {status?.source === "settings" && (
+          <button onClick={() => save(true)} className="rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised">
             {t.remove}
           </button>
         )}
