@@ -347,7 +347,7 @@ mod tests {
         let zip_path = result.zip_path.unwrap();
         assert!(zip_path.ends_with("Envy.zip"));
         let mut archive = zip::ZipArchive::new(File::open(&zip_path).unwrap()).unwrap();
-        let mut names: Vec<String> = archive.file_names().map(String::from).collect();
+        let mut names: Vec<String> = archive.file_names().map(|n| n.unwrap().into_owned()).collect();
         names.sort();
         assert_eq!(names, vec!["Envy.flp", "beat.mp3", "take1.wav"]);
         let mut content = String::new();
@@ -417,7 +417,7 @@ mod tests {
         approved.insert("\\\\attacker\\share\\loop.wav".to_string());
         let result = package_one(&mut resolver, &project, &root.join("out"), &approved).unwrap();
         let mut archive = zip::ZipArchive::new(File::open(result.zip_path.unwrap()).unwrap()).unwrap();
-        let mut names: Vec<String> = archive.file_names().map(String::from).collect();
+        let mut names: Vec<String> = archive.file_names().map(|n| n.unwrap().into_owned()).collect();
         names.sort();
         assert_eq!(names, vec!["Bait.flp", "kick.wav"]);
         for i in 0..archive.len() {
