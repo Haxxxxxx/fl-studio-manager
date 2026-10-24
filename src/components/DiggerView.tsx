@@ -63,7 +63,7 @@ export function DiggerView() {
   const t = tr(T);
   const folders = useAppStore((s) => s.settings.beatFolders ?? NO_FOLDERS);
   const addBeatFolder = useAppStore((s) => s.addBeatFolder);
-  const { beats, loading, error, picked, query, load, toggle, clearPicks, setQuery, dig, webQuery, searchedFor, searching, clearUnseen, shownRound, setShownRound } = useDigger();
+  const { beats, loading, error, picked, query, load, loadLeads, toggle, clearPicks, setQuery, dig, webQuery, searchedFor, searching, clearUnseen, shownRound, setShownRound } = useDigger();
   const [playing, setPlaying] = useState<string | null>(null);
   const [yt, setYt] = useState<YoutubeStatus | null>(null);
   // The results section is always there (its search box is the only way to
@@ -86,7 +86,9 @@ export function DiggerView() {
 
   useEffect(() => {
     if (folderKey) void load();
-  }, [folderKey, load]);
+    // The saved leads (DigResults' "Saved" chips) live in the same folders.
+    void loadLeads();
+  }, [folderKey, load, loadLeads]);
 
   // A dig that finished while another view was open has been seen now.
   useEffect(() => {

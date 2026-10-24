@@ -76,5 +76,6 @@ The Digger (left menu) is a deliberate, user-approved exception to rules 1-2: it
 - Beats live ONLY in the Digger: never in Library, stats, calendar or the crew backend.
 - NO downloading from YouTube or anywhere (terms of service). Leasing or buying a beat is a human hand-off: the Digger only opens links.
 - The official YouTube embedded player inside the app (nocookie host, play only) was approved by the user on 2026-10-24; downloading stays forbidden.
+- Approved 2026-10-24: leads (link + title + facts) are saved as text files in the beats folder, and an optional user-configured converter link opens in the browser. Hivo itself never downloads audio.
 - Audio sent to the AI is opt-in (a Settings toggle), short excerpts only, disclosed in the UI.
 - Anything beyond this (a beat store, auto-download, producer outreach, beat stats): STOP and flag, rule 0 applies.

@@ -145,6 +145,11 @@ pub struct Settings {
     /// key, nothing else. Kept once set.
     #[serde(default)]
     pub install_id: Option<String>,
+    /// The Digger's optional converter link, user-configured: an https url
+    /// with `{url}` where the video address goes. Opened in the browser,
+    /// never called by Hivo.
+    #[serde(default)]
+    pub converter_url_template: Option<String>,
 }
 
 fn default_caption_language() -> String {
@@ -172,6 +177,7 @@ impl Default for Settings {
             beat_folders: Vec::new(),
             dig_send_audio: false,
             install_id: None,
+            converter_url_template: None,
         }
     }
 }

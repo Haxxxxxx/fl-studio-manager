@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, deeperExclude, foundKey, foundTitles, googleSearchUrl, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
+import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, converterLink, deeperExclude, foundKey, foundTitles, googleSearchUrl, leadFacts, leadHash, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
@@ -81,5 +81,35 @@ describe("digger links", () => {
     expect(youtubeId("https://www.beatstars.com/beat/night-123")).toBeNull();
     expect(youtubeId("javascript:alert(1)")).toBeNull();
     expect(youtubeId("")).toBeNull();
+  });
+});
+
+describe("digger leads", () => {
+  it("hashes a url like the Rust side (FNV-1a 32-bit, 8 lowercase hex digits)", () => {
+    // Same vectors as src-tauri/src/leads.rs.
+    expect(leadHash("https://youtu.be/dQw4w9WgXcQ")).toBe("8fd69810");
+    expect(leadHash("  https://youtu.be/dQw4w9WgXcQ \n")).toBe("8fd69810");
+    expect(leadHash("a")).toBe("e40c292c");
+    expect(leadHash("")).toBe("811c9dc5");
+    expect(leadHash("prod é")).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it("carries the dig's facts, the one beat's key and bpm only when one was dug", () => {
+    const dig = { analysis: { summary: " Dark, slow trap. ", traits: ["dark", " 808 slides "], tempo: "140 BPM" }, beats: [{ bpm: 140, key: "Am" }] };
+    expect(leadFacts(dig)).toEqual({ summary: "Dark, slow trap.", traits: ["140 BPM", "dark", "808 slides"], bpm: 140, key: "Am" });
+    expect(leadFacts({ ...dig, beats: [{ bpm: 140, key: "Am" }, { bpm: 90, key: "C" }] })).toMatchObject({ bpm: null, key: null });
+    expect(leadFacts({ analysis: { summary: "", traits: [], tempo: "" }, beats: [] })).toEqual({ summary: null, traits: [], bpm: null, key: null });
+    expect(leadFacts(null)).toEqual({ summary: null, traits: [], bpm: null, key: null });
+  });
+
+  it("builds the converter link from an https template with a {url} slot only", () => {
+    const video = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1";
+    expect(converterLink("https://example.com/convert?u={url}", video)).toBe(`https://example.com/convert?u=${encodeURIComponent(video)}`);
+    expect(converterLink(" https://example.com/{url}/go?x={url} ", "https://a.b/c")).toBe("https://example.com/https%3A%2F%2Fa.b%2Fc/go?x=https%3A%2F%2Fa.b%2Fc");
+    expect(converterLink("http://example.com/convert?u={url}", video)).toBeNull();
+    expect(converterLink("https://example.com/convert", video)).toBeNull();
+    expect(converterLink("javascript:{url}", video)).toBeNull();
+    expect(converterLink(undefined, video)).toBeNull();
+    expect(converterLink("", video)).toBeNull();
   });
 });

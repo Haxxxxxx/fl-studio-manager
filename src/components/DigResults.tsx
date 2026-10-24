@@ -1,18 +1,21 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ExternalLink, Play, Search, X } from "lucide-react";
 import { useDigger } from "../store/useDigger";
+import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
-import { MAX_LIKED, MAX_QUERY_CHARS, googleSearchUrl, seedList, youtubeId, youtubeSearchUrl } from "../lib/digger";
+import { MAX_LIKED, MAX_QUERY_CHARS, converterLink, googleSearchUrl, leadFacts, leadHash, seedList, youtubeId, youtubeSearchUrl } from "../lib/digger";
 import { dict, tr } from "../i18n";
-import type { WebLink, YoutubeStatus } from "../types";
+import type { Lead, WebLink, YoutubeStatus } from "../types";
 
 // The bottom of the Digger's main area once a dig (or a search) exists: the
 // round breadcrumb and the YouTube search in the header, the docked player,
 // the shown round's YouTube results as a grid of cards, then its web links.
 // Every card and link has a "Use for next dig" toggle: the picks seed the
-// next "Go deeper" round. YouTube links play in YouTube's own embedded
-// player (one at a time). Links only: nothing is ever downloaded
-// (docs/GUARDRAILS.md).
+// next "Go deeper" round. "Save to Prods" writes a small text file (link,
+// title, the dig's facts) into the beats folder's `_leads`, never audio.
+// YouTube links play in YouTube's own embedded player (one at a time). The
+// optional "Convert" button only opens the user's own converter link in the
+// browser. Links only: nothing is ever downloaded (docs/GUARDRAILS.md).
 
 const NB = " ";
 const T = dict(
@@ -40,6 +43,12 @@ const T = dict(
     like: "Use for next dig",
     likeFull: `${MAX_LIKED} picks max for the next dig. Unpick one first.`,
     seededFrom: (list: string) => `Seeded from: ${list}`,
+    save: "Save to Prods",
+    saving: "Saving…",
+    saved: "Saved",
+    savedTitle: "Saved in your beats folder (_leads). Click to show the file.",
+    convert: "Convert",
+    convertTitle: "Opens your converter link in the browser with this video's address. Hivo never downloads audio.",
     hint: "Opens in your browser. Leasing a beat stays between you and the producer: the Digger downloads nothing.",
   },
   {
@@ -66,6 +75,12 @@ const T = dict(
     like: "Pour le prochain creusage",
     likeFull: `${MAX_LIKED} sélections max pour le prochain creusage. Retires-en une d'abord.`,
     seededFrom: (list: string) => `À partir de${NB}: ${list}`,
+    save: "Enregistrer dans Prods",
+    saving: "Enregistrement…",
+    saved: "Enregistré",
+    savedTitle: "Enregistré dans ton dossier de prods (_leads). Clique pour afficher le fichier.",
+    convert: "Convertir",
+    convertTitle: "Ouvre ton lien de conversion dans le navigateur avec l'adresse de cette vidéo. Hivo ne télécharge jamais d'audio.",
     hint: `S'ouvre dans ton navigateur. La licence d'une prod se règle entre toi et le beatmaker${NB}: le Digger ne télécharge rien.`,
   },
 );
@@ -103,8 +118,40 @@ function LikeChip({ id, title }: { id: string; title: string }) {
   );
 }
 
+/** The dig's facts every lead on screen carries (the rounds share one dig). */
+function useLeadFacts() {
+  const dig = useDigger((s) => s.dig);
+  return useMemo(() => leadFacts(dig), [dig]);
+}
+
+/** "Save to Prods" on a card or a link; "Saved" (click: show the file) once
+ * its url's hash is among the lead files. */
+function SaveChip({ lead }: { lead: Lead }) {
+  const t = tr(T);
+  const hash = leadHash(lead.url);
+  const path = useDigger((s) => s.savedLeads.get(hash));
+  const saveLead = useDigger((s) => s.saveLead);
+  const [busy, setBusy] = useState(false);
+  const on = !!path;
+  const click = async () => {
+    if (path) return api.revealInFileManager(path);
+    setBusy(true);
+    try {
+      await saveLead(lead);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button type="button" onClick={() => void click()} aria-pressed={on} disabled={busy} title={on ? t.savedTitle : undefined} className={`${chip(on)} shrink-0 whitespace-nowrap disabled:opacity-40`}>
+      {busy ? t.saving : on ? t.saved : t.save}
+    </button>
+  );
+}
+
 function WebLinks({ links, label: name, onPlay }: { links: WebLink[]; label: string; onPlay: (p: Playing) => void }) {
   const t = tr(T);
+  const facts = useLeadFacts();
   return (
     <ul className="flex flex-col gap-1" aria-label={name}>
       {links.map((l) => {
@@ -125,6 +172,7 @@ function WebLinks({ links, label: name, onPlay }: { links: WebLink[]; label: str
               </span>
             </button>
             <LikeChip id={l.url} title={title} />
+            <SaveChip lead={{ url: l.url, title, producer: l.site, year: "", source: "web", ...facts }} />
           </li>
         );
       })}
@@ -143,7 +191,9 @@ interface Props {
 
 export function DigResults({ yt, round, setRound, fill }: Props) {
   const t = tr(T);
-  const { dig, rounds, webQuery, roundResults, searching, searchError, setWebQuery, searchYoutube } = useDigger();
+  const { dig, rounds, webQuery, roundResults, searching, searchError, leadError, setWebQuery, searchYoutube } = useDigger();
+  const converter = useAppStore((s) => s.settings.converterUrlTemplate);
+  const facts = useLeadFacts();
   const [playing, setPlaying] = useState<Playing | null>(null);
   const q = webQuery.trim();
   const run = (query: string) => {
@@ -237,39 +287,49 @@ export function DigResults({ yt, round, setRound, fill }: Props) {
         )}
 
         {searchError && <div role="alert" className="rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{searchError}</div>}
+        {leadError && <div role="alert" className="rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{leadError}</div>}
         {searching && <p className="text-xs text-engrave">{t.searching}</p>}
         {!searching && !!shown?.query && shown.query === q && videos.length === 0 && <p className="text-xs text-engrave">{t.noResults}</p>}
         {videos.length > 0 && shown?.query && <h3 className={label}>{t.youtubeFor(shown.query)}</h3>}
         {videos.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 @[900px]:grid-cols-2 @[1200px]:grid-cols-3" aria-label="YouTube">
-            {videos.map((v) => (
-              <li key={v.id} className="flex flex-col gap-2 rounded border border-rule bg-panel p-2">
-                <img
-                  src={v.thumbnail}
-                  alt=""
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-                  className="aspect-video w-full rounded-sm bg-raised object-cover"
-                />
-                <span className="line-clamp-2 min-h-[2lh] text-xs text-cream" title={v.title}>
-                  {v.title}
-                </span>
-                <span className="truncate font-mono text-[10.5px] text-engrave">
-                  {v.channel}
-                  {v.publishedAt ? ` · ${v.publishedAt.slice(0, 4)}` : ""}
-                </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <button onClick={() => setPlaying({ id: v.id, title: v.title })} aria-label={t.play(v.title)} className={`${secondary} flex items-center gap-1`}>
-                    <Play size={12} aria-hidden /> {t.playShort}
-                  </button>
-                  <button onClick={() => void api.openExternal(v.url)} aria-label={t.openVideo(v.title)} className={`${secondary} flex items-center gap-1 font-normal text-body`}>
-                    <ExternalLink size={12} aria-hidden /> {t.open}
-                  </button>
-                  <LikeChip id={v.id} title={v.title} />
-                </div>
-              </li>
-            ))}
+            {videos.map((v) => {
+              const convert = converterLink(converter, v.url);
+              return (
+                <li key={v.id} className="flex flex-col gap-2 rounded border border-rule bg-panel p-2">
+                  <img
+                    src={v.thumbnail}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+                    className="aspect-video w-full rounded-sm bg-raised object-cover"
+                  />
+                  <span className="line-clamp-2 min-h-[2lh] text-xs text-cream" title={v.title}>
+                    {v.title}
+                  </span>
+                  <span className="truncate font-mono text-[10.5px] text-engrave">
+                    {v.channel}
+                    {v.publishedAt ? ` · ${v.publishedAt.slice(0, 4)}` : ""}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button onClick={() => setPlaying({ id: v.id, title: v.title })} aria-label={t.play(v.title)} className={`${secondary} flex items-center gap-1`}>
+                      <Play size={12} aria-hidden /> {t.playShort}
+                    </button>
+                    <button onClick={() => void api.openExternal(v.url)} aria-label={t.openVideo(v.title)} className={`${secondary} flex items-center gap-1 font-normal text-body`}>
+                      <ExternalLink size={12} aria-hidden /> {t.open}
+                    </button>
+                    {convert && (
+                      <button onClick={() => void api.openExternal(convert)} title={t.convertTitle} className={`${secondary} flex items-center gap-1 font-normal text-body`}>
+                        <ExternalLink size={12} aria-hidden /> {t.convert}
+                      </button>
+                    )}
+                    <LikeChip id={v.id} title={v.title} />
+                    <SaveChip lead={{ url: v.url, title: v.title, producer: v.channel, year: v.publishedAt.slice(0, 4), source: "youtube", ...facts }} />
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
 
