@@ -52,8 +52,12 @@ export async function discardUpdate(): Promise<void> {
 
 /** Ask the server for a newer version: null when up to date, or outside the
  * desktop app (a browser tab can't update anything). */
+/** Updates make sense only in a packaged app: a `tauri dev` build has no
+ * bundle to replace, so installing one over target/debug would misfire. */
+export const UPDATES_ENABLED: boolean = isTauri() && !import.meta.env.DEV;
+
 export async function checkForUpdate(): Promise<AvailableUpdate | null> {
-  if (!isTauri()) return null;
+  if (!UPDATES_ENABLED) return null;
   await discardUpdate();
   let update: Update | null;
   try {

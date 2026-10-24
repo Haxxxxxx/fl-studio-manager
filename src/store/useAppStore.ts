@@ -519,7 +519,7 @@ export const useAppStore = create<AppState>((set, get) => {
       get().refreshCoverStatus();
       set({ settingsLoaded: true });
       // One update check per launch (never for sample data or a browser tab).
-      if (isTauri() && !get().demoMode) void get().checkUpdate({ quiet: true });
+      if (updater.UPDATES_ENABLED && !get().demoMode) void get().checkUpdate({ quiet: true });
 
       if (!get().unlisten) {
         const unlisten = await api.onRenderProgress((event: RenderEvent) => {
