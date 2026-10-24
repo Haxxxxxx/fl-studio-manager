@@ -43,12 +43,40 @@ pub fn get_settings(app: AppHandle) -> Result<Settings, String> {
 #[tauri::command]
 pub fn save_settings(app: AppHandle, settings: Settings) -> Result<Settings, String> {
     let mut saved = load(&app)?;
-    apply_preferences(&mut saved, settings);
+    let problem = apply_preferences(&mut saved, settings);
     store(&app, &saved)?;
-    Ok(saved)
+    match problem {
+        Some(message) => Err(message),
+        None => Ok(saved),
+    }
 }
 
-fn apply_preferences(saved: &mut Settings, from: Settings) {
+/// Same limit as the Settings field's `maxLength` (src/components/SettingsView.tsx).
+const MAX_CONVERTER_CHARS: usize = 300;
+
+/// The converter link, if it's usable: https, with a `{url}` slot, short,
+/// plain text. None for an empty field (cleared, no error).
+fn converter_template(raw: Option<&str>) -> Result<Option<String>, String> {
+    let Some(t) = raw.map(str::trim).filter(|t| !t.is_empty()) else { return Ok(None) };
+    let ok = t.starts_with("https://") && t.contains("{url}") && t.chars().count() <= MAX_CONVERTER_CHARS && !t.chars().any(char::is_control);
+    if ok {
+        Ok(Some(t.to_string()))
+    } else {
+        Err(format!("The converter link must start with https:// and contain {{url}} ({MAX_CONVERTER_CHARS} characters max)."))
+    }
+}
+
+/// Applies what the webview may set. Returns the one thing that was refused
+/// (and cleared), if any; the other preferences are applied regardless.
+fn apply_preferences(saved: &mut Settings, from: Settings) -> Option<String> {
+    let mut problem = None;
+    match converter_template(from.converter_url_template.as_deref()) {
+        Ok(t) => saved.converter_url_template = t,
+        Err(e) => {
+            saved.converter_url_template = None;
+            problem = Some(e);
+        }
+    }
     if matches!(from.render_format.as_str(), "wav" | "mp3" | "ogg" | "flac") {
         saved.render_format = from.render_format;
     }
@@ -67,6 +95,7 @@ fn apply_preferences(saved: &mut Settings, from: Settings) {
     if saved.install_id.is_none() {
         saved.install_id = from.install_id.filter(|id| id.len() == 36);
     }
+    problem
 }
 
 /// Runs a native picker off the main thread. None = cancelled.
@@ -448,6 +477,23 @@ mod tests {
         assert_eq!(saved.ui_language, "fr");
         apply_preferences(&mut saved, Settings { ui_language: "klingon".into(), ..Settings::default() });
         assert_eq!(saved.ui_language, "fr");
+    }
+
+    #[test]
+    fn converter_link_is_checked_or_cleared() {
+        let mut saved = Settings::default();
+        let good = "https://example.com/convert?u={url}";
+        assert_eq!(apply_preferences(&mut saved, Settings { converter_url_template: Some(format!("  {good} ")), ..Settings::default() }), None);
+        assert_eq!(saved.converter_url_template.as_deref(), Some(good));
+        for bad in ["http://example.com/{url}", "https://example.com/convert", "javascript:{url}", &format!("https://x.y/{{url}}{}", "a".repeat(300)), "https://x.y/{url}\u{7}?x"] {
+            saved.converter_url_template = Some(good.into());
+            let problem = apply_preferences(&mut saved, Settings { converter_url_template: Some(bad.into()), ..Settings::default() });
+            assert!(problem.is_some_and(|p| p.contains("https://")), "{bad}");
+            assert_eq!(saved.converter_url_template, None, "cleared: {bad}");
+        }
+        saved.converter_url_template = Some(good.into());
+        assert_eq!(apply_preferences(&mut saved, Settings { converter_url_template: Some("   ".into()), ..Settings::default() }), None);
+        assert_eq!(saved.converter_url_template, None, "an empty field clears it without an error");
     }
 
     #[test]

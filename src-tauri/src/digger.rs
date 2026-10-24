@@ -588,7 +588,7 @@ pub struct WebLink {
 }
 
 /// https only, no credentials, a host, a sane length.
-fn safe_url(raw: &str) -> Option<String> {
+pub(crate) fn safe_url(raw: &str) -> Option<String> {
     let url = reqwest::Url::parse(raw.trim()).ok()?;
     (url.scheme() == "https" && url.host_str().is_some_and(|h| !h.is_empty()) && url.username().is_empty() && url.password().is_none() && raw.len() <= 2048)
         .then(|| url.to_string())

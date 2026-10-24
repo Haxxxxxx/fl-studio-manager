@@ -89,6 +89,12 @@ impl Scope {
         self.output.as_ref().is_some_and(|(_, o)| inside(path, o))
     }
 
+    /// A lead file (`_leads/` inside a beats folder): the one thing the app
+    /// shows from a beats folder besides the beats themselves.
+    fn in_beat_leads(&self, path: &Path) -> bool {
+        self.beat_roots.iter().any(|r| inside(path, &r.join(crate::leads::LEADS_DIR)))
+    }
+
     /// A DAW project file inside a linked folder.
     pub fn project(&self, path: &str) -> Result<PathBuf, String> {
         let real = resolve(Path::new(path)).filter(|p| self.in_roots(p)).ok_or_else(|| denied("That project", path))?;
@@ -116,10 +122,11 @@ impl Scope {
     }
 
     /// Any file in a linked folder or the export folder (what the app shows,
-    /// plays or analyzes: projects, renders, kit files).
+    /// plays or analyzes: projects, renders, kit files), or a saved lead in
+    /// a beats folder's `_leads`.
     pub fn known_file(&self, path: &str) -> Result<PathBuf, String> {
         resolve(Path::new(path))
-            .filter(|p| self.in_roots(p) || self.in_output(p))
+            .filter(|p| self.in_roots(p) || self.in_output(p) || self.in_beat_leads(p))
             .map(|_| PathBuf::from(path))
             .ok_or_else(|| denied("That file", path))
     }
@@ -298,6 +305,22 @@ pub mod tests {
         assert!(f.scope.folder_in_roots(&s(&f.outside)).is_err());
         assert_eq!(f.scope.output().unwrap(), f.out.as_path());
         assert!(Scope::from_settings(&Settings::default()).output().is_err());
+    }
+
+    #[test]
+    fn a_beats_folder_only_reveals_its_leads() {
+        let f = fixture("leads");
+        let beats = f.dir.join("Beats");
+        fs::create_dir_all(beats.join("_leads")).unwrap();
+        fs::write(beats.join("_leads").join("night-8fd69810.md"), b"# Night").unwrap();
+        fs::write(beats.join("kick.wav"), b"RIFF").unwrap();
+        let settings = Settings { beat_folders: vec![s(&beats)], ..Settings::default() };
+        let scope = Scope::from_settings(&settings);
+        assert!(scope.known_file(&s(&beats.join("_leads").join("night-8fd69810.md"))).is_ok());
+        assert!(scope.known_file(&s(&beats.join("kick.wav"))).is_err(), "beats themselves go through `beat()`");
+        assert!(scope.known_file(&s(&beats.join("_leads").join("..").join("kick.wav"))).is_err());
+        assert!(scope.known_file(&s(&f.outside.join("secret.txt"))).is_err());
+        assert!(f.scope.known_file(&s(&beats.join("_leads").join("night-8fd69810.md"))).is_err(), "no beats folder linked");
     }
 
     #[test]

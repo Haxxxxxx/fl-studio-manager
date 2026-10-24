@@ -1,5 +1,8 @@
 // Pure helpers for the Digger: search links and starter queries from beat
-// file names. Links only: the Digger never downloads anything.
+// file names, leads (text files) and the user's converter link. Links only:
+// the Digger never downloads anything.
+
+import type { Lead } from "../types";
 
 /** Same limit as `MAX_QUERY_CHARS` in src-tauri/src/youtube.rs. */
 export const MAX_QUERY_CHARS = 120;
@@ -119,6 +122,47 @@ export function youtubeId(url: string): string | null {
     id = u.pathname.slice(1).split("/")[0];
   }
   return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+}
+
+/** Same limit as `MAX_LEAD_SLUG` in src-tauri/src/leads.rs (the file name's title part). */
+export const MAX_LEAD_SLUG = 60;
+
+/**
+ * FNV-1a (32-bit) of the trimmed url's UTF-8 bytes as 8 lowercase hex
+ * digits: the suffix of a saved lead's file name (same as `lead_hash` in
+ * src-tauri/src/leads.rs), so "Saved" can be told from the file list.
+ */
+export function leadHash(url: string): string {
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(url.trim())) {
+    h ^= b;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+/** The dig's facts a lead carries: summary, tempo + traits, and the one
+ * picked beat's key and bpm when exactly one beat was dug (else none). */
+export function leadFacts(dig: { analysis: { summary: string; traits: string[]; tempo: string }; beats: { bpm: number | null; key: string | null }[] } | null): Pick<Lead, "summary" | "traits" | "bpm" | "key"> {
+  if (!dig) return { summary: null, traits: [], bpm: null, key: null };
+  const one = dig.beats.length === 1 ? dig.beats[0] : null;
+  return {
+    summary: dig.analysis.summary.trim() || null,
+    traits: [dig.analysis.tempo, ...dig.analysis.traits].map((t) => t.trim()).filter(Boolean),
+    bpm: one?.bpm ?? null,
+    key: one?.key ?? null,
+  };
+}
+
+/**
+ * The user's converter link with the video address in its `{url}` slot, or
+ * null unless the template is https and has the slot. Opened in the browser
+ * by the user: Hivo never calls it and never downloads audio.
+ */
+export function converterLink(template: string | undefined, url: string): string | null {
+  const t = template?.trim() ?? "";
+  if (!t.startsWith("https://") || !t.includes("{url}")) return null;
+  return t.split("{url}").join(encodeURIComponent(url));
 }
 
 /** "140 BPM · Am · 3:05" for one analysed beat; "≈" marks an estimated tempo. */

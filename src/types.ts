@@ -113,6 +113,9 @@ export interface Settings {
   ffmpegPath: string | null;
   /** A uuid made once on this install: the feedback form's rate-limit key (nothing else). */
   installId?: string;
+  /** The Digger's optional converter link: an https url with `{url}` where
+   * the video address goes. Opened in the browser; Hivo never calls it. */
+  converterUrlTemplate?: string;
 }
 
 export type RenderFormat = "wav" | "mp3" | "ogg";
@@ -553,6 +556,28 @@ export interface DigResult {
   web: WebLink[];
   webSearches: string[];
   webError: string | null;
+}
+
+/** A found beat saved as a text file in the beats folder (src-tauri/src/leads.rs
+ * Lead): the link, what the card showed and the dig's facts. Never audio. */
+export interface Lead {
+  url: string;
+  title: string;
+  /** The channel (YouTube) or the site (web link). */
+  producer: string;
+  /** "2024", or "" when unknown. */
+  year: string;
+  source: "youtube" | "web";
+  bpm: number | null;
+  key: string | null;
+  traits: string[];
+  summary: string | null;
+}
+
+/** A lead on disk: the url hash in its file name (`leadHash`) and its path. */
+export interface SavedLead {
+  hash: string;
+  path: string;
 }
 
 /** One "Go deeper" round: more web links, seeded by the dig's analysis, or
