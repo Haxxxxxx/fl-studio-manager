@@ -24,6 +24,7 @@ import {
   type KitField,
   type KitInput,
   inEnglish,
+  kitArtists,
 } from "../lib/launchKit";
 import { dict, tr } from "../i18n";
 import { aiDisclosure, draftCopy, reviewKit } from "../lib/ai";
@@ -60,6 +61,11 @@ const T = dict(
     exportWhere: "Writes the kit to <export folder>/Launch Kits/",
     exporting: "Exporting…",
     exportKit: "Export kit",
+    includeArtistIds: "Include artist IDs",
+    artistIdsHint: (artists: { name: string; profiles: unknown[] }[]) =>
+      artists.length === 0
+        ? "No one credited on this song yet (credit people in the song panel)."
+        : `Adds artist-ids.md and an \"Artist profiles\" section to the distributor sheet: ${artists.map((a) => `${a.name} (${a.profiles.length} ID${a.profiles.length === 1 ? "" : "s"})`).join(", ")}. Look up profiles in People to fill them.`,
     exported: (open: number) => `Kit exported${open ? `, with ${open} open item(s) listed in checklist.md` : ""}.`,
     showFolder: "Show folder",
     useSuggestions: (n: number) => `Use all ${n} AI suggestion${plural(n)}`,
@@ -137,6 +143,11 @@ const T = dict(
     exportWhere: "Écrit le kit dans <dossier d'export>/Launch Kits/",
     exporting: "Export…",
     exportKit: "Exporter le kit",
+    includeArtistIds: "Inclure les ID artistes",
+    artistIdsHint: (artists: { name: string; profiles: unknown[] }[]) =>
+      artists.length === 0
+        ? "Personne n'est crédité sur ce son pour l'instant (crédite des personnes dans le panneau du son)."
+        : `Ajoute artist-ids.md et une section « Profils artistes » à la fiche distributeur : ${artists.map((a) => `${a.name} (${a.profiles.length} ID${a.profiles.length > 1 ? "s" : ""})`).join(", ")}. Cherche les profils dans Personnes pour les remplir.`,
     exported: (open: number) => `Kit exporté${open ? `, avec ${open} point${plural(open)} ouvert${plural(open)} dans checklist.md` : ""}.`,
     showFolder: "Ouvrir le dossier",
     useSuggestions: (n: number) => (n === 1 ? "Utiliser la suggestion de l'IA" : `Utiliser les ${n} suggestions de l'IA`),
@@ -242,6 +253,7 @@ export function LaunchKitView() {
   const workspace = useAppStore((s) => s.workspace);
   const settings = useAppStore((s) => s.settings);
   const setKitCaptionLanguage = useAppStore((s) => s.setKitCaptionLanguage);
+  const setKitIncludeArtistIds = useAppStore((s) => s.setKitIncludeArtistIds);
   const demoMode = useAppStore((s) => s.demoMode);
   const setKitEdit = useAppStore((s) => s.setKitEdit);
   const setKitEdits = useAppStore((s) => s.setKitEdits);
@@ -329,7 +341,9 @@ export function LaunchKitView() {
       const dir = await api.exportLaunchKit({
         folderName: title,
         // The files don't follow the app's language (distributor sheet, checklist).
-        files: inEnglish(() => kitFiles(buildKit(kitInput), snippets, kitChecks(project, analysis), lang, masterExt)),
+        files: inEnglish(() =>
+          kitFiles(buildKit(kitInput), snippets, kitChecks(project, analysis), lang, masterExt, meta.launchKit?.includeArtistIds ? kitArtists(meta, kitInput.people) : null),
+        ),
         master: project.renders[0]?.path ?? null,
         masterName: masterBaseName(fields, project.name),
         clips: snippets,
@@ -359,7 +373,16 @@ export function LaunchKitView() {
             }}
           />
           <KitStatus missing={missing} warnings={warnings} accepted={!!accepted} aiVerified={ai.verified} onJump={jumpToNextNeed} />
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-body" title={t.artistIdsHint(kitArtists(meta, kitInput.people))}>
+              <input
+                type="checkbox"
+                checked={!!meta.launchKit?.includeArtistIds}
+                onChange={(e) => setKitIncludeArtistIds(project.path, e.target.checked)}
+                className="accent-orange-500"
+              />
+              {t.includeArtistIds}
+            </label>
             <button
               onClick={() => acceptKit(project.path)}
               disabled={missing > 0 || !!accepted}

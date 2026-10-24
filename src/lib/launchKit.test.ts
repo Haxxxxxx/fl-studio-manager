@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Album, Person, ProjectInfo, SongMeta } from "../types";
-import { artistLine, buildKit, captionLanguageIssue, kitFiles, kitGuide, kitReadme, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
+import { artistLine, buildKit, captionLanguageIssue, kitArtists, kitFiles, kitGuide, kitReadme, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
 
 const today = new Date(2026, 9, 13); // Tue 13 Oct 2026
 const people: Person[] = [
@@ -46,6 +46,27 @@ describe("artists and featuring", () => {
     expect(value(kit, "featuring")).toBe("Ben");
     expect(artistLine("Ana", "Ben")).toBe("Ana feat. Ben");
     expect(masterBaseName(kit, "x")).toBe("Ana feat. Ben - Night Run");
+  });
+
+  it("puts the credited people's profile IDs in the kit only when opted in", () => {
+    const withLinks: Person[] = people.map((p, i) =>
+      i === 0
+        ? { ...p, links: [{ platform: "spotify", label: "Spotify", category: "streaming", url: "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb", id: "4Z8W4fKeB5YxbusRsdQVPb", source: "musicbrainz" }, { platform: "website", label: "Website", category: "other", url: "https://example.com/", id: null, source: "musicbrainz" }] }
+        : p,
+    );
+    const artists = kitArtists(meta, withLinks);
+    expect(artists.length).toBeGreaterThan(1);
+    expect(artists[0].profiles).toEqual([{ label: "Spotify", id: "4Z8W4fKeB5YxbusRsdQVPb", url: "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb" }]);
+    expect(artists.slice(1).every((a) => a.profiles.length === 0)).toBe(true);
+    const off = kitFiles(buildKit(input(meta)), [], []);
+    expect(off.some((f) => f.name === "artist-ids.md")).toBe(false);
+    expect(off.find((f) => f.name === "distributor-sheet.md")!.content).not.toContain("Artist profiles");
+    const on = kitFiles(buildKit(input(meta)), [], [], "en", "wav", artists);
+    const ids = on.find((f) => f.name === "artist-ids.md")!.content;
+    expect(ids).toContain("Spotify: 4Z8W4fKeB5YxbusRsdQVPb");
+    expect(ids).toContain("no profiles looked up yet");
+    expect(on.find((f) => f.name === "distributor-sheet.md")!.content).toContain("## Artist profiles");
+    expect(JSON.parse(on.find((f) => f.name === "metadata.json")!.content).artists[0].profiles[0].id).toBe("4Z8W4fKeB5YxbusRsdQVPb");
   });
 
   it("lists songwriters with roles and splits from the credits", () => {

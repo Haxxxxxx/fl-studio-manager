@@ -109,8 +109,11 @@ pub struct PlatformLink {
 #[serde(rename_all = "camelCase")]
 pub struct SpotifyDetails {
     pub id: String,
-    pub followers: u64,
-    pub popularity: u32,
+    /// None when Spotify doesn't return them (apps in development mode
+    /// created after 2025 get artist objects without followers, popularity
+    /// or genres).
+    pub followers: Option<u64>,
+    pub popularity: Option<u32>,
     pub genres: Vec<String>,
     /// Only an `https://i.scdn.co/…` picture, else None.
     pub image_url: Option<String>,
@@ -470,8 +473,8 @@ pub fn parse_spotify_artist(v: &Value, id: &str) -> SpotifyDetails {
         .map(|u| u.to_string());
     SpotifyDetails {
         id: id.to_string(),
-        followers: v.get("followers").and_then(|f| f.get("total")).and_then(Value::as_u64).unwrap_or(0),
-        popularity: v.get("popularity").and_then(Value::as_u64).unwrap_or(0).min(100) as u32,
+        followers: v.get("followers").and_then(|f| f.get("total")).and_then(Value::as_u64),
+        popularity: v.get("popularity").and_then(Value::as_u64).map(|p| p.min(100) as u32),
         genres: v
             .get("genres")
             .and_then(Value::as_array)
@@ -881,9 +884,11 @@ mod tests {
     fn spotify_artist_parses_and_keeps_only_its_cdn_picture() {
         let v = json!({ "followers": { "total": 1234 }, "popularity": 57, "genres": ["french hip hop", "rap", "", "x"], "images": [ { "url": "https://i.scdn.co/image/abc" } ] });
         let d = parse_spotify_artist(&v, "4Z8W4fKeB5YxbusRsdQVPb");
-        assert_eq!((d.followers, d.popularity, d.genres.len(), d.image_url.as_deref()), (1234, 57, 3, Some("https://i.scdn.co/image/abc")));
-        let v = json!({ "images": [ { "url": "https://evil.example/x.jpg" } ] });
-        assert_eq!(parse_spotify_artist(&v, "id").image_url, None);
+        assert_eq!((d.followers, d.popularity, d.genres.len(), d.image_url.as_deref()), (Some(1234), Some(57), 3, Some("https://i.scdn.co/image/abc")));
+        // What a development-mode app gets: no followers, popularity or genres.
+        let v = json!({ "id": "x", "name": "Someone", "images": [ { "url": "https://evil.example/x.jpg" } ] });
+        let d = parse_spotify_artist(&v, "id");
+        assert_eq!((d.followers, d.popularity, d.genres.len(), d.image_url), (None, None, 0, None));
     }
 
     #[test]

@@ -229,6 +229,9 @@ export interface LaunchKitMeta {
   snippetLengths?: Record<string, number>;
   /** Set by "Accept all"; cleared by any later edit. */
   acceptedAtMs?: number;
+  /** Opt-in: the credited people's platform IDs (Spotify artist ID…) go
+   * into the exported kit (artist-ids.md, distributor sheet, metadata). */
+  includeArtistIds?: boolean;
   ai?: KitAiMeta;
   /** The picked cover concept: small metadata only, never image bytes
    * (the image itself is cover-concept.jpg in the kit folder). */
@@ -358,8 +361,10 @@ export interface PlatformLink {
 
 export interface SpotifyDetails {
   id: string;
-  followers: number;
-  popularity: number;
+  /** null when Spotify doesn't return them (newer apps in development mode
+   * get artist objects without followers, popularity or genres). */
+  followers: number | null;
+  popularity: number | null;
   genres: string[];
   imageUrl: string | null;
 }
