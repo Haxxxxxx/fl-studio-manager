@@ -54,15 +54,17 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<Settings, Str
 /// Same limit as the Settings field's `maxLength` (src/components/SettingsView.tsx).
 const MAX_CONVERTER_CHARS: usize = 300;
 
-/// The converter link, if it's usable: https, with a `{url}` slot, short,
-/// plain text. None for an empty field (cleared, no error).
+/// The converter link, if it's usable: https, short, plain text. A `{url}`
+/// slot is optional: without one the app opens the page and the user pastes
+/// the address (converterLink in src/lib/digger.ts). None for an empty field
+/// (cleared, no error).
 fn converter_template(raw: Option<&str>) -> Result<Option<String>, String> {
     let Some(t) = raw.map(str::trim).filter(|t| !t.is_empty()) else { return Ok(None) };
-    let ok = t.starts_with("https://") && t.contains("{url}") && t.chars().count() <= MAX_CONVERTER_CHARS && !t.chars().any(char::is_control);
+    let ok = t.starts_with("https://") && t.chars().count() <= MAX_CONVERTER_CHARS && !t.chars().any(char::is_control);
     if ok {
         Ok(Some(t.to_string()))
     } else {
-        Err(format!("The converter link must start with https:// and contain {{url}} ({MAX_CONVERTER_CHARS} characters max)."))
+        Err(format!("The converter link must start with https:// ({MAX_CONVERTER_CHARS} characters max)."))
     }
 }
 
@@ -512,7 +514,10 @@ mod tests {
         let good = "https://example.com/convert?u={url}";
         assert_eq!(apply_preferences(&mut saved, Settings { converter_url_template: Some(format!("  {good} ")), ..Settings::default() }), None);
         assert_eq!(saved.converter_url_template.as_deref(), Some(good));
-        for bad in ["http://example.com/{url}", "https://example.com/convert", "javascript:{url}", &format!("https://x.y/{{url}}{}", "a".repeat(300)), "https://x.y/{url}\u{7}?x"] {
+        // A page without a `{url}` slot is fine: the address is pasted there.
+        assert_eq!(apply_preferences(&mut saved, Settings { converter_url_template: Some("https://example.com/convert".into()), ..Settings::default() }), None);
+        assert_eq!(saved.converter_url_template.as_deref(), Some("https://example.com/convert"));
+        for bad in ["http://example.com/{url}", "javascript:{url}", &format!("https://x.y/{{url}}{}", "a".repeat(300)), "https://x.y/{url}\u{7}?x"] {
             saved.converter_url_template = Some(good.into());
             let problem = apply_preferences(&mut saved, Settings { converter_url_template: Some(bad.into()), ..Settings::default() });
             assert!(problem.is_some_and(|p| p.contains("https://")), "{bad}");

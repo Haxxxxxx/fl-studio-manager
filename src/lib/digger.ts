@@ -196,8 +196,15 @@ export function leadFacts(dig: { analysis: { summary: string; traits: string[]; 
  */
 export function converterLink(template: string | undefined, url: string): string | null {
   const t = template?.trim() ?? "";
-  if (!t.startsWith("https://") || !t.includes("{url}")) return null;
-  return t.split("{url}").join(encodeURIComponent(url));
+  if (!t.startsWith("https://")) return null;
+  return t.includes("{url}") ? t.split("{url}").join(encodeURIComponent(url)) : t;
+}
+
+/** A converter link without a `{url}` slot: the page is opened as is and
+ * the video address is copied for the user to paste there. */
+export function converterNeedsPaste(template: string | undefined): boolean {
+  const t = template?.trim() ?? "";
+  return t.startsWith("https://") && !t.includes("{url}");
 }
 
 /** "140 BPM · Am · 3:05" for one analysed beat; "≈" marks an estimated tempo. */
