@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type React from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -35,17 +36,22 @@ import { pathsByShareId } from "../lib/crewSync";
 import { ProgressBar } from "./AlbumsView";
 import { StatusDot, btn, btnPrimary } from "./ui";
 import { Card, HeroStat, SongLines, StatTile } from "../ui";
+import { areaPath, monotonePath } from "../lib/curve";
 import { dict, locale, tr } from "../i18n";
 
 // Charts stay neutral (cream → grey, plus one amber) so blue keeps meaning
 // "stage" and orange "needs you". Storage is part-to-whole over four
 // categories in fixed order, backed by direct labels in the legend.
 const STORAGE_COLORS = ["#f2efe8", "#8d897f", "#5a5850", "#c98500"];
-// Activity heatmap: one hue (the app accent), stepped by opacity over the surface.
-const HEAT = ["#1f1f1c", "rgba(255,90,31,0.32)", "rgba(255,90,31,0.55)", "rgba(255,90,31,0.8)", "#ff5a1f"];
-
+// Activity curve: saves per week over the last year, one neutral series on
+// a hairline grid (charts stay neutral; orange is for "needs you").
 const DAY = 24 * 60 * 60 * 1000;
-const HEATMAP_WEEKS = 53;
+const ACTIVITY_WEEKS = 53;
+/** Drawing space of the curve; the SVG is stretched to the card's width. */
+const CURVE_W = 1000;
+const CURVE_H = 150;
+/** Room above the highest point for its marker. */
+const CURVE_PAD = 6;
 
 const s = (n: number) => (n === 1 ? "" : "s");
 
@@ -68,7 +74,7 @@ const T = dict(
     releases: "Releases",
     pickUp: "Pick up where you left off",
     open: "Open",
-    studioActivity: "Studio activity — saves per day, last 12 months",
+    studioActivity: "Studio activity — saves per week, last 12 months",
     pipeline: "Pipeline",
     nothingTriaged: "Nothing triaged yet — open the Pipeline board and drag songs into stages.",
     willOpen: "Will this computer open your songs?",
@@ -78,7 +84,6 @@ const T = dict(
     done: (done: number, total: number) => `${done}/${total} done`,
     mostBackups: "Most backups — clean up from the song's Versions panel",
     files: (n: number) => `${n} files`,
-    weekdays: ["Mon", "", "Wed", "", "Fri", "", ""].join(","),
     activeDays: "Active days",
     currentStreak: "Current streak",
     streakDays: (n: number) => `${n} day${s(n)}`,
@@ -86,8 +91,8 @@ const T = dict(
     longestStreak: "Longest streak",
     longestDays: (n: number) => `${n} days`,
     busiest: (date: string, n: number) => `Busiest: ${date} · ${n} saves`,
-    less: "Less",
-    more: "More",
+    week: (from: string, to: string) => `${from} – ${to}`,
+    perWeekMax: (n: number) => `max ${n}`,
     saves: (n: number) => `${n} save${s(n)}`,
     unknown: "Unknown",
     followUp: (days: number) => `Follow up — no answer after ${days} days`,
@@ -147,7 +152,7 @@ const T = dict(
     releases: "Sorties",
     pickUp: "Reprends là où tu t'es arrêté",
     open: "Ouvrir",
-    studioActivity: "Activité studio — sauvegardes par jour, 12 derniers mois",
+    studioActivity: "Activité studio — sauvegardes par semaine, 12 derniers mois",
     pipeline: "Pipeline",
     nothingTriaged: "Rien de classé pour l'instant — ouvre le tableau Pipeline et glisse tes sons dans les étapes.",
     willOpen: "Cet ordi va-t-il ouvrir tes sons ?",
@@ -157,7 +162,6 @@ const T = dict(
     done: (done: number, total: number) => `${done}/${total} fini${done > 1 ? "s" : ""}`,
     mostBackups: "Le plus de sauvegardes — fais le ménage depuis le panneau Versions du son",
     files: (n: number) => `${n} fichiers`,
-    weekdays: ["Lun", "", "Mer", "", "Ven", "", ""].join(","),
     activeDays: "Jours actifs",
     currentStreak: "Série en cours",
     streakDays: (n: number) => `${n} jour${s(n)}`,
@@ -165,8 +169,8 @@ const T = dict(
     longestStreak: "Plus longue série",
     longestDays: (n: number) => `${n} jours`,
     busiest: (date: string, n: number) => `Record : ${date} · ${n} sauvegardes`,
-    less: "Moins",
-    more: "Plus",
+    week: (from: string, to: string) => `${from} – ${to}`,
+    perWeekMax: (n: number) => `max ${n}`,
     saves: (n: number) => `${n} sauvegarde${s(n)}`,
     unknown: "Inconnu",
     followUp: (days: number) => `À relancer — pas de réponse après ${days} jours`,
@@ -347,7 +351,7 @@ function MyDashboard() {
         <CrewCards songs={songs} />
 
         <Card title={t.studioActivity}>
-          <ActivityHeatmap />
+          <ActivityCurve />
         </Card>
 
         <div className="grid grid-cols-2 gap-4">
@@ -473,21 +477,21 @@ function MyDashboard() {
 
 /** GitHub-style calendar: every save (current file + each backup) is a
  * real work session, so this shows when you actually made music. */
-function ActivityHeatmap() {
+function ActivityCurve() {
   const songs = useVisibleSongs();
   const openDetail = useAppStore((s) => s.openDetail);
-  const [hover, setHover] = useState<{ day: number; x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
   const t = tr(T);
 
   const lastSave = useMemo(() => Math.max(0, ...songs.map((p) => p.modifiedAtMs)), [songs]);
-  const { days, max, activeDays, streak, longest, busiest, months } = useMemo(() => {
+  const { weeks, max, activeDays, streak, longest, busiest, months } = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    // Grid starts on the Monday HEATMAP_WEEKS weeks back.
+    // The series starts on the Monday ACTIVITY_WEEKS weeks back.
     const start = new Date(today);
-    start.setDate(today.getDate() - ((today.getDay() + 6) % 7) - (HEATMAP_WEEKS - 1) * 7);
+    start.setDate(today.getDate() - ((today.getDay() + 6) % 7) - (ACTIVITY_WEEKS - 1) * 7);
     // Calendar days, not 24h steps: a DST change makes one day 23 or 25h
-    // long, which would shift every later cell's date (or drop today).
+    // long, which would shift every later day's date (or drop today).
     const dayIndex = (d: Date) =>
       Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) -
         Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / DAY);
@@ -516,14 +520,25 @@ function ActivityHeatmap() {
       longest = Math.max(longest, run);
     }
     const busiest = days.reduce((a, b) => (b.saves > a.saves ? b : a), days[0]);
-    // Month label over the first column containing the 1st of that month.
-    const months: (string | null)[] = Array.from({ length: Math.ceil(total / 7) }, (_, w) => {
+    // One point per week (Monday to Sunday, the last one ending today).
+    const weeks = Array.from({ length: Math.ceil(total / 7) }, (_, w) => {
+      const slice = days.slice(w * 7, w * 7 + 7);
+      const names = new Set<string>();
+      let saves = 0;
+      for (const d of slice) {
+        saves += d.saves;
+        for (const n of d.songs) names.add(n);
+      }
+      return { start: slice[0].date, end: slice[slice.length - 1].date, saves, songs: names };
+    });
+    // Month label under the first week containing the 1st of that month.
+    const months: (string | null)[] = weeks.map((_, w) => {
       const firstOfMonth = days.slice(w * 7, w * 7 + 7).find((d) => d.date.getDate() === 1);
       return firstOfMonth ? firstOfMonth.date.toLocaleDateString(locale(), { month: "short" }) : null;
     });
     return {
-      days,
-      max: Math.max(1, ...days.map((d) => d.saves)),
+      weeks,
+      max: Math.max(1, ...weeks.map((w) => w.saves)),
       activeDays: days.filter((d) => d.saves > 0).length,
       streak,
       longest,
@@ -532,83 +547,93 @@ function ActivityHeatmap() {
     };
   }, [songs]);
 
-  const level = (n: number) => (n === 0 ? 0 : Math.min(4, 1 + Math.floor(((n - 1) / max) * 4)));
-  const weeks = Math.ceil(days.length / 7);
-  const hovered = hover ? days[hover.day] : null;
+  const xAt = (i: number) => (weeks.length > 1 ? i / (weeks.length - 1) : 0);
+  const points = weeks.map((w, i) => ({ x: xAt(i) * CURVE_W, y: CURVE_PAD + (1 - w.saves / max) * (CURVE_H - CURVE_PAD) }));
+  const line = monotonePath(points);
+  const area = areaPath(points, line, CURVE_H);
+  const hovered = hover === null ? null : weeks[hover];
+  const gridY = [CURVE_H, CURVE_PAD + (CURVE_H - CURVE_PAD) / 2, CURVE_PAD];
+
+  // The crosshair snaps to the nearest week for the pointer's x.
+  const track = (e: React.PointerEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const ratio = r.width ? (e.clientX - r.left) / r.width : 0;
+    setHover(Math.max(0, Math.min(weeks.length - 1, Math.round(ratio * (weeks.length - 1)))));
+  };
+  const openFirstSong = () => {
+    const name = hovered ? [...hovered.songs][0] : undefined;
+    const p = name ? songs.find((s) => s.name === name) : undefined;
+    if (p) openDetail(p.path);
+  };
+  const dateShort = (d: Date) => d.toLocaleDateString(locale(), { month: "short", day: "numeric" });
 
   return (
-    <div className="relative">
-      <div className="flex gap-4">
-        <div className="flex gap-[2px] overflow-x-auto pb-1">
-          <div className="mr-1 flex flex-col gap-[2px] pt-[15px] text-[9px] leading-[11px] text-engrave">
-            {t.weekdays.split(",").map((d, i) => (
-              <span key={i} className="h-[11px]">{d}</span>
+    <div className="flex gap-4">
+      <div className="relative min-w-0 flex-1">
+        <div className="relative" style={{ height: CURVE_H }}>
+          {/* Stretched viewBox so the curve fills the card; strokes keep their
+              width through vector-effect, and the marker is HTML so it stays round. */}
+          <svg
+            viewBox={`0 0 ${CURVE_W} ${CURVE_H}`}
+            preserveAspectRatio="none"
+            role="img"
+            aria-label={t.studioActivity}
+            onPointerMove={track}
+            onPointerLeave={() => setHover(null)}
+            onClick={openFirstSong}
+            className={`absolute inset-0 h-full w-full overflow-visible ${hovered?.songs.size ? "cursor-pointer" : ""}`}
+          >
+            {gridY.map((y) => (
+              <line key={y} x1={0} x2={CURVE_W} y1={y} y2={y} stroke="var(--color-rule)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
             ))}
-          </div>
-          {Array.from({ length: weeks }, (_, w) => (
-            <div key={w} className="flex flex-col gap-[2px]">
-              <span className="h-[13px] w-[11px] overflow-visible whitespace-nowrap text-[9px] leading-[11px] text-engrave">
-                {months[w]}
+            <path d={area} fill="var(--color-cream)" fillOpacity={0.08} />
+            <path d={line} fill="none" stroke="var(--color-cream)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            {hover !== null && (
+              <line x1={points[hover].x} x2={points[hover].x} y1={CURVE_PAD} y2={CURVE_H} stroke="var(--color-rule-strong)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            )}
+          </svg>
+          {hover !== null && (
+            <span
+              className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cream ring-2 ring-panel"
+              style={{ left: `${xAt(hover) * 100}%`, top: `${(points[hover].y / CURVE_H) * 100}%` }}
+            />
+          )}
+          <span className="pointer-events-none absolute right-0 top-0 -translate-y-1/2 bg-panel pl-1 text-[9px] text-engrave">{t.perWeekMax(max)}</span>
+        </div>
+        <div className="relative mt-1 h-[13px] text-[9px] text-engrave">
+          {months.map((m, w) =>
+            m ? (
+              <span key={w} className="absolute whitespace-nowrap" style={{ left: `${xAt(w) * 100}%` }}>
+                {m}
               </span>
-              {days.slice(w * 7, w * 7 + 7).map((d, i) => (
-                <div
-                  key={d.date.getTime()}
-                  onMouseEnter={(e) => {
-                    const r = e.currentTarget.getBoundingClientRect();
-                    const parent = e.currentTarget.closest(".relative")!.getBoundingClientRect();
-                    setHover({ day: w * 7 + i, x: r.left - parent.left + r.width / 2, y: r.top - parent.top });
-                  }}
-                  onMouseLeave={() => setHover(null)}
-                  onClick={() => {
-                    const name = [...d.songs][0];
-                    const p = songs.find((s) => s.name === name);
-                    if (p) openDetail(p.path);
-                  }}
-                  className={`h-[11px] w-[11px] rounded-[2px] ${d.saves ? "cursor-pointer" : ""} ${hover?.day === w * 7 + i ? "ring-1 ring-cream" : ""}`}
-                  style={{ background: HEAT[level(d.saves)] }}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="flex shrink-0 flex-col justify-center gap-2 text-xs">
-          <HeroStat label={t.activeDays} value={activeDays} />
-          {streak > 0 ? (
-            <HeroStat label={t.currentStreak} value={t.streakDays(streak)} />
-          ) : (
-            lastSave > 0 && <HeroStat label={t.lastSession} value={formatRelative(lastSave)} />
-          )}
-          {longest > 1 && <HeroStat label={t.longestStreak} value={t.longestDays(longest)} />}
-          {busiest.saves > 0 && (
-            <div className="text-[11px] text-engrave">
-              {t.busiest(busiest.date.toLocaleDateString(locale(), { month: "short", day: "numeric" }), busiest.saves)}
-            </div>
+            ) : null,
           )}
         </div>
-      </div>
-      <div className="mt-2 flex items-center gap-1 text-[10px] text-engrave">
-        {t.less}
-        {HEAT.map((c) => (
-          <span key={c} className="h-[10px] w-[10px] rounded-[2px]" style={{ background: c }} />
-        ))}
-        {t.more}
-      </div>
-      {hover && hovered && (
-        <div
-          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-rule bg-chassis px-2.5 py-1.5 text-[11px] shadow-xl"
-          style={{ left: hover.x, top: hover.y - 6 }}
-        >
-          <div className="text-engrave">
-            {hovered.date.toLocaleDateString(locale(), { weekday: "short", month: "short", day: "numeric" })}
+        {hover !== null && hovered && (
+          <div
+            className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-rule bg-chassis px-2.5 py-1.5 text-[11px] shadow-xl"
+            style={{ left: `${Math.min(92, Math.max(8, xAt(hover) * 100))}%`, top: points[hover].y - 10 }}
+          >
+            <div className="text-engrave">{t.week(dateShort(hovered.start), dateShort(hovered.end))}</div>
+            <div className="font-medium text-cream">{t.saves(hovered.saves)}</div>
+            {hovered.songs.size > 0 && <div className="max-w-[200px] truncate text-body">{[...hovered.songs].join(", ")}</div>}
           </div>
-          <div className="font-medium text-cream">
-            {t.saves(hovered.saves)}
+        )}
+      </div>
+      <div className="flex shrink-0 flex-col justify-center gap-2 text-xs">
+        <HeroStat label={t.activeDays} value={activeDays} />
+        {streak > 0 ? (
+          <HeroStat label={t.currentStreak} value={t.streakDays(streak)} />
+        ) : (
+          lastSave > 0 && <HeroStat label={t.lastSession} value={formatRelative(lastSave)} />
+        )}
+        {longest > 1 && <HeroStat label={t.longestStreak} value={t.longestDays(longest)} />}
+        {busiest.saves > 0 && (
+          <div className="text-[11px] text-engrave">
+            {t.busiest(busiest.date.toLocaleDateString(locale(), { month: "short", day: "numeric" }), busiest.saves)}
           </div>
-          {hovered.songs.size > 0 && (
-            <div className="max-w-[200px] truncate text-body">{[...hovered.songs].join(", ")}</div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
