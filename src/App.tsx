@@ -20,6 +20,7 @@ import { NewProjectModal } from "./components/NewProjectModal";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { supabase } from "./lib/supabase";
 import { isReadOnlyInstallError } from "./lib/updaterErrors";
+import { scrubPaths } from "./lib/feedback";
 import { appLocation } from "./lib/tauri";
 import { UPDATES_ENABLED } from "./lib/updater";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
@@ -134,8 +135,6 @@ function UpdateNotice() {
 }
 
 
-/** Stays up while the workspace can't be read or saved (the red banner
- * above is one-off and dismissable; this one isn't). */
 /** The fix Terminal command for a quarantined copy (what the strip copies). */
 const FIX_COMMAND = "xattr -cr /Applications/Hivo.app";
 
@@ -178,6 +177,8 @@ function LocationNotice() {
   );
 }
 
+/** Stays up while the workspace can't be read or saved (the red banner
+ * above is one-off and dismissable; this one isn't). */
 function NotSavingStrip() {
   const writable = useAppStore((s) => s.workspaceWritable);
   const saveError = useAppStore((s) => s.saveError);
@@ -319,7 +320,7 @@ export default function App() {
           {/* The in-app form, with this error as the message (only when this build has a backend). */}
           {supabase && (
             <button
-              onClick={() => openFeedback({ category: "bug", message: saveError ?? startupError ?? "" })}
+              onClick={() => openFeedback({ category: "bug", message: scrubPaths(saveError ?? startupError ?? "") })}
               className="shrink-0 whitespace-nowrap text-red-200/70 underline hover:text-red-100"
             >
               {tr(T).reportThis}

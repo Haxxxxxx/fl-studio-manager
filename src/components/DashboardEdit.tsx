@@ -229,7 +229,6 @@ export function BlockFrame({
   onHide: () => void;
   children: ReactNode;
 }) {
-  const strip = useRef<HTMLDivElement>(null);
   const t = tr(T_LAYOUT);
   const title = t.blockTitle(id);
 
@@ -238,19 +237,22 @@ export function BlockFrame({
   const over = drag.spot?.id === id ? drag.spot : null;
   return (
     <section
-      draggable
       aria-label={title}
-      // Only the strip starts a drag: the content keeps its own gestures
-      // (the attention carousel scrolls by dragging).
-      onDragStart={(e) => (strip.current?.contains(e.target as Node) ? drag.start(e, id) : e.preventDefault())}
       onDragOver={(e) => drag.over(e, id)}
       onDragLeave={drag.leave}
       onDrop={drag.drop}
-      onDragEnd={drag.end}
       className={`relative flex min-w-0 flex-col gap-1 rounded border border-dashed border-rule-strong p-1 ${SIZE_CLASS[size]}`}
     >
       {over && <div className={`absolute inset-x-1 h-0.5 rounded-full bg-hot ${over.before ? "-top-[3px]" : "-bottom-[3px]"}`} aria-hidden />}
-      <div ref={strip} title={t.dragToReorder} className="flex cursor-grab items-center gap-1 rounded bg-raised px-1.5 py-1 active:cursor-grabbing">
+      {/* Only the strip is draggable: the content keeps its own gestures
+          (the attention carousel scrolls by dragging). */}
+      <div
+        draggable
+        onDragStart={(e) => drag.start(e, id)}
+        onDragEnd={drag.end}
+        title={t.dragToReorder}
+        className="flex cursor-grab items-center gap-1 rounded bg-raised px-1.5 py-1 active:cursor-grabbing"
+      >
         <GripVertical size={13} className="shrink-0 text-engrave" aria-hidden />
         <span className={`min-w-0 flex-1 truncate ${engrave}`}>{title}</span>
         <button onClick={() => onSize(nextSize(size))} title={t.width} aria-label={`${t.width}: ${t.sizeName(size)}`} className={`${stripButton} px-1.5 font-mono text-[10px] uppercase tracking-[0.08em]`}>
