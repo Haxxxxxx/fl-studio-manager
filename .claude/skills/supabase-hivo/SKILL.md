@@ -22,6 +22,17 @@ specific here.
 - `supabase/config.toml`: local stack; auth OTP length 6, expiry 10 min, email
   template carries `{{ .Token }}` (code only; clients use `detectSessionInUrl: false`).
 
+## Where this overrides the generic `supabase` skill
+- **Every schema change is a migration file plus a pgTAP test.** Never run SQL
+  directly on the hosted project (`supabase db query`, MCP `execute_sql`, the
+  dashboard editor), even for "a quick fix": it leaves the migration history
+  and local stack out of sync.
+- Migration files are hand-named `<YYYYMMDD>000000_<topic>.sql` (one per day
+  and topic), not `supabase migration new` timestamps, so the order reads.
+- The apps ship the legacy anon key on purpose (pinned in the CSPs and
+  `web/vercel.json`); switching to a publishable key is a deliberate change
+  of all three places plus `.env.local`, not a drive-by.
+
 ## Rules that every migration follows
 - RLS on every table; `revoke … from public, anon`; grants to `authenticated` only
   for what the client needs; writes go through `security definer` functions with
