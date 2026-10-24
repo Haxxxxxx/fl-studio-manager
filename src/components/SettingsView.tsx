@@ -367,6 +367,8 @@ export function SettingsView() {
 
         <YoutubeSettings />
 
+        <DiggerSettings />
+
         <section id="fl">
           <h2 className="text-sm font-semibold text-cream">{t.flExe}</h2>
           <p className="mt-1 text-xs text-engrave">{t.flExeHint}</p>
@@ -796,6 +798,98 @@ function YoutubeSettings() {
       </div>
       {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
       <p className="mt-2 text-[11px] leading-relaxed text-engrave">{t.privacy}</p>
+    </section>
+  );
+}
+
+const T_DIGGER = dict(
+  {
+    title: "Digger",
+    converter: "Converter link (opens in your browser)",
+    placeholder: "https://example.com/convert?u={url}",
+    save: "Save",
+    remove: "Remove",
+    saved: "Link saved. Each YouTube result in the Digger gets a Convert button.",
+    removed: "Link removed.",
+    disclosure:
+      "Hivo opens this link with the video address and nothing else. The site, its terms and what you do with the file are between you and it; Hivo never downloads audio.",
+  },
+  {
+    title: "Digger",
+    converter: "Lien de conversion (s'ouvre dans ton navigateur)",
+    placeholder: "https://example.com/convert?u={url}",
+    save: "Enregistrer",
+    remove: "Retirer",
+    saved: "Lien enregistré. Chaque résultat YouTube du Digger a un bouton Convertir.",
+    removed: "Lien retiré.",
+    disclosure:
+      "Hivo ouvre ce lien avec l'adresse de la vidéo et rien d'autre. Le site, ses conditions et ce que tu fais du fichier, c'est entre toi et lui ; Hivo ne télécharge jamais d'audio.",
+  },
+);
+
+/** Same limit as `MAX_CONVERTER_CHARS` in src-tauri/src/settings.rs. */
+const MAX_CONVERTER_CHARS = 300;
+
+/** The Digger's converter link: a user-provided https url with `{url}`
+ * where the video address goes. Checked in Rust (cleared when unusable). */
+function DiggerSettings() {
+  const saved = useAppStore((s) => s.settings.converterUrlTemplate ?? "");
+  const updateSettings = useAppStore((s) => s.updateSettings);
+  const [value, setValue] = useState(saved);
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const t = tr(T_DIGGER);
+
+  useEffect(() => {
+    setValue(saved);
+  }, [saved]);
+
+  async function save(next: string | null) {
+    setMessage(null);
+    try {
+      await updateSettings({ converterUrlTemplate: next?.trim() || undefined });
+      setMessage({ kind: "ok", text: next?.trim() ? t.saved : t.removed });
+    } catch (e) {
+      // Rust cleared it: keep the store in step, then say why.
+      await updateSettings({ converterUrlTemplate: undefined }).catch(() => {});
+      setMessage({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  return (
+    <section id="digger">
+      <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
+      <label className="mt-3 block text-xs text-body" htmlFor="converter-link">
+        {t.converter}
+      </label>
+      <form
+        className="mt-1 flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save(value);
+        }}
+      >
+        <input
+          id="converter-link"
+          type="url"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={t.placeholder}
+          maxLength={MAX_CONVERTER_CHARS}
+          autoComplete="off"
+          spellCheck={false}
+          className={field}
+        />
+        <button type="submit" disabled={value.trim() === saved} className="rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-chassis hover:bg-orange-400 disabled:opacity-40">
+          {t.save}
+        </button>
+        {saved && (
+          <button type="button" onClick={() => void save(null)} className="rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised">
+            {t.remove}
+          </button>
+        )}
+      </form>
+      {message && <div className={`mt-2 text-xs ${message.kind === "ok" ? "text-emerald-300" : "text-red-300"}`}>{message.text}</div>}
+      <p className="mt-2 text-[11px] leading-relaxed text-engrave">{t.disclosure}</p>
     </section>
   );
 }

@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import * as api from "../lib/tauri";
-import { deeperExclude, foundTitles, likedTitles, searchesDone, toggleLiked, type Liked } from "../lib/digger";
+import { deeperExclude, foundTitles, leadHash, likedTitles, searchesDone, toggleLiked, type Liked } from "../lib/digger";
 import { useAppStore } from "./useAppStore";
-import type { BeatFile, DigResult, WebLink, YoutubeVideo } from "../types";
+import type { BeatFile, DigResult, Lead, WebLink, YoutubeVideo } from "../types";
 
 // The Digger: raw beats from the beats folders, up to 5 picked to dig for
 // similar ones (docs/GUARDRAILS.md: a deliberate addition for the Creation
@@ -79,7 +79,16 @@ interface DiggerState {
   /** A dig or round finished while another view was open (Sidebar LED). */
   unseen: boolean;
   clearUnseen: () => void;
+  /** Leads saved in the beats folders' `_leads`: url hash (`leadHash`) → file path. */
+  savedLeads: Map<string, string>;
+  loadLeads: () => Promise<void>;
+  /** Writes the lead as a text file (Rust: leads.rs); its hash turns "Saved". */
+  saveLead: (lead: Lead) => Promise<void>;
+  leadError: string | null;
 }
+
+/** A stable empty map: a fresh one in a selector re-renders forever. */
+const NO_LEADS: Map<string, string> = new Map();
 
 /** A dig finished: flag it unless the Digger is on screen. */
 function markUnseen(set: (s: Partial<DiggerState>) => void) {
@@ -202,6 +211,26 @@ export const useDigger = create<DiggerState>((set, get) => ({
   },
   unseen: false,
   clearUnseen: () => set({ unseen: false }),
+  savedLeads: NO_LEADS,
+  loadLeads: async () => {
+    try {
+      const saved = await api.listLeads();
+      set({ savedLeads: new Map(saved.map((l) => [l.hash, l.path])) });
+    } catch {
+      // No beats folder or nothing readable: nothing is saved, nothing to show.
+      set({ savedLeads: NO_LEADS });
+    }
+  },
+  saveLead: async (lead) => {
+    set({ leadError: null });
+    try {
+      const path = await api.saveLead(lead);
+      set({ savedLeads: new Map(get().savedLeads).set(leadHash(lead.url), path) });
+    } catch (e) {
+      set({ leadError: e instanceof Error ? e.message : String(e) });
+    }
+  },
+  leadError: null,
 }));
 
 /** Whether the picks changed since the last dig. */

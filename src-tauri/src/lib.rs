@@ -7,6 +7,7 @@ mod digger;
 mod cover;
 mod files;
 mod key;
+mod leads;
 mod location;
 mod flp_metadata;
 mod models;
@@ -45,6 +46,8 @@ pub fn run() {
             beats::scan_beats,
             digger::dig_beats,
             digger::dig_deeper,
+            leads::save_lead,
+            leads::list_leads,
             settings::pick_fl_studio,
             settings::use_detected_fl_studio,
             settings::pick_ffmpeg,

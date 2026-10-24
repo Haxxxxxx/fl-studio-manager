@@ -20,6 +20,8 @@ import type {
   YoutubeVideo,
   DigResult,
   DigDeeperResult,
+  Lead,
+  SavedLead,
 } from "../types";
 
 /** Scans the linked folders and export folder saved in Settings (Rust reads them). */
@@ -71,6 +73,11 @@ export const digDeeper = (
   language: "fr" | "en",
 ): Promise<DigDeeperResult> =>
   invoke("dig_deeper", { request: { analysis: { summary, traits, tempo, queries }, exclude, foundTitles, searchesDone, likedTitles, language } });
+/** Writes `<first beats folder>/_leads/<slug>-<hash>.md` (text only, never
+ * audio); returns the file's path. Saving the same url again overwrites it. */
+export const saveLead = (lead: Lead): Promise<string> => invoke("save_lead", { lead });
+/** The leads saved in the beats folders' `_leads` (url hash + path). */
+export const listLeads = (): Promise<SavedLead[]> => invoke("list_leads");
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
 export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
 export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");
