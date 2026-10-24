@@ -31,6 +31,8 @@ import type {
   Workspace,
 } from "../types";
 
+import type { FeedbackDraft } from "../lib/feedback";
+
 const DEFAULT_SETTINGS: Settings = {
   watchedFolders: [],
   flStudioPath: null,
@@ -143,6 +145,8 @@ interface AppState {
   /** Song shown in the Launch Kit view. */
   launchPath: string | null;
   newProject: NewProjectDraft | null;
+  /** What the feedback form opens on ("Report this" on an error prefills it). */
+  feedback: FeedbackDraft | null;
   update: UpdateState;
   /** `quiet`: the startup check; being offline is normal then, so a failure
    * is logged, not shown. */
@@ -228,6 +232,8 @@ interface AppState {
   refreshCoverStatus: () => Promise<void>;
   openNewProject: (draft?: Partial<NewProjectDraft>) => void;
   closeNewProject: () => void;
+  openFeedback: (draft?: Partial<FeedbackDraft>) => void;
+  closeFeedback: () => void;
 
   // Song metadata
   updateSong: (path: string, patch: Partial<SongMeta>) => void;
@@ -442,6 +448,7 @@ export const useAppStore = create<AppState>((set, get) => {
     openPersonId: null,
     launchPath: null,
     newProject: null,
+    feedback: null,
     update: { status: "idle" },
 
     checkUpdate: async ({ quiet = false } = {}) => {
@@ -859,6 +866,8 @@ export const useAppStore = create<AppState>((set, get) => {
     openNewProject: (draft) =>
       set({ newProject: { albumId: null, status: "creation", ...draft } }),
     closeNewProject: () => set({ newProject: null }),
+    openFeedback: (draft) => set({ feedback: { category: "idea", message: "", ...draft } }),
+    closeFeedback: () => set({ feedback: null }),
 
     updateSong: (path, patch) =>
       mutateWorkspace((ws) => {

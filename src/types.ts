@@ -111,6 +111,8 @@ export interface Settings {
   digSendAudio?: boolean;
   /** ffmpeg for shorts; null = found automatically. */
   ffmpegPath: string | null;
+  /** A uuid made once on this install: the feedback form's rate-limit key (nothing else). */
+  installId?: string;
 }
 
 export type RenderFormat = "wav" | "mp3" | "ogg";
