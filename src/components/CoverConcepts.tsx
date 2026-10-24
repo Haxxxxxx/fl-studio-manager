@@ -121,7 +121,7 @@ export function CoverConcepts({ path, title, artists, brief }: { path: string; t
       <div className="mt-4 flex items-center gap-3 rounded-lg border border-rule bg-panel p-3 text-sm">
         <ImageIcon size={16} className="shrink-0 text-orange-300" />
         <span className="flex-1 text-xs text-body">{t.setUpHint(PER_DAY)}</span>
-        <button onClick={() => setView("settings")} className={btn}>
+        <button onClick={() => setView("settings", "cover")} className={btn}>
           {t.setUp}
         </button>
       </div>
