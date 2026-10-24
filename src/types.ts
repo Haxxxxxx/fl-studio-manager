@@ -336,6 +336,61 @@ export interface Person {
   aliases: string[];
   contact: string;
   notes: string;
+  /** Looked-up profiles (People → Look up profiles). Local only: never
+   * shared with the crew. */
+  mbid?: string | null;
+  links?: PlatformLink[];
+  spotify?: SpotifyDetails | null;
+  /** ISO date of the last lookup. */
+  lookedUpAt?: string;
+}
+
+/** A profile on one platform (Rust: lookup.rs): the link, rebuilt from the
+ * id for known platforms, and the id distributors ask for. */
+export interface PlatformLink {
+  platform: string;
+  label: string;
+  category: "streaming" | "social" | "other";
+  url: string;
+  id: string | null;
+  source: "musicbrainz" | "deezer" | "itunes";
+}
+
+export interface SpotifyDetails {
+  id: string;
+  followers: number;
+  popularity: number;
+  genres: string[];
+  imageUrl: string | null;
+}
+
+export type LookupSource = "musicbrainz" | "spotify";
+
+/** One artist to pick from (MusicBrainz, or Spotify with credentials). */
+export interface LookupCandidate {
+  source: LookupSource;
+  id: string;
+  name: string;
+  disambiguation: string;
+  country: string;
+  kind: string;
+  score: number;
+  followers: number | null;
+}
+
+export interface LookupProfile {
+  source: LookupSource;
+  mbid: string | null;
+  name: string;
+  links: PlatformLink[];
+  spotify: SpotifyDetails | null;
+  /** "no credentials", or Spotify's error, when a Spotify link exists but no details. */
+  spotifyNote: string | null;
+}
+
+export interface SpotifyStatus {
+  configured: boolean;
+  source: string | null;
 }
 
 export interface Credit {

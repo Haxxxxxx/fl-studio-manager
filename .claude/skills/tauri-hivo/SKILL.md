@@ -24,8 +24,10 @@ Use the generic `tauri-v2` skill for the framework; this is what's decided here.
   must say the same thing apart from the dev server/local Supabase hosts and
   `'unsafe-inline'` in `devCsp`'s `script-src` (the Vite dev server needs it;
   the hosts are otherwise identical). Every
-  host is pinned (the Supabase project ref, `i.ytimg.com`, `www.hi-vo.fr` in
-  `frame-src`); never `'unsafe-eval'`, never a wildcard. Fonts are
+  host is pinned (the Supabase project ref, `i.ytimg.com` and `i.scdn.co` in
+  `img-src`, `www.hi-vo.fr` in `frame-src`); never `'unsafe-eval'`, never a
+  wildcard. Lookups (MusicBrainz, Deezer, iTunes, Spotify) run in Rust
+  (`lookup.rs`), so no lookup host is in `connect-src`. Fonts are
   bundled (`@fontsource`), so no Google Fonts host anywhere.
 - The Digger's player frames `https://www.hi-vo.fr/embed.html?v=<id>`
   (`web/public/embed.html`, `EMBED_PAGE` in `src/lib/digger.ts`), not YouTube:

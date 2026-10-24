@@ -22,6 +22,10 @@ import type {
   DigDeeperResult,
   Lead,
   SavedLead,
+  LookupCandidate,
+  LookupProfile,
+  LookupSource,
+  SpotifyStatus,
 } from "../types";
 
 /** Scans the linked folders and export folder saved in Settings (Rust reads them). */
@@ -83,6 +87,13 @@ export const saveLead = (lead: Lead): Promise<string> => invoke("save_lead", { l
 export const listLeads = (): Promise<SavedLead[]> => invoke("list_leads");
 /** Deletes one lead file (must be inside a beats folder's `_leads`). */
 export const deleteLead = (path: string): Promise<void> => invoke("delete_lead", { path });
+
+/** Artist profile lookup (Rust: lookup.rs): MusicBrainz, Deezer, iTunes, and Spotify with credentials. */
+export const lookupArtists = (query: string): Promise<LookupCandidate[]> => invoke("lookup_artists", { query });
+export const lookupProfile = (source: LookupSource, id: string): Promise<LookupProfile> => invoke("lookup_profile", { source, id });
+export const spotifyStatus = (): Promise<SpotifyStatus> => invoke("spotify_status");
+export const setSpotifyCredentials = (clientId: string | null, clientSecret: string | null): Promise<void> =>
+  invoke("set_spotify_credentials", { clientId, clientSecret });
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
 export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
 export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");
