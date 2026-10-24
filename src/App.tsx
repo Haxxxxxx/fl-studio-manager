@@ -17,9 +17,9 @@ import { RenderPanel } from "./components/RenderPanel";
 import { PackageConfirm, PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
-import { StatusDot } from "./components/ui";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
 import { useCrewStore, useInCrew } from "./store/useCrewStore";
+import { StatusDot, btnPrimary, btnQuiet } from "./ui";
 
 const fileName = (p: string) => p.split(/[/\\]/).pop() ?? p;
 
@@ -33,8 +33,14 @@ const T = dict(
     browserBefore: "This is the app's UI in a browser tab, so nothing can load or save here (no folders, settings or AI key). Run",
     browserAfter: "and use the Hivo window that opens.",
     dismiss: "Dismiss",
-    notSaving: "Changes aren't being saved",
+    updateReady: (v: string) => `Hivo ${v} is ready`,
+    updateDownloading: (v: string, pct: number | null) => `Downloading Hivo ${v}${pct === null ? "…" : ` · ${pct}%`}`,
+    updateRestarting: (v: string) => `Hivo ${v} is installed, restarting…`,
+    updateFailed: (v: string, error: string) => `Couldn't update to Hivo ${v}: ${error}`,
+    updateNow: "Update and restart",
     retry: "Retry",
+    later: "Later",
+    notSaving: "Changes aren't being saved",
   },
   {
     kept: (n: number) =>
@@ -47,10 +53,67 @@ const T = dict(
       "C'est l'interface de l'app dans un onglet de navigateur, donc rien ne peut se charger ni s'enregistrer ici (pas de dossiers, de réglages ni de clé IA). Lance",
     browserAfter: "et utilise la fenêtre Hivo qui s'ouvre.",
     dismiss: "Fermer",
-    notSaving: "Les modifications ne sont pas enregistrées",
+    updateReady: (v: string) => `Hivo ${v} est prêt`,
+    updateDownloading: (v: string, pct: number | null) => `Téléchargement de Hivo ${v}${pct === null ? "…" : ` · ${pct} %`}`,
+    updateRestarting: (v: string) => `Hivo ${v} est installé, redémarrage…`,
+    updateFailed: (v: string, error: string) => `Impossible de passer à Hivo ${v} : ${error}`,
+    updateNow: "Mettre à jour et redémarrer",
     retry: "Réessayer",
+    later: "Plus tard",
+    notSaving: "Les modifications ne sont pas enregistrées",
   },
 );
+
+/** A newer Hivo is ready: one strip above the view, one orange action. Only
+ * shown once a version is known (check failures stay in Settings). */
+function UpdateNotice() {
+  const update = useAppStore((s) => s.update);
+  const install = useAppStore((s) => s.installUpdate);
+  const check = useAppStore((s) => s.checkUpdate);
+  const dismiss = useAppStore((s) => s.dismissUpdate);
+  const { status, version } = update;
+  if (!version || status === "idle" || status === "checking") return null;
+  const pct = update.progress === undefined ? null : Math.round(update.progress * 100);
+  const led = status === "error" ? "var(--color-missing)" : status === "available" ? "var(--color-hot)" : "var(--color-ok)";
+  const text =
+    status === "available"
+      ? tr(T).updateReady(version)
+      : status === "downloading"
+        ? tr(T).updateDownloading(version, pct)
+        : status === "ready"
+          ? tr(T).updateRestarting(version)
+          : tr(T).updateFailed(version, update.error ?? "");
+  return (
+    <div role="status" className="flex shrink-0 items-center gap-3 border-b border-rule bg-panel px-5 py-2 text-xs">
+      <StatusDot color={led} size={7} />
+      <span className={`min-w-0 flex-1 truncate ${status === "error" ? "text-missing" : "text-cream"}`} title={text}>
+        {text}
+      </span>
+      {status === "downloading" && pct !== null && (
+        <span className="h-1 w-32 shrink-0 overflow-hidden rounded bg-rule" aria-hidden>
+          <span className="block h-full bg-cream" style={{ width: `${pct}%` }} />
+        </span>
+      )}
+      {status === "available" && (
+        <button onClick={() => void install()} className={btnPrimary}>
+          {tr(T).updateNow}
+        </button>
+      )}
+      {/* After a failure the downloaded update is gone: look again first. */}
+      {status === "error" && (
+        <button onClick={() => void check()} className={btnPrimary}>
+          {tr(T).retry}
+        </button>
+      )}
+      {(status === "available" || status === "error") && (
+        <button onClick={dismiss} className={btnQuiet}>
+          {tr(T).later}
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 /** Stays up while the workspace can't be read or saved (the red banner
  * above is one-off and dismissable; this one isn't). */
@@ -154,7 +217,10 @@ export default function App() {
   return (
     <div key={lang} className="relative flex h-screen bg-chassis text-cream">
       <Sidebar />
+      {/* A column, so the strips sit above the view (every view is flex-1
+          with its own overflow, so it still scrolls). */}
       <div className="flex min-w-0 flex-1 flex-col">
+        <UpdateNotice />
         <NotSavingStrip />
         {view === "dashboard" && <Dashboard />}
         {view === "library" && <LibraryView />}

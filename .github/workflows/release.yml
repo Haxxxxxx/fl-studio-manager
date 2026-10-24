@@ -23,6 +23,14 @@
 #   install scripts and build tools never see it.
 # - `npm ci --ignore-scripts`: dependency install scripts never run.
 # - Actions pinned to full commit SHAs.
+#
+# Updates: the builds are signed with the TAURI_SIGNING_PRIVATE_KEY secret
+# and uploaded, with latest.json, to the public `releases` bucket of that
+# project (SUPABASE_SERVICE_ROLE_KEY secret, write-only use). The app checks
+# latest.json on launch; the website's /download/* point at latest/*.
+# Pushing a version tag therefore SHIPS the update: every installed app
+# offers it on its next launch, before the draft GitHub Release is
+# published. Only tag a commit on main that is ready for the crew.
 name: Release builds
 
 on:
@@ -82,11 +90,73 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      # Both builds sign their updater artifacts (.app.tar.gz, -setup.exe)
+      # with the key the app's updater verifies against (plugins.updater.pubkey
+      # in tauri.conf.json). The key has no password.
       - name: macOS installer (universal)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npm run tauri build -- --target universal-apple-darwin
 
       - name: Windows installer (cross-compiled)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+
+      # The public `releases` bucket on the crew's Supabase project: the
+      # updater reads latest.json from it, the website links to latest/*.
+      # The service-role key exists only in this step.
+      - name: Publish to the releases bucket
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          mac=src-tauri/target/universal-apple-darwin/release/bundle
+          win=src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis
+          dmg=$(ls "$mac"/dmg/*.dmg)
+          app=$(ls "$mac"/macos/*.app.tar.gz)
+          exe=$(ls "$win"/*-setup.exe)
+          test -s "$app.sig" && test -s "$exe.sig"
+          public="$SUPABASE_URL/storage/v1/object/public/releases"
+          # up <bucket path> <file> <content type>
+          up() {
+            curl -fsS -o /dev/null -X POST "$SUPABASE_URL/storage/v1/object/releases/$1" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "x-upsert: true" \
+              -H "Content-Type: $3" --data-binary "@$2"
+            echo "uploaded $1"
+          }
+          dir="v$version"
+          up "$dir/$(basename "$app")" "$app" application/gzip
+          up "$dir/$(basename "$app").sig" "$app.sig" text/plain
+          up "$dir/$(basename "$exe")" "$exe" application/octet-stream
+          up "$dir/$(basename "$exe").sig" "$exe.sig" text/plain
+          up "latest/Hivo.dmg" "$dmg" application/x-apple-diskimage
+          up "latest/Hivo-setup.exe" "$exe" application/octet-stream
+          # The updater manifest, last so a half-finished upload never points
+          # at files that aren't there yet.
+          VERSION="$version" APP_URL="$public/$dir/$(basename "$app")" APP_SIG="$(cat "$app.sig")" \
+          EXE_URL="$public/$dir/$(basename "$exe")" EXE_SIG="$(cat "$exe.sig")" \
+          node -e '
+            const e = process.env;
+            const mac = { signature: e.APP_SIG, url: e.APP_URL };
+            const manifest = {
+              version: e.VERSION,
+              notes: `Hivo ${e.VERSION}`,
+              pub_date: new Date().toISOString(),
+              platforms: {
+                "darwin-universal": mac,
+                "darwin-aarch64": mac,
+                "darwin-x86_64": mac,
+                "windows-x86_64": { signature: e.EXE_SIG, url: e.EXE_URL },
+              },
+            };
+            require("fs").writeFileSync("latest.json", JSON.stringify(manifest, null, 2) + "\n");
+          '
+          up "latest.json" latest.json application/json
 
       - name: Draft release
         env:

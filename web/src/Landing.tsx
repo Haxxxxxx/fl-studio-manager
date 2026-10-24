@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from "react";
-import { ArrowRight, Check, Minus } from "lucide-react";
+import { ArrowRight, Check, Download, Minus } from "lucide-react";
 import { LogoLockup, LogoMark } from "./LogoMark";
 import { STATUSES } from "@shared/lib/songs";
 import { LANDING, type LandingCopy } from "./landingCopy";
@@ -10,7 +10,7 @@ import type { Lang } from "./lang";
 // (landingCopy.ts): /fr and /en pick one, / follows the browser. Every claim
 // has to be true of the shipped app: when a feature changes, change both.
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 
 const primary = "inline-flex items-center gap-2 rounded bg-hot px-5 py-2.5 font-display uppercase tracking-[0.06em] text-base font-bold text-chassis hover:bg-hot-hover";
 const ghost = "inline-flex items-center gap-2 rounded border border-rule-strong px-5 py-2.5 font-display uppercase tracking-[0.06em] text-base font-semibold text-cream hover:bg-raised";
@@ -47,6 +47,15 @@ export function Landing({ signIn, lang }: { signIn: ReactNode; lang: Lang }) {
               <h2 className={h2}>{t.signin.title}</h2>
               <p className="mt-5 max-w-md text-base leading-relaxed text-body">{t.signin.lead}</p>
               <p className="mt-3 max-w-md text-sm text-body">{t.signin.app}</p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <a href="/download/mac" className={ghost}>
+                  <Download size={16} strokeWidth={2.5} /> {t.signin.mac}
+                </a>
+                <a href="/download/windows" className={ghost}>
+                  <Download size={16} strokeWidth={2.5} /> {t.signin.windows}
+                </a>
+              </div>
+              <p className="mt-3 max-w-md font-mono text-xs text-engrave">{t.signin.firstRun}</p>
             </div>
             <div className="rounded-2xl border border-rule bg-panel p-6">{signIn}</div>
           </div>
