@@ -8,6 +8,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /** Address the mailto fallback writes to; set at build time. */
 export const FEEDBACK_EMAIL: string | null = (import.meta.env.VITE_FEEDBACK_EMAIL ?? "").trim() || null;
 
+/** A message with local file paths blanked ("Report this" prefills from
+ * error banners, which can name a folder). */
+export function scrubPaths(text: string): string {
+  return text.replace(/(?:[A-Za-z]:\\|\\\\|\/(?:Users|home|Volumes|private|var|tmp|mnt|media)\/)[^\s"'`]*/g, "<path>");
+}
+
 export interface FeedbackContext {
   /** App version ("0.4.0"), or "dev" outside a build. */
   version: string;

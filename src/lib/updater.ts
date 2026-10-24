@@ -50,12 +50,12 @@ export async function discardUpdate(): Promise<void> {
   await update?.close().catch(() => {});
 }
 
-/** Ask the server for a newer version: null when up to date, or outside the
- * desktop app (a browser tab can't update anything). */
 /** Updates make sense only in a packaged app: a `tauri dev` build has no
  * bundle to replace, so installing one over target/debug would misfire. */
 export const UPDATES_ENABLED: boolean = isTauri() && !import.meta.env.DEV;
 
+/** Ask the server for a newer version: null when up to date, or outside the
+ * desktop app (a browser tab can't update anything). */
 export async function checkForUpdate(): Promise<AvailableUpdate | null> {
   if (!UPDATES_ENABLED) return null;
   await discardUpdate();
@@ -77,6 +77,9 @@ export async function installUpdate(onProgress: (progress: UpdateProgress) => vo
   if (!update) throw new UpdateError("install", "No update to install: check for updates first.");
   let downloaded = 0;
   let total: number | null = null;
+  // Flush the pending save now: on Windows the installer takes the process
+  // down inside downloadAndInstall, before any code after it runs.
+  await beforeRelaunch?.();
   try {
     await update.downloadAndInstall((event) => {
       if (event.event === "Started") total = event.data.contentLength ?? null;

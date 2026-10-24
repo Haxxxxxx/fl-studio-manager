@@ -79,7 +79,6 @@ export async function detectFlStudio(): Promise<string | null> {
   return invoke("detect_fl_studio");
 }
 
-/** The first DAW projects folder found (FL Studio, Studio One, REAPER, Ableton, Cubase, Bitwig, Pro Tools defaults). */
 /** Every DAW's default projects folder on this computer (read-only). */
 export async function detectDawFolders(): Promise<DetectedFolder[]> {
   return invoke("detect_daw_folders");

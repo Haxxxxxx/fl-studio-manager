@@ -83,6 +83,14 @@ jobs:
           git fetch --no-tags --depth=1000 origin main
           git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
 
+      # The tag must name the version in tauri.conf.json: the bucket paths,
+      # latest.json and the release are all derived from that version.
+      - name: Tag matches the version
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "::error::tag $GITHUB_REF_NAME but tauri.conf.json says $version"; exit 1; }
+
       - run: npm ci --ignore-scripts
 
       - run: npm test
