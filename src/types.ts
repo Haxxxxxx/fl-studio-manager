@@ -1,3 +1,5 @@
+import type { DashboardLayout } from "./lib/dashboardLayout";
+
 export interface FileEntry {
   path: string;
   sizeBytes: number;
@@ -403,6 +405,9 @@ export interface Workspace {
   pipeline?: PipelineConfig;
   /** Shared releases deleted here: their crew rows are deleted on the next sync. */
   deletedReleaseShares?: { id: string; crewId?: string; userId?: string }[];
+  /** How the "Me" dashboard is arranged. Missing = the default
+   * (src/lib/dashboardLayout.ts); normalized on read, never on load. */
+  dashboard?: DashboardLayout;
 }
 
 /** A pipeline column. Columns sit on the fixed lifecycle stages: putting a
