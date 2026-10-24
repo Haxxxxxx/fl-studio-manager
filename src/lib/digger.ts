@@ -124,6 +124,19 @@ export function youtubeId(url: string): string | null {
   return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
 }
 
+/**
+ * The website page that wraps the YouTube player (web/public/embed.html). The
+ * app frames it instead of YouTube because the webview's tauri:// origin sends
+ * no referrer and YouTube refuses an embed without one (error 153). Must stay
+ * in `frame-src` of both CSPs in tauri.conf.json.
+ */
+export const EMBED_PAGE = "https://www.hi-vo.fr/embed.html";
+
+/** The player URL for a video id from `youtubeId()`, or null for anything else. */
+export function embedUrl(id: string): string | null {
+  return /^[A-Za-z0-9_-]{11}$/.test(id) ? `${EMBED_PAGE}?v=${id}` : null;
+}
+
 /** Same limit as `MAX_LEAD_SLUG` in src-tauri/src/leads.rs (the file name's title part). */
 export const MAX_LEAD_SLUG = 60;
 

@@ -3,7 +3,7 @@ import { ExternalLink, Play, Search, X } from "lucide-react";
 import { useDigger } from "../store/useDigger";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
-import { MAX_LIKED, MAX_QUERY_CHARS, converterLink, googleSearchUrl, leadFacts, leadHash, seedList, youtubeId, youtubeSearchUrl } from "../lib/digger";
+import { MAX_LIKED, MAX_QUERY_CHARS, converterLink, embedUrl, googleSearchUrl, leadFacts, leadHash, seedList, youtubeId, youtubeSearchUrl } from "../lib/digger";
 import { dict, tr } from "../i18n";
 import type { Lead, WebLink, YoutubeStatus } from "../types";
 
@@ -276,9 +276,12 @@ export function DigResults({ yt, round, setRound, fill }: Props) {
                 <X size={14} />
               </button>
             </div>
+            {/* The website's wrapper page, not YouTube directly: the webview's
+                tauri:// origin sends no referrer and YouTube refuses the embed
+                without one (error 153). See web/public/embed.html. */}
             <iframe
               key={playing.id}
-              src={`https://www.youtube-nocookie.com/embed/${playing.id}?autoplay=1`}
+              src={embedUrl(playing.id) ?? undefined}
               allow="autoplay; encrypted-media"
               title={playing.title}
               className="aspect-video w-full max-w-2xl rounded bg-chassis"
