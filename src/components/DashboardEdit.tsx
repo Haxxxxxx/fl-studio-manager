@@ -36,7 +36,21 @@ export const T_LAYOUT = dict(
         storage: "Storage",
         pitches: "Pitches",
         releases: "Releases",
+        tempoKey: "Tempo & key tendencies",
+        workingHours: "Working hours",
+        yourSound: "Your sound",
+        collaborators: "Collaborators",
+        songShape: "Song shape",
       })[id],
+    /** One line under the title saying what the block reads (tendency blocks only). */
+    blockSubtitle: (id: DashboardBlockId): string =>
+      ({
+        tempoKey: "Project tempos and the keys you set, across your songs",
+        workingHours: "Every save, by weekday and hour, last 12 months",
+        yourSound: "Plugins and sample folders, by the songs they're in",
+        collaborators: "Credits on your songs",
+        songShape: "Versions, time to a first mixdown, and when songs start",
+      })[id as TendencyBlockId] ?? "",
   },
   {
     editLayout: "Modifier la disposition",
@@ -68,9 +82,25 @@ export const T_LAYOUT = dict(
         storage: "Stockage",
         pitches: "Pitchs",
         releases: "Sorties",
+        tempoKey: "Tendances tempo & tonalité",
+        workingHours: "Heures de travail",
+        yourSound: "Ton son",
+        collaborators: "Collaborateurs",
+        songShape: "Forme des sons",
       })[id],
+    blockSubtitle: (id: DashboardBlockId): string =>
+      ({
+        tempoKey: "Les tempos des projets et les tonalités que tu as notées, sur tous tes sons",
+        workingHours: "Chaque sauvegarde, par jour de la semaine et par heure, 12 derniers mois",
+        yourSound: "Plugins et dossiers de samples, par nombre de sons où ils sont",
+        collaborators: "Les crédits de tes sons",
+        songShape: "Versions, délai jusqu'au premier mixdown, et quand les sons démarrent",
+      })[id as TendencyBlockId] ?? "",
   },
 );
+
+/** The optional tendency blocks (src/lib/tendencies.ts): hidden by default. */
+export type TendencyBlockId = "tempoKey" | "workingHours" | "yourSound" | "collaborators" | "songShape";
 
 // ---- Grid ----
 
