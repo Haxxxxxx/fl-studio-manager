@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   FeedbackError,
   contextLine,
+  scrubPaths,
   feedbackAsText,
   feedbackErrorKind,
   feedbackMailto,
@@ -21,6 +22,12 @@ const input: FeedbackInput = {
 };
 
 describe("feedback", () => {
+  it("blanks local paths before a report is prefilled", () => {
+    expect(scrubPaths("not a folder on this computer: /Users/someone/Music/FL")).toBe("not a folder on this computer: <path>");
+    expect(scrubPaths("could not write C:\\Users\\someone\\AppData\\settings.json")).toBe("could not write <path>");
+    expect(scrubPaths("network path \\\\nas\\music refused")).toBe("network path <path> refused");
+    expect(scrubPaths("Gemini took too long")).toBe("Gemini took too long");
+  });
   it("reads the OS family from the user agent", () => {
     expect(osFromUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605")).toBe("macOS");
     expect(osFromUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537")).toBe("Windows");
