@@ -158,28 +158,116 @@ pub fn write_lead(folder: &Path, lead: &Lead, date: &str) -> Result<PathBuf, Str
     Ok(path)
 }
 
-/// The url hashes of the lead files in `dir` (`<slug>-<hash>.md`).
+/// A lead file bigger than this isn't one of ours: skipped.
+const MAX_LEAD_FILE: u64 = 64 * 1024;
+
+/// The lead files in `dir` (`<slug>-<hash>.md`), newest first, each read
+/// back into its facts (a file that doesn't parse keeps its hash and path,
+/// with the file name as title).
 pub fn hashes_in(dir: &Path) -> Vec<SavedLead> {
     let Ok(entries) = fs::read_dir(dir) else { return Vec::new() };
-    entries
+    let mut leads: Vec<SavedLead> = entries
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
         .filter_map(|e| {
             let name = e.file_name().to_string_lossy().to_string();
             let stem = name.strip_suffix(".md")?;
             let hash = stem.rsplit('-').next()?;
-            (hash.len() == 8 && hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
-                .then(|| SavedLead { hash: hash.to_string(), path: e.path().to_string_lossy().to_string() })
+            if hash.len() != 8 || !hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+                return None;
+            }
+            let meta = e.metadata().ok()?;
+            if meta.len() > MAX_LEAD_FILE {
+                return None;
+            }
+            let modified_at_ms = meta.modified().ok().and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+            let text = fs::read_to_string(e.path()).unwrap_or_default();
+            let mut lead = parse_lead(&text).unwrap_or_default();
+            if lead.title.is_empty() {
+                lead.title = stem.to_string();
+            }
+            Some(SavedLead { hash: hash.to_string(), path: e.path().to_string_lossy().to_string(), modified_at_ms, ..lead })
         })
-        .collect()
+        .collect();
+    leads.sort_by(|a, b| b.modified_at_ms.cmp(&a.modified_at_ms).then_with(|| a.title.cmp(&b.title)));
+    leads
 }
 
-/// A lead on disk: the url hash in its name and where it is (for "reveal").
-#[derive(Debug, Clone, Serialize, PartialEq)]
+/// The facts of a lead file, read back from the Markdown `lead_markdown`
+/// writes. Tolerant: any line can be missing. The link is kept only when it
+/// is still an https url (the file is the user's to edit; the UI opens it).
+pub fn parse_lead(text: &str) -> Option<SavedLead> {
+    let mut lead = SavedLead::default();
+    let mut lines = text.lines();
+    let first = lines.next()?;
+    lead.title = clip(first.strip_prefix("# ")?.trim(), MAX_TITLE);
+    if lead.title == "Lead" {
+        lead.title.clear();
+    }
+    let mut in_facts = true;
+    let mut body: Vec<&str> = Vec::new();
+    for line in lines {
+        let line = line.trim_end();
+        if in_facts {
+            if let Some(fact) = line.strip_prefix("- ") {
+                let (name, value) = match fact.split_once(':') {
+                    Some((n, v)) => (n.trim(), v.trim()),
+                    None => continue,
+                };
+                match name {
+                    "Link" => lead.url = safe_url(value).map(|_| value.to_string()).unwrap_or_default(),
+                    "Source" => lead.source = if value.eq_ignore_ascii_case("youtube") { LeadSource::Youtube } else { LeadSource::Web },
+                    "Producer" => lead.producer = clip(value, MAX_PRODUCER),
+                    "Year" => lead.year = clip(value, MAX_YEAR),
+                    "Tempo" => lead.bpm = value.split_whitespace().next().and_then(|n| n.parse::<f64>().ok()).filter(|b| (30.0..=300.0).contains(b)),
+                    "Key" => lead.key = Some(clip(value, MAX_KEY)).filter(|k| !k.is_empty()),
+                    "Traits" => lead.traits = value.split(',').map(|t| clip(t, MAX_TRAIT)).filter(|t| !t.is_empty()).take(MAX_TRAITS).collect(),
+                    "Saved" => lead.saved_on = clip(value, MAX_YEAR),
+                    _ => {}
+                }
+                continue;
+            }
+            if line.is_empty() && (lead.url.is_empty() && lead.saved_on.is_empty()) {
+                // The blank line under the title.
+                continue;
+            }
+            in_facts = false;
+        }
+        if line != FOOTER {
+            body.push(line);
+        }
+    }
+    let summary = clip(&body.join(" "), MAX_SUMMARY);
+    lead.summary = Some(summary).filter(|s| !s.is_empty());
+    Some(lead)
+}
+
+/// A lead on disk: the url hash in its name, where it is (for "reveal"), and
+/// its facts read back from the file (empty when the file doesn't parse).
+#[derive(Debug, Clone, Default, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedLead {
     pub hash: String,
     pub path: String,
+    pub modified_at_ms: u64,
+    /// Empty when the file holds no https link any more.
+    pub url: String,
+    pub title: String,
+    pub producer: String,
+    pub year: String,
+    pub source: LeadSource,
+    pub bpm: Option<f64>,
+    pub key: Option<String>,
+    pub traits: Vec<String>,
+    pub summary: Option<String>,
+    /// "YYYY-MM-DD" as written when saved.
+    pub saved_on: String,
+}
+
+impl Default for LeadSource {
+    fn default() -> Self {
+        LeadSource::Web
+    }
 }
 
 /// Today's date (UTC) as YYYY-MM-DD, no dependency needed.
@@ -213,11 +301,21 @@ pub fn save_lead(app: AppHandle, lead: Lead) -> Result<String, String> {
     write_lead(folder, &lead, &today()).map(|p| p.to_string_lossy().to_string())
 }
 
-/// The leads saved in every beats folder's `_leads` (url hash + path).
+/// The leads saved in every beats folder's `_leads`, newest first, read back.
 #[tauri::command]
 pub fn list_leads(app: AppHandle) -> Result<Vec<SavedLead>, String> {
     let scope = Scope::load(&app)?;
-    Ok(scope.beat_folders().iter().flat_map(|f| hashes_in(&f.join(LEADS_DIR))).collect())
+    let mut leads: Vec<SavedLead> = scope.beat_folders().iter().flat_map(|f| hashes_in(&f.join(LEADS_DIR))).collect();
+    leads.sort_by(|a, b| b.modified_at_ms.cmp(&a.modified_at_ms).then_with(|| a.title.cmp(&b.title)));
+    Ok(leads)
+}
+
+/// Deletes one lead file (only ever a `.md` inside a beats folder's `_leads`).
+#[tauri::command]
+pub fn delete_lead(app: AppHandle, path: String) -> Result<(), String> {
+    let scope = Scope::load(&app)?;
+    let real = scope.lead_file(&path)?;
+    fs::remove_file(&real).map_err(|e| format!("couldn't delete {}: {e}", real.display()))
 }
 
 #[cfg(test)]
@@ -311,8 +409,33 @@ mod tests {
         fs::write(root.join(LEADS_DIR).join("other-DEADBEEF.md"), "x").unwrap();
         let saved = hashes_in(&root.join(LEADS_DIR));
         let _ = fs::remove_dir_all(&root);
-        assert_eq!(saved, vec![SavedLead { hash: "8fd69810".into(), path: first.to_string_lossy().to_string() }]);
+        assert_eq!(saved.len(), 1);
+        let s = &saved[0];
+        assert_eq!((s.hash.as_str(), s.path.as_str()), ("8fd69810", first.to_string_lossy().as_ref()));
+        assert_eq!((s.url.as_str(), s.title.as_str(), s.producer.as_str(), s.year.as_str()), (lead().url.as_str(), lead().title.as_str(), "X Beats", "2024"));
+        assert_eq!((s.source, s.bpm, s.key.as_deref(), s.saved_on.as_str()), (LeadSource::Youtube, Some(140.0), Some("Am"), "2026-10-25"));
+        assert_eq!(s.traits, lead().traits);
+        assert_eq!(s.summary.as_deref(), Some("Updated."));
+        assert!(s.modified_at_ms > 0);
         assert!(hashes_in(Path::new("/definitely/not/here")).is_empty());
+    }
+
+    #[test]
+    fn lead_files_read_back_tolerantly() {
+        let round = parse_lead(&lead_markdown(&lead(), "2026-10-24")).unwrap();
+        assert_eq!(round.title, lead().title);
+        assert_eq!(round.summary.as_deref(), Some("Dark, slow trap with long 808s."));
+        assert_eq!(round.saved_on, "2026-10-24");
+        // A bare lead: no facts, no summary.
+        let bare = Lead { producer: String::new(), year: String::new(), bpm: None, key: None, traits: vec![], summary: None, source: LeadSource::Web, ..lead() };
+        let round = parse_lead(&lead_markdown(&bare, "2026-10-24")).unwrap();
+        assert_eq!((round.producer.as_str(), round.bpm, round.key, round.traits.len(), round.summary, round.source), ("", None, None, 0, None, LeadSource::Web));
+        // Edited by hand: the link isn't https any more, the summary spans lines.
+        let edited = "# Night\n\n- Link: javascript:alert(1)\n- Tempo: lots\n- Saved: 2026-01-01\n\nLine one.\nLine two.\n\nSaved by Hivo's Digger. Lease or download from the producer's page; Hivo never downloads audio.\n";
+        let round = parse_lead(edited).unwrap();
+        assert_eq!((round.url.as_str(), round.bpm, round.summary.as_deref()), ("", None, Some("Line one. Line two.")));
+        assert!(parse_lead("not a lead").is_none());
+        assert!(parse_lead("").is_none());
     }
 
     #[test]

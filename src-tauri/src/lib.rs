@@ -50,6 +50,7 @@ pub fn run() {
             digger::dig_deeper,
             leads::save_lead,
             leads::list_leads,
+            leads::delete_lead,
             settings::pick_fl_studio,
             settings::use_detected_fl_studio,
             settings::pick_ffmpeg,
