@@ -102,7 +102,7 @@ function SignIn({ lang }: { lang: Lang }) {
             void run(() => sendCode(email)).then((ok) => ok && setSentTo(email.trim()));
           }}
         >
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.email} autoComplete="email" className={input} />
+          <input type="email" name="email" id="signin-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.email} autoComplete="email" autoCapitalize="none" spellCheck={false} className={input} />
           <button disabled={busy || !/^\S+@\S+\.\S+$/.test(email.trim())} className={primary}>
             {busy ? t.sending : t.send}
           </button>
