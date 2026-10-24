@@ -1,6 +1,8 @@
 import { create } from "zustand";
+import { isTauri } from "@tauri-apps/api/core";
 import { dict, tr } from "../i18n";
 import * as api from "../lib/tauri";
+import * as updater from "../lib/updater";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
 import { addColumn, moveCard, moveColumn, removeColumn, renameColumn } from "../lib/pipeline";
@@ -81,6 +83,16 @@ interface NewProjectDraft {
   status: SongStatus;
 }
 
+/** In-app updates (src/lib/updater.ts): one check at startup, then Settings. */
+export interface UpdateState {
+  status: "idle" | "checking" | "available" | "downloading" | "ready" | "error";
+  /** The newer version found; stays set through download and install errors. */
+  version?: string;
+  /** 0..1 while downloading, when the server said how big the file is. */
+  progress?: number;
+  error?: string;
+}
+
 interface AppState {
   view: View;
   settings: Settings;
@@ -130,6 +142,14 @@ interface AppState {
   /** Song shown in the Launch Kit view. */
   launchPath: string | null;
   newProject: NewProjectDraft | null;
+  update: UpdateState;
+  /** `quiet`: the startup check; being offline is normal then, so a failure
+   * is logged, not shown. */
+  checkUpdate: (opts?: { quiet?: boolean }) => Promise<void>;
+  /** Download, install and restart into the version `update.version`. */
+  installUpdate: () => Promise<void>;
+  /** "Later": hide the notice for this session. */
+  dismissUpdate: () => void;
   /** Settings section to scroll to on arrival (SettingsView clears it). */
   settingsSection: string | null;
 
@@ -416,6 +436,44 @@ export const useAppStore = create<AppState>((set, get) => {
     openPersonId: null,
     launchPath: null,
     newProject: null,
+    update: { status: "idle" },
+
+    checkUpdate: async ({ quiet = false } = {}) => {
+      const { status } = get().update;
+      if (status === "checking" || status === "downloading" || status === "ready") return;
+      set({ update: { status: "checking" } });
+      try {
+        const found = await updater.checkForUpdate();
+        set({ update: found ? { status: "available", version: found.version } : { status: "idle" } });
+      } catch (e) {
+        if (quiet) {
+          console.warn("update check failed", e);
+          set({ update: { status: "idle" } });
+          return;
+        }
+        set({ update: { status: "error", error: e instanceof Error ? e.message : String(e) } });
+      }
+    },
+
+    installUpdate: async () => {
+      const { status, version } = get().update;
+      if (!version || status === "downloading" || status === "ready") return;
+      set({ update: { status: "downloading", version } });
+      try {
+        await updater.installUpdate(
+          ({ downloaded, total, finished }) =>
+            set({ update: { status: finished ? "ready" : "downloading", version, progress: total ? downloaded / total : undefined } }),
+          flushWorkspace,
+        );
+      } catch (e) {
+        set({ update: { status: "error", version, error: e instanceof Error ? e.message : String(e) } });
+      }
+    },
+
+    dismissUpdate: () => {
+      void updater.discardUpdate();
+      set({ update: { status: "idle" } });
+    },
     settingsSection: null,
 
     setView: (view, section) =>
@@ -447,6 +505,8 @@ export const useAppStore = create<AppState>((set, get) => {
       get().refreshAiStatus();
       get().refreshCoverStatus();
       set({ settingsLoaded: true });
+      // One update check per launch (never for sample data or a browser tab).
+      if (isTauri() && !get().demoMode) void get().checkUpdate({ quiet: true });
 
       if (!get().unlisten) {
         const unlisten = await api.onRenderProgress((event: RenderEvent) => {

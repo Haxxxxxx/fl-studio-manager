@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
@@ -293,6 +294,8 @@ export function SettingsView() {
             <option value="en">English</option>
           </select>
         </section>
+
+        <UpdatesSection />
 
         <section className="flex items-center justify-between rounded-lg border border-rule bg-panel px-4 py-3">
           <div>
@@ -845,6 +848,101 @@ function BeatFoldersSection() {
         </button>
       </div>
       {error && <div className="mt-2 text-xs text-missing">{error}</div>}
+    </section>
+  );
+}
+
+const T_UPDATES = dict(
+  {
+    hint: "Checked once at launch. An update downloads, installs and restarts the app in one click.",
+    check: "Check for updates",
+    checking: "Checking…",
+    upToDate: "You're up to date.",
+    available: (v: string) => `Hivo ${v} is available.`,
+    install: "Update and restart",
+    downloading: (pct: number | null) => `Downloading…${pct === null ? "" : ` ${pct}%`}`,
+    restarting: "Installed, restarting…",
+  },
+  {
+    hint: "Vérifié une fois au lancement. Une mise à jour se télécharge, s'installe et relance l'appli en un clic.",
+    check: "Vérifier les mises à jour",
+    checking: "Vérification…",
+    upToDate: "Tu as la dernière version.",
+    available: (v: string) => `Hivo ${v} est disponible.`,
+    install: "Mettre à jour et redémarrer",
+    downloading: (pct: number | null) => `Téléchargement…${pct === null ? "" : ` ${pct} %`}`,
+    restarting: "Installé, redémarrage…",
+  },
+);
+
+/** The running version and a manual update check (the store owns the state,
+ * so the strip in App.tsx and this line never disagree). */
+function UpdatesSection() {
+  const update = useAppStore((s) => s.update);
+  const checkUpdate = useAppStore((s) => s.checkUpdate);
+  const installUpdate = useAppStore((s) => s.installUpdate);
+  const [version, setVersion] = useState<string | null>(null);
+  // Nothing to say before the first click (the startup check is silent).
+  const [checked, setChecked] = useState(false);
+  const t = tr(T_UPDATES);
+
+  useEffect(() => {
+    let live = true;
+    // A browser tab has no app version to show.
+    getVersion().then((v) => live && setVersion(v)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function check() {
+    await checkUpdate();
+    setChecked(true);
+  }
+
+  const { status } = update;
+  const pct = update.progress === undefined ? null : Math.round(update.progress * 100);
+  const line =
+    status === "available" && update.version
+      ? t.available(update.version)
+      : status === "downloading"
+        ? t.downloading(pct)
+        : status === "ready"
+          ? t.restarting
+          : status === "error"
+            ? (update.error ?? "")
+            : checked && status === "idle"
+              ? t.upToDate
+              : null;
+
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-cream">Hivo{version ? ` ${version}` : ""}</h2>
+          <p className="mt-0.5 text-xs text-engrave">{t.hint}</p>
+        </div>
+        <button
+          onClick={() => void check()}
+          disabled={status === "checking" || status === "downloading" || status === "ready"}
+          className="shrink-0 rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {status === "checking" ? t.checking : t.check}
+        </button>
+      </div>
+      {line !== null && (
+        <div className="mt-2 flex items-center gap-3 text-xs">
+          <span className={status === "error" ? "text-red-300" : status === "available" ? "text-cream" : "text-emerald-300"}>{line}</span>
+          {status === "available" && (
+            <button
+              onClick={() => void installUpdate()}
+              className="shrink-0 rounded-md border border-rule-strong px-3 py-1.5 text-xs text-cream hover:bg-raised"
+            >
+              {t.install}
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
