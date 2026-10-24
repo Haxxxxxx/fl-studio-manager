@@ -7,6 +7,7 @@ mod digger;
 mod cover;
 mod files;
 mod key;
+mod location;
 mod flp_metadata;
 mod models;
 mod package;
@@ -30,6 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             scanner::scan_projects,
+            location::app_location,
             settings::get_settings,
             settings::save_settings,
             settings::detect_fl_studio,

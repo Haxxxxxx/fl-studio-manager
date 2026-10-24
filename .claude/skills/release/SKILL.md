@@ -58,6 +58,11 @@ GitHub Release. Watch it: `gh run list --workflow 'Release builds' --limit 1`,
 - Open the draft on GitHub Releases, check the notes, **Publish**.
 - Settings → "Check for updates" on an installed older build finds it.
 - First macOS auto-update: watch it by hand once (app is ad-hoc signed, not notarized).
+- "Couldn't update: Read-only file system (os error 30)" on macOS = the app runs from
+  the mounted .dmg or from Gatekeeper's translocated copy of a downloaded, unnotarized
+  app. Fix: move it to Applications with Finder, or `xattr -cr /Applications/Hivo.app`,
+  relaunch, retry. Verified on 0.5.0 → 0.5.1 (2026-10-24). The app explains this itself
+  since #115; only notarization removes it for good.
 
 ## Website (separate, manual)
 Vercel project `fl-manager-crew` in the **personal** team (`personnal3`), not
