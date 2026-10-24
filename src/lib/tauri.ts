@@ -19,6 +19,7 @@ import type {
   YoutubeStatus,
   YoutubeVideo,
   DigResult,
+  DigDeeperResult,
 } from "../types";
 
 /** Scans the linked folders and export folder saved in Settings (Rust reads them). */
@@ -56,6 +57,9 @@ export const setYoutubeKey = (key: string | null): Promise<void> => invoke("set_
 export const youtubeSearch = (query: string): Promise<YoutubeVideo[]> => invoke("youtube_search", { query });
 /** The dig: Rust checks the beats, analyses them and builds the Gemini prompts. */
 export const digBeats = (beats: string[], language: "fr" | "en"): Promise<DigResult> => invoke("dig_beats", { request: { beats, language } });
+/** "Go deeper": one more web search seeded by the dig, skipping the urls already found. */
+export const digDeeper = (analysis: DigResult["analysis"], exclude: string[], language: "fr" | "en"): Promise<DigDeeperResult> =>
+  invoke("dig_deeper", { request: { analysis, exclude, language } });
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
 export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
 export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");

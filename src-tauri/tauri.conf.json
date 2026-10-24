@@ -32,7 +32,7 @@
         "object-src": "'none'",
         "base-uri": "'self'",
         "form-action": "'none'",
-        "frame-src": "'none'"
+        "frame-src": "https://www.youtube-nocookie.com"
       },
       "devCsp": {
         "default-src": "'self'",
@@ -45,7 +45,7 @@
         "object-src": "'none'",
         "base-uri": "'self'",
         "form-action": "'none'",
-        "frame-src": "'none'"
+        "frame-src": "https://www.youtube-nocookie.com"
       },
       "assetProtocol": {
         "enable": true,
