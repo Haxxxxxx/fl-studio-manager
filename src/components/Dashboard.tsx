@@ -29,6 +29,7 @@ import { EmptyLibrary, useVisibleSongs } from "./LibraryView";
 import { CrewWhoCard, NextReleaseCard, StalledCard } from "./CrewCards";
 import { AttentionCarousel } from "./AttentionCarousel";
 import { AddBlockTray, BlockFrame, EmptyBlock, T_LAYOUT, VariantSwitch, useBlockDrag } from "./DashboardEdit";
+import { TendencyBlock, tendencyLooks } from "./TendencyBlocks";
 import {
   defaultLayout,
   hideBlock,
@@ -580,6 +581,13 @@ function MyDashboard({ editing }: { editing: boolean }) {
             </div>
           </Card>
         );
+      // The tendency blocks (hidden until added from the tray).
+      case "tempoKey":
+      case "workingHours":
+      case "yourSound":
+      case "collaborators":
+      case "songShape":
+        return <TendencyBlock id={id} variant={variantOf(layout, id)} control={variantSwitch(id, tendencyLooks(id))} />;
     }
   };
 
