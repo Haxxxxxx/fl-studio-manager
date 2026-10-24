@@ -17,9 +17,19 @@ export function googleSearchUrl(query: string): string {
 /** Same limit as `MAX_EXCLUDE` in src-tauri/src/digger.rs. */
 export const MAX_EXCLUDE = 50;
 
-/** The urls a "Go deeper" round must skip: the first dig's, then every round's, deduplicated. */
-export function deeperExclude(first: { url: string }[], rounds: { url: string }[][]): string[] {
-  return [...new Set([first, ...rounds].flat().map((l) => l.url))].slice(0, MAX_EXCLUDE);
+/** Same limit as `MAX_KEY_CHARS` in src-tauri/src/digger.rs. */
+const MAX_KEY_CHARS = 120;
+
+/** How a found beat is remembered between rounds: "title | site", lowercased
+ * (same as `found_key` in Rust). Not the url: Google Search grounding hands
+ * out a fresh redirect link for the same page every time. */
+export function foundKey(link: { text: string; site: string }): string {
+  return `${link.text.trim()} | ${link.site.trim()}`.toLowerCase().slice(0, MAX_KEY_CHARS);
+}
+
+/** The beats a "Go deeper" round must skip: the first dig's, then every round's, deduplicated. */
+export function deeperExclude(first: { text: string; site: string }[], rounds: { text: string; site: string }[][]): string[] {
+  return [...new Set([first, ...rounds].flat().map(foundKey))].slice(0, MAX_EXCLUDE);
 }
 
 /**

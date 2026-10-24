@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXCLUDE, MAX_QUERY_CHARS, beatFactsLine, beatQuery, deeperExclude, googleSearchUrl, youtubeId, youtubeSearchUrl } from "./digger";
+import { MAX_EXCLUDE, MAX_QUERY_CHARS, beatFactsLine, beatQuery, deeperExclude, foundKey, googleSearchUrl, youtubeId, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
@@ -21,10 +21,12 @@ describe("digger links", () => {
     expect(beatQuery("x".repeat(300)).length).toBeLessThanOrEqual(MAX_QUERY_CHARS);
   });
 
-  it("lists the urls a deeper round must skip, once each, capped", () => {
-    const l = (url: string) => ({ url });
-    expect(deeperExclude([l("https://a/1"), l("https://a/2")], [[l("https://a/2"), l("https://a/3")], [l("https://a/4")]])).toEqual(["https://a/1", "https://a/2", "https://a/3", "https://a/4"]);
-    const many = Array.from({ length: 70 }, (_, i) => l(`https://a/${i}`));
+  it("lists the beats a deeper round must skip by title and site, once each, capped", () => {
+    const l = (text: string, site = "BeatStars") => ({ text, site });
+    expect(foundKey(l(" Night Drive ", " beatstars.com "))).toBe("night drive | beatstars.com");
+    expect(foundKey(l("x".repeat(300))).length).toBe(120);
+    expect(deeperExclude([l("A"), l("B")], [[l("b"), l("C")], [l("D")]])).toEqual(["a | beatstars", "b | beatstars", "c | beatstars", "d | beatstars"]);
+    const many = Array.from({ length: 70 }, (_, i) => l(`Beat ${i}`));
     expect(deeperExclude(many, []).length).toBe(MAX_EXCLUDE);
     expect(deeperExclude([], [])).toEqual([]);
   });
