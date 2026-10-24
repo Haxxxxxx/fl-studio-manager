@@ -32,6 +32,14 @@ export function deeperExclude(first: { text: string; site: string }[], rounds: {
   return [...new Set([first, ...rounds].flat().map(foundKey))].slice(0, MAX_EXCLUDE);
 }
 
+/** Same limit as `MAX_SEARCHES_DONE` in src-tauri/src/digger.rs. */
+export const MAX_SEARCHES_DONE = 50;
+
+/** Every search the rounds ran so far (the seed's go separately), once each, capped. */
+export function searchesDone(rounds: { queries: string[] }[]): string[] {
+  return [...new Set(rounds.flatMap((r) => r.queries).map((q) => q.trim()).filter(Boolean))].slice(0, MAX_SEARCHES_DONE);
+}
+
 /** Same limits as `MAX_FOUND_TITLES` / `MAX_TITLE_CHARS` in src-tauri/src/digger.rs. */
 export const MAX_FOUND_TITLES = 50;
 const MAX_TITLE_CHARS = 120;

@@ -69,6 +69,8 @@ export function DiggerView() {
   // The round on screen (DigResults + DigPanel): back to the latest one
   // whenever a dig or a round arrives.
   const [selectedRound, setSelectedRound] = useState(0);
+  // The results section is always there (its search box is the only way to
+  // search YouTube); it takes its share of the height once it has something.
   const showResults = !!dig || searchedFor !== null || searching || webQuery.trim() !== "";
   const audio = useRef<HTMLAudioElement>(null);
   const shown = useMemo(() => filterBeats(beats, query), [beats, query]);
@@ -215,7 +217,7 @@ export function DiggerView() {
                 )}
               </div>
             </div>
-            {showResults && <DigResults yt={yt} round={selectedRound} setRound={setSelectedRound} />}
+            <DigResults yt={yt} round={selectedRound} setRound={setSelectedRound} fill={showResults} />
           </div>
           <DigPanel yt={yt} round={selectedRound} />
         </div>

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import * as api from "../lib/tauri";
-import { deeperExclude, foundTitles } from "../lib/digger";
+import { deeperExclude, foundTitles, searchesDone } from "../lib/digger";
 import { useAppStore } from "./useAppStore";
 import type { BeatFile, DigResult, WebLink, YoutubeVideo } from "../types";
 
@@ -138,12 +138,14 @@ export const useDigger = create<DiggerState>((set, get) => ({
       const links = rounds.map((r) => r.links);
       // Everything already on screen, so the new searches go elsewhere.
       const shown = foundTitles([...dig.web, ...links.flat()].map((l) => l.text).concat(results.map((v) => v.title)));
-      const round = await api.digDeeper(dig.analysis, deeperExclude(dig.web, links), shown, language);
+      const round = await api.digDeeper(dig.analysis, deeperExclude(dig.web, links), shown, searchesDone(rounds), language);
       // A new dig meanwhile made this round about the wrong picks.
       if (get().dig !== dig) return;
-      if (round.web.length || round.queries.length) set({ rounds: [...get().rounds, { links: round.web, queries: round.queries }] });
+      const brought = round.web.length > 0 || round.queries.length > 0;
+      if (brought) set({ rounds: [...get().rounds, { links: round.web, queries: round.queries }] });
       if (round.webError) set({ deeperError: round.webError });
-      markUnseen(set);
+      // The menu dot means "something new to look at", not "a round ran".
+      if (brought) markUnseen(set);
       // Same as runDig: the first new search runs right away.
       const first = round.queries[0];
       if (first) {

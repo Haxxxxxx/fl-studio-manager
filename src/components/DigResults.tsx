@@ -32,6 +32,7 @@ const T = dict(
     searching: "Searching…",
     noResults: "No results. Try other words.",
     web: "Found on the web",
+    youtubeFor: (q: string) => `YouTube · ${q}`,
     googled: "Google searches behind these links",
     openLink: (site: string) => `Open ${site}`,
     hint: "Opens in your browser. Leasing a beat stays between you and the producer: the Digger downloads nothing.",
@@ -54,6 +55,7 @@ const T = dict(
     searching: "Recherche…",
     noResults: "Aucun résultat. Essaie d'autres mots.",
     web: "Trouvé sur le web",
+    youtubeFor: (q: string) => `YouTube · ${q}`,
     googled: "Recherches Google derrière ces liens",
     openLink: (site: string) => `Ouvrir ${site}`,
     hint: `S'ouvre dans ton navigateur. La licence d'une prod se règle entre toi et le beatmaker${NB}: le Digger ne télécharge rien.`,
@@ -105,9 +107,11 @@ interface Props {
   /** The round on screen: 0 is the dig, n is rounds[n - 1]. */
   round: number;
   setRound: (round: number) => void;
+  /** Take the free height (there is something to show) or stay compact. */
+  fill: boolean;
 }
 
-export function DigResults({ yt, round, setRound }: Props) {
+export function DigResults({ yt, round, setRound, fill }: Props) {
   const t = tr(T);
   const { dig, rounds, webQuery, results, searching, searchError, searchedFor, setWebQuery, searchYoutube } = useDigger();
   const [playing, setPlaying] = useState<Playing | null>(null);
@@ -120,7 +124,7 @@ export function DigResults({ yt, round, setRound }: Props) {
   const links = dig ? (round === 0 ? dig.web : (rounds[round - 1]?.links ?? [])) : [];
 
   return (
-    <section aria-label={t.title} className="flex min-h-0 flex-1 flex-col border-t-[3px] border-rule-strong">
+    <section aria-label={t.title} className={`flex min-h-0 flex-col border-t-[3px] border-rule-strong ${fill ? "flex-1" : "shrink-0"}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule px-6 py-2">
         <h2 className={label}>{t.title}</h2>
         {dig && (
@@ -195,6 +199,7 @@ export function DigResults({ yt, round, setRound }: Props) {
         {searchError && <div role="alert" className="rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{searchError}</div>}
         {searching && <p className="text-xs text-engrave">{t.searching}</p>}
         {!searching && searchedFor !== null && searchedFor === q && results.length === 0 && <p className="text-xs text-engrave">{t.noResults}</p>}
+        {results.length > 0 && searchedFor && <h3 className={label}>{t.youtubeFor(searchedFor)}</h3>}
         {results.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 @[900px]:grid-cols-2 @[1200px]:grid-cols-3" aria-label="YouTube">
             {results.map((v) => (

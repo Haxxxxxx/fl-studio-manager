@@ -66,8 +66,10 @@ export const digDeeper = (
   { summary, traits, tempo, queries }: DigResult["analysis"],
   exclude: string[],
   foundTitles: string[],
+  searchesDone: string[],
   language: "fr" | "en",
-): Promise<DigDeeperResult> => invoke("dig_deeper", { request: { analysis: { summary, traits, tempo, queries }, exclude, foundTitles, language } });
+): Promise<DigDeeperResult> =>
+  invoke("dig_deeper", { request: { analysis: { summary, traits, tempo, queries }, exclude, foundTitles, searchesDone, language } });
 export const pickFlStudio = (): Promise<Settings> => invoke("pick_fl_studio");
 export const useDetectedFlStudio = (): Promise<Settings> => invoke("use_detected_fl_studio");
 export const pickFfmpeg = (): Promise<Settings> => invoke("pick_ffmpeg");

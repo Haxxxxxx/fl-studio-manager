@@ -52,6 +52,9 @@ const MAX_EXCLUDE: usize = 50;
 /// Titles already shown (web links + YouTube results) that the new-searches
 /// call is told about, at most this many (`MAX_FOUND_TITLES` in src/lib/digger.ts)…
 const MAX_FOUND_TITLES: usize = 50;
+/// Searches already run (the seed's and every round's) that a new round must
+/// not repeat, at most this many (`MAX_SEARCHES_DONE` in src/lib/digger.ts).
+const MAX_SEARCHES_DONE: usize = 50;
 /// …each clipped to this (`MAX_TITLE_CHARS` in src/lib/digger.ts).
 const MAX_TITLE_CHARS: usize = 120;
 
@@ -365,6 +368,9 @@ pub struct DigDeeperRequest {
     /// Titles already shown (web link texts, YouTube results): data for the
     /// new-searches call, so it goes elsewhere.
     found_titles: Vec<String>,
+    /// Searches run by earlier rounds (the seed's are in `analysis`).
+    #[serde(default)]
+    searches_done: Vec<String>,
     language: String,
 }
 
@@ -382,7 +388,7 @@ fn deeper_system(language: &str) -> String {
     format!(
         "You find instrumental beats on the web for a rapper who already ran one search and wants to go deeper. Search YouTube, BeatStars, Airbit, SoundCloud and similar sites.
 Rules:
-- Never list a beat whose link is under ALREADY FOUND. Look for other producers and other sites than those.
+- Never list a beat whose title is under ALREADY FOUND. Look for other producers and other sites than those.
 - Stay narrow: the beats must match the traits and the tempo closely.
 - List up to {MAX_DEEPER_LINKS} specific beats, one per line, as: title - producer - site. Only list beats you actually found in search results.
 - No downloads, no free-download sites.
@@ -533,13 +539,20 @@ fn dedup_clipped(items: &[String], max_chars: usize, max: usize) -> Vec<String> 
     out
 }
 
-/// The seed, the exclusion keys and the found titles, each cut to size.
+/// The seed, the exclusion keys and the found titles, each cut to size. The
+/// seed's queries grow with the searches earlier rounds ran, so the next
+/// round is told about all of them and skips them.
 fn sanitize_deeper(request: &DigDeeperRequest) -> Result<(Analysis, Vec<String>, Vec<String>), String> {
     let seed = &request.analysis;
-    let analysis = sanitize_analysis(&json!({ "summary": seed.summary, "traits": seed.traits, "tempo": seed.tempo, "queries": seed.queries }))?;
-    let lowered: Vec<String> = request.exclude.iter().map(|k| k.to_lowercase()).collect();
-    let exclude = dedup_clipped(&lowered, MAX_KEY_CHARS, MAX_EXCLUDE);
+    let mut analysis = sanitize_analysis(&json!({ "summary": seed.summary, "traits": seed.traits, "tempo": seed.tempo, "queries": seed.queries }))?;
+    // Clip first, then lowercase: the same order as `found_key`.
+    let exclude: Vec<String> = dedup_clipped(&request.exclude, MAX_KEY_CHARS, MAX_EXCLUDE).into_iter().map(|k| k.to_lowercase()).collect();
     let found_titles = dedup_clipped(&request.found_titles, MAX_TITLE_CHARS, MAX_FOUND_TITLES);
+    for q in dedup_clipped(&request.searches_done, crate::youtube::MAX_QUERY_CHARS, MAX_SEARCHES_DONE) {
+        if !analysis.queries.contains(&q) {
+            analysis.queries.push(q);
+        }
+    }
     Ok((analysis, exclude, found_titles))
 }
 
