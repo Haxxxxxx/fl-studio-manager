@@ -809,7 +809,7 @@ function YoutubeSettings() {
 const T_SPOTIFY = dict(
   {
     title: "Spotify (People, free)",
-    intro: "Lets \"Look up profiles\" on a person search Spotify and show followers, genres, popularity and the artist picture. Without it, the Spotify artist ID still comes from MusicBrainz when it has the link. In the",
+    intro: "Lets \"Look up profiles\" on a person search Spotify directly (small artists are there long before MusicBrainz) and fetch the artist picture; followers and popularity come too when Spotify shares them with your app (newer apps in development mode don't get them). Without credentials, the Spotify artist ID still comes from MusicBrainz when it has the link. In the",
     link: "Spotify developer dashboard",
     steps: ", create an app (any name, redirect URI unused) and copy its Client ID and Client secret.",
     off: "No credentials: MusicBrainz only.",
@@ -827,7 +827,7 @@ const T_SPOTIFY = dict(
   },
   {
     title: "Spotify (Personnes, gratuit)",
-    intro: "Permet à « Chercher les profils » sur une personne de chercher sur Spotify et d'afficher abonnés, genres, popularité et photo d'artiste. Sans ça, l'ID artiste Spotify vient quand même de MusicBrainz quand il a le lien. Dans le",
+    intro: "Permet à « Chercher les profils » sur une personne de chercher directement sur Spotify (les petits artistes y sont bien avant MusicBrainz) et de récupérer la photo d'artiste ; abonnés et popularité viennent aussi quand Spotify les partage avec ton appli (les applis récentes en mode développement ne les ont pas). Sans identifiants, l'ID artiste Spotify vient quand même de MusicBrainz quand il a le lien. Dans le",
     link: "tableau de bord développeur Spotify",
     steps: ", crée une appli (n'importe quel nom, l'URI de redirection ne sert pas) et copie son Client ID et son Client secret.",
     off: "Pas d'identifiants : MusicBrainz seulement.",

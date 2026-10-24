@@ -231,6 +231,8 @@ interface AppState {
   setKitCover: (path: string, cover: KitCoverMeta | undefined) => void;
   /** This kit's caption language; undefined = the one in Settings. */
   setKitCaptionLanguage: (path: string, lang: CaptionLang | undefined) => void;
+  /** Opt-in: the credited people's profile IDs go into the exported kit. */
+  setKitIncludeArtistIds: (path: string, on: boolean) => void;
   /** null until loaded; whether Cloudflare credentials are set. */
   coverStatus: CoverStatus | null;
   refreshCoverStatus: () => Promise<void>;
@@ -871,6 +873,10 @@ export const useAppStore = create<AppState>((set, get) => {
     setKitCaptionLanguage: (path, captionLanguage) => {
       const kit = get().workspace.songs[path]?.launchKit ?? {};
       get().updateSong(path, { launchKit: { ...kit, captionLanguage, acceptedAtMs: undefined } });
+    },
+    setKitIncludeArtistIds: (path, on) => {
+      const kit = get().workspace.songs[path]?.launchKit ?? {};
+      get().updateSong(path, { launchKit: { ...kit, includeArtistIds: on || undefined } });
     },
     coverStatus: null,
     refreshCoverStatus: async () => {
