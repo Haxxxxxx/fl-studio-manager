@@ -2,7 +2,8 @@ import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, MessageSqu
 import { getVersion } from "@tauri-apps/api/app";
 import { isTauri } from "@tauri-apps/api/core";
 import { useAppStore } from "../store/useAppStore";
-import { btnPrimary, engrave, Wordmark } from "../ui";
+import { useDigger } from "../store/useDigger";
+import { btnPrimary, engrave, StatusDot, Wordmark } from "../ui";
 import { CrewSection } from "./CrewSection";
 import { useCrewStore, useInCrew } from "../store/useCrewStore";
 import { currentLang, dict, tr } from "../i18n";
@@ -57,6 +58,8 @@ export function Sidebar() {
   const inCrew = useInCrew();
   const crewEnabled = useCrewStore((s) => s.enabled);
   const openFeedback = useAppStore((s) => s.openFeedback);
+  // A dig finished while another view was open: "needs you" on the entry.
+  const digUnseen = useDigger((s) => s.unseen);
   const t = tr(T);
 
   // The in-app form (FeedbackModal) when this build has a backend; else the
@@ -118,6 +121,7 @@ export function Sidebar() {
               <span className="flex items-center gap-2">
                 <Icon size={16} strokeWidth={2} />
                 {item.label}
+                {item.id === "digger" && digUnseen && <StatusDot color="var(--color-hot)" size={6} />}
               </span>
               {typeof item.badge === "number" && item.badge > 0 && (
                 <span className={`font-mono text-[11px] tabular-nums ${active ? "text-chassis/70" : "text-engrave"}`}>{item.badge}</span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXCLUDE, MAX_QUERY_CHARS, beatFactsLine, beatQuery, deeperExclude, foundKey, googleSearchUrl, youtubeId, youtubeSearchUrl } from "./digger";
+import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_QUERY_CHARS, beatFactsLine, beatQuery, deeperExclude, foundKey, foundTitles, googleSearchUrl, searchesDone, youtubeId, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
@@ -29,6 +29,18 @@ describe("digger links", () => {
     const many = Array.from({ length: 70 }, (_, i) => l(`Beat ${i}`));
     expect(deeperExclude(many, []).length).toBe(MAX_EXCLUDE);
     expect(deeperExclude([], [])).toEqual([]);
+  });
+
+  it("lists the titles already shown, once each, clipped and capped", () => {
+    expect(foundTitles([" Night  Drive ", "", "night drive", "Cold Room", "x".repeat(300)])).toEqual(["Night Drive", "Cold Room", "x".repeat(120)]);
+    expect(foundTitles(Array.from({ length: 70 }, (_, i) => `Beat ${i}`)).length).toBe(MAX_FOUND_TITLES);
+    expect(foundTitles([])).toEqual([]);
+  });
+
+  it("lists the searches earlier rounds ran, once each, capped", () => {
+    expect(searchesDone([{ queries: ["a", " b "] }, { queries: ["b", "", "c"] }])).toEqual(["a", "b", "c"]);
+    expect(searchesDone(Array.from({ length: 9 }, (_, i) => ({ queries: Array.from({ length: 8 }, (_, j) => `q${i}-${j}`) }))).length).toBe(50);
+    expect(searchesDone([])).toEqual([]);
   });
 
   it("reads the video ID of YouTube links only", () => {
