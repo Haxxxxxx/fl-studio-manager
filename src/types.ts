@@ -548,15 +548,18 @@ export interface DigResult {
   model: string;
   audioSent: boolean;
   beats: BeatFacts[];
-  analysis: { summary: string; traits: string[]; tempo: string; queries: string[] };
+  /** `heard`: what Gemini heard in the excerpts, only when they were sent. */
+  analysis: { summary: string; traits: string[]; tempo: string; queries: string[]; heard?: string };
   web: WebLink[];
   webSearches: string[];
   webError: string | null;
 }
 
-/** One "Go deeper" round: more web links, seeded by the dig's analysis. */
+/** One "Go deeper" round: more web links, seeded by the dig's analysis, or
+ * (when the key has no Google Search) new YouTube searches instead. */
 export interface DigDeeperResult {
   web: WebLink[];
   webSearches: string[];
   webError: string | null;
+  queries: string[];
 }

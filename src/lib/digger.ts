@@ -32,6 +32,25 @@ export function deeperExclude(first: { text: string; site: string }[], rounds: {
   return [...new Set([first, ...rounds].flat().map(foundKey))].slice(0, MAX_EXCLUDE);
 }
 
+/** Same limits as `MAX_FOUND_TITLES` / `MAX_TITLE_CHARS` in src-tauri/src/digger.rs. */
+export const MAX_FOUND_TITLES = 50;
+const MAX_TITLE_CHARS = 120;
+
+/** The titles already shown, for a "Go deeper" round without Google Search:
+ * trimmed, clipped, blanks and repeats (any case) dropped, capped. */
+export function foundTitles(titles: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of titles) {
+    const t = raw.trim().replace(/\s+/g, " ").slice(0, MAX_TITLE_CHARS);
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+    if (out.length >= MAX_FOUND_TITLES) break;
+  }
+  return out;
+}
+
 /**
  * The video ID of a YouTube link (watch?v=, youtu.be/, /shorts/), or null for
  * anything else. Only an ID ever reaches the embedded player.
