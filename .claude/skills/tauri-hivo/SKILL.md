@@ -49,7 +49,7 @@ Use the generic `tauri-v2` skill for the framework; this is what's decided here.
 
 ## Paired constants (keep both sides equal)
 - `WAVE_*` in `src/lib/shorts.ts` ↔ `src-tauri/src/shorts.rs`.
-- `MAX_QUERY_CHARS`, `MAX_EXCLUDE`, `MAX_KEY_CHARS`, `MAX_FOUND_TITLES`, `MAX_TITLE_CHARS` in `src/lib/digger.ts` ↔ `digger.rs`/`youtube.rs`.
+- `MAX_QUERY_CHARS`, `MAX_EXCLUDE`, `MAX_KEY_CHARS`, `MAX_FOUND_TITLES`, `MAX_TITLE_CHARS`, `MAX_LIKED` in `src/lib/digger.ts` ↔ `digger.rs`/`youtube.rs`.
 - `found_key` (Rust) ↔ `foundKey` (TS).
 
 ## Dev and build

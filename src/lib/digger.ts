@@ -42,21 +42,60 @@ export function searchesDone(rounds: { queries: string[] }[]): string[] {
 
 /** Same limits as `MAX_FOUND_TITLES` / `MAX_TITLE_CHARS` in src-tauri/src/digger.rs. */
 export const MAX_FOUND_TITLES = 50;
-const MAX_TITLE_CHARS = 120;
+export const MAX_TITLE_CHARS = 120;
+
+/** `title` the way the prompts get it: trimmed, one space between words, clipped. */
+function cleanTitle(title: string): string {
+  return title.trim().replace(/\s+/g, " ").slice(0, MAX_TITLE_CHARS);
+}
+
+/** `titles` cleaned, blanks and repeats (any case) dropped, at most `max`. */
+function cleanTitles(titles: string[], max: number): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of titles) {
+    const t = cleanTitle(raw);
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+    if (out.length >= max) break;
+  }
+  return out;
+}
 
 /** The titles already shown, for a "Go deeper" round without Google Search:
  * trimmed, clipped, blanks and repeats (any case) dropped, capped. */
 export function foundTitles(titles: string[]): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const raw of titles) {
-    const t = raw.trim().replace(/\s+/g, " ").slice(0, MAX_TITLE_CHARS);
-    if (!t || seen.has(t.toLowerCase())) continue;
-    seen.add(t.toLowerCase());
-    out.push(t);
-    if (out.length >= MAX_FOUND_TITLES) break;
-  }
-  return out;
+  return cleanTitles(titles, MAX_FOUND_TITLES);
+}
+
+/** Same limit as `MAX_LIKED` in src-tauri/src/digger.rs. */
+export const MAX_LIKED = 20;
+
+/** A result picked for the next round to go closer to ("Use for next dig"):
+ * a YouTube video id or a web link url, and the title the prompt will see. */
+export interface Liked {
+  id: string;
+  title: string;
+}
+
+/** `liked` with `id` toggled: dropped when there, added (title cleaned)
+ * unless the list is full. */
+export function toggleLiked(liked: Liked[], id: string, title: string): Liked[] {
+  if (liked.some((l) => l.id === id)) return liked.filter((l) => l.id !== id);
+  if (liked.length >= MAX_LIKED) return liked;
+  return [...liked, { id, title: cleanTitle(title) || id }];
+}
+
+/** The picks' titles for a "Go deeper" round: same cleaning as `foundTitles`, capped at MAX_LIKED. */
+export function likedTitles(liked: Liked[]): string[] {
+  return cleanTitles(liked.map((l) => l.title), MAX_LIKED);
+}
+
+/** The picks a round was seeded from, short enough for a tooltip: the first 3, then "+n". */
+export function seedList(seeds: string[]): string {
+  const rest = seeds.length - 3;
+  return seeds.slice(0, 3).join(", ") + (rest > 0 ? ` +${rest}` : "");
 }
 
 /**

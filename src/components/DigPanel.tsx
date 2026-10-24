@@ -32,6 +32,7 @@ const T = dict(
     aiSearches: "Searches from the dig",
     round: (n: number) => `Round ${n}`,
     deeper: "Go deeper",
+    deeperSeeded: (n: number) => `Go deeper · seeded from ${n} pick${n > 1 ? "s" : ""}`,
     deeperRunning: "Digging deeper…",
     find: "Find similar beats",
     ideas: "Searches from your picks",
@@ -56,6 +57,7 @@ const T = dict(
     aiSearches: "Recherches tirées de l'analyse",
     round: (n: number) => `Tour ${n}`,
     deeper: "Creuser plus loin",
+    deeperSeeded: (n: number) => `Creuser plus loin · à partir de ${n} sélection${n > 1 ? "s" : ""}`,
     deeperRunning: "On creuse…",
     find: "Trouver des prods proches",
     ideas: "Recherches tirées de tes choix",
@@ -198,7 +200,7 @@ export function DigPanel({ yt, round }: Props) {
           {dig.webError && <p className="text-[11px] text-engrave">{dig.webError}</p>}
           {d.deeperError && <p className="text-[11px] text-engrave">{d.deeperError}</p>}
           <button onClick={() => void d.runDeeper(currentLang(), !!yt?.configured)} disabled={d.diggingDeeper || d.digging} className={`${secondary} self-start`}>
-            {d.diggingDeeper ? t.deeperRunning : t.deeper}
+            {d.diggingDeeper ? t.deeperRunning : d.liked.length > 0 ? t.deeperSeeded(d.liked.length) : t.deeper}
           </button>
         </section>
       )}
