@@ -17,9 +17,29 @@ export const DASHBOARD_BLOCK_IDS = [
   "storage",
   "pitches",
   "releases",
+  // Tendencies (src/lib/tendencies.ts): off the dashboard until added from the tray.
+  "tempoKey",
+  "workingHours",
+  "yourSound",
+  "collaborators",
+  "songShape",
 ] as const;
 
 export type DashboardBlockId = (typeof DASHBOARD_BLOCK_IDS)[number];
+
+/** Blocks that start hidden: they only appear through Edit layout → Add
+ * block, and a stored layout that doesn't know them gets them in `hidden`. */
+export const BLOCK_DEFAULT_HIDDEN: Partial<Record<DashboardBlockId, true>> = {
+  tempoKey: true,
+  workingHours: true,
+  yourSound: true,
+  collaborators: true,
+  songShape: true,
+};
+
+export function isDefaultHidden(id: DashboardBlockId): boolean {
+  return BLOCK_DEFAULT_HIDDEN[id] === true;
+}
 
 export const BLOCK_SIZES = ["full", "half", "third"] as const;
 export type BlockSize = (typeof BLOCK_SIZES)[number];
@@ -39,6 +59,11 @@ export const BLOCK_VARIANTS: Record<DashboardBlockId, readonly string[]> = {
   storage: ["bar"],
   pitches: ["cards"],
   releases: ["list"],
+  tempoKey: ["bars", "list"],
+  workingHours: ["grid", "summary"],
+  yourSound: ["top", "shifts"],
+  collaborators: ["top", "recent"],
+  songShape: ["numbers", "starts"],
 };
 
 export interface DashboardLayout {
@@ -52,10 +77,11 @@ export interface DashboardLayout {
   sizes: Partial<Record<DashboardBlockId, BlockSize>>;
 }
 
-/** Today's dashboard, top to bottom, with the widths it has always had. */
+/** Today's dashboard, top to bottom, with the widths it has always had. The
+ * tendency blocks wait in `hidden`. */
 export const DEFAULT_LAYOUT: DashboardLayout = {
-  order: [...DASHBOARD_BLOCK_IDS],
-  hidden: [],
+  order: DASHBOARD_BLOCK_IDS.filter((id) => !isDefaultHidden(id)),
+  hidden: DASHBOARD_BLOCK_IDS.filter(isDefaultHidden),
   variants: {},
   sizes: {
     nextRelease: "half",
@@ -63,6 +89,11 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
     crewWho: "half",
     pipeline: "half",
     openCleanly: "half",
+    tempoKey: "half",
+    workingHours: "half",
+    yourSound: "half",
+    collaborators: "half",
+    songShape: "half",
   },
 };
 
@@ -106,15 +137,16 @@ function cleanIds(raw: unknown, taken: Set<DashboardBlockId>): DashboardBlockId[
 
 /** A stored layout (from any version, or anything at all) made drawable:
  * unknown ids dropped, duplicates removed, blocks the stored layout doesn't
- * know (added since) appended to the visible order so they show up, and
- * variants and sizes checked against the registry. `defaults` fills the
- * sizes the stored layout doesn't set. */
+ * know (added since) appended to the visible order so they show up (or to
+ * `hidden` when the registry says they start hidden), and variants and
+ * sizes checked against the registry. `defaults` fills the sizes the stored
+ * layout doesn't set. */
 export function normalizeLayout(raw: unknown, defaults: DashboardLayout = DEFAULT_LAYOUT): DashboardLayout {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const taken = new Set<DashboardBlockId>();
   const order = cleanIds(r.order, taken);
   const hidden = cleanIds(r.hidden, taken);
-  for (const id of DASHBOARD_BLOCK_IDS) if (!taken.has(id)) order.push(id);
+  for (const id of DASHBOARD_BLOCK_IDS) if (!taken.has(id)) (isDefaultHidden(id) ? hidden : order).push(id);
 
   const variants: DashboardLayout["variants"] = {};
   const rv = (r.variants && typeof r.variants === "object" ? r.variants : {}) as Record<string, unknown>;

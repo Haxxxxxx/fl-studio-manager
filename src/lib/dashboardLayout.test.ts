@@ -5,6 +5,7 @@ import {
   DEFAULT_LAYOUT,
   defaultLayout,
   hideBlock,
+  isDefaultHidden,
   moveBlock,
   nextSize,
   normalizeLayout,
@@ -17,12 +18,24 @@ import {
 } from "./dashboardLayout";
 
 describe("dashboard layout", () => {
-  it("the default shows every block once, in registry order", () => {
-    expect(DEFAULT_LAYOUT.order).toEqual([...DASHBOARD_BLOCK_IDS]);
-    expect(DEFAULT_LAYOUT.hidden).toEqual([]);
-    expect(visibleBlocks(DEFAULT_LAYOUT)).toEqual([...DASHBOARD_BLOCK_IDS]);
+  it("the default shows every block once, in registry order, except the ones that start hidden", () => {
+    const shown = DASHBOARD_BLOCK_IDS.filter((id) => !isDefaultHidden(id));
+    expect(DEFAULT_LAYOUT.order).toEqual(shown);
+    expect(DEFAULT_LAYOUT.hidden).toEqual(DASHBOARD_BLOCK_IDS.filter(isDefaultHidden));
+    expect(visibleBlocks(DEFAULT_LAYOUT)).toEqual(shown);
+    expect([...DEFAULT_LAYOUT.order, ...DEFAULT_LAYOUT.hidden].sort()).toEqual([...DASHBOARD_BLOCK_IDS].sort());
     expect(sizeOf(DEFAULT_LAYOUT, "stats")).toBe("full");
     expect(sizeOf(DEFAULT_LAYOUT, "pipeline")).toBe("half");
+  });
+
+  it("the tendency blocks start hidden, at half width", () => {
+    for (const id of ["tempoKey", "workingHours", "yourSound", "collaborators", "songShape"] as const) {
+      expect(isDefaultHidden(id)).toBe(true);
+      expect(DEFAULT_LAYOUT.hidden).toContain(id);
+      expect(sizeOf(DEFAULT_LAYOUT, id)).toBe("half");
+    }
+    expect(isDefaultHidden("stats")).toBe(false);
+    expect(isDefaultHidden("activity")).toBe(false);
   });
 
   it("in a crew the three crew cards share a row", () => {
@@ -54,16 +67,39 @@ describe("dashboard layout", () => {
       const out = normalizeLayout({ order: ["pipeline", "bogus", "stats", "pipeline", 7], hidden: ["stats", "nope"] });
       expect(out.order.slice(0, 2)).toEqual(["pipeline", "stats"]);
       // "stats" was already in order, so it's not hidden twice.
-      expect(out.hidden).toEqual([]);
+      expect(out.hidden).toEqual(DEFAULT_LAYOUT.hidden);
       expect(new Set(out.order).size).toBe(out.order.length);
     });
 
     it("appends blocks a stored layout doesn't know, so new ones show up", () => {
       const out = normalizeLayout({ order: ["pitches"], hidden: ["stats"] });
       expect(out.order[0]).toBe("pitches");
-      expect(out.hidden).toEqual(["stats"]);
+      expect(out.hidden).toEqual(["stats", ...DASHBOARD_BLOCK_IDS.filter(isDefaultHidden)]);
       expect([...out.order, ...out.hidden].sort()).toEqual([...DASHBOARD_BLOCK_IDS].sort());
       expect(out.order).not.toContain("stats");
+      expect(out.order).toEqual(["pitches", ...DASHBOARD_BLOCK_IDS.filter((id) => id !== "pitches" && id !== "stats" && !isDefaultHidden(id))]);
+    });
+
+    it("blocks that start hidden go to `hidden` when the stored layout doesn't know them, never to the order", () => {
+      // A layout saved before the tendency blocks existed.
+      const old = normalizeLayout({ order: ["stats", "activity"], hidden: ["storage"] });
+      expect(old.order).not.toContain("tempoKey");
+      expect(old.hidden).toContain("tempoKey");
+      expect(old.hidden).toContain("songShape");
+      expect(visibleBlocks(old)).not.toContain("workingHours");
+      // The user's own placement of a tendency block is kept.
+      const placed = normalizeLayout({ order: ["tempoKey", "stats"], hidden: [] });
+      expect(placed.order.slice(0, 2)).toEqual(["tempoKey", "stats"]);
+      expect(placed.hidden).toEqual(DASHBOARD_BLOCK_IDS.filter((id) => isDefaultHidden(id) && id !== "tempoKey"));
+      // Garbage gives the default, tendency blocks hidden.
+      expect(normalizeLayout(undefined).hidden).toEqual(DEFAULT_LAYOUT.hidden);
+    });
+
+    it("showBlock puts a default-hidden block on the grid, at the bottom", () => {
+      const shown = showBlock(DEFAULT_LAYOUT, "collaborators");
+      expect(shown.order[shown.order.length - 1]).toBe("collaborators");
+      expect(shown.hidden).not.toContain("collaborators");
+      expect(normalizeLayout(JSON.parse(JSON.stringify(shown)))).toEqual(shown);
     });
 
     it("checks variants and sizes against the registry", () => {
@@ -100,11 +136,11 @@ describe("dashboard layout", () => {
     it("hideBlock and showBlock move a block between the lists; show appends", () => {
       const hidden = hideBlock(DEFAULT_LAYOUT, "stats");
       expect(hidden.order).not.toContain("stats");
-      expect(hidden.hidden).toEqual(["stats"]);
+      expect(hidden.hidden).toEqual([...DEFAULT_LAYOUT.hidden, "stats"]);
       expect(visibleBlocks(hidden)).not.toContain("stats");
       expect(hideBlock(hidden, "stats")).toBe(hidden);
       const shown = showBlock(hidden, "stats");
-      expect(shown.hidden).toEqual([]);
+      expect(shown.hidden).toEqual(DEFAULT_LAYOUT.hidden);
       expect(shown.order[shown.order.length - 1]).toBe("stats");
       expect(showBlock(DEFAULT_LAYOUT, "stats")).toBe(DEFAULT_LAYOUT);
     });
