@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { UPDATES_ENABLED } from "../lib/updater";
+import { isReadOnlyInstallError } from "../lib/updaterErrors";
 import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
@@ -864,10 +865,12 @@ const T_UPDATES = dict(
     downloading: (pct: number | null) => `Downloading…${pct === null ? "" : ` ${pct}%`}`,
     restarting: "Installed, restarting…",
     devBuild: "Development build: updates are off here. Install a release to test them.",
+    readOnly: "Hivo is running from a read-only place (the disk image, or the copy macOS makes of a downloaded app). Move it to Applications with Finder, open it from there, and try again.",
   },
   {
     hint: "Vérifié une fois au lancement. Une mise à jour se télécharge, s'installe et relance l'appli en un clic.",
     devBuild: "Version de développement : les mises à jour sont désactivées ici. Installe une release pour les tester.",
+    readOnly: "Hivo tourne depuis un emplacement en lecture seule (l'image disque, ou la copie que macOS fait d'une appli téléchargée). Déplace-le dans Applications avec le Finder, ouvre-le de là et réessaie.",
     check: "Vérifier les mises à jour",
     checking: "Vérification…",
     upToDate: "Tu as la dernière version.",
@@ -913,7 +916,7 @@ function UpdatesSection() {
         : status === "ready"
           ? t.restarting
           : status === "error"
-            ? (update.error ?? "")
+            ? (isReadOnlyInstallError(update.error) ? t.readOnly : (update.error ?? ""))
             : checked && status === "idle"
               ? t.upToDate
               : null;

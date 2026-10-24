@@ -19,6 +19,7 @@ import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { supabase } from "./lib/supabase";
+import { isReadOnlyInstallError } from "./lib/updaterErrors";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
 import { useCrewStore, useInCrew } from "./store/useCrewStore";
 import { StatusDot, btnPrimary, btnQuiet } from "./ui";
@@ -40,6 +41,7 @@ const T = dict(
     updateDownloading: (v: string, pct: number | null) => `Downloading Hivo ${v}${pct === null ? "…" : ` · ${pct}%`}`,
     updateRestarting: (v: string) => `Hivo ${v} is installed, restarting…`,
     updateFailed: (v: string, error: string) => `Couldn't update to Hivo ${v}: ${error}`,
+    updateReadOnly: "Hivo is running from a read-only place (the disk image, or the copy macOS makes of a downloaded app). Move it to Applications with Finder, open it from there, and try again.",
     updateNow: "Update and restart",
     retry: "Retry",
     later: "Later",
@@ -61,6 +63,7 @@ const T = dict(
     updateDownloading: (v: string, pct: number | null) => `Téléchargement de Hivo ${v}${pct === null ? "…" : ` · ${pct} %`}`,
     updateRestarting: (v: string) => `Hivo ${v} est installé, redémarrage…`,
     updateFailed: (v: string, error: string) => `Impossible de passer à Hivo ${v} : ${error}`,
+    updateReadOnly: "Hivo tourne depuis un emplacement en lecture seule (l'image disque, ou la copie que macOS fait d'une appli téléchargée). Déplace-le dans Applications avec le Finder, ouvre-le de là et réessaie.",
     updateNow: "Mettre à jour et redémarrer",
     retry: "Réessayer",
     later: "Plus tard",
@@ -86,7 +89,9 @@ function UpdateNotice() {
         ? tr(T).updateDownloading(version, pct)
         : status === "ready"
           ? tr(T).updateRestarting(version)
-          : tr(T).updateFailed(version, update.error ?? "");
+          : isReadOnlyInstallError(update.error)
+            ? tr(T).updateReadOnly
+            : tr(T).updateFailed(version, update.error ?? "");
   return (
     <div role="status" className="flex shrink-0 items-center gap-3 border-b border-rule bg-panel px-5 py-2 text-xs">
       <StatusDot color={led} size={7} />
