@@ -813,6 +813,8 @@ const T_DIGGER = dict(
     remove: "Remove",
     saved: "Link saved. Each YouTube result in the Digger gets a Convert button.",
     removed: "Link removed.",
+    howTo:
+      "The converter page's address. If the site takes the video address in its own link, put {url} where it goes; otherwise Hivo opens the page and copies the video address for you to paste there.",
     disclosure:
       "Hivo opens this link with the video address and nothing else. The site, its terms and what you do with the file are between you and it; Hivo never downloads audio.",
   },
@@ -824,6 +826,8 @@ const T_DIGGER = dict(
     remove: "Retirer",
     saved: "Lien enregistré. Chaque résultat YouTube du Digger a un bouton Convertir.",
     removed: "Lien retiré.",
+    howTo:
+      "L'adresse de la page de conversion. Si le site prend l'adresse de la vidéo dans son propre lien, mets {url} à sa place ; sinon Hivo ouvre la page et copie l'adresse de la vidéo pour que tu la colles là-bas.",
     disclosure:
       "Hivo ouvre ce lien avec l'adresse de la vidéo et rien d'autre. Le site, ses conditions et ce que tu fais du fichier, c'est entre toi et lui ; Hivo ne télécharge jamais d'audio.",
   },
@@ -863,6 +867,7 @@ function DiggerSettings() {
       <label className="mt-3 block text-xs text-body" htmlFor="converter-link">
         {t.converter}
       </label>
+      <p className="mt-1 text-[11px] leading-relaxed text-engrave">{t.howTo}</p>
       <form
         className="mt-1 flex items-center gap-2"
         onSubmit={(e) => {

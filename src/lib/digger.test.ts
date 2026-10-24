@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, converterLink, deeperExclude, embedUrl, foundKey, matchBeat, titleKey, foundTitles, googleSearchUrl, leadFacts, leadHash, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
+import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, converterLink, converterNeedsPaste, deeperExclude, embedUrl, foundKey, matchBeat, titleKey, foundTitles, googleSearchUrl, leadFacts, leadHash, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
@@ -131,7 +131,12 @@ describe("digger leads", () => {
     expect(converterLink("https://example.com/convert?u={url}", video)).toBe(`https://example.com/convert?u=${encodeURIComponent(video)}`);
     expect(converterLink(" https://example.com/{url}/go?x={url} ", "https://a.b/c")).toBe("https://example.com/https%3A%2F%2Fa.b%2Fc/go?x=https%3A%2F%2Fa.b%2Fc");
     expect(converterLink("http://example.com/convert?u={url}", video)).toBeNull();
-    expect(converterLink("https://example.com/convert", video)).toBeNull();
+    // No slot: the page itself, and the address goes to the clipboard.
+    expect(converterLink("https://example.com/convert", video)).toBe("https://example.com/convert");
+    expect(converterNeedsPaste("https://example.com/convert")).toBe(true);
+    expect(converterNeedsPaste("https://example.com/convert?u={url}")).toBe(false);
+    expect(converterNeedsPaste("http://example.com/convert")).toBe(false);
+    expect(converterNeedsPaste(undefined)).toBe(false);
     expect(converterLink("javascript:{url}", video)).toBeNull();
     expect(converterLink(undefined, video)).toBeNull();
     expect(converterLink("", video)).toBeNull();

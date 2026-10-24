@@ -1,13 +1,12 @@
 import { ExternalLink, FolderOpen, Pause, Play } from "lucide-react";
 import { useDigger } from "../store/useDigger";
-import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
-import { converterLink, matchBeat, youtubeId } from "../lib/digger";
+import { matchBeat, youtubeId } from "../lib/digger";
 import { formatRelative } from "../lib/format";
 import { dict, tr } from "../i18n";
 import type { BeatFile, SavedLead } from "../types";
 import { ConfirmButton } from "../ui";
-import { LikeChip, chip, secondary } from "./DigResults";
+import { ConvertButton, LikeChip, chip, secondary } from "./DigResults";
 
 // The Digger's "Saved prods" tab: every lead saved with "Save to Prods"
 // (the text files in the beats folders' `_leads`), newest first, with the
@@ -27,8 +26,6 @@ const T = dict(
     playTitle: (title: string) => `Play ${title}`,
     open: "Open",
     openTitle: (title: string) => `Open ${title} in the browser`,
-    convert: "Convert",
-    convertTitle: "Opens your converter link in the browser with this video's address. The site, its terms and the file are between you and it.",
     showFile: "Show file",
     remove: "Remove",
     confirmRemove: "Delete the lead file?",
@@ -47,8 +44,6 @@ const T = dict(
     playTitle: (title: string) => `Écouter ${title}`,
     open: "Ouvrir",
     openTitle: (title: string) => `Ouvrir ${title} dans le navigateur`,
-    convert: "Convertir",
-    convertTitle: "Ouvre ton lien de conversion dans le navigateur avec l'adresse de cette vidéo. Le site, ses conditions et le fichier, c'est entre toi et lui.",
     showFile: "Voir le fichier",
     remove: "Retirer",
     confirmRemove: "Supprimer le fichier de la prod ?",
@@ -93,9 +88,7 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
   const t = tr(T);
   const setPlaying = useDigger((s) => s.setPlaying);
   const deleteLead = useDigger((s) => s.deleteLead);
-  const converter = useAppStore((s) => s.settings.converterUrlTemplate);
   const id = lead.url ? youtubeId(lead.url) : null;
-  const convert = lead.url ? converterLink(converter, lead.url) : null;
   const facts = [
     lead.producer,
     lead.year,
@@ -147,11 +140,7 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
             <ExternalLink size={11} aria-hidden /> {t.open}
           </button>
         )}
-        {convert && (
-          <button type="button" onClick={() => void api.openExternal(convert)} title={t.convertTitle} className={secondary}>
-            {t.convert}
-          </button>
-        )}
+        {lead.url && <ConvertButton url={lead.url} />}
         {lead.url && <LikeChip id={id ?? lead.url} title={lead.title} />}
         <button type="button" onClick={() => void api.revealInFileManager(lead.path)} className={`${secondary} flex items-center gap-1`}>
           <FolderOpen size={11} aria-hidden /> {t.showFile}
