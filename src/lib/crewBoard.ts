@@ -87,6 +87,8 @@ export function crewMove(songs: CrewSongRow[], cfg: PipelineConfig, onServer: bo
   const others = inColumn.filter((s) => s.id !== songId);
   let at = beforeId ? others.findIndex((s) => s.id === beforeId) : others.length;
   if (at < 0) at = others.length;
+  // Dropped where it already sits: nothing changes, so no call to the server.
+  if (inColumn.findIndex((s) => s.id === songId) === at) return { kind: "none" };
   const base = { kind: "card" as const, songId, columnId, expectedAt: song.stage_updated_at };
   // Every card up to the drop point is placed by hand: one order between them.
   if (others.slice(0, at === others.length ? at : at + 1).every(placed)) {

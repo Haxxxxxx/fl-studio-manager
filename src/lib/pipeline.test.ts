@@ -97,6 +97,20 @@ describe("pipeline model", () => {
     expect(names(w, [...all, D])[1]).toEqual(["Creation", ["A", "B", "C", "D"]]);
   });
 
+  it("a drop that changes nothing leaves the workspace alone (no column pinned, no hand-sort)", () => {
+    const w = ws({ "/p/A.flp": { status: "creation" }, "/p/B.flp": { status: "creation" } });
+    expect(names(w, all)[1]).toEqual(["Creation", ["A", "B"]]);
+    // On itself, before its own follower, or at the end when it's already last.
+    expect(moveCard(w, all, "/p/A.flp", "creation", "/p/A.flp")).toBe(w);
+    expect(moveCard(w, all, "/p/A.flp", "creation", "/p/B.flp")).toBe(w);
+    expect(moveCard(w, all, "/p/B.flp", "creation", null)).toBe(w);
+    // A real move still lands.
+    expect(names(moveCard(w, all, "/p/B.flp", "creation", "/p/A.flp"), all)[1]).toEqual(["Creation", ["B", "A"]]);
+    // Same spot in another column of the same stage is a move (the pin changes).
+    const two = addColumn(w, "Mixing", "creation", "mix");
+    expect(moveCard(two, all, "/p/A.flp", "mix", null)).not.toBe(two);
+  });
+
   it("a stage changed elsewhere (drawer, crewmate) moves the song to that stage's first column", () => {
     let w = addColumn(ws(), "Mixing", "production", "mix");
     w = moveCard(w, all, "/p/A.flp", "mix", null, NOW);
