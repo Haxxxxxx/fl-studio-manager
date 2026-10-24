@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
+import { UPDATES_ENABLED } from "../lib/updater";
 import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
@@ -862,9 +863,11 @@ const T_UPDATES = dict(
     install: "Update and restart",
     downloading: (pct: number | null) => `Downloading…${pct === null ? "" : ` ${pct}%`}`,
     restarting: "Installed, restarting…",
+    devBuild: "Development build: updates are off here. Install a release to test them.",
   },
   {
     hint: "Vérifié une fois au lancement. Une mise à jour se télécharge, s'installe et relance l'appli en un clic.",
+    devBuild: "Version de développement : les mises à jour sont désactivées ici. Installe une release pour les tester.",
     check: "Vérifier les mises à jour",
     checking: "Vérification…",
     upToDate: "Tu as la dernière version.",
@@ -920,11 +923,11 @@ function UpdatesSection() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-sm font-semibold text-cream">Hivo{version ? ` ${version}` : ""}</h2>
-          <p className="mt-0.5 text-xs text-engrave">{t.hint}</p>
+          <p className="mt-0.5 text-xs text-engrave">{UPDATES_ENABLED ? t.hint : t.devBuild}</p>
         </div>
         <button
           onClick={() => void check()}
-          disabled={status === "checking" || status === "downloading" || status === "ready"}
+          disabled={!UPDATES_ENABLED || status === "checking" || status === "downloading" || status === "ready"}
           className="shrink-0 rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
         >
           {status === "checking" ? t.checking : t.check}
