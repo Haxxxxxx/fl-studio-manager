@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import * as api from "../lib/tauri";
-import { deeperExclude, foundTitles, searchesDone } from "../lib/digger";
+import { deeperExclude, foundTitles, likedTitles, searchesDone, toggleLiked, type Liked } from "../lib/digger";
 import { useAppStore } from "./useAppStore";
 import type { BeatFile, DigResult, WebLink, YoutubeVideo } from "../types";
 
@@ -14,6 +14,22 @@ export const MAX_PICKS = 5;
 export interface DeeperRound {
   links: WebLink[];
   queries: string[];
+  /** The titles of the results the round was seeded from ("Use for next dig"). */
+  seeds: string[];
+}
+
+/** One round's YouTube results: the search that ran and what it gave back. */
+export interface RoundResults {
+  query: string;
+  videos: YoutubeVideo[];
+}
+
+/** `list` with `entry` at `round`, earlier rounds that never searched left empty. */
+function withRound(list: RoundResults[], round: number, entry: RoundResults): RoundResults[] {
+  const out = list.slice();
+  while (out.length < round) out.push({ query: "", videos: [] });
+  out[round] = entry;
+  return out;
 }
 
 interface DiggerState {
@@ -27,15 +43,27 @@ interface DiggerState {
   toggle: (path: string) => void;
   clearPicks: () => void;
   setQuery: (query: string) => void;
-  /** The web search (DigPanel): what was searched and what YouTube gave back. */
+  /** The YouTube search box (DigResults): what was typed, whether a search runs. */
   webQuery: string;
-  results: YoutubeVideo[];
   searching: boolean;
   searchError: string | null;
-  /** The query the current `results` answer (null before any search). */
+  /** The last search that answered (null before any search). */
   searchedFor: string | null;
   setWebQuery: (q: string) => void;
+  /** Search YouTube; the results land in the round on screen (`shownRound`). */
   searchYoutube: (q: string) => Promise<void>;
+  /** The round on screen: 0 is the dig, n is rounds[n - 1]. Back to the
+   * latest whenever a dig or a round arrives. */
+  shownRound: number;
+  setShownRound: (round: number) => void;
+  /** YouTube results per round, indexed like the breadcrumb: 0 is the dig's
+   * first search, n is rounds[n - 1]'s, each updated by a manual search
+   * while that round is shown. */
+  roundResults: RoundResults[];
+  /** Results picked for the next round to go closer to (max MAX_LIKED);
+   * a new dig clears them. */
+  liked: Liked[];
+  toggleLiked: (id: string, title: string) => void;
   /** The AI dig over the picks (Rust: digger.rs). */
   dig: DigResult | null;
   /** The picks the current `dig` is about. */
@@ -84,7 +112,6 @@ export const useDigger = create<DiggerState>((set, get) => ({
   clearPicks: () => set({ picked: [] }),
   setQuery: (query) => set({ query }),
   webQuery: "",
-  results: [],
   searching: false,
   searchError: null,
   searchedFor: null,
@@ -92,17 +119,25 @@ export const useDigger = create<DiggerState>((set, get) => ({
   searchYoutube: async (q) => {
     const query = q.trim();
     if (!query) return;
+    // The results belong to the round on screen when the search started.
+    const round = get().shownRound;
     set({ webQuery: query, searching: true, searchError: null });
     try {
-      const results = await api.youtubeSearch(query);
+      const videos = await api.youtubeSearch(query);
       // A slower, older search must not overwrite a newer one.
-      if (get().webQuery === query) set({ results, searchedFor: query });
+      if (get().webQuery === query) set({ searchedFor: query, roundResults: withRound(get().roundResults, round, { query, videos }) });
     } catch (e) {
-      if (get().webQuery === query) set({ results: [], searchedFor: null, searchError: e instanceof Error ? e.message : String(e) });
+      // The round keeps what it had; the error shows above it.
+      if (get().webQuery === query) set({ searchedFor: null, searchError: e instanceof Error ? e.message : String(e) });
     } finally {
       if (get().webQuery === query) set({ searching: false });
     }
   },
+  shownRound: 0,
+  setShownRound: (shownRound) => set({ shownRound }),
+  roundResults: [],
+  liked: [],
+  toggleLiked: (id, title) => set({ liked: toggleLiked(get().liked, id, title) }),
   dig: null,
   dugFor: [],
   digging: false,
@@ -113,9 +148,10 @@ export const useDigger = create<DiggerState>((set, get) => ({
     set({ digging: true, digError: null });
     try {
       const dig = await api.digBeats(picks, language);
-      set({ dig, dugFor: picks, rounds: [], deeperError: null });
+      // A fresh dig: no rounds, no per-round results, no picks, back to round 0.
+      set({ dig, dugFor: picks, rounds: [], roundResults: [], liked: [], shownRound: 0, deeperError: null });
       markUnseen(set);
-      // Start the first AI search right away; the others are one click.
+      // Start the first AI search right away (round 0's results); the others are one click.
       const first = dig.analysis.queries[0];
       if (first) {
         set({ webQuery: first });
@@ -131,18 +167,24 @@ export const useDigger = create<DiggerState>((set, get) => ({
   diggingDeeper: false,
   deeperError: null,
   runDeeper: async (language, youtube) => {
-    const { dig, rounds, results, diggingDeeper } = get();
+    const { dig, rounds: before, roundResults, liked, diggingDeeper } = get();
     if (!dig || diggingDeeper) return;
     set({ diggingDeeper: true, deeperError: null });
     try {
-      const links = rounds.map((r) => r.links);
-      // Everything already on screen, so the new searches go elsewhere.
-      const shown = foundTitles([...dig.web, ...links.flat()].map((l) => l.text).concat(results.map((v) => v.title)));
-      const round = await api.digDeeper(dig.analysis, deeperExclude(dig.web, links), shown, searchesDone(rounds), language);
+      const links = before.map((r) => r.links);
+      // Everything already on screen (every round's), so the new searches go elsewhere.
+      const shown = foundTitles([...dig.web, ...links.flat()].map((l) => l.text).concat(roundResults.flatMap((r) => r.videos.map((v) => v.title))));
+      // The picks steer the round: their titles go to both prompts as data.
+      const seeds = likedTitles(liked);
+      const round = await api.digDeeper(dig.analysis, deeperExclude(dig.web, links), shown, searchesDone(before), seeds, language);
       // A new dig meanwhile made this round about the wrong picks.
       if (get().dig !== dig) return;
       const brought = round.web.length > 0 || round.queries.length > 0;
-      if (brought) set({ rounds: [...get().rounds, { links: round.web, queries: round.queries }] });
+      if (brought) {
+        // The new round goes on screen, so its first search lands in it.
+        const rounds = [...get().rounds, { links: round.web, queries: round.queries, seeds }];
+        set({ rounds, shownRound: rounds.length });
+      }
       if (round.webError) set({ deeperError: round.webError });
       // The menu dot means "something new to look at", not "a round ran".
       if (brought) markUnseen(set);

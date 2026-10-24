@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_QUERY_CHARS, beatFactsLine, beatQuery, deeperExclude, foundKey, foundTitles, googleSearchUrl, searchesDone, youtubeId, youtubeSearchUrl } from "./digger";
+import { MAX_EXCLUDE, MAX_FOUND_TITLES, MAX_LIKED, MAX_QUERY_CHARS, beatFactsLine, beatQuery, deeperExclude, foundKey, foundTitles, googleSearchUrl, likedTitles, searchesDone, seedList, toggleLiked, youtubeId, youtubeSearchUrl } from "./digger";
 
 describe("digger links", () => {
   it("builds a YouTube search page link", () => {
@@ -35,6 +35,30 @@ describe("digger links", () => {
     expect(foundTitles([" Night  Drive ", "", "night drive", "Cold Room", "x".repeat(300)])).toEqual(["Night Drive", "Cold Room", "x".repeat(120)]);
     expect(foundTitles(Array.from({ length: 70 }, (_, i) => `Beat ${i}`)).length).toBe(MAX_FOUND_TITLES);
     expect(foundTitles([])).toEqual([]);
+  });
+
+  it(`picks results for the next round, at most ${MAX_LIKED}, titles cleaned; picking again unpicks`, () => {
+    let liked = toggleLiked([], "v1", "  Night  Drive ");
+    liked = toggleLiked(liked, "https://www.beatstars.com/beat/x", "");
+    expect(liked).toEqual([
+      { id: "v1", title: "Night Drive" },
+      { id: "https://www.beatstars.com/beat/x", title: "https://www.beatstars.com/beat/x" },
+    ]);
+    expect(toggleLiked(liked, "v1", "Night Drive")).toEqual([{ id: "https://www.beatstars.com/beat/x", title: "https://www.beatstars.com/beat/x" }]);
+    expect(toggleLiked([], "v2", "x".repeat(300))[0].title.length).toBe(120);
+    let full: ReturnType<typeof toggleLiked> = [];
+    for (let i = 0; i < MAX_LIKED + 5; i++) full = toggleLiked(full, `v${i}`, `Beat ${i}`);
+    expect(full.length).toBe(MAX_LIKED);
+    expect(toggleLiked(full, "v0", "Beat 0").length).toBe(MAX_LIKED - 1);
+  });
+
+  it("lists the picks' titles for the round, once each, capped, and sums them up for a tooltip", () => {
+    expect(likedTitles([{ id: "a", title: "Night Drive" }, { id: "b", title: "night drive" }, { id: "c", title: "Cold Room" }])).toEqual(["Night Drive", "Cold Room"]);
+    expect(likedTitles(Array.from({ length: 30 }, (_, i) => ({ id: `v${i}`, title: `Beat ${i}` }))).length).toBe(MAX_LIKED);
+    expect(likedTitles([])).toEqual([]);
+    expect(seedList(["A", "B"])).toBe("A, B");
+    expect(seedList(["A", "B", "C", "D", "E"])).toBe("A, B, C +2");
+    expect(seedList([])).toBe("");
   });
 
   it("lists the searches earlier rounds ran, once each, capped", () => {

@@ -63,12 +63,9 @@ export function DiggerView() {
   const t = tr(T);
   const folders = useAppStore((s) => s.settings.beatFolders ?? NO_FOLDERS);
   const addBeatFolder = useAppStore((s) => s.addBeatFolder);
-  const { beats, loading, error, picked, query, load, toggle, clearPicks, setQuery, dig, rounds, webQuery, searchedFor, searching, clearUnseen } = useDigger();
+  const { beats, loading, error, picked, query, load, toggle, clearPicks, setQuery, dig, webQuery, searchedFor, searching, clearUnseen, shownRound, setShownRound } = useDigger();
   const [playing, setPlaying] = useState<string | null>(null);
   const [yt, setYt] = useState<YoutubeStatus | null>(null);
-  // The round on screen (DigResults + DigPanel): back to the latest one
-  // whenever a dig or a round arrives.
-  const [selectedRound, setSelectedRound] = useState(0);
   // The results section is always there (its search box is the only way to
   // search YouTube); it takes its share of the height once it has something.
   const showResults = !!dig || searchedFor !== null || searching || webQuery.trim() !== "";
@@ -103,10 +100,6 @@ export function DiggerView() {
       live = false;
     };
   }, []);
-
-  useEffect(() => {
-    setSelectedRound(rounds.length);
-  }, [dig, rounds.length]);
 
   const playToggle = (b: BeatFile) => {
     const el = audio.current;
@@ -217,9 +210,9 @@ export function DiggerView() {
                 )}
               </div>
             </div>
-            <DigResults yt={yt} round={selectedRound} setRound={setSelectedRound} fill={showResults} />
+            <DigResults yt={yt} round={shownRound} setRound={setShownRound} fill={showResults} />
           </div>
-          <DigPanel yt={yt} round={selectedRound} />
+          <DigPanel yt={yt} round={shownRound} />
         </div>
       )}
     </div>
