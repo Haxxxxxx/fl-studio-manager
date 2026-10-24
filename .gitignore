@@ -35,3 +35,6 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 .design-sync/lib/
+
+# Claude Code worktrees (local only)
+.claude/worktrees/
