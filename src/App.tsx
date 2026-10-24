@@ -1,7 +1,7 @@
 import { DiggerView } from "./components/DiggerView";
 import { applyLang, dict, resolveLang, tr } from "./i18n";
 import { CrewBoardView, CrewMembersView, CrewReleasesView, CrewSettingsView } from "./components/CrewViews";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./components/Sidebar";
@@ -20,6 +20,8 @@ import { NewProjectModal } from "./components/NewProjectModal";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { supabase } from "./lib/supabase";
 import { isReadOnlyInstallError } from "./lib/updaterErrors";
+import { appLocation } from "./lib/tauri";
+import { UPDATES_ENABLED } from "./lib/updater";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
 import { useCrewStore, useInCrew } from "./store/useCrewStore";
 import { StatusDot, btnPrimary, btnQuiet } from "./ui";
@@ -42,6 +44,10 @@ const T = dict(
     updateRestarting: (v: string) => `Hivo ${v} is installed, restarting…`,
     updateFailed: (v: string, error: string) => `Couldn't update to Hivo ${v}: ${error}`,
     updateReadOnly: "Hivo is running from a read-only place (the disk image, or the copy macOS makes of a downloaded app). Move it to Applications with Finder, open it from there, and try again.",
+    locationDmg: "Hivo is running from the disk image: updates can't install here. Drag it to Applications in Finder and open it from there.",
+    locationTranslocated: "macOS is running a quarantine copy of Hivo: updates can't install here. Move it to Applications with Finder (or run the fix command in Terminal) and reopen it.",
+    copyFix: "Copy fix command",
+    copied: "Copied",
     updateNow: "Update and restart",
     retry: "Retry",
     later: "Later",
@@ -64,6 +70,10 @@ const T = dict(
     updateRestarting: (v: string) => `Hivo ${v} est installé, redémarrage…`,
     updateFailed: (v: string, error: string) => `Impossible de passer à Hivo ${v} : ${error}`,
     updateReadOnly: "Hivo tourne depuis un emplacement en lecture seule (l'image disque, ou la copie que macOS fait d'une appli téléchargée). Déplace-le dans Applications avec le Finder, ouvre-le de là et réessaie.",
+    locationDmg: "Hivo tourne depuis l'image disque : les mises à jour ne peuvent pas s'installer ici. Glisse-le dans Applications avec le Finder et ouvre-le de là.",
+    locationTranslocated: "macOS exécute une copie en quarantaine de Hivo : les mises à jour ne peuvent pas s'installer ici. Déplace-le dans Applications avec le Finder (ou lance la commande de réparation dans le Terminal) et rouvre-le.",
+    copyFix: "Copier la commande de réparation",
+    copied: "Copié",
     updateNow: "Mettre à jour et redémarrer",
     retry: "Réessayer",
     later: "Plus tard",
@@ -126,6 +136,48 @@ function UpdateNotice() {
 
 /** Stays up while the workspace can't be read or saved (the red banner
  * above is one-off and dismissable; this one isn't). */
+/** The fix Terminal command for a quarantined copy (what the strip copies). */
+const FIX_COMMAND = "xattr -cr /Applications/Hivo.app";
+
+/** On macOS, a warning when Hivo runs from the disk image or from Gatekeeper's
+ * quarantine copy: in-app updates would fail there (see updaterErrors.ts). */
+function LocationNotice() {
+  const [kind, setKind] = useState<"dmg" | "translocated" | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    if (!UPDATES_ENABLED) return;
+    let live = true;
+    appLocation()
+      .then((l) => live && setKind(l.readOnly))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!kind || dismissed) return null;
+  const copy = () => {
+    void navigator.clipboard.writeText(FIX_COMMAND).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div role="status" className="flex shrink-0 items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-1.5 text-xs text-cream">
+      <StatusDot color="var(--color-warn)" size={6} />
+      <span className="flex-1">{kind === "dmg" ? tr(T).locationDmg : tr(T).locationTranslocated}</span>
+      {kind === "translocated" && (
+        <button onClick={copy} className="rounded border border-rule-strong px-2 py-0.5 font-mono text-[11px] text-body hover:bg-raised hover:text-cream">
+          {copied ? tr(T).copied : tr(T).copyFix}
+        </button>
+      )}
+      <button onClick={() => setDismissed(true)} aria-label={tr(T).dismiss} className="text-engrave hover:text-cream">
+        ✕
+      </button>
+    </div>
+  );
+}
+
 function NotSavingStrip() {
   const writable = useAppStore((s) => s.workspaceWritable);
   const saveError = useAppStore((s) => s.saveError);
@@ -232,6 +284,7 @@ export default function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <UpdateNotice />
         <NotSavingStrip />
+        <LocationNotice />
         {view === "dashboard" && <Dashboard />}
         {view === "library" && <LibraryView />}
         {view === "pipeline" && <PipelineView />}

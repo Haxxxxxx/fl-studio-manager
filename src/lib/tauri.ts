@@ -51,6 +51,8 @@ export const removeBeatFolder = (folder: string): Promise<Settings> => invoke("r
 export const scanBeats = (): Promise<BeatFile[]> => invoke("scan_beats");
 /** Whether a YouTube Data API key is set (the key itself never comes back). */
 export const youtubeStatus = (): Promise<YoutubeStatus> => invoke("youtube_status");
+/** Whether the app runs from a read-only place on macOS ("dmg", "translocated") or null. */
+export const appLocation = (): Promise<{ readOnly: "dmg" | "translocated" | null }> => invoke("app_location");
 /** Saves (or, with null, removes) the YouTube key. */
 export const setYoutubeKey = (key: string | null): Promise<void> => invoke("set_youtube_key", { key });
 /** YouTube music-video search (Rust side, cached for a few hours). */
