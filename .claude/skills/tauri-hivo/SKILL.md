@@ -24,9 +24,14 @@ Use the generic `tauri-v2` skill for the framework; this is what's decided here.
   must say the same thing apart from the dev server/local Supabase hosts and
   `'unsafe-inline'` in `devCsp`'s `script-src` (the Vite dev server needs it;
   the hosts are otherwise identical). Every
-  host is pinned (the Supabase project ref, `i.ytimg.com`, the YouTube no-cookie
-  embed in `frame-src`); never `'unsafe-eval'`, never a wildcard. Fonts are
+  host is pinned (the Supabase project ref, `i.ytimg.com`, `www.hi-vo.fr` in
+  `frame-src`); never `'unsafe-eval'`, never a wildcard. Fonts are
   bundled (`@fontsource`), so no Google Fonts host anywhere.
+- The Digger's player frames `https://www.hi-vo.fr/embed.html?v=<id>`
+  (`web/public/embed.html`, `EMBED_PAGE` in `src/lib/digger.ts`), not YouTube:
+  the webview's `tauri://localhost` origin sends no referrer and YouTube answers
+  error 153 without one. The wrapper's own CSP (`web/vercel.json`) lists the
+  app origins in `frame-ancestors`; a new app origin must be added there.
 - `media-src`/`img-src` allow the `asset:` protocol; folders are allowed from
   Rust (`asset_protocol_scope().allow_directory`) only for the user's own folders.
 

@@ -32,7 +32,7 @@
         "object-src": "'none'",
         "base-uri": "'self'",
         "form-action": "'none'",
-        "frame-src": "https://www.youtube-nocookie.com"
+        "frame-src": "https://www.hi-vo.fr"
       },
       "devCsp": {
         "default-src": "'self'",
@@ -45,7 +45,7 @@
         "object-src": "'none'",
         "base-uri": "'self'",
         "form-action": "'none'",
-        "frame-src": "https://www.youtube-nocookie.com"
+        "frame-src": "https://www.hi-vo.fr"
       },
       "assetProtocol": {
         "enable": true,
