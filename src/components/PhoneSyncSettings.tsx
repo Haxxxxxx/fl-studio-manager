@@ -111,7 +111,9 @@ export function PhoneSyncSettings() {
     setError(null);
     try {
       const p = await api.phoneSyncPair();
-      const qr = await QRCode.toDataURL(p.url, { errorCorrectionLevel: "M", margin: 2, width: 232 });
+      // Low error correction keeps the modules big; a 4-module quiet zone and a
+      // 2x bitmap shown at 320 px (no smoothing) are what phone scanners need.
+      const qr = await QRCode.toDataURL(p.url, { errorCorrectionLevel: "L", margin: 4, width: 640 });
       setPairing({ ...p, qr });
       setCopied(false);
       setStatus(await api.phoneSyncStatus());
@@ -158,7 +160,7 @@ export function PhoneSyncSettings() {
       {pairing && (
         <div className="mt-3 rounded-lg border border-rule bg-panel p-4">
           <p className="text-xs leading-relaxed text-body">{t.scan}</p>
-          <img src={pairing.qr} alt={t.pair} width={232} height={232} className="mt-3 rounded bg-white" />
+          <img src={pairing.qr} alt={t.pair} width={320} height={320} style={{ imageRendering: "pixelated" }} className="mt-3 rounded bg-white" />
           <p className="mt-3 text-[11px] text-engrave">{t.pasteHint}</p>
           <div className="mt-1 select-all break-all rounded border border-rule bg-raised p-2 font-mono text-[11px] text-body">{pairing.url}</div>
           <div className={`mt-2 text-xs ${justPaired ? "text-emerald-300" : "text-engrave"}`}>

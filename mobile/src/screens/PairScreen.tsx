@@ -78,6 +78,9 @@ export function PairScreen() {
           onPress={() => (scanning ? setScanning(false) : void startScan())}
           style={{ marginTop: 20 }}
         />
+        {/* Right under the camera, so a refused code is never hidden below the fold. */}
+        {busy ? <Text style={styles.status}>{t.codeRead}</Text> : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Engrave style={{ marginTop: 28, marginBottom: 6 }}>{t.pasteLabel}</Engrave>
         <TextInput
@@ -91,7 +94,6 @@ export function PairScreen() {
           style={styles.input}
         />
         <Button label={busy ? t.pairing : t.pair} onPress={() => void submit(text)} disabled={busy || !text.trim()} style={{ marginTop: 10 }} />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -116,4 +118,5 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   error: { color: C.missing, marginTop: 12, fontSize: 14 },
+  status: { color: C.cream, marginTop: 12, fontSize: 14 },
 });
