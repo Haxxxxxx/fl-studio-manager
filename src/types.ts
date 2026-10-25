@@ -474,6 +474,11 @@ export interface Workspace {
   /** How the "Me" dashboard is arranged. Missing = the default
    * (src/lib/dashboardLayout.ts); normalized on read, never on load. */
   dashboard?: DashboardLayout;
+  /** Notes on the Digger's saved prods, by lead url hash (`leadHash`). Kept
+   * here, not in the lead files, so re-saving a prod never wipes them. */
+  leadNotes?: Record<string, string>;
+  /** Notes on beats (Settings → Beats folders), by file path. */
+  beatNotes?: Record<string, string>;
 }
 
 /** A pipeline column. Columns sit on the fixed lifecycle stages: putting a
