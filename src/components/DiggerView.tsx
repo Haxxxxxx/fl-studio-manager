@@ -1,22 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, FolderPlus, Pause, Play, RefreshCw, Search, Shovel, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { Check, FolderPlus, NotebookPen, Pause, Play, RefreshCw, Search, Shovel, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { MAX_PICKS, filterBeats, useDigger } from "../store/useDigger";
 import * as api from "../lib/tauri";
 import { audioSrc } from "../lib/tauri";
 import { formatBytes, formatRelative } from "../lib/format";
+import { matchBeat } from "../lib/digger";
 import { isFileDrag } from "../lib/dropGuard";
 import { dict, tr } from "../i18n";
 import type { BeatFile, YoutubeStatus } from "../types";
 import { DigPanel } from "./DigPanel";
 import { DigResults } from "./DigResults";
 import { SavedLeads } from "./SavedLeads";
-import { NotesBox } from "./NotesBox";
+import { DigNotesPanel, type LocalPlayer, type NotesTarget } from "./DigNotesPanel";
 
 // The Digger: your raw beats (Settings → Beats folders). Pick up to 5 and dig
 // the web for similar ones to start a new song on (DigPanel). Once a dig or a
 // search exists, the main area splits: beats on top, results below
-// (DigResults).
+// (DigResults). Selecting a beat or a saved prod (a click on its row) swaps
+// the right column for its notes (DigNotesPanel) until ✕, "Back to dig" or Esc.
 
 const NB = " ";
 // A stable empty list: a fresh [] in a store selector re-renders forever.
@@ -44,6 +46,8 @@ const T = dict(
     dismiss: "Dismiss",
     tabBeats: "Your beats",
     tabSaved: (n: number) => `Saved prods · ${n}`,
+    hasNotes: "Has notes",
+    openNotes: (name: string) => `Notes on ${name}`,
   },
   {
     title: "Digger",
@@ -64,8 +68,13 @@ const T = dict(
     dismiss: "Fermer",
     tabBeats: "Tes prods",
     tabSaved: (n: number) => `Prods enregistrées · ${n}`,
+    hasNotes: "A des notes",
+    openNotes: (name: string) => `Notes sur ${name}`,
   },
 );
+
+/** The row whose notes are open: a beat (its path) or a saved prod (its url hash). */
+type Selection = { kind: "beat"; path: string } | { kind: "lead"; hash: string };
 
 export function DiggerView() {
   const t = tr(T);
@@ -73,8 +82,14 @@ export function DiggerView() {
   const addBeatFolder = useAppStore((s) => s.addBeatFolder);
   const { beats, loading, error, picked, query, load, loadLeads, toggle, clearPicks, setQuery, dig, webQuery, searchedFor, searching, clearUnseen, shownRound, setShownRound } = useDigger();
   const [playing, setPlaying] = useState<string | null>(null);
+  // The beat in the <audio> element (playing or paused) and where it is.
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const beatNotes = useAppStore((s) => s.workspace.beatNotes);
-  const setBeatNote = useAppStore((s) => s.setBeatNote);
+  const leads = useDigger((s) => s.leads);
+  // The row whose notes are open in the right column (null: the dig panel).
+  const [selected, setSelected] = useState<Selection | null>(null);
   const [yt, setYt] = useState<YoutubeStatus | null>(null);
   // The top block shows the beats to pick from, or the saved prods.
   const [tab, setTab] = useState<"beats" | "saved">("beats");
@@ -116,6 +131,28 @@ export function DiggerView() {
     };
   }, []);
 
+  // Esc closes the notes panel (not while a text field handles its own Esc).
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (e.target instanceof HTMLInputElement && e.target.type !== "checkbox") return;
+      setSelected(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
+
+  const target = useMemo<NotesTarget | null>(() => {
+    if (!selected) return null;
+    if (selected.kind === "beat") {
+      const beat = beats.find((b) => b.path === selected.path);
+      return beat ? { kind: "beat", beat } : null;
+    }
+    const lead = leads.find((l) => l.hash === selected.hash);
+    return lead ? { kind: "lead", lead, beat: matchBeat(lead, beats) } : null;
+  }, [selected, beats, leads]);
+
   const playToggle = (b: BeatFile) => {
     const el = audio.current;
     if (!el) return;
@@ -124,14 +161,46 @@ export function DiggerView() {
       setPlaying(null);
       return;
     }
-    el.src = audioSrc(b.path);
+    // The same beat paused: carry on from where it stopped.
+    if (loaded !== b.path) {
+      el.src = audioSrc(b.path);
+      setLoaded(b.path);
+      setTime(0);
+      setDuration(0);
+    }
     void el.play().catch(() => setPlaying(null));
     setPlaying(b.path);
   };
 
+  const player: LocalPlayer = {
+    loaded,
+    playing,
+    time,
+    duration,
+    toggle: playToggle,
+    seek: (sec) => {
+      const el = audio.current;
+      if (!el || !loaded) return;
+      el.currentTime = sec;
+      setTime(sec);
+    },
+  };
+
+  /** A click on a row selects it, unless it lands on one of its controls. */
+  const selectRow = (e: MouseEvent, sel: Selection) => {
+    if ((e.target as HTMLElement).closest("button, a, input, textarea, select, label")) return;
+    setSelected(sel);
+  };
+
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <audio ref={audio} onEnded={() => setPlaying(null)} className="hidden" />
+      <audio
+        ref={audio}
+        onEnded={() => setPlaying(null)}
+        onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        className="hidden"
+      />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule px-6 py-3">
         <div className="mr-auto">
           <h1 className="flex items-center gap-2 font-display text-3xl uppercase leading-none tracking-tight text-cream">
@@ -203,7 +272,13 @@ export function DiggerView() {
               {error && <div role="alert" className="mx-6 mt-3 rounded-md border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-cream">{error}</div>}
               <div className="flex-1 overflow-y-auto px-4 py-2">
                 {tab === "saved" ? (
-                  <SavedLeads beats={beats} playingBeat={playing} onPlayBeat={playToggle} />
+                  <SavedLeads
+                    beats={beats}
+                    playingBeat={playing}
+                    onPlayBeat={playToggle}
+                    selected={selected?.kind === "lead" ? selected.hash : null}
+                    onSelect={(hash, e) => (e ? selectRow(e, { kind: "lead", hash }) : setSelected({ kind: "lead", hash }))}
+                  />
                 ) : loading && beats.length === 0 ? (
                   <p className="p-4 text-sm text-engrave">{t.loading}</p>
                 ) : shown.length === 0 ? (
@@ -213,9 +288,14 @@ export function DiggerView() {
                     {shown.map((b) => {
                       const on = picked.includes(b.path);
                       const disabled = !on && full;
+                      const sel = selected?.kind === "beat" && selected.path === b.path;
+                      const hasNote = !!beatNotes?.[b.path];
                       return (
-                        <li key={b.path} className={`flex flex-col gap-1 rounded px-2 py-1.5 ${on ? "bg-raised ring-1 ring-hot/40" : "hover:bg-raised"}`}>
-                          <div className="flex items-center gap-3">
+                        <li
+                          key={b.path}
+                          onClick={(e) => selectRow(e, { kind: "beat", path: b.path })}
+                          className={`flex cursor-pointer items-center gap-3 rounded px-2 py-1.5 ${sel ? "bg-raised ring-1 ring-cream" : on ? "bg-raised ring-1 ring-hot/40" : "hover:bg-raised"}`}
+                        >
                           <button
                             onClick={() => playToggle(b)}
                             aria-label={playing === b.path ? t.pause(b.name) : t.play(b.name)}
@@ -223,21 +303,32 @@ export function DiggerView() {
                           >
                             {playing === b.path ? <Pause size={12} /> : <Play size={12} />}
                           </button>
-                          <label className={`flex min-w-0 flex-1 items-center gap-3 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
-                            <input type="checkbox" checked={on} disabled={disabled} onChange={() => toggle(b.path)} aria-label={t.pick(b.name)} className="accent-orange-500" />
-                            <span className="min-w-0 flex-1">
-                              <span title={b.name} className="block truncate text-sm text-cream">{b.name}</span>
-                              <span className="block truncate font-mono text-[10.5px] text-engrave">{b.folder}</span>
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            disabled={disabled}
+                            onChange={() => toggle(b.path)}
+                            aria-label={t.pick(b.name)}
+                            className={`accent-orange-500 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setSelected({ kind: "beat", path: b.path })}
+                            aria-label={t.openNotes(b.name)}
+                            aria-pressed={sel}
+                            className={`min-w-0 flex-1 text-left ${disabled ? "opacity-50" : ""}`}
+                          >
+                            <span title={b.name} className="block truncate text-sm text-cream">{b.name}</span>
+                            <span className="block truncate font-mono text-[10.5px] text-engrave">{b.folder}</span>
+                          </button>
+                          {hasNote && (
+                            <span title={t.hasNotes} className="shrink-0 text-body">
+                              <NotebookPen size={12} aria-label={t.hasNotes} />
                             </span>
-                          </label>
+                          )}
                           <span className="hidden shrink-0 text-xs text-engrave lg:inline">{formatRelative(b.modifiedAtMs)}</span>
                           <span className="w-16 shrink-0 text-right font-mono text-[11px] text-engrave">{formatBytes(b.sizeBytes)}</span>
                           {on && <Check size={14} className="shrink-0 text-hot" aria-hidden />}
-                          </div>
-                          {/* Under the play button's column, so it reads as this beat's. */}
-                          <div className="pl-[42px]">
-                            <NotesBox value={beatNotes?.[b.path]} onChange={(text) => setBeatNote(b.path, text)} />
-                          </div>
                         </li>
                       );
                     })}
@@ -247,7 +338,7 @@ export function DiggerView() {
             </div>
             <DigResults yt={yt} round={shownRound} setRound={setShownRound} fill={showResults} />
           </div>
-          <DigPanel yt={yt} round={shownRound} />
+          {target ? <DigNotesPanel target={target} player={player} onClose={() => setSelected(null)} /> : <DigPanel yt={yt} round={shownRound} />}
         </div>
       )}
     </div>

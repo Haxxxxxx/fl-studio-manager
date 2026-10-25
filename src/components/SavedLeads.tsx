@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Check, Copy, ExternalLink, FolderOpen, Pause, Play } from "lucide-react";
+import { useRef, useState, type MouseEvent } from "react";
+import { Check, Copy, ExternalLink, FolderOpen, NotebookPen, Pause, Play } from "lucide-react";
 import { useDigger } from "../store/useDigger";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
@@ -9,13 +9,13 @@ import { dict, tr } from "../i18n";
 import type { BeatFile, SavedLead } from "../types";
 import { ConfirmButton } from "../ui";
 import { ConvertButton, LikeChip, chip, secondary } from "./DigResults";
-import { NotesBox } from "./NotesBox";
 
 // The Digger's "Saved prods" tab: every lead saved with "Save to Prods"
 // (the text files in the beats folders' `_leads`), newest first, with the
 // facts read back from the file. A lead plays again in the docked YouTube
 // player; a file in the beats folders whose name matches the title is shown
-// as "In your prods" and plays locally. Nothing here downloads anything.
+// as "In your prods" and plays locally. A click on a row opens its notes in
+// the Digger's right column (DigNotesPanel). Nothing here downloads anything.
 
 const T = dict(
   {
@@ -39,6 +39,9 @@ const T = dict(
     copyManual: "Selected: press ⌘C / Ctrl+C",
     savedOn: (when: string) => `Saved ${when}`,
     bpm: (n: number) => `${Math.round(n)} BPM`,
+    hasNotes: "Has notes",
+    notes: "Notes",
+    openNotes: (title: string) => `Notes on ${title}`,
   },
   {
     title: "Prods enregistrées",
@@ -61,6 +64,9 @@ const T = dict(
     copyManual: "Sélectionné : fais ⌘C / Ctrl+C",
     savedOn: (when: string) => `Enregistrée ${when}`,
     bpm: (n: number) => `${Math.round(n)} BPM`,
+    hasNotes: "A des notes",
+    notes: "Notes",
+    openNotes: (title: string) => `Notes sur ${title}`,
   },
 );
 
@@ -69,9 +75,14 @@ interface Props {
   /** The beat the Digger's own audio element is playing (its path). */
   playingBeat: string | null;
   onPlayBeat: (beat: BeatFile) => void;
+  /** The saved prod whose notes are open (its url hash). */
+  selected: string | null;
+  /** Open a row's notes: from a click on the row (`e`: DiggerView ignores
+   * clicks on its controls) or from its Notes button (no `e`). */
+  onSelect: (hash: string, e?: MouseEvent) => void;
 }
 
-export function SavedLeads({ beats, playingBeat, onPlayBeat }: Props) {
+export function SavedLeads({ beats, playingBeat, onPlayBeat, selected, onSelect }: Props) {
   const t = tr(T);
   const leads = useDigger((s) => s.leads);
   const leadError = useDigger((s) => s.leadError);
@@ -85,7 +96,15 @@ export function SavedLeads({ beats, playingBeat, onPlayBeat }: Props) {
         <>
           <ul className="flex flex-col gap-2">
             {leads.map((lead) => (
-              <LeadRow key={lead.path} lead={lead} beat={matchBeat(lead, beats)} playingBeat={playingBeat} onPlayBeat={onPlayBeat} />
+              <LeadRow
+                key={lead.path}
+                lead={lead}
+                beat={matchBeat(lead, beats)}
+                playingBeat={playingBeat}
+                onPlayBeat={onPlayBeat}
+                selected={selected === lead.hash}
+                onSelect={(e) => onSelect(lead.hash, e)}
+              />
             ))}
           </ul>
           <p className="px-1 text-[11px] text-engrave">{t.downloadedHint}</p>
@@ -117,12 +136,20 @@ function useCopyLink(url: string) {
 /** The main action's look (orange), same shape as the other row buttons. */
 const primary = "rounded bg-hot px-2.5 py-1.5 text-xs font-semibold text-chassis hover:bg-hot-hover";
 
-function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; beat: BeatFile | null; playingBeat: string | null; onPlayBeat: (b: BeatFile) => void }) {
+interface RowProps {
+  lead: SavedLead;
+  beat: BeatFile | null;
+  playingBeat: string | null;
+  onPlayBeat: (b: BeatFile) => void;
+  selected: boolean;
+  onSelect: (e?: MouseEvent) => void;
+}
+
+function LeadRow({ lead, beat, playingBeat, onPlayBeat, selected, onSelect }: RowProps) {
   const t = tr(T);
   const setPlaying = useDigger((s) => s.setPlaying);
   const deleteLead = useDigger((s) => s.deleteLead);
-  const note = useAppStore((s) => s.workspace.leadNotes?.[lead.hash]);
-  const setLeadNote = useAppStore((s) => s.setLeadNote);
+  const hasNote = useAppStore((s) => !!s.workspace.leadNotes?.[lead.hash]);
   const id = lead.url ? youtubeId(lead.url) : null;
   const link = useCopyLink(lead.url);
   const facts = [
@@ -135,13 +162,18 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
   const localPlaying = !!beat && playingBeat === beat.path;
 
   return (
-    <li className="flex flex-col gap-1.5 rounded border border-rule bg-panel px-3 py-2">
+    <li onClick={(e) => onSelect(e)} className={`flex cursor-pointer flex-col gap-1.5 rounded border px-3 py-2 ${selected ? "border-cream bg-raised" : "border-rule bg-panel hover:bg-raised"}`}>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm text-cream" title={lead.title}>
+            <span className="min-w-0 truncate text-sm text-cream" title={lead.title}>
               {lead.title}
             </span>
+            {hasNote && (
+              <span title={t.hasNotes} className="shrink-0 text-body">
+                <NotebookPen size={12} aria-label={t.hasNotes} />
+              </span>
+            )}
             {beat && (
               <span className={`${chip(true)} shrink-0 whitespace-nowrap`} title={beat.path}>
                 {t.inProds}
@@ -163,9 +195,6 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
           ) : (
             <p className="mt-1 text-[11px] text-engrave">{t.noLink}</p>
           )}
-          <div className="mt-1.5">
-            <NotesBox value={note} onChange={(text) => setLeadNote(lead.hash, text)} />
-          </div>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -198,6 +227,9 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
         )}
         {lead.url && <ConvertButton url={lead.url} />}
         {lead.url && <LikeChip id={id ?? lead.url} title={lead.title} />}
+        <button type="button" onClick={() => onSelect()} aria-label={t.openNotes(lead.title)} aria-pressed={selected} className={`${secondary} flex items-center gap-1`}>
+          <NotebookPen size={11} aria-hidden /> {t.notes}
+        </button>
         <button type="button" onClick={() => void api.revealInFileManager(lead.path)} className={`${secondary} flex items-center gap-1`}>
           <FolderOpen size={11} aria-hidden /> {t.showFile}
         </button>
