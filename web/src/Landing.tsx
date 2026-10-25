@@ -10,7 +10,7 @@ import type { Lang } from "./lang";
 // (landingCopy.ts): /fr and /en pick one, / follows the browser. Every claim
 // has to be true of the shipped app: when a feature changes, change both.
 
-const VERSION = "0.6.0";
+const VERSION = "0.6.1";
 /** The Play Store listing. Empty until the app is published there: the button stays hidden. */
 const PLAY_URL: string = "";
 
