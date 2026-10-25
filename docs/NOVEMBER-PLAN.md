@@ -46,11 +46,11 @@ All nine checklist steps pass with two real accounts, A1 is fixed, and the SMTP 
 Hivo helps you untangle your notes on each beat you pick, and the rest of the writing and creation process: lyrics, ideas, voice memos. You write on the phone; the desktop has it while you work in FL Studio. BandLab projects (and other mobile sketches) can be sent to FL through Hivo for detailed work.
 
 ### B-now. BandLab today, before any phone app
-The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and send it to the desktop.**
-1. In BandLab: export the mixdown (or stems) as mp3/wav.
-2. Send it to the computer: AirDrop to the Mac (lands in Downloads; move it to a beats folder), or save it to iCloud Drive / Google Drive into a folder that's linked as a **beats folder** in Hivo.
-3. It shows in the **Digger** like any beat: playable, diggable, savable. **Works today, no code.**
-4. **Missing piece (small, desktop only):** "Start a song from this beat" on a Digger beat: the New song dialog opens with the beat's name, creates the FL project from the template as today, copies the audio into the new song folder under `Beat/` (not next to the `.flp`, so it isn't mistaken for a mixdown), keeps a BandLab link if pasted, and opens FL Studio. You drag the audio into the playlist: Hivo never writes `.flp` files.
+The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and send it to the desktop, as a song in the project folders** (not the beats folder: a BandLab session is a song in progress, not a raw beat).
+1. In BandLab: export the mixdown (or stems) as mp3/wav, and send it to the computer (AirDrop to the Mac, or iCloud Drive / Google Drive).
+2. **Desktop, new: Library → "Import a BandLab export"** (small, desktop only). Pick the file(s), a name and a linked project folder. Hivo creates `<project folder>/<name>/BandLab/` with the audio, and the song appears in the Library and the pipeline as a **sketch** (stage Creation, playable, with notes, tags, credits and the BandLab link if pasted). The sketch lives in `workspace.json` like every other song's data; nothing is written outside the new folder.
+3. **"Continue in FL Studio"** on the sketch: creates `<name>.flp` from your template in that same folder (the existing New song flow) and opens FL. The song keeps its stage, notes and credits, now attached to the `.flp`. You drag the BandLab audio into the playlist: Hivo never writes inside `.flp` files.
+4. Not automatic: a file just dropped in a project folder isn't picked up on its own (audio next to projects already means mixdowns and recordings to the scanner; guessing would mislabel them).
 
 ### B1. Decisions made (2026-10-25)
 - **Nothing written on the phone goes to Hivo's server.** No lyrics, notes, ideas or voice memos in Supabase.
@@ -83,7 +83,7 @@ The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and sen
 2. **Phone sync** in Settings: on/off, pairing QR code, paired phones, last sync.
 3. **Inbox:** what came from the phone and isn't attached yet (ideas, sketches), to assign to a beat or a song.
 4. **Session view (teleprompter):** a window kept on top of FL Studio, showing the lyrics large, section by section; arrow keys or auto-scroll at the BPM.
-5. **Sketch → FL:** a BandLab export from the phone shows as "Start an FL project from this". Hivo creates the song folder in a linked folder, copies the audio in, keeps the BandLab link, and opens FL Studio. You drag the stems into the playlist: Hivo never writes `.flp` files.
+5. **Sketch → FL:** a BandLab export from the phone becomes a sketch song in a project folder, exactly like "Import a BandLab export" (B-now), then "Continue in FL Studio".
 
 **Later (each needs a yes):** rhyme suggestions, lyrics in the Launch Kit, sharing one song's lyrics with a featured artist, sync away from home (would need a relay: the server question again).
 
