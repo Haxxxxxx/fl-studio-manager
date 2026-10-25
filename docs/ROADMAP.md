@@ -1,21 +1,19 @@
 # Hivo (formerly FL Manager): Roadmap and status
 
-> Status as of **14 October 2026, night**. Hard rules for any work: [GUARDRAILS.md](GUARDRAILS.md). This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
+> Status as of **25 October 2026** (v0.5.4 released; next steps in [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md)). Hard rules for any work: [GUARDRAILS.md](GUARDRAILS.md). This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
 
 ---
 
 ## 1. Where we are, in one minute
 
-- **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion. It comes with a web dashboard for the crew.
-- **The name.** The app is now **Hivo** (formerly FL Manager), with a hive-cell logo. The rename is merged, the website shows it, and so do the sign-in emails.
-- **Installers.** **v0.2.2** is the latest GitHub release: Mac universal .dmg (signed ad-hoc: opens with "Open Anyway") and Windows setup .exe. Built automatically on the Mac (self-hosted GitHub runner) when a version tag is pushed.
-- **Phase 0 (stabilize, demo-ready).** Done, except two things: the crew pitch, and cleaning the git history before the repo can go public.
-- **Phase 1 (crew dashboard, Launch Kit, design identity).** Built and merged. Batch 2 (feedback from the first real artist) is merged too: pipeline board/list/table with editable columns, crew menu, solo mode.
-- **Phase 2 (plugins, hardware, distributor integrations).** Not started; ideas only.
-- **Biggest open items today:**
-  - **a human end-to-end test of the crew flow** (sign in, create/join a crew, share a song, see it on the website). Nothing new gets built on the crew side before it passes (guardrail 4);
-  - the repo can't go public until the history scrub;
-  - the crew pitch.
+- **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion, with a web dashboard for the crew.
+- **Releases.** **v0.5.4** is the latest (2026-10-24): Mac universal .dmg and Windows setup .exe, downloadable from the website. Installed apps **update themselves** (signed updates from the Supabase `releases` bucket, Settings → Check for updates). Builds run on the Mac (self-hosted GitHub runner) when a version tag is pushed.
+- **Phases.** Phase 0, 1a, 1b and 1c are built (checklist in section 7). Two Phase 0 items remain: the crew pitch and the git history scrub.
+- **What's next: [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md).** In order:
+  - **Part A:** verify the crew flow end to end with two accounts and fix the "shared song not showing" report (guardrail 4.1);
+  - **Part A2:** finish the initial brief (Launch Kit hand-off fixes, real-world tests, pitch, history scrub);
+  - **Part B, after that:** the mobile creation companion (BandLab exports into projects first, then a native app syncing over Wi-Fi).
+- **Ready but not released:** everything merged since 0.5.4 ships as **0.5.5** when you say so (Digger saved prods and converter, People profiles, "Include artist IDs" in the kit, the Library folder tree).
 
 ---
 
@@ -26,21 +24,21 @@
   - desktop: Tauri 2 (Rust backend) with React 19, TypeScript, Zustand and Tailwind;
   - web dashboard: Vite on Vercel;
   - crew backend: Supabase in the EU (Ireland).
-- **Tests:**
-  - 128 unit tests for the app logic;
-  - 132 Rust tests for scanning, files, audio and the AI connection;
-  - 140 database tests covering crew rules, privacy, limits, stage versions and crew columns.
-  - Both builds are clean.
-- **Pull requests:** 70 merged since the start. None open.
+- **Tests** (as of 2026-10-25):
+  - 221 unit tests for the app logic;
+  - 183 Rust tests (scanning, files, audio, AI, Digger, leads, lookups);
+  - 175 database tests covering crew rules, privacy, limits, stage versions, crew columns, the releases bucket and the feedback form.
+  - Both builds are clean; CI runs all of it on every PR, plus npm and cargo audits.
+- **Pull requests:** 125 merged. Open: the November plan (#136), a design-system docs pointer (#132), and Dependabot bumps held back on purpose (#99, #100, #104, #105, #117).
 - **Live:**
-  - crew website: https://www.hi-vo.fr (also still at fl-manager-crew.vercel.app);
-  - installers: GitHub releases (public repo; latest `v0.2.2`: Mac universal .dmg and Windows setup .exe);
+  - crew website: https://www.hi-vo.fr, with `/download/mac` and `/download/windows`;
+  - installers and update manifest: the public Supabase `releases` bucket, plus GitHub releases (public repo);
   - sign-in emails: sent through Brevo from the hi-vo.fr domain (Supabase custom SMTP);
-  - Claude Design project "fl-Manager": holds the 28 synced components, already in the Hivo / System 02 look.
-- **Quality pass done:** a three-part audit (Rust↔app bridge, app wiring, crew backend) found and fixed every broken link between features (PR #24).
+  - Claude Design project "fl-Manager": holds the synced components, in the Hivo / System 02 look.
 - **Free stack, by choice:**
   - Gemini free tier for AI text;
   - Cloudflare Workers AI (free) for cover concepts;
+  - YouTube Data API (free quota) for the Digger; Spotify Web API (free app credentials) and keyless MusicBrainz, Deezer and iTunes for People profiles;
   - ffmpeg on your own computer for video;
   - Supabase and Vercel free tiers;
   - no paid APIs.
@@ -55,7 +53,9 @@
 - Scans your project folders for FL Studio, Ableton Live, REAPER and Studio One, and reads tempo, plugins, samples and track names from inside them. Pro Tools, Cubase and Bitwig projects are listed and tracked, but their files are closed formats, so nothing is read from inside.
 - Groups everything that belongs to a song: backups, mixdowns, recorded takes and stems.
 - If you rename or move a project, the song keeps its stage, notes and credits.
+- **Library:** a folder tree on the left (your linked folders and the folders holding several songs) scopes the table, with a breadcrumb. Flags that match what's on disk: "last saved" counts FL's autosaves, the mixdown light compares to that, missing samples are looked up in **Settings → Sample libraries** before being called missing, unreadable projects are flagged.
 - Sample data mode, to demo the app without real projects.
+- English and French.
 
 **The song panel**
 - Stage, key, tags, notes, releases, credits and who it was pitched to.
@@ -69,13 +69,14 @@
 
 **Seeing the whole picture**
 - **Pipeline** in three views over one model: board, list and table. Rename, add, remove and reorder columns; each column sits on a stage (Creation, Production, Prep, Release, Promotion), so the crew always sees the stage. Hand-sorted cards, one shared filter; the table sorts on its own without touching the board.
-- **Dashboard:**
-  - song counts, a year of studio activity, stalled songs (no save in 21+ days, FL backups and autosaves count as saves) and the next release;
-  - who's on what (in a crew);
-  - a health check: "will this computer open your songs" (missing plugins or samples).
-  - A Me / Crew switch.
+- **Dashboard:** a customizable bento (reorder, hide, add, resize; two views per block): song counts, studio activity, stalled songs (no save in 21+ days), the next release, who's on what (in a crew), a health check (missing plugins or samples), a Me / Crew switch. Five optional "tendency" blocks (tempo & key, working hours, your sound, collaborators, song shape), personal only.
 - Releases (EPs, albums) with their track lists, and a release calendar with readiness checks.
-- People: credits, splits, and pitches.
+- **People:** credits, splits and pitches; **Look up profiles** finds a person's Spotify, Apple Music, Deezer, YouTube, socials… with the IDs distributors ask for (MusicBrainz, Deezer, iTunes; Spotify with free app credentials). Stored locally, never shared.
+
+**The Digger (creation stage)**
+- Your raw beats (Settings → Beats folders): pick up to 5, Gemini describes what they share (optionally listening to 30 s of each) and finds similar beats on YouTube and the web; "Go deeper" rounds seeded by the picks you like.
+- YouTube results play in the app (the official player, framed through the website so it works in the signed app).
+- **Saved prods:** "Save to Prods" keeps a link and its facts as a small file in the beats folder; a tab lists them, plays them, matches them to beats you downloaded. An optional converter link opens in your browser. Hivo itself never downloads audio.
 
 **The Launch Kit (the deal-breaker)**
 - Fills in the release metadata by itself:
@@ -93,9 +94,9 @@
   - drafts captions;
   - reviews every field with a verdict and a confidence score.
   - It never overrides measured values like BPM or duration.
-  - Built to stay inside the free tier: when one Gemini model hits its limit, it switches to the backup model; a used-up daily quota is skipped; calls are spaced out; and it doesn't re-check a kit that hasn't changed.
+  - Built to stay inside the free tier: when one Gemini model hits its limit or is too slow, it switches to the backup model; a used-up daily quota is skipped; calls are spaced out; and it doesn't re-check a kit that hasn't changed.
 - Accept all, edit any field, reset, or do it all by hand.
-- Exports a ready folder: metadata (JSON and CSV), a sheet to paste into your distributor, the cover brief, captions, a checklist, the snippets, the shorts and the chosen cover.
+- Exports a ready folder: metadata (JSON and CSV), a sheet to paste into your distributor, the cover brief, captions, a checklist, the snippets, the shorts and the chosen cover. Opt-in **"Include artist IDs"** adds the credited people's platform IDs.
 
 **The crew (shared, EU-hosted)**
 - Sign in with an email code; no passwords.
@@ -104,7 +105,7 @@
 - Each song is shared only if you choose to. Only facts travel: title (editable for the crew), stage, BPM, key, tags, credits, dates, "has a mixdown", "kit accepted" and the last save date. Audio, file paths, samples, notes and track names never leave your computer through sharing.
 - The optional AI features are the one exception, and say so where they're switched on: the song name, tags, tempo, key, credits and kit text go to Google Gemini (notes only if you turn that on), and a cover prompt goes to Cloudflare.
 - Live updates for everyone, including when a song is unshared or someone leaves.
-- A crew section in the menu: Crew board and Crew releases for everyone; Members & invites and Crew settings for the owner. A note says why nothing syncs when that's the case.
+- A crew section in the menu: Crew board and Crew releases for everyone; Members & invites and Crew settings for the owner. A "Join your crew" entry point when you're not in one.
 - The crew board is the same board / list / table as yours, in the crew's own columns: the owner renames, adds, removes and reorders them; anyone moves cards. The website shows the same columns and order.
 - Share a whole release (and its tracks) at once; the crew sees it in Crew releases and on the website's Releases tab.
 - Solo mode: until you're in a crew, crew features stay hidden; the Launch Kit is always there.
@@ -112,8 +113,12 @@
 - A song only disappears from the crew when you unshare it, never because a scan missed it.
 
 **The crew website**
-- A landing page (what it is, privacy, sign in).
+- A landing page (what it is, privacy, sign in, download for Mac and Windows), in French and English.
 - Once signed in: the crew board (change a stage by dragging), the calendar, and the crew page. Works on a phone.
+
+**Feedback and updates**
+- A feedback form in the app (bug / idea / question) that reaches you directly, rate-limited; the red error banner's "Report this" prefills it with paths removed.
+- In-app updates (checked at launch and from Settings), with a clear fix when the app runs from a read-only place.
 
 **Design**
 - "System 02, built like a rack unit": solid warm greys, engraved labels, LED status lights, one hot orange, condensed caps for titles and buttons.
@@ -122,14 +127,15 @@
 
 **Brand and installers**
 - Hivo name and hive-cell logo everywhere: the app, its icons, the website, the link preview, the sign-in emails.
-- Mac (universal) and Windows installers, built locally and kept as private GitHub releases. They're unsigned, so expect a one-time warning on first launch.
+- Mac (universal) and Windows installers on the website and GitHub. The Mac app isn't notarized, so expect a one-time "Open Anyway" on first launch.
 
-### In progress
+### In progress (see [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md))
 
-- **Human test of the crew flow** (guardrail 4): two accounts, create and join a crew, share a real song, see it on the website.
+- **Human test of the crew flow** (guardrail 4.1): two accounts, the nine-step checklist, and the "shared song not showing" report (2026-10-24).
 - **Testing on real songs and a real PC.**
   - The hook detection was tested on synthetic audio, not yet on the crew's tracks.
   - The Windows installer was cross-built on a Mac and hasn't been run on a Windows PC yet.
+- **Launch Kit hand-off fixes** (§3 of [UX-AUDIT-2026-10.md](UX-AUDIT-2026-10.md)): the suggested release date isn't saved, nothing moves a song past Prep from the kit, the kit can show another song after a relink, no-mixdown is a dead end.
 
 ### Blocked
 
@@ -138,23 +144,25 @@
 
 ### Decisions waiting on you
 
-- **Apple notarization** (removes the Mac warning entirely) needs a paid Apple Developer account. Not done: free stack.
+- **Ship 0.5.5** (what's merged since 0.5.4).
+- **Apple Developer account (99 USD a year):** would remove the Mac warning (notarization) and is required for TestFlight when the iOS app comes. Not done: free stack.
 
 ### Thought about, not built
 
+- **The mobile creation companion:** planned in [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md), part B (after part A).
 - **Logic Pro.** Not readable today. The link-preview design mentioned it, so the rendered image lists FL Studio, Ableton Live, REAPER and Pro Tools instead.
 - **Render and package for DAWs other than FL Studio.** Today the app tells you where to export in your DAW instead.
 - **Exporting stems from the app.** Stems are detected and shown, not created.
 - **Distributor-specific export formats** (per-distributor templates instead of one universal sheet).
-- **Shared releases.** The database already has a table for crew releases, but the apps don't sync releases yet; only songs are shared.
+- **Deleting a crew** (today: remove everyone, then leave) and **owner actions on the website** (invite, remove, rename, columns).
 - **Phase 2, in full:**
-  - **Plugin recommendations:** suggest plugins by stage, knowing what's installed. Today the app knows which plugins each song uses and whether this computer has them. It does not scan plugin folders or compare against a market catalog.
+  - **Plugin recommendations:** suggest plugins by stage, knowing what's installed. Today the app knows which plugins each song uses and whether this computer has them.
   - **Hardware awareness:** identify connected interfaces, controllers and synths (USB IDs, MIDI and audio device names).
   - **A "confirm once" studio profile** for what can't be detected (cloud plugins, analog gear).
   - ~~Social publishing straight from the Launch Kit~~: rejected. Posting is a human hand-off (guardrail 2).
   - **Distributor integrations** (push metadata and files instead of re-typing; many distributors only allow manual upload).
 - **Money (splits, contracts, rights registration).** Not before the crew actually releases through Hivo (guardrail 4).
-- **Release stats** (streams, listeners, revenue): blocked, no free API gives real numbers (guardrail 6).
+- **Release stats** (streams, listeners, revenue): blocked, no free API gives real numbers (guardrail 6). People profiles show Spotify followers only when Spotify shares them with the app.
 
 ---
 
@@ -198,6 +206,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] Group stats vs personal stats (Me / Crew switch)
 - [x] Release calendar
 - [x] Where each song's files live
+- [ ] **Verified end to end by a human with two accounts** (guardrail 4.1; NOVEMBER-PLAN part A)
 
 **Phase 1b: Launch Kit**
 - [x] Extract everything possible from the project and the mixdown
@@ -205,22 +214,25 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] AI verification on every field, with confidence
 - [x] Full edit UI: accept all, edit per field, or manual
 - [x] Export a distributor-ready kit (one universal format; per-distributor formats not built)
+- [ ] **Hand-off into Release** (date saved, stage moves from the kit; audit §3; NOVEMBER-PLAN part A2)
+- [ ] Tested on real songs (hook detection)
 
 **Phase 1c: design identity**
 - [x] A visual identity for the crew (System 02, Hivo brand)
 - [x] Applied across the app and the website
 
-**Phase 2: ecosystem**: not started (see "Thought about, not built").
+**Phase 1d: shipping**
+- [x] Signed in-app updates, website downloads
+- [x] Feedback form
+- [ ] Windows installer run on a real PC
+
+**Phase 2: ecosystem**: not started (see "Thought about, not built"). The mobile companion is planned separately (NOVEMBER-PLAN part B).
 
 ---
 
-## 8. Suggested next steps
+## 8. Next steps
 
-1. Test the crew flow end to end yourself with v0.2.1 (two accounts, Mac + PC). Until it passes, nothing new on the crew side.
-2. Try the Launch Kit on a few real songs whose hook you know, and run the Windows installer on a PC.
-3. Prepare and give the crew pitch with the demo (November milestone: prove the crew lives in the board).
-4. Decide whether to scrub the old commits (the repo is public).
-5. Then, and only then, pick the next slice, inside the guardrails.
+The ordered list lives in **[NOVEMBER-PLAN.md](NOVEMBER-PLAN.md)**: part A (crew verification and the share report), part A2 (finish the initial brief), then part B (mobile). Update that file as items close, and tick section 7 here.
 
 ## 9. Notes for Claude Code
 

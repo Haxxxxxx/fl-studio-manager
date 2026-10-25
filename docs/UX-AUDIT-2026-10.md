@@ -9,6 +9,8 @@ Severity:
 
 Rule references are to `docs/GUARDRAILS.md`.
 
+**Status (2026-10-25):** sections 1-2 and 4-7 were worked through in the 0.5.x releases. Still open: **§3 (the Launch Kit hand-off)**, tracked as part A2 item 1 in [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md), and from §6 **A3** (no "delete a crew") and **A4** (no owner actions on the website), part A2 item 2. Line numbers below are from v0.4.0 and have moved since.
+
 ---
 
 ## 1. The big picture
