@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, CheckCircle2, FolderOpen, Minus, Pause, Play, Plus, Rocket, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, FolderOpen, Minus, Pause, Play, Plus, Rocket, RotateCcw, Sparkles } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { useCrewStore } from "../store/useCrewStore";
 import * as api from "../lib/tauri";
@@ -29,13 +29,14 @@ import {
 import { dict, tr } from "../i18n";
 import { aiDisclosure, draftCopy, reviewKit } from "../lib/ai";
 import { formatRelative } from "../lib/format";
-import { stageRank } from "../lib/songs";
+import { stageRank, statusInfo } from "../lib/songs";
 import type { AudioAnalysis, ProjectInfo, Snippet } from "../types";
 import { useVisibleSongs } from "./LibraryView";
 import { SongPicker } from "./SongPicker";
 import { ShortsPanel } from "./ShortsPanel";
 import { CoverConcepts } from "./CoverConcepts";
-import { btn, btnPrimary } from "./ui";
+import { StatusSelect, btn, btnPrimary } from "./ui";
+import { canRenderInApp } from "../lib/daws";
 import { Card, CheckLine, FieldRow, KitStatus } from "../ui";
 
 // Snippet colors: the dark categorical slots, in fixed order (as elsewhere).
@@ -47,6 +48,14 @@ const T = dict(
   {
     empty: "Link a project folder (or load sample data) to build a launch kit.",
     needExportFolder: "Set an export folder in Settings first.",
+    openSettings: "Open Settings",
+    unavailable: "The song this kit was opened for isn't in the Library any more (archived, a template, or no longer in a linked folder).",
+    pickAnother: "Open the kit for another song",
+    backToSong: "Song",
+    backToSongTitle: "Back to this song's panel in the Library",
+    moveToStage: (stage: string) => `Move to ${stage}`,
+    renderNow: "Render now",
+    rendering: "Rendering…",
     exportConfirm: (missing: number, flagged: number) => {
       const what = [missing && `${missing} field${plural(missing)} still need${missing === 1 ? "s" : ""} you`, flagged && `the AI flagged ${flagged}`]
         .filter(Boolean)
@@ -131,6 +140,14 @@ const T = dict(
   {
     empty: "Relie un dossier de projets (ou charge les données d'exemple) pour monter un Launch Kit.",
     needExportFolder: "Choisis d'abord un dossier d'export dans les Réglages.",
+    openSettings: "Ouvrir les Réglages",
+    unavailable: "Le son pour lequel ce kit était ouvert n'est plus dans la Bibliothèque (archivé, modèle, ou plus dans un dossier relié).",
+    pickAnother: "Ouvrir le kit d'un autre son",
+    backToSong: "Son",
+    backToSongTitle: "Revenir au panneau de ce son dans la Bibliothèque",
+    moveToStage: (stage: string) => `Passer en ${stage}`,
+    renderNow: "Faire le rendu",
+    rendering: "Rendu en cours…",
     exportConfirm: (missing: number, flagged: number) => {
       const what = [missing && `${missing} champ${plural(missing)} à compléter`, flagged && `l'IA en a signalé ${flagged}`].filter(Boolean).join(" et ");
       return `${what[0].toUpperCase()}${what.slice(1)}. Exporter quand même ? Ce qui reste ouvert va dans checklist.md et la fiche distributeur.`;
@@ -270,7 +287,16 @@ export function LaunchKitView() {
     const rank = (p: ProjectInfo) => (p.renders.length ? 0 : 10) + stage(p);
     return [...songs].sort((a, b) => rank(a) - rank(b) || b.modifiedAtMs - a.modifiedAtMs);
   }, [songs, workspace.songs]);
-  const project = songs.find((p) => p.path === launchPath) ?? ordered[0];
+  // A kit opened for one song never silently shows another: when that song
+  // is gone (archived, a template, no longer in a linked folder), say so.
+  const chosen = launchPath ? songs.find((p) => p.path === launchPath) : undefined;
+  const unavailable = !!launchPath && !chosen;
+  const project = chosen ?? (launchPath ? undefined : ordered[0]);
+  const updateSong = useAppStore((s) => s.updateSong);
+  const setView = useAppStore((s) => s.setView);
+  const openDetail = useAppStore((s) => s.openDetail);
+  const startRender = useAppStore((s) => s.startRender);
+  const rendering = useAppStore((s) => s.rendering);
   const { analysis, error: analysisError, loading } = useAnalysis(project, demoMode);
   const [exportState, setExportState] = useState<{ status: "idle" | "running" } | { status: "done"; dir: string } | { status: "error"; message: string }>({ status: "idle" });
   /** Where the last "need you" jump went, so the next click moves on. */
@@ -280,6 +306,16 @@ export function LaunchKitView() {
 
   const t = tr(T);
   if (!project) {
+    if (unavailable && songs.length > 0) {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+          <p className="max-w-md text-sm text-body">{t.unavailable}</p>
+          <button onClick={() => openLaunchKit(null)} className={btn}>
+            {t.pickAnother}
+          </button>
+        </div>
+      );
+    }
     return <div className="flex flex-1 items-center justify-center text-sm text-engrave">{t.empty}</div>;
   }
 
@@ -314,6 +350,8 @@ export function LaunchKitView() {
   const byId = (id: KitField["id"]) => fields.find((f) => f.id === id)!;
 
   const edits = meta.launchKit?.edits ?? {};
+  // stageRank counts down from Promotion (0) to Creation, Unsorted last.
+  const beforeRelease = stageRank(meta.status) > stageRank("release");
   const suggestions = fields.filter((f) => f.review && !f.review.stale && f.review.suggestion && f.review.suggestion !== f.value);
 
   /** The status plate's "N need you": each click goes to the next field
@@ -329,10 +367,44 @@ export function LaunchKitView() {
     focusField(target);
   }
 
+  /** The suggested release date becomes the song's date once the kit is
+   * accepted or exported, so the Calendar, the Dashboard and the crew see
+   * the date the exported files announce (it would otherwise move to the
+   * next Friday a week later). A release's own date is left alone. */
+  function keepReleaseDate() {
+    if (!project) return;
+    const date = byId("releaseDate");
+    if (!edits.releaseDate && date.source === "suggested" && date.value) setKitEdit(project.path, "releaseDate", date.value);
+  }
+
+  function handleAccept() {
+    if (!project) return;
+    keepReleaseDate();
+    acceptKit(project.path);
+  }
+
+  /** Into the song's panel, in the Library. */
+  function backToSong() {
+    if (!project) return;
+    setView("library");
+    openDetail(project.path);
+  }
+
+  async function handleRender() {
+    if (!project) return;
+    setExportState({ status: "idle" });
+    try {
+      await startRender([project.path]);
+    } catch (e) {
+      setExportState({ status: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
   async function handleExport() {
     if (!project) return;
     if (!settings.outputFolder) return setExportState({ status: "error", message: t.needExportFolder });
     if (missing + ai.flagged > 0 && !window.confirm(t.exportConfirm(missing, ai.flagged))) return;
+    keepReleaseDate();
     const title = byId("title").value || project.name;
     setExportState({ status: "running" });
     try {
@@ -372,6 +444,10 @@ export function LaunchKitView() {
               setExportState({ status: "idle" });
             }}
           />
+          <StatusSelect compact value={meta.status} onChange={(status) => updateSong(project.path, { status })} />
+          <button onClick={backToSong} className="flex items-center gap-1 text-xs text-body hover:text-cream" title={t.backToSongTitle}>
+            <ArrowLeft size={12} /> {t.backToSong}
+          </button>
           <KitStatus missing={missing} warnings={warnings} accepted={!!accepted} aiVerified={ai.verified} onJump={jumpToNextNeed} />
           <div className="ml-auto flex items-center gap-3">
             <label className="flex cursor-pointer items-center gap-1.5 text-xs text-body" title={t.artistIdsHint(kitArtists(meta, kitInput.people))}>
@@ -384,7 +460,7 @@ export function LaunchKitView() {
               {t.includeArtistIds}
             </label>
             <button
-              onClick={() => acceptKit(project.path)}
+              onClick={handleAccept}
               disabled={missing > 0 || !!accepted}
               title={missing > 0 ? t.answerFirst : t.markReviewed}
               className={btn}
@@ -405,18 +481,37 @@ export function LaunchKitView() {
         {exportState.status === "done" && (
           <div className="flex items-center gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200">
             <CheckCircle2 size={16} /> {t.exported(missing + warnings)}
-            <button onClick={() => api.revealInFileManager(exportState.dir)} className="ml-auto flex items-center gap-1 text-xs underline">
+            {beforeRelease && (
+              <button onClick={() => updateSong(project.path, { status: "release" })} className="ml-auto rounded border border-emerald-400/40 px-2 py-0.5 text-xs hover:bg-emerald-500/10">
+                {t.moveToStage(statusInfo("release").label)}
+              </button>
+            )}
+            <button onClick={() => api.revealInFileManager(exportState.dir)} className={`${beforeRelease ? "" : "ml-auto "}flex items-center gap-1 text-xs underline`}>
               <FolderOpen size={13} /> {t.showFolder}
             </button>
           </div>
         )}
         {guide && <KitExportedDialog {...guide} onClose={() => setGuide(null)} />}
         {exportState.status === "error" && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">{exportState.message}</div>
+          <div className="flex items-center gap-3 rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+            <span className="flex-1">{exportState.message}</span>
+            {!settings.outputFolder && (
+              <button onClick={() => setView("settings", "export")} className="shrink-0 text-xs underline">
+                {t.openSettings}
+              </button>
+            )}
+          </div>
         )}
         {extra.map((c) => (
-          <div key={c.message} tabIndex={-1} data-needs-you={c.level === "missing" ? "" : undefined} className="rounded-md outline-none">
-            <CheckLine check={c} />
+          <div key={c.message} tabIndex={-1} data-needs-you={c.level === "missing" ? "" : undefined} className="flex items-center gap-3 rounded-md outline-none">
+            <div className="min-w-0 flex-1">
+              <CheckLine check={c} />
+            </div>
+            {project.renders.length === 0 && c.level === "missing" && canRenderInApp(project) && !demoMode && (
+              <button onClick={() => void handleRender()} disabled={rendering} className={`${btn} shrink-0 text-xs`}>
+                {rendering ? t.rendering : t.renderNow}
+              </button>
+            )}
           </div>
         ))}
         <div className="flex flex-wrap items-center gap-3 text-xs text-body">

@@ -638,7 +638,13 @@ export const useAppStore = create<AppState>((set, get) => {
             const favs = get().settings.favorites;
             if (favs.some((f) => map.has(f))) void get().updateSettings({ favorites: favs.map((f) => map.get(f) ?? f) });
             const open = get().detailPath;
-            set({ relinked: [...get().relinked, ...relinks], detailPath: open && map.has(open) ? map.get(open)! : open });
+            const kit = get().launchPath;
+            set({
+              relinked: [...get().relinked, ...relinks],
+              detailPath: open && map.has(open) ? map.get(open)! : open,
+              // The Launch Kit follows a "Save as" too, instead of showing another song.
+              launchPath: kit && map.has(kit) ? map.get(kit)! : kit,
+            });
           }
           set({ projects });
         }
