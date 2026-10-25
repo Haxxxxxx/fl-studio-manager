@@ -1,0 +1,128 @@
+# Hivo for the phone
+
+The phone half of phase B (docs/NOVEMBER-PLAN.md): an Expo (React Native,
+TypeScript strict) app that pairs with the Hivo desktop app over the local
+Wi-Fi and lets you read and write notes on the desktop's **saved prods**,
+**beats** and **songs**. Nothing goes through a server: the phone talks to the
+desktop directly, every body encrypted with the key from the pairing QR code
+(XChaCha20-Poly1305, see the phone sync contract).
+
+This folder is its own project (own `package.json` and lockfile). The root
+`npm test` / `npm run build` ignore it.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `App.tsx` | Fonts, locale, the tiny router (Pair → Library → Note / Settings), sync on launch and on return, `hivo://pair` links |
+| `src/lib/` | Pure logic with Vitest tests: `bytes` (base64url, UTF-8, fnv1a), `pairing` (QR URL parser), `envelope` (crypto), `client` (hosts in order, typed errors), `sync` (offline queue, conflicts, snapshot), `i18n` |
+| `src/store.ts` | App state; pairing in `expo-secure-store`, library cache + queued edits in AsyncStorage |
+| `src/screens/`, `src/components/` | UI (System 02 tokens in `src/theme.ts`, copied from `../src/theme.css`) |
+| `src/strings.ts` | Every visible string, English + French (`dict(en, fr)`, follows the phone's language) |
+| `scripts/fake-desktop.mjs` | A stand-in desktop server with sample data, to try the app without the desktop |
+| `scripts/make-icons.py` | Redraws the app icons (Pillow) |
+
+## Setup
+
+```sh
+cd mobile
+npm ci
+npm test          # Vitest, src/lib
+npm run typecheck # tsc --noEmit
+```
+
+`ios/` and `android/` are generated (`expo prebuild`, Continuous Native
+Generation) and git-ignored: change native settings in `app.json`, never in
+those folders.
+
+## iOS Simulator
+
+Needs Xcode (with an iOS Simulator runtime) and CocoaPods. No Apple account.
+
+```sh
+cd mobile
+npx expo run:ios --device "iPhone 17 Pro"
+```
+
+This prebuilds `ios/`, installs the pods, builds a debug app, starts Metro and
+opens it in the Simulator. The Simulator shares the Mac's network, so it
+reaches a Hivo desktop running on the same Mac.
+
+The Simulator has no camera: paste the pairing link instead, or open it from
+the Mac's terminal:
+
+```sh
+xcrun simctl openurl booted "hivo://pair?v=1&d=…"
+```
+
+## Android APK (local, free)
+
+Needs JDK 17 and the Android SDK.
+
+```sh
+cd mobile
+export JAVA_HOME=/path/to/jdk-17
+export ANDROID_HOME="$HOME/Library/Android/sdk"   # macOS default
+npx expo prebuild --platform android
+cd android && ./gradlew assembleRelease
+# → android/app/build/outputs/apk/release/app-release.apk
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+**Signing:** the generated `android/app/build.gradle` signs `release` with the
+debug keystore (`android/app/debug.keystore`, created by prebuild). That's fine
+for test builds you sideload; an APK shared with the crew should get a real
+keystore (kept out of git), because Android refuses to update an app signed
+with a different key.
+
+Android allows plain HTTP to the computer through
+`expo-build-properties` → `usesCleartextTraffic` (the bodies are encrypted
+anyway). iOS uses `NSAllowsLocalNetworking` and asks for local network access
+the first time.
+
+## Pairing
+
+1. On the computer: Hivo → **Settings → Phone sync** → turn it on → **Pair a
+   phone**. A QR code appears, with the link under it.
+2. On the phone: **Scan the QR code** (or paste the link, or scan it with the
+   system camera app, which opens Hivo).
+3. The phone says hello to the computer, then syncs. The computer lists the
+   phone under paired phones; **Forget** there unpairs it (the phone then shows
+   "This phone was forgotten on the desktop: pair again").
+
+Both must be on the same Wi-Fi. If the computer's firewall asks, allow Hivo's
+incoming connections.
+
+## Without the desktop
+
+```sh
+cd mobile
+node scripts/fake-desktop.mjs              # Simulator on this Mac (127.0.0.1)
+node scripts/fake-desktop.mjs 192.168.1.20 # a phone: use the Mac's Wi-Fi address
+```
+
+It prints a pairing link and serves sample prods, beats and songs. Type
+`edit some text` in its terminal to change a note "on the desktop" and try the
+conflict banner.
+
+## How sync works
+
+- **Offline first.** The library and notes are cached on the phone. Editing a
+  note saves it on the phone right away and queues it with the hash of the
+  desktop's note it started from (`baseHash`).
+- **Sync** (button, app launch, coming back to the app, leaving a note) =
+  `/v1/hello` the first time, push the queue to `/v1/notes`, then pull
+  `/v1/snapshot`. The hosts from the pairing link are tried in order.
+  Pushes go in batches (≤ 500 changes and about 600 KB of text each, the
+  desktop refuses bodies over 1 MB).
+- **Conflicts:** if the note changed on the desktop since, the desktop keeps
+  both texts (`--- from <phone> ---`); the phone takes the merged text and
+  shows a banner on that note.
+- **Deleted on the desktop** (`missing`): the phone keeps your text, marks the
+  item "Gone from the computer" (red LED), and lets you remove it once you've
+  copied it somewhere.
+- **Errors:** "Not on the same Wi-Fi as your computer" (no host answered),
+  "Phone sync is off on the desktop" (the connection was refused), "This phone
+  was forgotten on the desktop: pair again" (401), busy (429 / 503 / `busy`:
+  retry in a few seconds), too long (413 or the desktop's limits), demo data,
+  and "update both apps" (404 / `bad request`).
