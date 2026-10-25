@@ -4,6 +4,25 @@ import { describe, expect, it } from "vitest";
 const require = createRequire(import.meta.url);
 const { versionCode } = require("./versionCode.js");
 const { applyReleaseSigning } = require("./withReleaseSigning.js");
+const { addQueries, addMlkitDependency } = require("./withPlayServicesVisibility.js");
+
+describe("withPlayServicesVisibility", () => {
+  const base = () => ({ manifest: { application: [{ "meta-data": [] }] } });
+  it("declares the Play Store and Play services, once", () => {
+    const m = addQueries(addQueries(base()));
+    const names = m.manifest.queries[0].package.map((p) => p.$["android:name"]);
+    expect(names).toEqual(["com.android.vending", "com.google.android.gms"]);
+  });
+  it("asks Play services to fetch the barcode UI module at install, keeping other values", () => {
+    const m = base();
+    m.manifest.application[0]["meta-data"].push({ $: { "android:name": "com.google.mlkit.vision.DEPENDENCIES", "android:value": "ocr" } });
+    const out = addMlkitDependency(addMlkitDependency(m));
+    const md = out.manifest.application[0]["meta-data"].filter((x) => x.$["android:name"] === "com.google.mlkit.vision.DEPENDENCIES");
+    expect(md).toHaveLength(1);
+    expect(md[0].$["android:value"]).toBe("ocr,barcode_ui");
+    expect(addMlkitDependency(base()).manifest.application[0]["meta-data"][0].$["android:value"]).toBe("barcode_ui");
+  });
+});
 const appConfig = require("../app.config.js");
 const appJson = require("../app.json");
 

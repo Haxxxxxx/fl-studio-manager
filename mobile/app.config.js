@@ -7,11 +7,13 @@
 //   expo-constants re-reads this file at every Gradle build, so one prebuild
 //   serves both builds.
 // - the release signing plugin (plugins/withReleaseSigning.js).
+// - Play Store / Play services visibility for the QR scanner
+//   (plugins/withPlayServicesVisibility.js).
 const { versionCode } = require("./plugins/versionCode");
 
 module.exports = ({ config }) => ({
   ...config,
   android: { ...config.android, versionCode: versionCode(config.version) },
   extra: { ...config.extra, distribution: process.env.HIVO_DISTRIBUTION === "play" ? "play" : "direct" },
-  plugins: [...(config.plugins ?? []), "./plugins/withReleaseSigning"],
+  plugins: [...(config.plugins ?? []), "./plugins/withReleaseSigning", "./plugins/withPlayServicesVisibility"],
 });
