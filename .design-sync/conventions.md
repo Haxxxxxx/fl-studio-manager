@@ -32,7 +32,7 @@ Components are styled with Tailwind classes. `styles.css` holds the classes the 
 | Rules | `border-rule` (#2C2B27), `border-rule-strong` (#3D3C37), `divide-rule` |
 | Ink | `text-cream` (#F2EFE8 values, selected), `text-body` (#C9C5BB prose), `text-engrave` (#8D897F labels) |
 | Engraved label | `engrave` export = `font-mono text-[10.5px] uppercase tracking-[0.14em] text-engrave` |
-| Signal | `bg-hot`/`text-hot` (#FF5A1F) for the main action and "needs you". LED colours ok #3DDC84, warn #FFC233, missing #FF4040: pass the hex to `StatusDot` (only `text-warn`/`border-warn` exist as classes) |
+| Signal | `bg-hot`/`text-hot` (#FF5A1F) for the main action and "needs you". LED colours ok #3DDC84, warn #FFC233, missing #FF4040: pass the hex to `StatusDot`. As classes: `text-ok`, `bg-ok`, `text-warn`, `bg-warn`, `border-warn`, `text-missing`, `bg-missing`, `border-missing` (no `border-ok`) |
 | Type | `font-display` (Barlow Condensed: titles in caps, buttons, big figures), `font-sans` (IBM Plex Sans), `font-mono` (IBM Plex Mono: labels, data, BPM, dates) |
 | Selected | `bg-cream text-chassis` |
 | Numbers | `font-display text-4xl font-semibold tabular-nums text-cream` for figures, `font-mono tabular-nums` in columns |
@@ -51,4 +51,8 @@ Song stage colors are one blue ramp, dark → light (use with `StatusDot`, never
 
 ## Where the truth lives
 
-Read `styles.css` (and its `@import`s) before styling, and each component's `.prompt.md` and `.d.ts` for its props. Every value a `FieldRow` shows says where it came from (Detected, Suggested, AI draft, Edited, Needs you): keep that provenance visible in any redesign.
+Read `styles.css` (and its `@import`s) before styling, and each component's `README.md` and `.d.ts` for its props. Every value a `FieldRow` shows says where it came from (Detected, Suggested, AI draft, Edited, Needs you): keep that provenance visible in any redesign.
+
+## Language
+
+Every visible word in the components comes in English and French. They follow the viewer's browser: French when it prefers `fr`, else English (the app pins it from Settings → Language). Leave room for the French, which runs longer: "Mix current" is "Mix à jour", "Needs you" is "À compléter", "2 need you · 1 to check" is "2 à compléter · 1 à vérifier".
