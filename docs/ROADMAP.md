@@ -8,10 +8,10 @@
 
 - **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion, with a web dashboard for the crew.
 - **Releases.** **v0.5.4** is the latest (2026-10-24): Mac universal .dmg and Windows setup .exe, downloadable from the website. Installed apps **update themselves** (signed updates from the Supabase `releases` bucket, Settings → Check for updates). Builds run on the Mac (self-hosted GitHub runner) when a version tag is pushed.
-- **Phases.** Phase 0, 1a, 1b and 1c are built (checklist in section 7). Two Phase 0 items remain: the crew pitch and the git history scrub.
+- **Phases.** Phase 0, 1a, 1b and 1c are built (checklist in section 7). One Phase 0 item remains: the crew pitch (prepared outside the repo). The git history was scrubbed on 2026-10-25.
 - **What's next: [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md).** In order:
   - **Part A:** verify the crew flow end to end with two accounts and fix the "shared song not showing" report (guardrail 4.1);
-  - **Part A2:** finish the initial brief (Launch Kit hand-off fixes, real-world tests, pitch, history scrub);
+  - **Part A2:** finish the initial brief (Launch Kit hand-off fixes and history scrub done; Windows test and pitch left);
   - **Part B, after that:** the mobile creation companion (BandLab exports into projects first, then a native app syncing over Wi-Fi).
 - **Ready but not released:** everything merged since 0.5.4 ships as **0.5.5** when you say so (Digger saved prods and converter, People profiles, "Include artist IDs" in the kit, the Library folder tree).
 
@@ -139,8 +139,7 @@
 
 ### Blocked
 
-- **Old commits in the now-public repo** still contain artist names and a personal email. **Fix:** rewrite the git history (needs your OK: it rewrites every commit and force-pushes `main`).
-- **The crew pitch (Phase 0).** Waiting on you: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
+- **The crew pitch (Phase 0).** Being prepared with Claude on the web, outside this repo: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
 
 ### Decisions waiting on you
 
@@ -194,7 +193,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] Review the code, fix fragile parts
 - [x] Runs cleanly on a fresh machine
 - [x] Project folders are configurable, no hardcoded paths
-- [ ] Repo clean enough to be public: current files are clean; **old commits need a history rewrite**
+- [x] Repo clean enough to be public (history rewritten 2026-10-25: real names replaced by placeholders, personal email replaced by the GitHub no-reply address, every branch and tag)
 - [x] Setup guide
 - [x] Polished demo stats
 - [ ] Crew pitch (being prepared with Claude on the web, outside this repo)
