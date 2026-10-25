@@ -168,8 +168,14 @@ export const MAX_LEAD_SLUG = 60;
  * src-tauri/src/leads.rs), so "Saved" can be told from the file list.
  */
 export function leadHash(url: string): string {
+  return fnv1a32(url.trim());
+}
+
+/** FNV-1a (32-bit) of the text's UTF-8 bytes as 8 lowercase hex digits, not
+ * trimmed ("" → 811c9dc5, "a" → e40c292c). Also the phone sync note hash. */
+export function fnv1a32(text: string): string {
   let h = 0x811c9dc5;
-  for (const b of new TextEncoder().encode(url.trim())) {
+  for (const b of new TextEncoder().encode(text)) {
     h ^= b;
     h = Math.imul(h, 0x01000193) >>> 0;
   }

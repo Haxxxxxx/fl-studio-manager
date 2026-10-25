@@ -24,6 +24,7 @@ import { scrubPaths } from "./lib/feedback";
 import { appLocation } from "./lib/tauri";
 import { UPDATES_ENABLED } from "./lib/updater";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
+import { startPhoneSyncBridge } from "./store/phoneSyncBridge";
 import { useCrewStore, useInCrew } from "./store/useCrewStore";
 import { StatusDot, btnPrimary, btnQuiet } from "./ui";
 
@@ -248,6 +249,12 @@ export default function App() {
   useEffect(() => {
     if (!inCrew && view.startsWith("crew")) setView("dashboard");
   }, [inCrew, view, setView]);
+
+  // Phone sync: answer the requests Rust forwards (only arrive while it's on).
+  useEffect(() => {
+    if (!isTauri()) return;
+    return startPhoneSyncBridge();
+  }, []);
 
   // Closing the window right after an edit: write the pending save first.
   useEffect(() => {

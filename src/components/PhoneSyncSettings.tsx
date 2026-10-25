@@ -1,0 +1,216 @@
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
+import * as api from "../lib/tauri";
+import { formatDateTime } from "../lib/format";
+import type { PhonePairing, PhoneSyncStatus } from "../types";
+import { dict, tr } from "../i18n";
+
+const T = dict(
+  {
+    title: "Phone sync",
+    intro:
+      "Lets the Hivo phone app read your saved prods, beats and songs and write notes on them, over your local Wi-Fi only. Nothing goes through Hivo's server or any cloud.",
+    toggle: "Let paired phones sync over this network",
+    off: "Off: no port is open.",
+    on: (port: number) => `On: listening on port ${port}.`,
+    addresses: (list: string) => `This computer on the network: ${list}`,
+    noAddress: "No local network address found. Connect this computer to Wi-Fi (or a local network) first.",
+    firewall:
+      "The first time it's on, macOS or Windows asks whether Hivo may accept incoming connections: allow it (private networks only on Windows), or the phone can't reach it.",
+    pair: "Pair a phone",
+    scan: "Scan this code with the Hivo phone app. It holds the pairing key: show it only to your own phone.",
+    pasteHint: "No camera (iOS Simulator)? Paste this link in the app instead:",
+    copy: "Copy link",
+    copied: "Copied",
+    waiting: "Waiting for the phone…",
+    connected: (name: string) => `Paired with ${name}.`,
+    done: "Done",
+    phones: "Paired phones",
+    none: "No phone paired yet.",
+    neverSeen: "Never connected",
+    lastSeen: (when: string) => `Last seen ${when}`,
+    forget: "Forget",
+    unnamed: "Phone",
+    security:
+      "Each phone gets its own key, kept on this computer in an owner-only file and never shown again. Every request is encrypted and signed with it; Forget deletes the key, and that phone can't sync any more.",
+  },
+  {
+    title: "Synchro téléphone",
+    intro:
+      "Permet à l'appli Hivo sur téléphone de lire tes prods enregistrées, les prods de tes dossiers et tes sons et d'y écrire des notes, uniquement par ton Wi-Fi local. Rien ne passe par le serveur de Hivo ni par un cloud.",
+    toggle: "Autoriser les téléphones appairés à synchroniser sur ce réseau",
+    off: "Désactivée : aucun port n'est ouvert.",
+    on: (port: number) => `Activée : à l'écoute sur le port ${port}.`,
+    addresses: (list: string) => `Cet ordi sur le réseau : ${list}`,
+    noAddress: "Aucune adresse sur le réseau local. Connecte d'abord cet ordi au Wi-Fi (ou à un réseau local).",
+    firewall:
+      "La première fois, macOS ou Windows demande si Hivo peut accepter les connexions entrantes : autorise-le (réseaux privés seulement sous Windows), sinon le téléphone ne peut pas le joindre.",
+    pair: "Appairer un téléphone",
+    scan: "Scanne ce code avec l'appli Hivo sur ton téléphone. Il contient la clé d'appairage : ne le montre qu'à ton propre téléphone.",
+    pasteHint: "Pas de caméra (simulateur iOS) ? Colle plutôt ce lien dans l'appli :",
+    copy: "Copier le lien",
+    copied: "Copié",
+    waiting: "En attente du téléphone…",
+    connected: (name: string) => `Appairé avec ${name}.`,
+    done: "Terminé",
+    phones: "Téléphones appairés",
+    none: "Aucun téléphone appairé.",
+    neverSeen: "Jamais connecté",
+    lastSeen: (when: string) => `Vu ${when}`,
+    forget: "Oublier",
+    unnamed: "Téléphone",
+    security:
+      "Chaque téléphone a sa propre clé, gardée sur cet ordi dans un fichier réservé à ton compte et jamais réaffichée. Chaque requête est chiffrée et signée avec ; Oublier supprime la clé, et ce téléphone ne peut plus synchroniser.",
+  },
+);
+
+/** Settings → Phone sync: on/off, pairing QR, paired phones (docs/PHONE-SYNC.md). */
+export function PhoneSyncSettings() {
+  const t = tr(T);
+  const [status, setStatus] = useState<PhoneSyncStatus | null>(null);
+  const [pairing, setPairing] = useState<(PhonePairing & { qr: string }) | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api.phoneSyncStatus().then((s) => live && setStatus(s)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // While the QR is up, watch for the phone's first hello.
+  useEffect(() => {
+    if (!pairing) return;
+    const id = setInterval(() => {
+      api.phoneSyncStatus().then(setStatus).catch(() => {});
+    }, 2000);
+    return () => clearInterval(id);
+  }, [pairing]);
+
+  async function run(fn: () => Promise<PhoneSyncStatus>) {
+    setBusy(true);
+    setError(null);
+    try {
+      setStatus(await fn());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pair() {
+    if (!status?.addresses.length) {
+      setError(t.noAddress);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const p = await api.phoneSyncPair();
+      const qr = await QRCode.toDataURL(p.url, { errorCorrectionLevel: "M", margin: 2, width: 232 });
+      setPairing({ ...p, qr });
+      setCopied(false);
+      setStatus(await api.phoneSyncStatus());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const on = !!status?.on;
+  const paired = status?.devices ?? [];
+  const justPaired = pairing ? paired.find((d) => d.id === pairing.deviceId && d.lastSeenMs) : undefined;
+
+  return (
+    <section id="phone-sync">
+      <h2 className="text-sm font-semibold text-cream">{t.title}</h2>
+      <p className="mt-1 text-xs leading-relaxed text-engrave">{t.intro}</p>
+
+      <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-body">
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={busy || !status}
+          onChange={(e) => {
+            setPairing(null);
+            void run(() => api.phoneSyncEnable(e.target.checked));
+          }}
+          className="mt-0.5 accent-orange-500"
+        />
+        <span>{t.toggle}</span>
+      </label>
+      <div className={`mt-2 text-xs ${on ? "text-emerald-300" : "text-engrave"}`}>{on && status?.port ? t.on(status.port) : t.off}</div>
+      {on && <div className="mt-1 font-mono text-[11px] text-engrave">{status?.addresses.length ? t.addresses(status.addresses.join(", ")) : t.noAddress}</div>}
+      {status?.error && <div className="mt-2 text-xs text-red-300">{status.error}</div>}
+      <p className="mt-2 text-[11px] leading-relaxed text-engrave">{t.firewall}</p>
+
+      {on && !pairing && (
+        <button onClick={() => void pair()} disabled={busy} className="mt-3 rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-chassis hover:bg-orange-400 disabled:opacity-40">
+          {t.pair}
+        </button>
+      )}
+
+      {pairing && (
+        <div className="mt-3 rounded-lg border border-rule bg-panel p-4">
+          <p className="text-xs leading-relaxed text-body">{t.scan}</p>
+          <img src={pairing.qr} alt={t.pair} width={232} height={232} className="mt-3 rounded bg-white" />
+          <p className="mt-3 text-[11px] text-engrave">{t.pasteHint}</p>
+          <div className="mt-1 select-all break-all rounded border border-rule bg-raised p-2 font-mono text-[11px] text-body">{pairing.url}</div>
+          <div className={`mt-2 text-xs ${justPaired ? "text-emerald-300" : "text-engrave"}`}>
+            {justPaired ? t.connected(justPaired.name ?? t.unnamed) : t.waiting}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => {
+                void navigator.clipboard.writeText(pairing.url).then(() => setCopied(true));
+              }}
+              className="rounded-md border border-rule-strong px-3 py-2 text-sm text-body hover:bg-raised"
+            >
+              {copied ? t.copied : t.copy}
+            </button>
+            <button onClick={() => setPairing(null)} className="rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-chassis hover:bg-orange-400">
+              {t.done}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <div className="mt-2 text-xs text-red-300">{error}</div>}
+
+      <h3 className="mt-4 text-xs font-semibold text-cream">{t.phones}</h3>
+      {paired.length === 0 ? (
+        <p className="mt-1 text-xs text-engrave">{t.none}</p>
+      ) : (
+        <ul className="mt-1 divide-y divide-rule rounded-lg border border-rule">
+          {paired.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-3 px-3 py-2">
+              <div className="min-w-0">
+                <div className="truncate text-sm text-cream">{d.name ?? t.waiting}</div>
+                <div className="text-[11px] text-engrave">
+                  {d.lastSeenMs ? t.lastSeen(formatDateTime(d.lastSeenMs)) : t.neverSeen}
+                  {d.appVersion ? ` · ${d.appVersion}` : ""}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (pairing?.deviceId === d.id) setPairing(null);
+                  void run(() => api.phoneSyncForget(d.id));
+                }}
+                disabled={busy}
+                className="shrink-0 rounded-md border border-rule-strong px-3 py-1.5 text-xs text-body hover:bg-raised disabled:opacity-40"
+              >
+                {t.forget}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-[11px] leading-relaxed text-engrave">{t.security}</p>
+    </section>
+  );
+}

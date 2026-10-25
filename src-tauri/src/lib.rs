@@ -14,6 +14,7 @@ mod flp_metadata;
 mod models;
 mod package;
 mod paths;
+mod phone_sync;
 mod render;
 mod resolve;
 mod scanner;
@@ -31,6 +32,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            phone_sync::init(app.handle());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             scanner::scan_projects,
             location::app_location,
@@ -87,6 +92,11 @@ pub fn run() {
             youtube::youtube_status,
             youtube::set_youtube_key,
             youtube::youtube_search,
+            phone_sync::phone_sync_status,
+            phone_sync::phone_sync_enable,
+            phone_sync::phone_sync_pair,
+            phone_sync::phone_sync_forget,
+            phone_sync::phone_sync_reply,
             paths::open_project,
             paths::reveal_path,
         ])

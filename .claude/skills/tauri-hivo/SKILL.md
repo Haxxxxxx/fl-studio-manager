@@ -63,6 +63,7 @@ Use the generic `tauri-v2` skill for the framework; this is what's decided here.
   the vector `"https://youtu.be/dQw4w9WgXcQ"` → `8fd69810`.
 - `MAX_LEAD_SLUG` in `src/lib/digger.ts` ↔ `leads.rs`.
 - `MAX_CONVERTER_CHARS` in `src/components/SettingsView.tsx` ↔ `settings.rs`.
+- `MAX_CHANGES` in `src/lib/phoneSync.ts` and `MAX_NOTE_CHARS` in `src/lib/notes.ts` ↔ `phone_sync.rs`.
 
 ## Dev and build
 - `npm run tauri dev` watches `src-tauri/`; a branch switch rebuilds and restarts

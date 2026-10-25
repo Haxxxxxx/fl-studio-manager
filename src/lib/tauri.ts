@@ -26,6 +26,9 @@ import type {
   LookupProfile,
   LookupSource,
   SpotifyStatus,
+  PhoneSyncStatus,
+  PhonePairing,
+  PhoneSyncRequest,
 } from "../types";
 
 /** Scans the linked folders and export folder saved in Settings (Rust reads them). */
@@ -296,4 +299,18 @@ export async function openExternal(url: string): Promise<void> {
 /** Shows a file in Finder / Explorer. Rust refuses network paths. */
 export async function revealInFileManager(path: string): Promise<void> {
   await invoke("reveal_path", { path });
+}
+
+// ---- Phone sync (src-tauri/src/phone_sync.rs, docs/PHONE-SYNC.md) ----
+export const phoneSyncStatus = (): Promise<PhoneSyncStatus> => invoke("phone_sync_status");
+/** Opens (true) or closes (false) the local network port; saved. */
+export const phoneSyncEnable = (on: boolean): Promise<PhoneSyncStatus> => invoke("phone_sync_enable", { on });
+/** A new device and its QR url. The key in it is never returned again. */
+export const phoneSyncPair = (): Promise<PhonePairing> => invoke("phone_sync_pair");
+export const phoneSyncForget = (deviceId: string): Promise<PhoneSyncStatus> => invoke("phone_sync_forget", { deviceId });
+/** Answers a forwarded request: a body, or a short error ("demo", "busy"). */
+export const phoneSyncReply = (id: string, reply: { body: unknown } | { error: string }): Promise<void> =>
+  invoke("phone_sync_reply", { id, body: "body" in reply ? reply.body : null, error: "error" in reply ? reply.error : null });
+export function onPhoneSyncRequest(handler: (request: PhoneSyncRequest) => void): Promise<UnlistenFn> {
+  return listen<PhoneSyncRequest>("phone-sync-request", (e) => handler(e.payload));
 }
