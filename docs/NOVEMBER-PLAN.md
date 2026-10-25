@@ -1,6 +1,6 @@
 # November plan: finish crew sharing; the mobile creation companion after
 
-Status: **draft, nothing built.** Asked for on 2026-10-25. Order decided by the user: part A first, part B once A is done.
+Status: **draft, nothing built.** Asked for on 2026-10-25. Order decided by the user: part A (crew), then part A2 (finish the brief), then part B (mobile). Tracking: tick items here as they close, and the matching boxes in ROADMAP.md section 7.
 
 ---
 
@@ -33,14 +33,34 @@ Steps: reproduce with two accounts (yours plus a test account added in the Supab
 ### A3. Open crew items found in the code
 - **Deleting a crew** doesn't exist (only "remove everyone, then leave").
 - **The website has no owner actions** (invite, remove, rename, columns); it sends people to the desktop.
-- **Sign-in email sender:** Supabase's built-in mailer is rate-limited and meant for testing. Set a custom SMTP sender (an EU provider such as Brevo, free tier) before inviting the crew. **Needs you** (Supabase dashboard).
+- **Sign-in emails** already go through Brevo (custom SMTP, per the roadmap): step 1 of the checklist confirms the codes arrive.
+- **Needs you:** a second account (add a test email in the Supabase dashboard → Authentication → Users; sign-up is closed).
 
 ### A4. Done when
-All nine checklist steps pass with two real accounts, A1 is fixed, and the SMTP sender is set. Then part B starts.
+All nine checklist steps pass with two real accounts and A1 is fixed. Then part A2.
 
 ---
 
-## Part B: the mobile creation companion (after part A, on the side)
+## Part A2: finish the initial brief (after A, before B)
+
+What's left of the original roadmap (see [ROADMAP.md](ROADMAP.md) section 7). Code first, then tests, then the human items.
+
+| # | Item | Who | Notes |
+|---|---|---|---|
+| 1 | **Launch Kit hand-off** (audit §3 A1-A4): save the suggested release date on accept/export; stage control and a way back to the song in the kit header; remap the kit after a relink (never show another song); "Render now" / "Open Settings" on the no-mixdown and no-export-folder checks | Claude | The real breaks between "finished" and "released". Smaller audit §3 items (B1-B12) only where they sit on the same path. |
+| 2 | **Delete a crew**; **owner actions on the website** (invite code, remove member) | Claude | Only if the part A test shows they're needed; otherwise park. |
+| 3 | **Hook detection on real songs:** run the kit on 3-5 crew tracks whose hook you know | You (+ Claude on the fixes) | Tested on synthetic audio only so far. |
+| 4 | **Windows installer on a real PC** | You or a crewmate | Cross-built on the Mac, never run on Windows. |
+| 5 | **Ship 0.5.5**, then a release with A2's fixes | You say "ship it" | |
+| 6 | **The crew pitch** (Phase 0) | You | What it solves for them, six months out, what you need from them. November milestone: the crew lives in the board. |
+| 7 | **Git history scrub** (Phase 0) | Your OK, then Claude | Old commits in the public repo still contain artist names and a personal email. Rewrites every commit and force-pushes `main`. |
+
+### A2 done when
+The roadmap's section 7 has no open box except Phase 2.
+
+---
+
+## Part B: the mobile creation companion (after parts A and A2, on the side)
 
 ### B0. What it's for (the user's words, condensed)
 Hivo helps you untangle your notes on each beat you pick, and the rest of the writing and creation process: lyrics, ideas, voice memos. You write on the phone; the desktop has it while you work in FL Studio. BandLab projects (and other mobile sketches) can be sent to FL through Hivo for detailed work.
