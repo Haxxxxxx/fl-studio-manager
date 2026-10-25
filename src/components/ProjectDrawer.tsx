@@ -27,6 +27,7 @@ import { detectKey } from "../lib/people";
 import { SongCredits, SongPitches } from "./SongPeople";
 import { ShareToggle, StageConflictBanner } from "./CrewPanel";
 import { FilesPanel } from "./FilesPanel";
+import { NotesEditor } from "./NotesEditor";
 import { canRenderInApp, dawOf } from "../lib/daws";
 import { ConfirmButton, StatusSelect, TagEditor, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { Fact, Section } from "../ui";
@@ -426,12 +427,11 @@ export function ProjectDrawer() {
         </Section>
 
         <Section label={t.notes}>
-          <textarea
-            value={meta.notes ?? ""}
-            onChange={(e) => updateSong(project.path, { notes: e.target.value })}
+          <NotesEditor
+            key={project.path}
+            value={meta.notes}
+            onChange={(notes) => updateSong(project.path, { notes })}
             placeholder={t.notesPlaceholder}
-            rows={4}
-            className={`${input} resize-y text-xs leading-relaxed`}
           />
         </Section>
 
