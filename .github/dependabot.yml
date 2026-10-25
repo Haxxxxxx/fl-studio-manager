@@ -50,6 +50,10 @@ updates:
     ignore:
       - dependency-name: "tauri"
       - dependency-name: "tauri-*"
+      # 0.6 rewrites the decoding API used by audio.rs (mixdown analysis,
+      # hook detection): ported in its own PR, not by a bot bump (#100).
+      - dependency-name: "symphonia"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       minor-and-patch:
         update-types: [minor, patch]
