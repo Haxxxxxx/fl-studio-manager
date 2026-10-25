@@ -40,6 +40,22 @@ export function PairScreen() {
 
   async function startScan() {
     setError(null);
+    // Android: Google Play services' code scanner (the in-view analysis saw
+    // nothing on a real phone while the system camera read the same code).
+    // It brings its own full-screen UI and needs no camera permission here.
+    if (Platform.OS === "android" && CameraView.isModernBarcodeScannerAvailable) {
+      const sub = CameraView.onModernBarcodeScanned((res) => {
+        sub.remove();
+        void submit(res.data);
+      });
+      try {
+        await CameraView.launchScanner({ barcodeTypes: ["qr"] });
+      } catch (e) {
+        sub.remove();
+        setError(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
     if (!permission?.granted) {
       const p = await requestPermission();
       if (!p.granted) {
