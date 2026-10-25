@@ -72,7 +72,7 @@ Hivo helps you untangle your notes on each beat you pick, and the rest of the wr
 - **Nothing written on the phone goes to Hivo's server.** No lyrics, notes, ideas or voice memos in Supabase.
 - **The phone and the desktop sync directly over the same Wi-Fi.** That needs a **native app** (browsers block a secure website from talking to a local address), so the mobile app is native (Expo / React Native) and the PWA idea is dropped: without sync it would only be a separate notepad.
 - **Timing:** native is "on the side": it starts after part A and isn't promised for November.
-- **Distribution:** a free **Android APK** shared directly, and **TestFlight for iOS** (the crew is mostly on iPhone). TestFlight is part of the Apple Developer Program, **99 USD a year**: there's no free TestFlight. A free Apple ID only lets you install your own builds from Xcode on your own phone, and they expire after 7 days. Guardrail 7: decide on the Apple account when the iOS build is ready for the crew; until then, develop with the free Xcode route and the Android APK.
+- **Distribution (updated 2026-10-25):** Android through a free **APK on the website** (`/download/android`, with an in-app update banner) **and Google Play** (the user has a developer account; the first Play upload is manual). Both from the same release tag as the desktop, version **0.6.0** first. **No iOS distribution for now.** Earlier note, still true when iOS comes back: TestFlight is part of the Apple Developer Program, **99 USD a year**: there's no free TestFlight. A free Apple ID only lets you install your own builds from Xcode on your own phone, and they expire after 7 days. Guardrail 7: decide on the Apple account when the iOS build is ready for the crew.
 - **Testing (decided 2026-10-25), all free:** iOS in the **Xcode Simulator** (Xcode 26.6 with iOS 26.0 and 26.5 runtimes is installed on the Mac; no Apple account needed), Android on a **physical phone** over `adb` (installed, with the Android SDK). The Simulator shares the Mac's network, so it pairs with the Hivo desktop app on the same Mac; the Android phone pairs over the studio Wi-Fi. Simulator gaps to check on a real iPhone before the crew beta: the camera (QR pairing: type the pairing code instead in the Simulator), the microphone quality for voice memos, background behaviour.
 - **v1 includes** the ideas inbox and voice memos.
 
@@ -113,7 +113,7 @@ Hivo helps you untangle your notes on each beat you pick, and the rest of the wr
 | 2 | ✅ **Built 2026-10-25, not shipped** (branch `feature/phone-sync-desktop`): Phone sync server (pairing QR, encrypted envelope with the pairing key instead of pinned TLS, replay protection, snapshot + notes), with tests. mDNS left out of v1. |
 | 3 | Phone (Expo): pairing, saved prods / beats / songs lists, notes editor offline, ideas, sync. **Android APK** to install for testing; iOS in the Simulator. |
 | 4 | BandLab share target on the phone, file transfer, the desktop's sketch filing and "Continue in FL" (from #143), voice memos; session view on desktop. |
-| 5 | Crew beta: Android APK; iOS through TestFlight once the Apple account is decided. |
+| 5 | Distribution (decided 2026-10-25): Android **APK on the website** + **Google Play** (AAB from the release workflow, uploaded by hand; internal testing first), both apps at **0.6.0**; privacy policy at `/privacy` for the Play listing. **iOS not now.** |
 
 Step 1 is about a week; steps 2 to 4 are several weeks of part-time work. Native isn't a November promise.
 

@@ -10,7 +10,9 @@ import type { Lang } from "./lang";
 // (landingCopy.ts): /fr and /en pick one, / follows the browser. Every claim
 // has to be true of the shipped app: when a feature changes, change both.
 
-const VERSION = "0.5.5";
+const VERSION = "0.6.0";
+/** The Play Store listing. Empty until the app is published there: the button stays hidden. */
+const PLAY_URL: string = "";
 
 const primary = "inline-flex items-center gap-2 rounded bg-hot px-5 py-2.5 font-display uppercase tracking-[0.06em] text-base font-bold text-chassis hover:bg-hot-hover";
 const ghost = "inline-flex items-center gap-2 rounded border border-rule-strong px-5 py-2.5 font-display uppercase tracking-[0.06em] text-base font-semibold text-cream hover:bg-raised";
@@ -56,12 +58,24 @@ export function Landing({ signIn, lang }: { signIn: ReactNode; lang: Lang }) {
                 </a>
               </div>
               <p className="mt-3 max-w-md font-mono text-xs text-engrave">{t.signin.firstRun}</p>
+              <p className="mt-6 max-w-md text-sm text-body">{t.signin.phone}</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a href="/download/android" className={ghost}>
+                  <Download size={16} strokeWidth={2.5} /> {t.signin.android}
+                </a>
+                {PLAY_URL && (
+                  <a href={PLAY_URL} className={ghost} rel="noopener">
+                    {t.signin.play}
+                  </a>
+                )}
+              </div>
+              <p className="mt-3 max-w-md font-mono text-xs text-engrave">{t.signin.androidTip}</p>
             </div>
             <div className="rounded-2xl border border-rule bg-panel p-6">{signIn}</div>
           </div>
         </section>
       </main>
-      <Footer t={t} />
+      <Footer t={t} lang={lang} />
     </div>
   );
 }
@@ -437,7 +451,7 @@ function Faq({ t }: { t: LandingCopy }) {
   );
 }
 
-function Footer({ t }: { t: LandingCopy }) {
+function Footer({ t, lang }: { t: LandingCopy; lang: Lang }) {
   return (
     <footer className="border-t border-rule px-6 py-10 text-xs text-body">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
@@ -453,6 +467,9 @@ function Footer({ t }: { t: LandingCopy }) {
           </a>
           <a href="#faq" className="hover:text-cream">
             {t.nav.faq}
+          </a>
+          <a href={`/${lang}/privacy`} className="hover:text-cream">
+            {t.footer.privacyPolicy}
           </a>
         </nav>
         <span className="font-mono">{t.footer.data}</span>

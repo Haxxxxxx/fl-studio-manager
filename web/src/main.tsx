@@ -3,9 +3,12 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
 import { applyPageLang } from "./lang";
+import { isPrivacyPath, PrivacyPage } from "./Privacy";
 
 // /fr and /en pin the language (page text and crew messages) before the first render.
-applyPageLang();
+const lang = applyPageLang();
+// The privacy policy is a plain page: no sign-in, no crew store.
+const privacy = isPrivacyPath(location.pathname);
 
 /** The faces the hero uses (preloaded from index.html, see vite.config.ts). */
 const HERO_FONTS = [
@@ -21,9 +24,7 @@ const FONT_WAIT_MS = 400;
 
 const render = () =>
   createRoot(document.getElementById("root")!).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
+    <StrictMode>{privacy ? <PrivacyPage lang={lang} /> : <App />}</StrictMode>,
   );
 
 // First paint in the real fonts, not the fallback then a swap. They're

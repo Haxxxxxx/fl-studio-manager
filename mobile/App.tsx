@@ -7,6 +7,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { setLang } from "./src/lib/i18n";
 import { parsePairingUrl } from "./src/lib/pairing";
 import type { Kind } from "./src/lib/sync";
+import { UpdateBanner } from "./src/components/UpdateBanner";
 import { LibraryScreen } from "./src/screens/LibraryScreen";
 import { NoteScreen } from "./src/screens/NoteScreen";
 import { PairScreen } from "./src/screens/PairScreen";
@@ -86,6 +87,7 @@ export default function App() {
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: C.chassis }} edges={["top", "bottom", "left", "right"]}>
         <StatusBar style="light" />
+        {ready ? <UpdateBanner /> : null}
         {!ready ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator color={C.hot} />

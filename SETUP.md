@@ -102,10 +102,11 @@ Builds made for the crew already include the server address. If you run from sou
 
 ## Release builds (admin)
 
-Installers are built on the admin's Mac, registered as this repo's GitHub Actions runner (label `hivo`). It's free: no GitHub-hosted minutes are used. The Mac builds both the macOS `.dmg` (universal) and the Windows `.exe` (cross-compiled with cargo-xwin + NSIS).
+Installers are built on the admin's Mac, registered as this repo's GitHub Actions runner (label `hivo`). It's free: no GitHub-hosted minutes are used. The Mac builds the macOS `.dmg` (universal), the Windows `.exe` (cross-compiled with cargo-xwin + NSIS) and the phone app for Android (`.apk` for the website, `.aab` for Google Play).
 
 - **Make a release:** `git tag v0.2.0 && git push origin v0.2.0` (or Actions → Release builds → Run workflow). The Mac must be on. When it's done, open Releases, check the draft, Publish.
-- **Needs on the Mac:** Node, Rust (`rustup`, plus `cargo install cargo-xwin`), `brew install nsis llvm`.
+- **Needs on the Mac:** Node, Rust (`rustup`, plus `cargo install cargo-xwin`), `brew install nsis llvm`. For the phone app (the workflow's `android` job): `brew install openjdk@17` (the workflow pins `/opt/homebrew/Cellar/openjdk@17/17.0.18`: update that path when Homebrew moves it) and the Android SDK in `~/Library/Android/sdk` (platform, build-tools, NDK, as Android Studio or `sdkmanager` installs them).
+- **Phone app signing secrets:** `ANDROID_UPLOAD_KEYSTORE_BASE64` (`base64 -i upload.jks | pbcopy`), `ANDROID_UPLOAD_KEYSTORE_PASSWORD` (store and key password, the same), `ANDROID_UPLOAD_KEY_ALIAS`. Keep the keystore and its password backed up outside the repo: the website APK can only be updated by an APK signed with the same key.
 - **The runner** lives in `~/actions-runner-hivo` and runs as a background service. Stop it: `cd ~/actions-runner-hivo && ./svc.sh stop`. Start it: `./svc.sh start`. Remove it: `./svc.sh uninstall`, then `./config.sh remove` (with a removal token from the repo's Settings → Actions → Runners).
 - Only use a self-hosted runner on a **private** repo: on a public one, anyone's pull request could run code on the Mac.
 

@@ -14,6 +14,11 @@
       "source": "/download/windows",
       "destination": "https://chrbpaoljulntuvousnz.supabase.co/storage/v1/object/public/releases/latest/Hivo-setup.exe",
       "permanent": false
+    },
+    {
+      "source": "/download/android",
+      "destination": "https://chrbpaoljulntuvousnz.supabase.co/storage/v1/object/public/releases/latest/Hivo.apk",
+      "permanent": false
     }
   ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
