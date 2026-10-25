@@ -1,4 +1,4 @@
-# November plan: finish crew sharing, then the mobile creation companion
+# November plan: finish crew sharing; the mobile creation companion after
 
 Status: **draft, nothing built.** Asked for on 2026-10-25. Order decided by the user: part A first, part B once A is done.
 
@@ -40,52 +40,58 @@ All nine checklist steps pass with two real accounts, A1 is fixed, and the SMTP 
 
 ---
 
-## Part B: the mobile creation companion (after part A)
+## Part B: the mobile creation companion (after part A, on the side)
 
 ### B0. What it's for (the user's words, condensed)
 Hivo helps you untangle your notes on each beat you pick, and the rest of the writing and creation process: lyrics, ideas, voice memos. You write on the phone; the desktop has it while you work in FL Studio. BandLab projects (and other mobile sketches) can be sent to FL through Hivo for detailed work.
 
-### B1. Decisions already made (2026-10-25)
-- **Lyrics stay off the server.** Nothing written on the phone is stored in Supabase.
-- **PWA now, native later.** The phone app is the website installed to the home screen (free, no App Store); a native app is reconsidered once the crew has used it.
-- **v1 includes** the ideas inbox and voice memos (kept off the server too).
+### B1. Decisions made (2026-10-25)
+- **Nothing written on the phone goes to Hivo's server.** No lyrics, notes, ideas or voice memos in Supabase.
+- **The phone and the desktop sync directly over the same Wi-Fi.** That needs a **native app** (browsers block a secure website from talking to a local address), so the mobile app is native (Expo / React Native) and the PWA idea is dropped: without sync it would only be a separate notepad.
+- **Timing:** native is "on the side": it starts after part A and isn't promised for November.
+- **Distribution:** a free **Android APK** shared directly, and **TestFlight for iOS** (the crew is mostly on iPhone). TestFlight is part of the Apple Developer Program, **99 USD a year**: there's no free TestFlight. A free Apple ID only lets you install your own builds from Xcode on your own phone, and they expire after 7 days. Guardrail 7: decide on the Apple account when the iOS build is ready for the crew; until then, develop with the free Xcode route and the Android APK.
+- **v1 includes** the ideas inbox and voice memos.
 
-### B2. Open decision: how the phone and the desktop talk without Hivo's server
-| Option | How | Automatic? | Trade-off |
-|---|---|---|---|
-| **1. Your own cloud folder / AirDrop** (fits the "off the server" choice) | The phone saves notes, voice memos and BandLab exports to a **Hivo inbox** folder in iCloud Drive or Google Drive (or AirDrops them to the Mac). The desktop watches that folder and files everything under the right beat or song. The desktop writes a small index of your beats and songs to the same folder, so the phone can pick one. | Desktop: yes. Phone: one tap on the share sheet (a PWA can't write to iCloud by itself) | Hivo's server never sees anything; BandLab exports and voice memos travel the same way. Slightly manual on the phone until a native app. |
-| **2. Encrypted relay** | Supabase stores only scrambled data it can't read; the key lives on your devices (pair the phone by scanning a QR code on the desktop). | Both | Fully automatic, but encrypted blobs do sit on the server. Doesn't carry BandLab files or voice memos (audio stays off the server). |
-| **3. Same Wi-Fi, direct** | The desktop app talks to the phone over the local network. | Both, when on the same network | Browsers block a secure website from talking to a local address, so this needs the **native** app. Later. |
+### B2. How the direct sync works
+- **Opt-in on the desktop:** Settings → Phone sync (off by default). Only while it's on, the desktop app listens on the local network and announces itself (mDNS / Bonjour: `_hivo._tcp`). Turning it off closes the port.
+- **Pairing once:** the desktop shows a QR code holding a one-time pairing secret and its certificate fingerprint. The phone scans it, and both keep a device key. Unpaired devices get nothing; Settings lists paired phones with "Forget".
+- **Encrypted and authenticated:** TLS pinned to the fingerprint from the QR code (no certificate warnings, no trust in the network). Every request is signed with the device key.
+- **Offline first:** the phone keeps everything locally (SQLite) and queues changes; they sync whenever both are on the same Wi-Fi with the desktop app open. The phone shows "Last synced with *desktop name*: 2 h ago".
+- **Conflicts:** every note carries a version. If both sides changed the same note since the last sync, both copies are kept (yours, plus "from the desktop" below a marker) for you to merge by hand. No silent overwrite, no clock trusted.
+- **Files (voice memos, BandLab exports)** travel over the same paired connection, in chunks, and land in the song's or beat's folder on the desktop.
+- **Firewall:** macOS and Windows ask once to allow incoming connections when Phone sync is first turned on; the app says so beforehand.
 
-Recommendation: **option 1**. It matches "off the server", and one inbox carries text, voice memos and BandLab exports alike.
+### B3. Feature list (v1)
 
-### B3. Feature list (v1, assuming option 1)
-
-**Phone (PWA)**
-1. **Pick a beat or a song** from the index the desktop leaves in the inbox folder (or type a new idea's name).
-2. **Notes and lyrics per beat or song:** plain text with section headers (`[Verse 1]`, `[Hook]`…), a syllable count per line, a bar estimate from the BPM. Autosaved on the phone (works offline).
+**Phone (native)**
+1. **Your beats and songs:** the list the desktop sends at sync (names, BPM, key, stage). New ideas can be named on the phone.
+2. **Notes and lyrics per beat or song:** plain text with section headers (`[Verse 1]`, `[Hook]`…), a syllable count per line, a bar estimate from the BPM. Works offline.
 3. **Ideas inbox:** punchlines, titles, concepts without a beat; attach them later.
-4. **Voice memos:** record a flow or melody, attached to a beat or an idea, kept on the phone.
-5. **Send to desktop:** one share-sheet tap puts the note, memo or BandLab export in the Hivo inbox folder (or AirDrop to the Mac).
+4. **Voice memos:** record a flow or melody, attached to a beat, a song or an idea.
+5. **Receive BandLab exports (and other sketches):** "Share to Hivo" from BandLab's export (mixdown or stems) through the system share sheet; it's attached to a beat or kept as a new sketch, and goes to the desktop at the next sync.
+6. **Sync status** and the paired desktop's name.
 
 **Desktop**
 1. **Notes on beats** in the Digger (a beat gets notes before it becomes a song), and the same notes in a song's drawer. When a beat becomes a song (a new FL project), its notes move with it.
-2. **Inbox watcher:** files from the inbox folder are filed under their beat or song; anything unmatched waits in an Inbox list to be assigned.
-3. **Session view (teleprompter):** a window kept on top of FL Studio, showing the lyrics large, section by section; arrow keys or auto-scroll at the BPM.
-4. **BandLab (or any mobile sketch) → FL:** an exported mixdown or stems landing in the inbox shows as "Start an FL project from this". Hivo creates the song folder in a linked folder, copies the audio in, keeps the BandLab link, and opens FL Studio. You drag the stems into the playlist: Hivo never writes `.flp` files.
-5. **Writes the index** (beats and songs: names, BPM, key, stage) to the inbox folder for the phone.
+2. **Phone sync** in Settings: on/off, pairing QR code, paired phones, last sync.
+3. **Inbox:** what came from the phone and isn't attached yet (ideas, sketches), to assign to a beat or a song.
+4. **Session view (teleprompter):** a window kept on top of FL Studio, showing the lyrics large, section by section; arrow keys or auto-scroll at the BPM.
+5. **Sketch → FL:** a BandLab export from the phone shows as "Start an FL project from this". Hivo creates the song folder in a linked folder, copies the audio in, keeps the BandLab link, and opens FL Studio. You drag the stems into the playlist: Hivo never writes `.flp` files.
 
-**Later (each needs a yes):** a native app (automatic sync, background recording), rhyme suggestions, lyrics in the Launch Kit, sharing one song's lyrics with a featured artist.
+**Later (each needs a yes):** rhyme suggestions, lyrics in the Launch Kit, sharing one song's lyrics with a featured artist, sync away from home (would need a relay: the server question again).
 
 **Out:** recording or mixing on the phone, chat, a social feed, AI-written lyrics.
 
 ### B4. Rough timeline (starts when part A is done)
-| Week | Work |
+| Step | Work |
 |---|---|
-| 1 | Desktop: notes on beats + songs, inbox folder setting, watcher, index file, Inbox list. |
-| 2 | PWA: install, beat/song picker from the index, notes editor (offline), ideas, share-sheet send. |
-| 3 | Voice memos; BandLab/sketch → "Start an FL project"; session view on desktop. |
-| 4 | Test on one iPhone (Safari) and one Android (Chrome) with the real inbox folder; release. |
+| 1 | Desktop: notes on beats and songs, Inbox, session view (useful on their own, before any phone). |
+| 2 | Desktop: Phone sync server (mDNS, pairing QR, pinned TLS, signed requests), with tests. |
+| 3 | Phone (Expo): pairing, beat/song list, notes editor offline, ideas, sync. Android APK + Xcode install on your iPhone. |
+| 4 | Voice memos, BandLab share target, file transfer, sketch → FL project. |
+| 5 | Crew beta: Android APK; iOS through TestFlight once the Apple account is decided. |
+
+Step 1 is about a week; steps 2 to 4 are several weeks of part-time work. Native isn't a November promise.
 
 ### B5. Done when
-You write a verse on the phone for a beat, send it with one tap, open FL, and the session view shows it under that beat; a BandLab export becomes a new song folder with its stems; nothing touched Hivo's server.
+You write a verse on the phone for a beat, walk into the studio, the phone syncs over Wi-Fi, and the session view shows it next to FL; a BandLab export becomes a new song folder with its stems; nothing touched Hivo's server.
