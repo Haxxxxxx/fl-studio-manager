@@ -572,9 +572,9 @@ export function CrewInvites() {
             <code className="rounded bg-rule px-2 py-1.5 font-mono text-sm tracking-widest text-cream">{crew.invite}</code>
             <button
               onClick={() => void navigator.clipboard?.writeText(crew.invite!).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1200)))}
-              className="flex items-center gap-1 text-xs text-engrave hover:text-cream"
+              className={`${secondary} flex items-center gap-1.5`}
             >
-              {copied ? <Check size={12} /> : <ClipboardCopy size={12} />} {copied ? t.copied : t.copy}
+              {copied ? <Check size={14} /> : <ClipboardCopy size={14} />} {copied ? t.copied : t.copy}
             </button>
             <span className="text-[11px] text-engrave">{t.inviteValid}</span>
           </>

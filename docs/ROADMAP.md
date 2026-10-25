@@ -197,7 +197,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [ ] Repo clean enough to be public: current files are clean; **old commits need a history rewrite**
 - [x] Setup guide
 - [x] Polished demo stats
-- [ ] Crew pitch
+- [ ] Crew pitch (being prepared with Claude on the web, outside this repo)
 
 **Phase 1a: shared crew dashboard**
 - [x] Each member's songs visible to the group (opt-in, metadata only, EU)
@@ -206,7 +206,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] Group stats vs personal stats (Me / Crew switch)
 - [x] Release calendar
 - [x] Where each song's files live
-- [ ] **Verified end to end by a human with two accounts** (guardrail 4.1; NOVEMBER-PLAN part A)
+- [x] **Verified end to end by a human with several accounts** (2026-10-25; guardrail 4.1 lifted)
 
 **Phase 1b: Launch Kit**
 - [x] Extract everything possible from the project and the mixdown
@@ -215,7 +215,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] Full edit UI: accept all, edit per field, or manual
 - [x] Export a distributor-ready kit (one universal format; per-distributor formats not built)
 - [x] **Hand-off into Release** (date saved on accept/export, stage control and "Move to Release" in the kit, relink-safe; audit §3 A1-A4)
-- [ ] Tested on real songs (hook detection)
+- [x] Tested on real songs (hook detection works, 2026-10-25)
 
 **Phase 1c: design identity**
 - [x] A visual identity for the crew (System 02, Hivo brand)
@@ -224,7 +224,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 **Phase 1d: shipping**
 - [x] Signed in-app updates, website downloads
 - [x] Feedback form
-- [ ] Windows installer run on a real PC
+- [ ] Windows installer run on a real PC (planned in the coming days)
 
 **Phase 2: ecosystem**: not started (see "Thought about, not built"). The mobile companion is planned separately (NOVEMBER-PLAN part B).
 

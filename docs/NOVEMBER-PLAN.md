@@ -36,7 +36,7 @@ Steps: reproduce with two accounts (yours plus a test account added in the Supab
 - **Sign-in emails** already go through Brevo (custom SMTP, per the roadmap): step 1 of the checklist confirms the codes arrive.
 - **Needs you:** a second account (add a test email in the Supabase dashboard → Authentication → Users; sign-up is closed).
 
-### A4. Done when
+### A4. Done when (✅ passed 2026-10-25: the flow works with several accounts; the only finding was the invite copy button being too small, fixed)
 All nine checklist steps pass with two real accounts and A1 is fixed. Then part A2.
 
 ---
@@ -48,12 +48,12 @@ What's left of the original roadmap (see [ROADMAP.md](ROADMAP.md) section 7). Co
 | # | Item | Who | Notes |
 |---|---|---|---|
 | 1 | ✅ **Launch Kit hand-off** (audit §3 A1-A4, done 2026-10-25, PR fix/launch-kit-handoff): save the suggested release date on accept/export; stage control and a way back to the song in the kit header; remap the kit after a relink (never show another song); "Render now" / "Open Settings" on the no-mixdown and no-export-folder checks | Claude | The real breaks between "finished" and "released". Smaller audit §3 items (B1-B12) only where they sit on the same path. |
-| 2 | **Delete a crew**; **owner actions on the website** (invite code, remove member) | Claude | Only if the part A test shows they're needed; otherwise park. |
-| 3 | **Hook detection on real songs:** run the kit on 3-5 crew tracks whose hook you know | You (+ Claude on the fixes) | Tested on synthetic audio only so far. |
-| 4 | **Windows installer on a real PC** | You or a crewmate | Cross-built on the Mac, never run on Windows. |
-| 5 | **Ship 0.5.5**, then a release with A2's fixes | You say "ship it" | |
-| 6 | **The crew pitch** (Phase 0) | You | What it solves for them, six months out, what you need from them. November milestone: the crew lives in the board. |
-| 7 | **Git history scrub** (Phase 0) | Your OK, then Claude | Old commits in the public repo still contain artist names and a personal email. Rewrites every commit and force-pushes `main`. |
+| 2 | **Delete a crew**; **owner actions on the website** (invite code, remove member) | Claude | Parked: the part A test (2026-10-25) didn't need them. |
+| 3 | ✅ **Hook detection on real songs** | You | Works on real tracks (2026-10-25). |
+| 4 | **Windows installer on a real PC** | You or a crewmate | Planned in the coming days. |
+| 5 | **Ship 0.5.5** (includes the A2 Launch Kit fixes) | You run the release commands yourself | |
+| 6 | **The crew pitch** (Phase 0) | You, with Claude on the web (outside this repo) | What it solves for them, six months out, what you need from them. November milestone: the crew lives in the board. |
+| 7 | **Git history scrub** (Phase 0) | OK given 2026-10-25: Claude prepares and verifies the rewrite, you run the force-push | Old commits in the public repo still contain artist names and a personal email. Rewrites every commit and force-pushes `main`. |
 
 ### A2 done when
 The roadmap's section 7 has no open box except Phase 2.
