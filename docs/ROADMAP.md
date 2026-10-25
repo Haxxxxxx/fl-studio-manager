@@ -135,7 +135,7 @@
 - **Testing on real songs and a real PC.**
   - The hook detection was tested on synthetic audio, not yet on the crew's tracks.
   - The Windows installer was cross-built on a Mac and hasn't been run on a Windows PC yet.
-- **Launch Kit hand-off fixes** (§3 of [UX-AUDIT-2026-10.md](UX-AUDIT-2026-10.md)): the suggested release date isn't saved, nothing moves a song past Prep from the kit, the kit can show another song after a relink, no-mixdown is a dead end.
+- **Launch Kit, the rest of audit §3** (A5-A6 and the B items: readiness per release, two-dates confusion, modal and drawer friction): only where they block the path to release.
 
 ### Blocked
 
@@ -214,7 +214,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] AI verification on every field, with confidence
 - [x] Full edit UI: accept all, edit per field, or manual
 - [x] Export a distributor-ready kit (one universal format; per-distributor formats not built)
-- [ ] **Hand-off into Release** (date saved, stage moves from the kit; audit §3; NOVEMBER-PLAN part A2)
+- [x] **Hand-off into Release** (date saved on accept/export, stage control and "Move to Release" in the kit, relink-safe; audit §3 A1-A4)
 - [ ] Tested on real songs (hook detection)
 
 **Phase 1c: design identity**
