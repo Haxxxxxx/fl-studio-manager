@@ -40,6 +40,22 @@ export function PairScreen() {
 
   async function startScan() {
     setError(null);
+    // Android: Google Play services' code scanner (the in-view analysis saw
+    // nothing on a real phone while the system camera read the same code).
+    // It brings its own full-screen UI and needs no camera permission here.
+    if (Platform.OS === "android" && CameraView.isModernBarcodeScannerAvailable) {
+      const sub = CameraView.onModernBarcodeScanned((res) => {
+        sub.remove();
+        void submit(res.data);
+      });
+      try {
+        await CameraView.launchScanner({ barcodeTypes: ["qr"] });
+      } catch (e) {
+        sub.remove();
+        setError(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
     if (!permission?.granted) {
       const p = await requestPermission();
       if (!p.granted) {
@@ -78,6 +94,9 @@ export function PairScreen() {
           onPress={() => (scanning ? setScanning(false) : void startScan())}
           style={{ marginTop: 20 }}
         />
+        {/* Right under the camera, so a refused code is never hidden below the fold. */}
+        {busy ? <Text style={styles.status}>{t.codeRead}</Text> : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Engrave style={{ marginTop: 28, marginBottom: 6 }}>{t.pasteLabel}</Engrave>
         <TextInput
@@ -91,7 +110,6 @@ export function PairScreen() {
           style={styles.input}
         />
         <Button label={busy ? t.pairing : t.pair} onPress={() => void submit(text)} disabled={busy || !text.trim()} style={{ marginTop: 10 }} />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -116,4 +134,5 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   error: { color: C.missing, marginTop: 12, fontSize: 14 },
+  status: { color: C.cream, marginTop: 12, fontSize: 14 },
 });
