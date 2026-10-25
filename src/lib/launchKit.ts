@@ -1,7 +1,7 @@
 import type { AiFieldReview, Album, AudioAnalysis, CaptionLang, KitFieldId, MasterSpec, Person, ProjectInfo, Snippet, SongMeta } from "../types";
 import { detectKey, detectedPeople } from "./people";
 import { KEYS, renderFreshness } from "./songs";
-import { dawOf } from "./daws";
+import { dawOf, isSketch } from "./daws";
 import { applyLang, currentLang, dict, tr } from "../i18n";
 
 // On-screen text only (field labels, provenance notes, check messages).
@@ -77,6 +77,7 @@ const T = dict(
     tempoFromProject: (daw: string) => `From the ${daw} project's tempo`,
     closedFormat: (daw: string) => `${daw} projects can't be read from outside. Type the tempo once`,
     noTempoFound: "No tempo found in the project",
+    sketchTempo: "A BandLab sketch has no project to read the tempo from. Type it once",
     sure: (pct: number) => `${pct}% sure`,
     keyInPanelAudio: (key: string, sure: string) => `Set in the song panel. The audio sounds more like ${key} (${sure})`,
     keyInPanel: "Set in the song panel",
@@ -172,6 +173,7 @@ const T = dict(
     tempoFromProject: (daw: string) => `D'après le tempo du projet ${daw}`,
     closedFormat: (daw: string) => `Les projets ${daw} ne se lisent pas de l'extérieur. Tape le tempo une fois`,
     noTempoFound: "Aucun tempo trouvé dans le projet",
+    sketchTempo: "Un sketch BandLab n'a pas de projet où lire le tempo. Tape-le une fois",
     sure: (pct: number) => `sûr à ${pct} %`,
     keyInPanelAudio: (key: string, sure: string) => `Réglée dans le panneau du son. L'audio sonne plutôt en ${key} (${sure})`,
     keyInPanel: "Réglée dans le panneau du son",
@@ -508,7 +510,7 @@ function generate(input: KitInput) {
       : {
           value: "",
           source: "missing",
-          note: dawOf(project).readable === "none" ? t.closedFormat(daw) : t.noTempoFound,
+          note: isSketch(project) ? t.sketchTempo : dawOf(project).readable === "none" ? t.closedFormat(daw) : t.noTempoFound,
         };
 
   const typedKey = meta.key;

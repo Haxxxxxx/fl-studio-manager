@@ -66,6 +66,7 @@ The roadmap's section 7 has no open box except Phase 2.
 Hivo helps you untangle your notes on each beat you pick, and the rest of the writing and creation process: lyrics, ideas, voice memos. You write on the phone; the desktop has it while you work in FL Studio. BandLab projects (and other mobile sketches) can be sent to FL through Hivo for detailed work.
 
 ### B-now. BandLab today, before any phone app
+**Built (2026-10-25, branch feature/bandlab-import), not shipped yet**: needs a click-through in the app before a release.
 The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and send it to the desktop, as a song in the project folders** (not the beats folder: a BandLab session is a song in progress, not a raw beat).
 1. In BandLab: export the mixdown (or stems) as mp3/wav, and send it to the computer (AirDrop to the Mac, or iCloud Drive / Google Drive).
 2. **Desktop, new: Library → "Import a BandLab export"** (small, desktop only). Pick the file(s), a name and a linked project folder. Hivo creates `<project folder>/<name>/BandLab/` with the audio, and the song appears in the Library and the pipeline as a **sketch** (stage Creation, playable, with notes, tags, credits and the BandLab link if pasted). The sketch lives in `workspace.json` like every other song's data; nothing is written outside the new folder.

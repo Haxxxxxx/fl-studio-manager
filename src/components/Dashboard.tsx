@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatBytes, formatRelative } from "../lib/format";
-import { openInFlStudio } from "../lib/tauri";
+import { openInFlStudio, revealInFileManager } from "../lib/tauri";
+import { isSketch } from "../lib/daws";
 import {
   STATUSES,
   isFinished,
@@ -430,7 +431,8 @@ function MyDashboard({ editing }: { editing: boolean }) {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            openInFlStudio(p.path).catch((err) => console.error("couldn't open the project", err));
+                            // A BandLab sketch has no project yet: show its folder.
+                            (isSketch(p) ? revealInFileManager(p.path) : openInFlStudio(p.path)).catch((err) => console.error("couldn't open the project", err));
                           }}
                           className="flex items-center gap-1 text-engrave opacity-0 hover:text-orange-300 group-hover:opacity-100"
                         >

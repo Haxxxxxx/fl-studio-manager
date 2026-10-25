@@ -27,6 +27,7 @@ const TIPS = dict(
     "pro-tools": "In Pro Tools: File → Bounce Mix, WAV, 44.1 kHz, 24-bit (interleaved).",
     cubase: "In Cubase: File → Export → Audio Mixdown, WAV, 44.1 kHz, 24-bit.",
     bitwig: "In Bitwig: File → Export Audio, WAV, 44.1 kHz, 24-bit.",
+    bandlab: "A BandLab sketch has no project to render: export the mix from BandLab as WAV, or continue it in FL Studio.",
   },
   {
     "fl-studio": "Dans FL Studio : File → Export → Wave file, 44 100 Hz, 24 bits.",
@@ -36,6 +37,7 @@ const TIPS = dict(
     "pro-tools": "Dans Pro Tools : File → Bounce Mix, WAV, 44,1 kHz, 24 bits (interleaved).",
     cubase: "Dans Cubase : File → Export → Audio Mixdown, WAV, 44,1 kHz, 24 bits.",
     bitwig: "Dans Bitwig : File → Export Audio, WAV, 44,1 kHz, 24 bits.",
+    bandlab: "Un sketch BandLab n'a pas de projet à rendre : exporte le mix en WAV depuis BandLab, ou continue-le dans FL Studio.",
   },
 );
 
@@ -51,6 +53,7 @@ export const DAWS: Record<DawId, DawInfo> = {
   "pro-tools": daw("pro-tools", "Pro Tools", "PT", "none"),
   cubase: daw("cubase", "Cubase", "Cubase", "none"),
   bitwig: daw("bitwig", "Bitwig Studio", "Bitwig", "none"),
+  bandlab: daw("bandlab", "BandLab sketch", "BL", "none"),
 };
 
 /** Projects from older scans (before multi-DAW) are FL Studio. */
@@ -62,6 +65,10 @@ const PROJECT_EXT = /\.(flp|als|rpp|song|ptx|ptf|cpr|npr|bwproject)$/i;
 
 /** "Envy.als" → "Envy", for any DAW's project file. */
 export const stripProjectExt = (fileName: string) => fileName.replace(PROJECT_EXT, "");
+
+/** A BandLab sketch: audio in `<song>/BandLab/`, no project yet. Its path is
+ * that folder, so it can't be opened in a DAW (reveal it instead). */
+export const isSketch = (project: { daw?: DawId | null }) => project.daw === "bandlab";
 
 /** Rendering and packaging from the app need FL Studio. */
 export const canRenderInApp = (project: { daw?: DawId | null }) => dawOf(project).id === "fl-studio";

@@ -9,6 +9,7 @@ import type {
   CoverStatus,
   PackagePlan,
   PackageResult,
+  PickedAudio,
   ProjectInfo,
   RenderEvent,
   Settings,
@@ -142,6 +143,17 @@ export async function createProject(args: {
 }): Promise<string> {
   return invoke("create_project", args);
 }
+
+// BandLab sketches (src-tauri/src/sketch.rs). The picker runs in Rust and
+// keeps the files' paths; the webview only sees names and sizes.
+/** Native multi-file audio picker; [] when cancelled (the previous pick is kept). */
+export const pickBandlabFiles = (): Promise<PickedAudio[]> => invoke("pick_bandlab_files");
+/** Copies the picked files to `<parentFolder>/<name>/BandLab/`; returns the
+ * sketch's key (that folder's path). Refuses a name that already exists. */
+export const importBandlab = (parentFolder: string, name: string): Promise<string> => invoke("import_bandlab", { parentFolder, name });
+/** Copies the template to `<song>/<song>.flp` beside the sketch's BandLab
+ * folder; returns the new .flp path. */
+export const continueSketch = (sketchPath: string, templatePath: string): Promise<string> => invoke("continue_sketch", { sketchPath, templatePath });
 
 export async function duplicateProject(projectPath: string, newName: string): Promise<string> {
   return invoke("duplicate_project", { projectPath, newName });

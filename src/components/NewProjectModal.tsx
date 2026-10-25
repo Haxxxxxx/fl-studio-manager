@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import { STATUSES } from "../lib/songs";
@@ -71,7 +71,6 @@ export function NewProjectModal() {
   const resetLibraryFilters = useAppStore((s) => s.resetLibraryFilters);
 
   const [name, setName] = useState("");
-  const [factory, setFactory] = useState<TemplateInfo[]>([]);
   const [templatePath, setTemplatePath] = useState("");
   const [parentFolder, setParentFolder] = useState(settings.watchedFolders[0] ?? "");
   const [status, setStatus] = useState<SongStatus>(draft?.status ?? "creation");
@@ -79,8 +78,6 @@ export function NewProjectModal() {
   const [openAfter, setOpenAfter] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const userTemplates = useMemo(() => projects.filter((p) => p.isTemplate), [projects]);
 
   // The modal stays mounted: re-pick the location each time it opens, so a
   // folder linked (or removed) since the app started is reflected.
@@ -100,27 +97,7 @@ export function NewProjectModal() {
     setAlbumId(draft.albumId ?? "");
   }, [draft]);
 
-  useEffect(() => {
-    if (!draft) return;
-    let cancelled = false;
-    Promise.all([api.listTemplates(), api.defaultTemplate()])
-      .then(([list, fallback]) => {
-        if (cancelled) return;
-        setFactory(list);
-        const userTemplate = useAppStore.getState().projects.find((p) => p.isTemplate)?.path;
-        setTemplatePath((current) => current || fallback || userTemplate || list[0]?.path || "");
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [draft, settings.flStudioPath]);
-
-  const byCategory = useMemo(() => {
-    const groups = new Map<string, TemplateInfo[]>();
-    for (const t of factory) groups.set(t.category, [...(groups.get(t.category) ?? []), t]);
-    return [...groups.entries()];
-  }, [factory]);
+  const factory = useFactoryTemplates(!!draft, setTemplatePath);
 
   if (!draft) return null;
 
@@ -187,34 +164,7 @@ export function NewProjectModal() {
 
         <div>
           <div className={sectionLabel}>{L.startFrom}</div>
-          <select value={templatePath} onChange={(e) => setTemplatePath(e.target.value)} className={`${input} mt-1.5`}>
-            {!templatePath && <option value="">{L.chooseTemplate}</option>}
-            {userTemplates.length > 0 && (
-              <optgroup label={L.yourTemplates}>
-                {userTemplates.map((t) => (
-                  <option key={t.path} value={t.path}>
-                    {t.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {byCategory.map(([category, list]) => (
-              <optgroup key={category} label={`FL Studio — ${category}`}>
-                {list.map((t) => (
-                  <option key={t.path} value={t.path}>
-                    {t.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          {factory.length === 0 && userTemplates.length === 0 && (
-            <div className="mt-1 text-xs text-engrave">
-              {settings.flStudioPath
-                ? L.noTemplates
-                : L.setFlPath}
-            </div>
-          )}
+          <TemplateSelect value={templatePath} onChange={setTemplatePath} factory={factory} className="mt-1.5" />
         </div>
 
         <div>
@@ -294,5 +244,79 @@ export function NewProjectModal() {
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** FL's factory templates, loaded while `active`; the first time, picks FL's
+ * own default (else a template of yours, else the first) if none is picked. */
+export function useFactoryTemplates(active: boolean, setTemplatePath: Dispatch<SetStateAction<string>>): TemplateInfo[] {
+  const flStudioPath = useAppStore((s) => s.settings.flStudioPath);
+  const [factory, setFactory] = useState<TemplateInfo[]>([]);
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    Promise.all([api.listTemplates(), api.defaultTemplate()])
+      .then(([list, fallback]) => {
+        if (cancelled) return;
+        setFactory(list);
+        const userTemplate = useAppStore.getState().projects.find((p) => p.isTemplate)?.path;
+        setTemplatePath((current) => current || fallback || userTemplate || list[0]?.path || "");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [active, flStudioPath, setTemplatePath]);
+  return factory;
+}
+
+/** Your templates (projects under a Templates folder) and FL's, by category. */
+export function TemplateSelect({
+  value,
+  onChange,
+  factory,
+  className = "",
+}: {
+  value: string;
+  onChange: (path: string) => void;
+  factory: TemplateInfo[];
+  className?: string;
+}) {
+  const projects = useAppStore((s) => s.projects);
+  const flStudioPath = useAppStore((s) => s.settings.flStudioPath);
+  const userTemplates = useMemo(() => projects.filter((p) => p.isTemplate), [projects]);
+  const byCategory = useMemo(() => {
+    const groups = new Map<string, TemplateInfo[]>();
+    for (const t of factory) groups.set(t.category, [...(groups.get(t.category) ?? []), t]);
+    return [...groups.entries()];
+  }, [factory]);
+  const L = tr(T);
+  return (
+    <>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={`${input} ${className}`}>
+        {!value && <option value="">{L.chooseTemplate}</option>}
+        {userTemplates.length > 0 && (
+          <optgroup label={L.yourTemplates}>
+            {userTemplates.map((t) => (
+              <option key={t.path} value={t.path}>
+                {t.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {byCategory.map(([category, list]) => (
+          <optgroup key={category} label={`FL Studio — ${category}`}>
+            {list.map((t) => (
+              <option key={t.path} value={t.path}>
+                {t.name}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      {factory.length === 0 && userTemplates.length === 0 && (
+        <div className="mt-1 text-xs text-engrave">{flStudioPath ? L.noTemplates : L.setFlPath}</div>
+      )}
+    </>
   );
 }

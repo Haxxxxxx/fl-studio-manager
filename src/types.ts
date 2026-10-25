@@ -14,7 +14,9 @@ export interface StemsInfo {
   newestMs: number;
 }
 
-export type DawId = "fl-studio" | "ableton" | "reaper" | "studio-one" | "pro-tools" | "cubase" | "bitwig";
+/** "bandlab" = a BandLab sketch: `<song>/BandLab/` audio with no project yet
+ * (keyed by that folder's path, see src-tauri/src/sketch.rs). */
+export type DawId = "fl-studio" | "ableton" | "reaper" | "studio-one" | "pro-tools" | "cubase" | "bitwig" | "bandlab";
 
 /** A DAW's default projects folder found on this computer (Settings → Auto-detect DAWs). */
 export interface DetectedFolder {
@@ -81,6 +83,12 @@ export type SampleStatus = "ok" | "relocated" | "missing";
 export interface SampleInfo {
   path: string;
   status: SampleStatus;
+}
+
+/** A file the BandLab import picker returned (Rust keeps the path). */
+export interface PickedAudio {
+  name: string;
+  sizeBytes: number;
 }
 
 export interface TemplateInfo {
@@ -185,6 +193,9 @@ export interface SongMeta {
   credits?: Credit[];
   pitches?: Pitch[];
   launchKit?: LaunchKitMeta;
+  /** The song's BandLab project link (https only, see src/lib/sketch.ts).
+   * Local only: never shared with the crew. */
+  bandlabUrl?: string;
 }
 
 // ---- Launch Kit ----
