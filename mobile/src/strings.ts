@@ -54,6 +54,10 @@ export const T = dict(
     cancel: "Cancel",
     confirmForget: "Unpair",
     language: "Language follows the phone.",
+    // Update banner (website builds only)
+    updateAvailable: (v: string) => `Hivo ${v} is available. Download it and install it over this one: your notes stay.`,
+    updateDownload: "Download",
+    updateLater: "Later",
     // Stages
     stage: { creation: "Creation", production: "Production", prep: "Prep", release: "Release", promotion: "Promotion" } as Record<string, string>,
   },
@@ -102,6 +106,9 @@ export const T = dict(
     cancel: "Annuler",
     confirmForget: "Dissocier",
     language: "La langue suit celle du téléphone.",
+    updateAvailable: (v: string) => `Hivo ${v} est dispo. Télécharge-le et installe-le par-dessus celui-ci${NB}: tes notes restent.`,
+    updateDownload: "Télécharger",
+    updateLater: "Plus tard",
     stage: { creation: "Création", production: "Production", prep: "Prépa", release: "Sortie", promotion: "Promo" } as Record<string, string>,
   },
 );

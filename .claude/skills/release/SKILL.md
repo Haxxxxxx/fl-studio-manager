@@ -1,6 +1,6 @@
 ---
 name: release
-description: Ship a Hivo desktop release (tag → self-hosted Mac runner → signed installers → Supabase releases bucket → draft GitHub Release) and what to check before and after. Use for any version bump, tag, release failure, updater or download-link question.
+description: Ship a Hivo release, desktop and Android phone app (tag → self-hosted Mac runner → signed installers, APK and AAB → Supabase releases bucket → draft GitHub Release; Google Play upload by hand) and what to check before and after. Use for any version bump, tag, release failure, updater, Play or download-link question.
 ---
 
 # Hivo release flow
@@ -25,6 +25,13 @@ root `"version"` lines; regenerate with npm 11 if needed, npm 10.9 crashes with
 `edgesOut`), `src-tauri/Cargo.lock` (`cargo update --workspace`),
 `web/src/Landing.tsx` (`VERSION`). 10 changed lines, nothing else.
 
+Since 0.6.0 the phone app ships with the same version, so also:
+`mobile/app.json` (`expo.version`), `mobile/package.json`, and the two root
+`"version"` lines of `mobile/package-lock.json`. The Android `versionCode` is
+derived (major*10000 + minor*100 + patch, `mobile/plugins/versionCode.js`):
+never set it by hand. The `android` job refuses a tag whose version differs
+from `mobile/app.json` or `tauri.conf.json`.
+
 ## Tag
 ```
 git checkout main && git pull
@@ -40,11 +47,48 @@ build + cross-compiled Windows NSIS, both signed with `TAURI_SIGNING_PRIVATE_KEY
 GitHub Release. Watch it: `gh run list --workflow 'Release builds' --limit 1`,
 `gh run view <id> --log-failed`.
 
+Then the **`android` job** (same runner, `needs: build`): tag on main → phone
+version == tag == desktop version → `cd mobile && npm ci --ignore-scripts`,
+tests, tsc → `npx expo prebuild --platform android --clean` (no secrets) →
+keystore decoded to `$RUNNER_TEMP/hivo-upload.jks` → `assembleRelease
+-PreactNativeArchitectures=arm64-v8a` (APK, ~30 MB, website) →
+`bundleRelease` with `HIVO_DISTRIBUTION=play` (AAB, all ABIs, Play) → both
+checked against the upload certificate (fails if debug-signed) → APK to the
+bucket, `mobile-latest.json` last → APK + AAB attached to the draft → keystore
+deleted (`if: always()`). Re-run just this job if only it failed: the desktop
+part already shipped.
+
+Phone builds: the APK ("direct") shows an update banner when
+`mobile-latest.json` has a newer version (checked at launch, at most once a
+day). The AAB ("play") never checks: Play updates it, and Play's policy forbids
+an app updating itself from elsewhere. Signing goes through
+`mobile/plugins/withReleaseSigning.js`: `HIVO_UPLOAD_STORE_FILE`,
+`HIVO_UPLOAD_STORE_PASSWORD`, `HIVO_UPLOAD_KEY_ALIAS`, `HIVO_UPLOAD_KEY_PASSWORD`;
+without them a release build is signed with the debug key (local tests only).
+
+## Google Play (manual, by the user)
+The workflow never uploads to Play. After the run: download
+`Hivo-<ver>-android.aab` from the draft release and upload it in Play Console
+(internal testing first, then promote). The first upload creates the app
+(`fr.hivo.mobile`) and enrolls it in Play App Signing; every later upload must
+be signed with the same upload key (the GitHub secret). Each upload needs a
+higher versionCode, which the version bump gives. Privacy policy URL for the
+listing: `https://www.hi-vo.fr/en/privacy` (French: `/fr/privacy`; page in
+`web/src/privacyCopy.ts`, keep it true when what an app sends changes). Once
+the listing is live, set `PLAY_URL` in `web/src/Landing.tsx` to show the
+Google Play button.
+
 ## Secrets and places (never print any of them)
 - `TAURI_SIGNING_PRIVATE_KEY`: GitHub repo secret; backup at `~/.tauri/hivo.key`.
   Public half is `plugins.updater.pubkey` in `tauri.conf.json`. Never on Vercel.
-- `SUPABASE_SERVICE_ROLE_KEY`: GitHub repo secret, used only by the publish step.
-  Never in the app, never on Vercel.
+- `SUPABASE_SERVICE_ROLE_KEY`: GitHub repo secret, used only by the publish
+  steps (desktop and phone). Never in the app, never on Vercel.
+- `ANDROID_UPLOAD_KEYSTORE_BASE64` (the upload `.jks`, base64),
+  `ANDROID_UPLOAD_KEYSTORE_PASSWORD` (store and key password, the same),
+  `ANDROID_UPLOAD_KEY_ALIAS`: GitHub repo secrets for the phone app. Keep a
+  backup of the keystore and password outside the repo: website APK users can
+  only update to an APK signed with the same key. Never commit a keystore
+  (`*.jks`, `*.key` are git-ignored in `mobile/`).
 - Repo variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_FEEDBACK_EMAIL`.
 - Bucket: public `releases` on the Supabase project (migration
   `20261024000000_releases_bucket.sql`). Public read URL:
@@ -55,6 +99,11 @@ GitHub Release. Watch it: `gh run list --workflow 'Release builds' --limit 1`,
   on the target. Same for `/download/windows`. (404 at the bucket = no release
   uploaded yet, normal before the first successful run.)
 - `latest.json` exists in the bucket with the new version.
+- Phone: `curl -sI https://www.hi-vo.fr/download/android` → 307 to
+  `latest/Hivo.apk`; `mobile-latest.json` at the bucket root has the new
+  version, the `v<ver>/Hivo-<ver>-android-arm64.apk` URL and its sha256. An
+  older website APK shows the update banner on its next launch (a day after its
+  last check at most).
 - Open the draft on GitHub Releases, check the notes, **Publish**.
 - Settings → "Check for updates" on an installed older build finds it.
 - First macOS auto-update: watch it by hand once (app is ad-hoc signed, not notarized).

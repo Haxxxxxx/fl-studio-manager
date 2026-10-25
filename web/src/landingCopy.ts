@@ -20,8 +20,8 @@ export interface LandingCopy {
   privacy: { title: string; lead: string; travels: string; travelItems: string[]; stays: string; stayItems: string[]; note: string };
   status: { kicker: string; title: string; lead: string; ready: string; readyItems: string[]; limits: string; limitItems: string[]; next: string; nextItems: string[]; labels: [string, string, string] };
   faq: { title: string; items: Pair[] };
-  signin: { title: string; lead: string; app: string; mac: string; windows: string; firstRun: string };
-  footer: { tagline: string; data: string; nav: string };
+  signin: { title: string; lead: string; app: string; mac: string; windows: string; firstRun: string; phone: string; android: string; play: string; androidTip: string };
+  footer: { tagline: string; data: string; nav: string; privacyPolicy: string };
 }
 
 const en: LandingCopy = {
@@ -168,8 +168,12 @@ const en: LandingCopy = {
     mac: "Download for Mac",
     windows: "Download for Windows",
     firstRun: "Mac: if it says it can't verify the developer, go to System Settings → Privacy & Security and click Open Anyway. Windows: More info → Run anyway.",
+    phone: "The phone app (Android) keeps your notes and lyrics on your prods, beats and songs, and syncs them with the desktop app over your Wi-Fi.",
+    android: "Download for Android",
+    play: "Get it on Google Play",
+    androidTip: "Android: allow installs from your browser when Android asks.",
   },
-  footer: { tagline: "made with and for the crew", data: "crew data: EU (Ireland) · audio: never leaves your machine", nav: "Footer" },
+  footer: { tagline: "made with and for the crew", data: "crew data: EU (Ireland) · audio: never leaves your machine", nav: "Footer", privacyPolicy: "Privacy policy" },
 };
 
 const fr: LandingCopy = {
@@ -316,8 +320,12 @@ const fr: LandingCopy = {
     mac: "Télécharger pour Mac",
     windows: "Télécharger pour Windows",
     firstRun: "Mac : s'il dit ne pas pouvoir vérifier le développeur, va dans Réglages Système → Confidentialité et sécurité et clique Ouvrir quand même. Windows : Informations complémentaires → Exécuter quand même.",
+    phone: "L'appli téléphone (Android) garde tes notes et tes textes sur tes prods, tes beats et tes sons, et les synchronise avec l'appli de l'ordi par ton Wi-Fi.",
+    android: "Télécharger pour Android",
+    play: "Disponible sur Google Play",
+    androidTip: "Android : autorise les installations depuis ton navigateur quand Android le demande.",
   },
-  footer: { tagline: "fait avec et pour le crew", data: "données du crew : UE (Irlande) · audio : ne quitte jamais ton ordi", nav: "Pied de page" },
+  footer: { tagline: "fait avec et pour le crew", data: "données du crew : UE (Irlande) · audio : ne quitte jamais ton ordi", nav: "Pied de page", privacyPolicy: "Politique de confidentialité" },
 };
 
 export const LANDING: Record<Lang, LandingCopy> = { en, fr };

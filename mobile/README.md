@@ -19,6 +19,9 @@ This folder is its own project (own `package.json` and lockfile). The root
 | `src/store.ts` | App state; pairing in `expo-secure-store`, library cache + queued edits in AsyncStorage |
 | `src/screens/`, `src/components/` | UI (System 02 tokens in `src/theme.ts`, copied from `../src/theme.css`) |
 | `src/strings.ts` | Every visible string, English + French (`dict(en, fr)`, follows the phone's language) |
+| `app.json`, `app.config.js` | Expo config; the second derives the Android versionCode and the build's distribution (website or Play) |
+| `plugins/` | Config plugins (release signing) and the versionCode helper, with tests |
+| `src/update.ts`, `src/components/UpdateBanner.tsx` | Update check and banner (website builds only) |
 | `scripts/fake-desktop.mjs` | A stand-in desktop server with sample data, to try the app without the desktop |
 | `scripts/make-icons.py` | Redraws the app icons (Pillow) |
 
@@ -69,11 +72,46 @@ cd android && ./gradlew assembleRelease
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-**Signing:** the generated `android/app/build.gradle` signs `release` with the
-debug keystore (`android/app/debug.keystore`, created by prebuild). That's fine
-for test builds you sideload; an APK shared with the crew should get a real
-keystore (kept out of git), because Android refuses to update an app signed
-with a different key.
+**Signing:** `plugins/withReleaseSigning.js` (registered in `app.config.js`)
+makes the generated `android/app/build.gradle` sign `release` with the upload
+keystore when these environment variables are set at Gradle time:
+
+| Variable | What |
+|---|---|
+| `HIVO_UPLOAD_STORE_FILE` | absolute path to the upload `.jks` (never in the repo) |
+| `HIVO_UPLOAD_STORE_PASSWORD` | keystore password |
+| `HIVO_UPLOAD_KEY_ALIAS` | key alias |
+| `HIVO_UPLOAD_KEY_PASSWORD` | key password (the same as the store password; defaults to it) |
+
+Without them, `release` is signed with the debug keystore
+(`android/app/debug.keystore`, created by prebuild): fine for test builds you
+sideload, never for the crew, because Android refuses to update an app signed
+with a different key. Gradle reads the variables when it runs, so no path or
+password lands in the generated files.
+
+```sh
+export HIVO_UPLOAD_STORE_FILE=/path/outside/the/repo/upload.jks
+export HIVO_UPLOAD_STORE_PASSWORD=…  HIVO_UPLOAD_KEY_PASSWORD=…  HIVO_UPLOAD_KEY_ALIAS=…
+cd android
+./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon  # website APK
+HIVO_DISTRIBUTION=play ./gradlew bundleRelease --no-daemon                   # Play AAB
+```
+
+**Version:** `version` in `app.json` (same as the desktop since 0.6.0);
+`android.versionCode` is derived from it in `app.config.js`
+(major*10000 + minor*100 + patch, `plugins/versionCode.js`).
+
+**Releases** are built by the `android` job of `.github/workflows/release.yml`
+on the same tag as the desktop: the APK goes to the public `releases` bucket
+(`latest/Hivo.apk`, behind hi-vo.fr/download/android) with
+`mobile-latest.json`; the AAB is attached to the draft GitHub Release and
+uploaded to Google Play by hand. See the `release` skill.
+
+**Updates:** website builds (`extra.distribution = "direct"`) read
+`mobile-latest.json` at launch, at most once a day (`src/update.ts`, rules in
+`src/lib/update.ts`), and show a banner with Download / Later when it's newer.
+Play builds (`HIVO_DISTRIBUTION=play` when Gradle runs) never check: Play
+updates them.
 
 Android allows plain HTTP to the computer through
 `expo-build-properties` → `usesCleartextTraffic` (the bodies are encrypted
