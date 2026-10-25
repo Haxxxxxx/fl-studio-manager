@@ -6,6 +6,7 @@ import { FolderPlus, Trash2, Wand2, FileSearch, PlayCircle } from "lucide-react"
 import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import { CrewPanel } from "./CrewPanel";
+import { PhoneSyncSettings } from "./PhoneSyncSettings";
 import { DetectedFolders } from "./DetectedFolders";
 import { canRenderInApp } from "../lib/daws";
 import { aiDisclosure } from "../lib/ai";
@@ -372,6 +373,8 @@ export function SettingsView() {
         <SpotifySettings />
 
         <DiggerSettings />
+
+        <PhoneSyncSettings />
 
         <section id="fl">
           <h2 className="text-sm font-semibold text-cream">{t.flExe}</h2>

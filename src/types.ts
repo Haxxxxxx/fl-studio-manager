@@ -661,3 +661,39 @@ export interface DigDeeperResult {
   webError: string | null;
   queries: string[];
 }
+
+// ---- Phone sync (docs/PHONE-SYNC.md) ----
+
+/** A paired phone as Rust reports it (never its key). */
+export interface PhoneDevice {
+  id: string;
+  /** Set by the phone's first hello; null = paired, never connected. */
+  name: string | null;
+  appVersion: string | null;
+  pairedAtMs: number;
+  lastSeenMs: number | null;
+}
+
+export interface PhoneSyncStatus {
+  on: boolean;
+  port: number | null;
+  /** Private IPv4 addresses, best first. */
+  addresses: string[];
+  devices: PhoneDevice[];
+  /** Why the listener couldn't start, if it couldn't. */
+  error: string | null;
+}
+
+/** A new pairing: the QR payload (holds the key, shown once). */
+export interface PhonePairing {
+  deviceId: string;
+  url: string;
+}
+
+/** A decrypted /v1/snapshot or /v1/notes request, forwarded by Rust. */
+export interface PhoneSyncRequest {
+  id: string;
+  path: string;
+  body: unknown;
+  phoneName: string;
+}

@@ -77,9 +77,9 @@ Hivo helps you untangle your notes on each beat you pick, and the rest of the wr
 - **v1 includes** the ideas inbox and voice memos.
 
 ### B2. How the direct sync works
-- **Opt-in on the desktop:** Settings → Phone sync (off by default). Only while it's on, the desktop app listens on the local network and announces itself (mDNS / Bonjour: `_hivo._tcp`). Turning it off closes the port.
-- **Pairing once:** the desktop shows a QR code holding a one-time pairing secret and its certificate fingerprint. The phone scans it, and both keep a device key. Unpaired devices get nothing; Settings lists paired phones with "Forget".
-- **Encrypted and authenticated:** TLS pinned to the fingerprint from the QR code (no certificate warnings, no trust in the network). Every request is signed with the device key.
+- **Opt-in on the desktop:** Settings → Phone sync (off by default). Only while it's on, the desktop app listens on the local network. Turning it off closes the port. (mDNS / Bonjour `_hivo._tcp` announcement: not in v1, the QR carries the addresses; see [PHONE-SYNC.md](PHONE-SYNC.md).)
+- **Pairing once:** the desktop shows a QR code holding a random per-phone key, the desktop's addresses and port. The phone scans it, and both keep the device key. Unpaired devices get nothing; Settings lists paired phones with "Forget".
+- **Encrypted and authenticated:** ~~TLS pinned to the fingerprint from the QR code~~ **changed 2026-10-25: plain HTTP on the LAN, every body an encrypted envelope (XChaCha20-Poly1305) with the pairing key**, plus a timestamp window and nonce set against replays. Same guarantees (nothing readable or forgeable on the network) without native SSL pinning on the phone. Contract: [PHONE-SYNC.md](PHONE-SYNC.md).
 - **Offline first:** the phone keeps everything locally (SQLite) and queues changes; they sync whenever both are on the same Wi-Fi with the desktop app open. The phone shows "Last synced with *desktop name*: 2 h ago".
 - **Conflicts:** every note carries a version. If both sides changed the same note since the last sync, both copies are kept (yours, plus "from the desktop" below a marker) for you to merge by hand. No silent overwrite, no clock trusted.
 - **Files (voice memos, BandLab exports)** travel over the same paired connection, in chunks, and land in the song's or beat's folder on the desktop.
@@ -110,7 +110,7 @@ Hivo helps you untangle your notes on each beat you pick, and the rest of the wr
 | Step | Work |
 |---|---|
 | 1 | Desktop: notes on saved prods and beats (songs already have notes). Order confirmed 2026-10-25: notes → sync → Android APK. |
-| 2 | Desktop: Phone sync server (mDNS, pairing QR, pinned TLS, signed requests), with tests. |
+| 2 | ✅ **Built 2026-10-25, not shipped** (branch `feature/phone-sync-desktop`): Phone sync server (pairing QR, encrypted envelope with the pairing key instead of pinned TLS, replay protection, snapshot + notes), with tests. mDNS left out of v1. |
 | 3 | Phone (Expo): pairing, saved prods / beats / songs lists, notes editor offline, ideas, sync. **Android APK** to install for testing; iOS in the Simulator. |
 | 4 | BandLab share target on the phone, file transfer, the desktop's sketch filing and "Continue in FL" (from #143), voice memos; session view on desktop. |
 | 5 | Crew beta: Android APK; iOS through TestFlight once the Apple account is decided. |
