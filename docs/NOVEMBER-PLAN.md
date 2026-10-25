@@ -53,7 +53,7 @@ What's left of the original roadmap (see [ROADMAP.md](ROADMAP.md) section 7). Co
 | 4 | **Windows installer on a real PC** | You or a crewmate | Planned in the coming days. |
 | 5 | **Ship 0.5.5** (includes the A2 Launch Kit fixes) | You run the release commands yourself | |
 | 6 | **The crew pitch** (Phase 0) | You, with Claude on the web (outside this repo) | What it solves for them, six months out, what you need from them. November milestone: the crew lives in the board. |
-| 7 | **Git history scrub** (Phase 0) | OK given 2026-10-25: Claude prepares and verifies the rewrite, you run the force-push | Old commits in the public repo still contain artist names and a personal email. Rewrites every commit and force-pushes `main`. |
+| 7 | ✅ **Git history scrub** (Phase 0) | Done 2026-10-25: rewritten with git-filter-repo, pushed by you, verified clean on GitHub (26 refs) | Old commits in the public repo still contain artist names and a personal email. Rewrites every commit and force-pushes `main`. |
 
 ### A2 done when
 The roadmap's section 7 has no open box except Phase 2.
