@@ -65,12 +65,8 @@ The roadmap's section 7 has no open box except Phase 2.
 ### B0. What it's for (the user's words, condensed)
 Hivo helps you untangle your notes on each beat you pick, and the rest of the writing and creation process: lyrics, ideas, voice memos. You write on the phone; the desktop has it while you work in FL Studio. BandLab projects (and other mobile sketches) can be sent to FL through Hivo for detailed work.
 
-### B-now. BandLab today, before any phone app
-The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and send it to the desktop, as a song in the project folders** (not the beats folder: a BandLab session is a song in progress, not a raw beat).
-1. In BandLab: export the mixdown (or stems) as mp3/wav, and send it to the computer (AirDrop to the Mac, or iCloud Drive / Google Drive).
-2. **Desktop, new: Library → "Import a BandLab export"** (small, desktop only). Pick the file(s), a name and a linked project folder. Hivo creates `<project folder>/<name>/BandLab/` with the audio, and the song appears in the Library and the pipeline as a **sketch** (stage Creation, playable, with notes, tags, credits and the BandLab link if pasted). The sketch lives in `workspace.json` like every other song's data; nothing is written outside the new folder.
-3. **"Continue in FL Studio"** on the sketch: creates `<name>.flp` from your template in that same folder (the existing New song flow) and opens FL. The song keeps its stage, notes and credits, now attached to the `.flp`. You drag the BandLab audio into the playlist: Hivo never writes inside `.flp` files.
-4. Not automatic: a file just dropped in a project folder isn't picked up on its own (audio next to projects already means mixdowns and recordings to the scanner; guessing would mislabel them).
+### B-now. BandLab exports (clarified 2026-10-25)
+**BandLab import belongs to the phone app**, next to taking notes on the prods stored on the desktop. A desktop "Import from BandLab" button was built by mistake (PR #143, draft, not shipped). What stays from it is the **desktop's receiving side**: a BandLab export sent from the phone is filed as a **sketch song** in a project folder (`<project folder>/<name>/BandLab/`, listed by the scanner, playable, with notes and credits), and **"Continue in FL Studio"** turns it into an `.flp` from a template next to the audio (Hivo never writes inside `.flp` files). The desktop Library button is dropped when #143 is reworked for step 4.
 
 ### B1. Decisions made (2026-10-25)
 - **Nothing written on the phone goes to Hivo's server.** No lyrics, notes, ideas or voice memos in Supabase.
@@ -92,15 +88,15 @@ The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and sen
 ### B3. Feature list (v1)
 
 **Phone (native)**
-1. **Your beats and songs:** the list the desktop sends at sync (names, BPM, key, stage). New ideas can be named on the phone.
-2. **Notes and lyrics per beat or song:** plain text with section headers (`[Verse 1]`, `[Hook]`…), a syllable count per line, a bar estimate from the BPM. Works offline.
+1. **Your prods and songs** (user, 2026-10-25: all three): the Digger's **saved prods** (link and facts), the **beats** in the beats folders, and the **songs** (projects), as the desktop sends them at sync (names, BPM, key, stage). New ideas can be named on the phone.
+2. **Notes and lyrics per saved prod, beat or song:** plain text with section headers (`[Verse 1]`, `[Hook]`…), a syllable count per line, a bar estimate from the BPM. Works offline.
 3. **Ideas inbox:** punchlines, titles, concepts without a beat; attach them later.
 4. **Voice memos:** record a flow or melody, attached to a beat, a song or an idea.
 5. **Receive BandLab exports (and other sketches):** "Share to Hivo" from BandLab's export (mixdown or stems) through the system share sheet; it's attached to a beat or kept as a new sketch, and goes to the desktop at the next sync.
 6. **Sync status** and the paired desktop's name.
 
 **Desktop**
-1. **Notes on beats** in the Digger (a beat gets notes before it becomes a song), and the same notes in a song's drawer. When a beat becomes a song (a new FL project), its notes move with it.
+1. **Notes on saved prods and beats** in the Digger (stored in the workspace, not in the lead files, so re-saving a prod never wipes them), and the song's existing notes in its drawer. When a beat becomes a song (a new FL project), its notes move with it. The desktop holds every note; the phone syncs to it.
 2. **Phone sync** in Settings: on/off, pairing QR code, paired phones, last sync.
 3. **Inbox:** what came from the phone and isn't attached yet (ideas, sketches), to assign to a beat or a song.
 4. **Session view (teleprompter):** a window kept on top of FL Studio, showing the lyrics large, section by section; arrow keys or auto-scroll at the BPM.
@@ -113,10 +109,10 @@ The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and sen
 ### B4. Rough timeline (starts when part A is done)
 | Step | Work |
 |---|---|
-| 1 | Desktop: notes on beats and songs, Inbox, session view (useful on their own, before any phone). |
+| 1 | Desktop: notes on saved prods and beats (songs already have notes). Order confirmed 2026-10-25: notes → sync → Android APK. |
 | 2 | Desktop: Phone sync server (mDNS, pairing QR, pinned TLS, signed requests), with tests. |
-| 3 | Phone (Expo): pairing, beat/song list, notes editor offline, ideas, sync. Tested in the iOS Simulator and on a physical Android phone. |
-| 4 | Voice memos, BandLab share target, file transfer, sketch → FL project. |
+| 3 | Phone (Expo): pairing, saved prods / beats / songs lists, notes editor offline, ideas, sync. **Android APK** to install for testing; iOS in the Simulator. |
+| 4 | BandLab share target on the phone, file transfer, the desktop's sketch filing and "Continue in FL" (from #143), voice memos; session view on desktop. |
 | 5 | Crew beta: Android APK; iOS through TestFlight once the Apple account is decided. |
 
 Step 1 is about a week; steps 2 to 4 are several weeks of part-time work. Native isn't a November promise.
