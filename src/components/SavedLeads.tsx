@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Check, Copy, ExternalLink, FolderOpen, Pause, Play } from "lucide-react";
 import { useDigger } from "../store/useDigger";
+import { useAppStore } from "../store/useAppStore";
 import * as api from "../lib/tauri";
 import { matchBeat, youtubeId } from "../lib/digger";
 import { formatRelative } from "../lib/format";
@@ -8,6 +9,7 @@ import { dict, tr } from "../i18n";
 import type { BeatFile, SavedLead } from "../types";
 import { ConfirmButton } from "../ui";
 import { ConvertButton, LikeChip, chip, secondary } from "./DigResults";
+import { NotesBox } from "./NotesBox";
 
 // The Digger's "Saved prods" tab: every lead saved with "Save to Prods"
 // (the text files in the beats folders' `_leads`), newest first, with the
@@ -119,6 +121,8 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
   const t = tr(T);
   const setPlaying = useDigger((s) => s.setPlaying);
   const deleteLead = useDigger((s) => s.deleteLead);
+  const note = useAppStore((s) => s.workspace.leadNotes?.[lead.hash]);
+  const setLeadNote = useAppStore((s) => s.setLeadNote);
   const id = lead.url ? youtubeId(lead.url) : null;
   const link = useCopyLink(lead.url);
   const facts = [
@@ -159,6 +163,9 @@ function LeadRow({ lead, beat, playingBeat, onPlayBeat }: { lead: SavedLead; bea
           ) : (
             <p className="mt-1 text-[11px] text-engrave">{t.noLink}</p>
           )}
+          <div className="mt-1.5">
+            <NotesBox value={note} onChange={(text) => setLeadNote(lead.hash, text)} />
+          </div>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">

@@ -11,6 +11,7 @@ import type { BeatFile, YoutubeStatus } from "../types";
 import { DigPanel } from "./DigPanel";
 import { DigResults } from "./DigResults";
 import { SavedLeads } from "./SavedLeads";
+import { NotesBox } from "./NotesBox";
 
 // The Digger: your raw beats (Settings → Beats folders). Pick up to 5 and dig
 // the web for similar ones to start a new song on (DigPanel). Once a dig or a
@@ -72,6 +73,8 @@ export function DiggerView() {
   const addBeatFolder = useAppStore((s) => s.addBeatFolder);
   const { beats, loading, error, picked, query, load, loadLeads, toggle, clearPicks, setQuery, dig, webQuery, searchedFor, searching, clearUnseen, shownRound, setShownRound } = useDigger();
   const [playing, setPlaying] = useState<string | null>(null);
+  const beatNotes = useAppStore((s) => s.workspace.beatNotes);
+  const setBeatNote = useAppStore((s) => s.setBeatNote);
   const [yt, setYt] = useState<YoutubeStatus | null>(null);
   // The top block shows the beats to pick from, or the saved prods.
   const [tab, setTab] = useState<"beats" | "saved">("beats");
@@ -211,7 +214,8 @@ export function DiggerView() {
                       const on = picked.includes(b.path);
                       const disabled = !on && full;
                       return (
-                        <li key={b.path} className={`flex items-center gap-3 rounded px-2 py-1.5 ${on ? "bg-raised ring-1 ring-hot/40" : "hover:bg-raised"}`}>
+                        <li key={b.path} className={`flex flex-col gap-1 rounded px-2 py-1.5 ${on ? "bg-raised ring-1 ring-hot/40" : "hover:bg-raised"}`}>
+                          <div className="flex items-center gap-3">
                           <button
                             onClick={() => playToggle(b)}
                             aria-label={playing === b.path ? t.pause(b.name) : t.play(b.name)}
@@ -229,6 +233,11 @@ export function DiggerView() {
                           <span className="hidden shrink-0 text-xs text-engrave lg:inline">{formatRelative(b.modifiedAtMs)}</span>
                           <span className="w-16 shrink-0 text-right font-mono text-[11px] text-engrave">{formatBytes(b.sizeBytes)}</span>
                           {on && <Check size={14} className="shrink-0 text-hot" aria-hidden />}
+                          </div>
+                          {/* Under the play button's column, so it reads as this beat's. */}
+                          <div className="pl-[42px]">
+                            <NotesBox value={beatNotes?.[b.path]} onChange={(text) => setBeatNote(b.path, text)} />
+                          </div>
                         </li>
                       );
                     })}

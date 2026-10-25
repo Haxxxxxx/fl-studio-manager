@@ -7,6 +7,7 @@ import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/s
 import { addColumn, moveCard, moveColumn, removeColumn, renameColumn } from "../lib/pipeline";
 import type { DashboardLayout } from "../lib/dashboardLayout";
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
+import { setNote } from "../lib/notes";
 import { canRenderInApp, dawOf, splitRenderable } from "../lib/daws";
 import type {
   DetectedFolder,
@@ -270,6 +271,9 @@ interface AppState {
   // People (collaborators & contacts), credits and pitches
   createPerson: (name: string, aliases?: string[]) => string;
   updatePerson: (id: string, patch: Partial<Omit<Person, "id">>) => void;
+  /** Notes on a saved prod (by lead hash) or a beat (by file path); empty removes. */
+  setLeadNote: (hash: string, text: string) => void;
+  setBeatNote: (path: string, text: string) => void;
   /** Also removes their credits and pitches. */
   deletePerson: (id: string) => void;
   addPitch: (path: string, pitch: Omit<Pitch, "id">) => void;
@@ -960,6 +964,9 @@ export const useAppStore = create<AppState>((set, get) => {
       }));
       return id;
     },
+
+    setLeadNote: (hash, text) => mutateWorkspace((ws) => ({ ...ws, leadNotes: setNote(ws.leadNotes, hash, text) })),
+    setBeatNote: (path, text) => mutateWorkspace((ws) => ({ ...ws, beatNotes: setNote(ws.beatNotes, path, text) })),
 
     updatePerson: (id, patch) =>
       mutateWorkspace((ws) => ({ ...ws, people: ws.people.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
