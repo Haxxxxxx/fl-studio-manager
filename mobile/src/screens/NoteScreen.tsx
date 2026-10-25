@@ -1,0 +1,131 @@
+import { useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Button, Engrave, Led } from "../components/ui";
+import { tr } from "../lib/i18n";
+import { findItem, isGone, itemKey, MAX_NOTE_CHARS, noteFor, type Kind } from "../lib/sync";
+import { clearConflict, flush, removeGone, setNote, useApp } from "../store";
+import { T } from "../strings";
+import { C, FONT, RADIUS } from "../theme";
+
+export function NoteScreen({ kind, id, onBack }: { kind: Kind; id: string; onBack: () => void }) {
+  const item = useApp((s) => s.sync.gone[itemKey(kind, id)] ?? findItem(s.sync, kind, id));
+  const gone = useApp((s) => isGone(s.sync, kind, id));
+  const stored = useApp((s) => noteFor(s.sync, kind, id));
+  const pending = useApp((s) => !!s.sync.pending[itemKey(kind, id)]);
+  const conflictAt = useApp((s) => s.sync.conflicts[itemKey(kind, id)]);
+  const [text, setText] = useState(stored);
+  const written = useRef(stored);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(text);
+  const t = tr(T);
+
+  // A sync replaced the note (merge, or edited on the computer): show it,
+  // unless an autosave is about to land.
+  useEffect(() => {
+    if (stored !== written.current && !timer.current) {
+      written.current = stored;
+      latest.current = stored;
+      setText(stored);
+    }
+  }, [stored]);
+
+  function remove() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    written.current = latest.current; // nothing left to save
+    removeGone(kind, id);
+    onBack();
+  }
+
+  function save() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (latest.current !== written.current) {
+      written.current = latest.current;
+      setNote(kind, id, latest.current);
+    }
+  }
+
+  function onChange(next: string) {
+    setText(next);
+    latest.current = next;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(save, 400);
+  }
+
+  // Save when leaving the screen.
+  useEffect(
+    () => () => {
+      save();
+      void flush();
+    },
+    [],
+  );
+
+  const title = item?.title ?? id;
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <View style={styles.header}>
+        <Pressable onPress={onBack} hitSlop={10} accessibilityRole="button" style={{ paddingVertical: 4 }}>
+          <Text style={styles.back}>‹ {t.back}</Text>
+        </Pressable>
+        <Text style={styles.title} numberOfLines={2}>{title}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
+          {item?.subtitle ? <Text style={styles.sub} numberOfLines={1}>{item.kind === "song" && item.stage ? t.stage[item.stage] ?? item.subtitle : item.subtitle}</Text> : null}
+          {item?.bpm != null || item?.key ? (
+            <Engrave style={{ marginLeft: item?.subtitle ? 10 : 0 }}>{[item?.bpm != null ? `${Math.round(item.bpm)} BPM` : null, item?.key].filter(Boolean).join(" · ")}</Engrave>
+          ) : null}
+        </View>
+        {item?.kind === "prod" && item.url ? (
+          <Button label={t.openLink} onPress={() => void Linking.openURL(item.url as string)} style={{ alignSelf: "flex-start", marginTop: 10, paddingVertical: 6 }} />
+        ) : null}
+      </View>
+
+      {gone ? (
+        <View style={[styles.conflict, { borderColor: C.missing }]}>
+          <Led color={C.missing} size={7} />
+          <Text style={styles.conflictText}>{t.goneBanner}</Text>
+          <Button label={t.removeFromPhone} variant="danger" onPress={remove} style={{ paddingVertical: 4, paddingHorizontal: 8, marginLeft: 6 }} />
+        </View>
+      ) : null}
+
+      {conflictAt ? (
+        <View style={styles.conflict}>
+          <Led color={C.warn} size={7} />
+          <Text style={styles.conflictText}>{t.conflict}</Text>
+          <Button label={t.dismiss} variant="quiet" onPress={() => clearConflict(kind, id)} style={{ paddingVertical: 4, paddingHorizontal: 8 }} />
+        </View>
+      ) : null}
+
+      <TextInput
+        value={text}
+        onChangeText={onChange}
+        onBlur={save}
+        multiline
+        maxLength={MAX_NOTE_CHARS}
+        placeholder={t.notePlaceholder}
+        placeholderTextColor={C.engrave}
+        style={styles.editor}
+        textAlignVertical="top"
+        autoCapitalize="sentences"
+        scrollEnabled
+      />
+      <View style={styles.footer}>
+        <Led color={gone ? C.missing : pending || text !== written.current ? C.warn : C.ok} size={7} />
+        <Engrave style={{ marginLeft: 6, flex: 1 }}>{gone ? t.gone : pending || text !== written.current ? t.savedLocal : t.savedSynced}</Engrave>
+        {text.length >= MAX_NOTE_CHARS ? <Text style={{ color: C.warn, fontSize: 12 }}>{t.tooLong(MAX_NOTE_CHARS)}</Text> : null}
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 3, borderBottomColor: C.rule },
+  back: { color: C.body, fontSize: 15 },
+  title: { fontFamily: FONT.display, fontSize: 28, color: C.cream, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 6 },
+  sub: { color: C.body, fontSize: 14, flexShrink: 1 },
+  conflict: { flexDirection: "row", alignItems: "center", margin: 12, marginBottom: 0, padding: 10, borderWidth: 1, borderColor: C.warn, borderRadius: RADIUS, backgroundColor: C.panel },
+  conflictText: { color: C.cream, flex: 1, marginLeft: 8, fontSize: 13, lineHeight: 18 },
+  editor: { flex: 1, margin: 12, padding: 12, backgroundColor: C.panel, borderWidth: 1, borderColor: C.rule, borderRadius: RADIUS, color: C.cream, fontSize: 16, lineHeight: 23 },
+  footer: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 10 },
+});

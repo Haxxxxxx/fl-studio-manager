@@ -1,0 +1,156 @@
+import { dict, tr } from "./lib/i18n";
+import type { SyncErrorCode } from "./lib/client";
+import type { PairingError } from "./lib/pairing";
+
+const NB = " "; // narrow no-break space before : ? ! in French
+
+export const T = dict(
+  {
+    // Pair
+    pairTitle: "Pair with your computer",
+    pairIntro: "On the computer: Hivo → Settings → Phone sync → Pair a phone. Then scan the QR code, or paste the link shown under it.",
+    scan: "Scan the QR code",
+    allowCamera: "Allow the camera",
+    cameraDenied: "No camera access. Paste the link instead, or allow the camera in the phone's settings.",
+    stopScan: "Stop scanning",
+    pasteLabel: "Pairing link",
+    pastePlaceholder: "hivo://pair?…",
+    pair: "Pair",
+    pairing: "Pairing…",
+    // Library
+    tabProd: "Saved prods",
+    tabBeat: "Beats",
+    tabSong: "Songs",
+    search: "Search",
+    sync: "Sync",
+    syncing: "Syncing…",
+    syncedAgo: (ago: string) => `Synced ${ago}`,
+    neverSynced: "Not synced yet",
+    unsynced: (n: number) => `${n} note${n === 1 ? "" : "s"} waiting to sync`,
+    emptyTab: "Nothing here yet. Sync to load your computer's library.",
+    noMatch: "No match.",
+    settings: "Settings",
+    // Note
+    back: "Back",
+    openLink: "Open link",
+    notePlaceholder: "Lyrics, ideas… Use [Verse 1], [Hook] as headers.",
+    savedLocal: "Saved on the phone · waiting for sync",
+    savedSynced: "Synced with the computer",
+    conflict: "Edited on both sides: the computer kept both versions. Check the note and tidy it up.",
+    dismiss: "OK",
+    tooLong: (max: number) => `Notes stop at ${max} characters.`,
+    gone: "Gone from the computer",
+    goneBanner: "This is no longer on the computer. Your text stays here on the phone: copy it somewhere, then remove it.",
+    removeFromPhone: "Remove from phone",
+    // Settings
+    computer: "Computer",
+    addresses: "Addresses",
+    thisPhone: "This phone",
+    version: "App version",
+    forget: "Unpair this computer",
+    forgetTitle: "Unpair?",
+    forgetBody: "The phone forgets this computer and its notes. Your notes stay on the computer.",
+    forgetBodyPending: (n: number) => `${n} note${n === 1 ? "" : "s"} not synced yet will be lost. Sync first if you can.`,
+    cancel: "Cancel",
+    confirmForget: "Unpair",
+    language: "Language follows the phone.",
+    // Stages
+    stage: { creation: "Creation", production: "Production", prep: "Prep", release: "Release", promotion: "Promotion" } as Record<string, string>,
+  },
+  {
+    pairTitle: "Associer ton ordi",
+    pairIntro: `Sur l'ordi${NB}: Hivo → Réglages → Sync téléphone → Associer un téléphone. Puis scanne le QR code, ou colle le lien affiché dessous.`,
+    scan: "Scanner le QR code",
+    allowCamera: "Autoriser la caméra",
+    cameraDenied: "Pas d'accès à la caméra. Colle le lien, ou autorise la caméra dans les réglages du téléphone.",
+    stopScan: "Arrêter",
+    pasteLabel: "Lien d'association",
+    pastePlaceholder: "hivo://pair?…",
+    pair: "Associer",
+    pairing: "Association…",
+    tabProd: "Prods gardées",
+    tabBeat: "Beats",
+    tabSong: "Sons",
+    search: "Chercher",
+    sync: "Synchro",
+    syncing: "Synchro…",
+    syncedAgo: (ago: string) => `Synchro ${ago}`,
+    neverSynced: "Pas encore synchronisé",
+    unsynced: (n: number) => `${n} note${n === 1 ? "" : "s"} en attente`,
+    emptyTab: "Rien pour l'instant. Synchronise pour charger la bibliothèque de ton ordi.",
+    noMatch: "Aucun résultat.",
+    settings: "Réglages",
+    back: "Retour",
+    openLink: "Ouvrir le lien",
+    notePlaceholder: "Textes, idées… Utilise [Couplet 1], [Refrain] comme titres.",
+    savedLocal: "Gardé sur le téléphone · en attente de synchro",
+    savedSynced: "Synchronisé avec l'ordi",
+    conflict: `Modifiée des deux côtés${NB}: l'ordi a gardé les deux versions. Relis la note et fais le tri.`,
+    dismiss: "OK",
+    tooLong: (max: number) => `Une note s'arrête à ${max} caractères.`,
+    gone: "N'est plus sur l'ordi",
+    goneBanner: `Ce n'est plus sur l'ordi. Ton texte reste ici sur le téléphone${NB}: copie-le ailleurs, puis retire-le.`,
+    removeFromPhone: "Retirer du téléphone",
+    computer: "Ordi",
+    addresses: "Adresses",
+    thisPhone: "Ce téléphone",
+    version: "Version de l'app",
+    forget: "Dissocier cet ordi",
+    forgetTitle: `Dissocier${NB}?`,
+    forgetBody: "Le téléphone oublie cet ordi et ses notes. Tes notes restent sur l'ordi.",
+    forgetBodyPending: (n: number) => `${n} note${n === 1 ? "" : "s"} pas encore synchronisée${n === 1 ? "" : "s"} ser${n === 1 ? "a" : "ont"} perdue${n === 1 ? "" : "s"}. Synchronise d'abord si tu peux.`,
+    cancel: "Annuler",
+    confirmForget: "Dissocier",
+    language: "La langue suit celle du téléphone.",
+    stage: { creation: "Création", production: "Production", prep: "Prépa", release: "Sortie", promotion: "Promo" } as Record<string, string>,
+  },
+);
+
+const ERRORS = dict(
+  {
+    offline: "Not on the same Wi-Fi as your computer",
+    off: "Phone sync is off on the desktop",
+    forgotten: "This phone was forgotten on the desktop: pair again",
+    demo: "The desktop shows sample data: link your real folders on it to sync",
+    busy: "The desktop is busy (scan running or still loading). Try again in a few seconds",
+    "too-big": "A note is too long to sync (20,000 characters max)",
+    outdated: "The phone app and the desktop app don't match: update both",
+    server: "The desktop answered with an error",
+    pairAgain: "Pair again",
+  },
+  {
+    offline: "Pas sur le même Wi-Fi que ton ordi",
+    off: "La sync téléphone est coupée sur l'ordi",
+    forgotten: `Ce téléphone a été oublié sur l'ordi${NB}: associe-le à nouveau`,
+    demo: `L'ordi affiche des données d'exemple${NB}: relie tes vrais dossiers dessus pour synchroniser`,
+    busy: "L'ordi est occupé (scan en cours ou chargement). Réessaie dans quelques secondes",
+    "too-big": "Une note est trop longue pour la synchro (20 000 caractères max)",
+    outdated: `L'app du téléphone et celle de l'ordi ne correspondent pas${NB}: mets les deux à jour`,
+    server: "L'ordi a répondu par une erreur",
+    pairAgain: "Associer à nouveau",
+  },
+);
+
+export const errorText = (code: SyncErrorCode): string => tr(ERRORS)[code];
+export const pairAgainText = (): string => tr(ERRORS).pairAgain;
+
+const PAIR_ERRORS = dict(
+  {
+    "not-hivo": "That's not a Hivo pairing link.",
+    version: "This link is for another version of Hivo. Update the app.",
+    device: "The link is incomplete (device). Copy it again.",
+    key: "The link is incomplete (key). Copy it again.",
+    hosts: "The link has no local address. Check the computer is on Wi-Fi.",
+    port: "The link is incomplete (port). Copy it again.",
+  },
+  {
+    "not-hivo": "Ce n'est pas un lien d'association Hivo.",
+    version: "Ce lien vient d'une autre version de Hivo. Mets l'app à jour.",
+    device: "Le lien est incomplet (appareil). Copie-le à nouveau.",
+    key: "Le lien est incomplet (clé). Copie-le à nouveau.",
+    hosts: "Le lien n'a pas d'adresse locale. Vérifie que l'ordi est sur le Wi-Fi.",
+    port: "Le lien est incomplet (port). Copie-le à nouveau.",
+  },
+);
+
+export const pairErrorText = (e: PairingError): string => tr(PAIR_ERRORS)[e];

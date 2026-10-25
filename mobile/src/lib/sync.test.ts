@@ -1,0 +1,292 @@
+import { randomBytes } from "node:crypto";
+import { describe, expect, it } from "vitest";
+import { fnv1a, toB64url } from "./bytes";
+import { createClient, SyncError, type Transport } from "./client";
+import { openRequest, ReplayGuard, sealResponse, type Reply } from "./envelope";
+import type { Pairing } from "./pairing";
+import {
+  allItems,
+  applyPushResults,
+  applySnapshot,
+  forgetGone,
+  isGone,
+  MAX_PUSH_TEXT_BYTES,
+  editNote,
+  emptyState,
+  filterItems,
+  itemKey,
+  MAX_CHANGES,
+  noteFor,
+  parseItem,
+  parseSnapshot,
+  pendingChanges,
+  runSync,
+  type Change,
+  type Item,
+  type Kind,
+  type SyncState,
+} from "./sync";
+
+const item = (kind: Kind, id: string, note = "", extra: Partial<Item> = {}): Item => ({
+  kind, id, title: id, subtitle: "", bpm: null, key: null, url: null, stage: null, note, noteHash: fnv1a(note), ...extra,
+});
+
+const withItems = (...items: Item[]): SyncState => ({ ...emptyState(), items });
+
+describe("parseItem / parseSnapshot", () => {
+  it("keeps valid items and drops junk", () => {
+    const snap = parseSnapshot({
+      items: [
+        { kind: "prod", id: "abc", title: "Dark loop", subtitle: "Producer · 2026", bpm: 140, key: "Am", url: "https://www.youtube.com/watch?v=x", stage: null, note: "hi", noteHash: fnv1a("hi") },
+        { kind: "song", id: "C:\\music\\Track.flp", title: "", note: "" },
+        { kind: "video", id: "x" },
+        null,
+        { kind: "beat", id: "" },
+      ],
+      generatedAt: 5,
+    });
+    expect(snap?.items.map((i) => i.id)).toEqual(["abc", "C:\\music\\Track.flp"]);
+    expect(snap?.items[1].title).toBe("Track.flp");
+    expect(snap?.items[1].noteHash).toBe("811c9dc5");
+    expect(snap?.generatedAt).toBe(5);
+    expect(parseSnapshot({})).toBeNull();
+  });
+  it("only keeps https links", () => {
+    expect(parseItem({ kind: "prod", id: "a", url: "javascript:alert(1)" })?.url).toBeNull();
+    expect(parseItem({ kind: "prod", id: "a", url: "http://x" })?.url).toBeNull();
+  });
+});
+
+describe("editNote / pendingChanges", () => {
+  it("queues an edit with the desktop's hash as base, and keeps that base", () => {
+    let s = withItems(item("beat", "b1", "old"));
+    s = editNote(s, "beat", "b1", "new", 1);
+    s = editNote(s, "beat", "b1", "newer", 2);
+    expect(pendingChanges(s)).toEqual([{ kind: "beat", id: "b1", text: "newer", baseHash: fnv1a("old") }]);
+    expect(noteFor(s, "beat", "b1")).toBe("newer");
+  });
+  it("drops the edit when the text goes back to the desktop's", () => {
+    let s = withItems(item("song", "s1", "same"));
+    s = editNote(s, "song", "s1", "changed", 1);
+    s = editNote(s, "song", "s1", "same", 2);
+    expect(pendingChanges(s)).toEqual([]);
+  });
+  it("orders by edit time and caps the batch", () => {
+    let s = emptyState();
+    for (let i = MAX_CHANGES + 5; i > 0; i--) s = editNote(s, "beat", `b${i}`, "x", i);
+    const c = pendingChanges(s);
+    expect(c).toHaveLength(MAX_CHANGES);
+    expect(c[0].id).toBe("b1");
+  });
+});
+
+describe("applyPushResults", () => {
+  const sent: Change[] = [
+    { kind: "beat", id: "a", text: "A", baseHash: fnv1a("") },
+    { kind: "beat", id: "b", text: "B", baseHash: fnv1a("") },
+    { kind: "beat", id: "c", text: "C", baseHash: fnv1a("") },
+  ];
+  const base = () => {
+    let s = withItems(item("beat", "a"), item("beat", "b"), item("beat", "c"));
+    for (const c of sent) s = editNote(s, c.kind, c.id, c.text, 1);
+    return s;
+  };
+
+  it("applied, conflict and missing", () => {
+    const merged = "desk\n\n--- from Phone ---\nB";
+    const s = applyPushResults(base(), sent, [
+      { kind: "beat", id: "a", status: "applied", note: "A", noteHash: fnv1a("A") },
+      { kind: "beat", id: "b", status: "conflict", note: merged, noteHash: fnv1a(merged) },
+      { kind: "beat", id: "c", status: "missing", note: "", noteHash: fnv1a("") },
+    ], 9);
+    expect(s.pending).toEqual({});
+    expect(noteFor(s, "beat", "a")).toBe("A");
+    expect(noteFor(s, "beat", "b")).toBe(merged);
+    expect(s.conflicts).toEqual({ [itemKey("beat", "b")]: 9 });
+    expect(s.items.map((i) => i.id)).toEqual(["a", "b"]);
+    // "missing" keeps the phone's text, marked as gone.
+    expect(isGone(s, "beat", "c")).toBe(true);
+    expect(noteFor(s, "beat", "c")).toBe("C");
+    expect(allItems(s).map((i) => i.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("gone items: edits stay local, a later snapshot keeps them, forget removes them", () => {
+    let s = applyPushResults(base(), sent, [{ kind: "beat", id: "c", status: "missing", note: "", noteHash: fnv1a("") }], 9);
+    s = editNote(s, "beat", "c", "C2", 10);
+    expect(pendingChanges(s).map((c) => c.id)).not.toContain("c");
+    s = applySnapshot(s, { items: [item("beat", "a")], generatedAt: 1 }, 11);
+    expect(noteFor(s, "beat", "c")).toBe("C2");
+    expect(forgetGone(s, "beat", "c").gone).toEqual({});
+  });
+
+  it("a gone item that comes back is queued again", () => {
+    let s = applyPushResults(base(), sent, [{ kind: "beat", id: "c", status: "missing", note: "", noteHash: fnv1a("") }], 9);
+    s = applySnapshot(s, { items: [item("beat", "c", "desk")], generatedAt: 1 }, 11);
+    expect(isGone(s, "beat", "c")).toBe(false);
+    expect(pendingChanges(s)).toContainEqual({ kind: "beat", id: "c", text: "C", baseHash: fnv1a("desk") });
+  });
+
+  it("keeps an edit typed during the push, rebased on what the desktop applied", () => {
+    let s = base();
+    s = editNote(s, "beat", "a", "A2", 5);
+    s = applyPushResults(s, sent, [{ kind: "beat", id: "a", status: "applied", note: "A", noteHash: fnv1a("A") }], 9);
+    expect(s.pending[itemKey("beat", "a")]).toMatchObject({ text: "A2", baseHash: fnv1a("A") });
+  });
+});
+
+// A fake desktop that follows the contract, end to end through the envelope.
+function fakeDesktop(pairing: Pairing, initial: Item[], opts: { demo?: boolean } = {}) {
+  const key = Buffer.from(pairing.key, "base64url");
+  const guard = new ReplayGuard();
+  const notes = new Map(initial.map((i) => [itemKey(i.kind, i.id), i]));
+  const rnd = (n: number) => new Uint8Array(randomBytes(n));
+  const log: string[] = [];
+  const transport: Transport = async (url, init) => {
+    const path = new URL(url).pathname;
+    log.push(`${new URL(url).hostname} ${path}`);
+    if (new URL(url).hostname !== "192.168.1.20") throw new TypeError("Network request failed");
+    let body: unknown;
+    try {
+      body = openRequest(key, init.headers["X-Hivo-Device"], path, JSON.parse(init.body), Date.now(), guard);
+    } catch {
+      return { status: 401, text: async () => "" };
+    }
+    let reply: Reply;
+    if (opts.demo) reply = { ok: false, error: "demo" };
+    else if (path === "/v1/hello") reply = { ok: true, body: { desktopName: "Studio", hivoVersion: "0.5.6" } };
+    else if (path === "/v1/snapshot") reply = { ok: true, body: { items: [...notes.values()], generatedAt: 1 } };
+    else {
+      const results = (body as { changes: Change[] }).changes.map((c) => {
+        const cur = notes.get(itemKey(c.kind, c.id));
+        if (!cur) return { kind: c.kind, id: c.id, status: "missing", note: "", noteHash: fnv1a("") };
+        // Final contract: applied when the hash matches, when the desktop
+        // already holds exactly `text`, or when its note is empty.
+        const conflict = cur.noteHash !== c.baseHash && cur.note !== c.text && cur.note !== "";
+        const note = conflict ? `${cur.note}\n\n--- from Phone ---\n${c.text}` : c.text;
+        notes.set(itemKey(c.kind, c.id), { ...cur, note, noteHash: fnv1a(note) });
+        return { kind: c.kind, id: c.id, status: conflict ? "conflict" : "applied", note, noteHash: fnv1a(note) };
+      });
+      reply = { ok: true, body: { results } };
+    }
+    const env = sealResponse(key, init.headers["X-Hivo-Device"], path, reply, rnd);
+    return { status: 200, text: async () => JSON.stringify(env) };
+  };
+  return { transport, notes, log };
+}
+
+const pairing: Pairing = {
+  deviceId: toB64url(new Uint8Array(randomBytes(16))),
+  key: toB64url(new Uint8Array(randomBytes(32))),
+  hosts: ["10.0.0.9", "192.168.1.20"],
+  port: 51234,
+  desktopName: "Studio",
+};
+const rnd = (n: number) => new Uint8Array(randomBytes(n));
+const hello = { phoneName: "Test phone", appVersion: "0.1.0" };
+
+describe("runSync with a fake desktop", () => {
+  it("hello, push, pull; falls through to the host that answers", async () => {
+    const desk = fakeDesktop(pairing, [item("song", "s1", "desk"), item("beat", "b1", "")]);
+    const call = createClient({ pairing, transport: desk.transport, random: rnd, now: Date.now });
+    let s = withItems(item("song", "s1", "desk"), item("beat", "b1", ""));
+    s = editNote(s, "beat", "b1", "[Hook]\nline", 1);
+    const r = await runSync(call, () => s, (n) => (s = n), hello, Date.now);
+    expect(r.desktopName).toBe("Studio");
+    expect(s.helloDone).toBe(true);
+    expect(s.pending).toEqual({});
+    expect(noteFor(s, "beat", "b1")).toBe("[Hook]\nline");
+    expect(desk.notes.get(itemKey("beat", "b1"))?.note).toBe("[Hook]\nline");
+    expect(s.lastSyncAt).not.toBeNull();
+    // The answering host moved first: the next call goes straight to it.
+    desk.log.length = 0;
+    await runSync(call, () => s, (n) => (s = n), hello, Date.now);
+    expect(desk.log).toEqual(["192.168.1.20 /v1/snapshot"]);
+  });
+
+  it("a note edited on both sides comes back merged with a conflict flag", async () => {
+    const desk = fakeDesktop(pairing, [item("song", "s1", "v1")]);
+    const call = createClient({ pairing, transport: desk.transport, random: rnd, now: Date.now });
+    let s = { ...withItems(item("song", "s1", "v1")), helloDone: true };
+    s = editNote(s, "song", "s1", "phone", 1);
+    desk.notes.set(itemKey("song", "s1"), item("song", "s1", "desktop"));
+    const r = await runSync(call, () => s, (n) => (s = n), hello, Date.now);
+    expect(r.conflicts).toBe(1);
+    expect(noteFor(s, "song", "s1")).toBe("desktop\n\n--- from Phone ---\nphone");
+    expect(s.conflicts[itemKey("song", "s1")]).toBeTypeOf("number");
+  });
+
+  it("maps failures to clear codes", async () => {
+    const forgotten = createClient({ pairing: { ...pairing, hosts: ["192.168.1.20"] }, transport: fakeDesktop({ ...pairing, key: toB64url(rnd(32)) }, []).transport, random: rnd, now: Date.now });
+    await expect(forgotten("/v1/snapshot", {})).rejects.toMatchObject({ code: "forgotten" });
+
+    const demo = createClient({ pairing, transport: fakeDesktop(pairing, [], { demo: true }).transport, random: rnd, now: Date.now });
+    await expect(demo("/v1/snapshot", {})).rejects.toMatchObject({ code: "demo" });
+
+    const refused: Transport = async () => { throw new TypeError("Network request failed"); };
+    await expect(createClient({ pairing, transport: refused, random: rnd, now: Date.now })("/v1/hello", {})).rejects.toMatchObject({ code: "off" });
+
+    let t = 0;
+    const slow: Transport = async () => { t += 10_000; throw new TypeError("Network request failed"); };
+    await expect(createClient({ pairing, transport: slow, random: rnd, now: () => t })("/v1/hello", {})).rejects.toMatchObject({ code: "offline" });
+
+    const status = (code: number): Transport => async () => ({ status: code, text: async () => "" });
+    const codeFor = (code: number) => createClient({ pairing, transport: status(code), random: rnd, now: Date.now })("/v1/notes", {}).catch((e: SyncError) => e.code);
+    expect(await codeFor(429)).toBe("busy");
+    expect(await codeFor(503)).toBe("busy");
+    expect(await codeFor(413)).toBe("too-big");
+    expect(await codeFor(404)).toBe("outdated");
+    expect(await codeFor(500)).toBe("server");
+
+    const key = Buffer.from(pairing.key, "base64url");
+    const errReply = (error: string): Transport => async (url) => ({
+      status: 200,
+      text: async () => JSON.stringify(sealResponse(key, pairing.deviceId, new URL(url).pathname, { ok: false, error }, rnd)),
+    });
+    const codeForError = (error: string) => createClient({ pairing, transport: errReply(error), random: rnd, now: Date.now })("/v1/notes", {}).catch((e: SyncError) => e.code);
+    expect(await codeForError("busy")).toBe("busy");
+    expect(await codeForError("bad request")).toBe("outdated");
+    expect(await codeForError("too many changes (500 max)")).toBe("too-big");
+    expect(await codeForError("note too long (20000 characters max)")).toBe("too-big");
+
+    const html: Transport = async () => ({ status: 200, text: async () => "<html>" });
+    const err = (await createClient({ pairing, transport: html, random: rnd, now: Date.now })("/v1/hello", {}).catch((e: unknown) => e)) as SyncError;
+    expect(err).toBeInstanceOf(SyncError);
+    expect(err.code).toBe("server");
+  });
+});
+
+describe("batching", () => {
+  it("splits big queues by byte budget and pushes them all in one sync", async () => {
+    const big = "x".repeat(19_000);
+    const items = Array.from({ length: 80 }, (_, i) => item("beat", `b${i}`));
+    let s = { ...withItems(...items), helloDone: true };
+    for (let i = 0; i < 80; i++) s = editNote(s, "beat", `b${i}`, big, i);
+    const first = pendingChanges(s);
+    expect(first.length).toBeLessThan(80);
+    expect(first.reduce((n, c) => n + c.text.length, 0)).toBeLessThanOrEqual(MAX_PUSH_TEXT_BYTES);
+    const desk = fakeDesktop(pairing, items);
+    const call = createClient({ pairing, transport: desk.transport, random: rnd, now: Date.now });
+    await runSync(call, () => s, (n) => (s = n), hello, Date.now);
+    expect(s.pending).toEqual({});
+    expect(desk.log.filter((l) => l.endsWith("/v1/notes")).length).toBeGreaterThan(1);
+  });
+
+  it("a retried push of the same text is applied, not merged", async () => {
+    const desk = fakeDesktop(pairing, [item("song", "s1", "same")]);
+    const call = createClient({ pairing, transport: desk.transport, random: rnd, now: Date.now });
+    let s = { ...withItems(item("song", "s1", "old")), helloDone: true };
+    s = editNote(s, "song", "s1", "same", 1);
+    const r = await runSync(call, () => s, (n) => (s = n), hello, Date.now);
+    expect(r.conflicts).toBe(0);
+    expect(noteFor(s, "song", "s1")).toBe("same");
+  });
+});
+
+describe("filterItems", () => {
+  it("filters by tab and searches title, subtitle, key and note", () => {
+    const items = [item("beat", "1", "", { title: "Night", key: "Am" }), item("beat", "2", "has hook"), item("song", "3")];
+    expect(filterItems(items, "beat", "").map((i) => i.id)).toEqual(["1", "2"]);
+    expect(filterItems(items, "beat", "am").map((i) => i.id)).toEqual(["1"]);
+    expect(filterItems(items, "beat", "HOOK").map((i) => i.id)).toEqual(["2"]);
+  });
+});
