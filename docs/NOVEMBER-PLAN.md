@@ -45,6 +45,13 @@ All nine checklist steps pass with two real accounts, A1 is fixed, and the SMTP 
 ### B0. What it's for (the user's words, condensed)
 Hivo helps you untangle your notes on each beat you pick, and the rest of the writing and creation process: lyrics, ideas, voice memos. You write on the phone; the desktop has it while you work in FL Studio. BandLab projects (and other mobile sketches) can be sent to FL through Hivo for detailed work.
 
+### B-now. BandLab today, before any phone app
+The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and send it to the desktop.**
+1. In BandLab: export the mixdown (or stems) as mp3/wav.
+2. Send it to the computer: AirDrop to the Mac (lands in Downloads; move it to a beats folder), or save it to iCloud Drive / Google Drive into a folder that's linked as a **beats folder** in Hivo.
+3. It shows in the **Digger** like any beat: playable, diggable, savable. **Works today, no code.**
+4. **Missing piece (small, desktop only):** "Start a song from this beat" on a Digger beat: the New song dialog opens with the beat's name, creates the FL project from the template as today, copies the audio into the new song folder under `Beat/` (not next to the `.flp`, so it isn't mistaken for a mixdown), keeps a BandLab link if pasted, and opens FL Studio. You drag the audio into the playlist: Hivo never writes `.flp` files.
+
 ### B1. Decisions made (2026-10-25)
 - **Nothing written on the phone goes to Hivo's server.** No lyrics, notes, ideas or voice memos in Supabase.
 - **The phone and the desktop sync directly over the same Wi-Fi.** That needs a **native app** (browsers block a secure website from talking to a local address), so the mobile app is native (Expo / React Native) and the PWA idea is dropped: without sync it would only be a separate notepad.
