@@ -77,6 +77,7 @@ The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and sen
 - **The phone and the desktop sync directly over the same Wi-Fi.** That needs a **native app** (browsers block a secure website from talking to a local address), so the mobile app is native (Expo / React Native) and the PWA idea is dropped: without sync it would only be a separate notepad.
 - **Timing:** native is "on the side": it starts after part A and isn't promised for November.
 - **Distribution:** a free **Android APK** shared directly, and **TestFlight for iOS** (the crew is mostly on iPhone). TestFlight is part of the Apple Developer Program, **99 USD a year**: there's no free TestFlight. A free Apple ID only lets you install your own builds from Xcode on your own phone, and they expire after 7 days. Guardrail 7: decide on the Apple account when the iOS build is ready for the crew; until then, develop with the free Xcode route and the Android APK.
+- **Testing (decided 2026-10-25), all free:** iOS in the **Xcode Simulator** (Xcode 26.6 with iOS 26.0 and 26.5 runtimes is installed on the Mac; no Apple account needed), Android on a **physical phone** over `adb` (installed, with the Android SDK). The Simulator shares the Mac's network, so it pairs with the Hivo desktop app on the same Mac; the Android phone pairs over the studio Wi-Fi. Simulator gaps to check on a real iPhone before the crew beta: the camera (QR pairing: type the pairing code instead in the Simulator), the microphone quality for voice memos, background behaviour.
 - **v1 includes** the ideas inbox and voice memos.
 
 ### B2. How the direct sync works
@@ -114,7 +115,7 @@ The interim flow (user, 2026-10-25): **export an mp3 or wav from BandLab and sen
 |---|---|
 | 1 | Desktop: notes on beats and songs, Inbox, session view (useful on their own, before any phone). |
 | 2 | Desktop: Phone sync server (mDNS, pairing QR, pinned TLS, signed requests), with tests. |
-| 3 | Phone (Expo): pairing, beat/song list, notes editor offline, ideas, sync. Android APK + Xcode install on your iPhone. |
+| 3 | Phone (Expo): pairing, beat/song list, notes editor offline, ideas, sync. Tested in the iOS Simulator and on a physical Android phone. |
 | 4 | Voice memos, BandLab share target, file transfer, sketch → FL project. |
 | 5 | Crew beta: Android APK; iOS through TestFlight once the Apple account is decided. |
 
