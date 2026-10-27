@@ -125,7 +125,7 @@ You write a verse on the phone for a beat, walk into the studio, the phone syncs
 
 ## Part C: the backlog (added 2026-10-27, after part B step 4)
 
-Asked for on 2026-10-27. Not ordered yet: pick the order when step 4 ships. Each item says what it needs first.
+Asked for on 2026-10-27. Audit §3 (the Launch Kit loose ends) was closed first, as asked. Each item says what it needs first; the plan below orders them.
 
 | # | Item | What it means | Needs first |
 |---|---|---|---|
@@ -134,3 +134,22 @@ Asked for on 2026-10-27. Not ordered yet: pick the order when step 4 ships. Each
 | C3 | **Per-distributor export formats** | The Launch Kit writes the sheet in each distributor's own layout (fields, order, limits) instead of one universal sheet. | The list of distributors the crew actually uses. |
 | C4 | **The Pace tendency block** | How long your songs stay in each stage, and where they stall. | A log of stage changes (when each song entered each stage), kept in the workspace from now on: no history exists before it. |
 | C5 | **"In your prods" for every prod** | Today a saved prod is marked "In your prods" only when a WAV or MP3 with a matching name sits in a beats folder from Settings. It should also confirm prods in other audio formats (FLAC, AIFF, M4A, OGG) and prods saved in another folder (Downloads, a converter's folder), and say where the file was found, with "Move to beats folder" when it's outside. Hivo still never downloads. | Which extra folders to look in: a "Downloads" toggle plus folders picked in Settings (path scoping stays in Rust). |
+
+### The plan (2026-10-27)
+
+Order: what's cheap and unblocked first, what needs an answer from you last. One release (0.8.0) when C1, C4 and C5 are in; C2 and C3 can follow in the next one.
+
+| Order | Item | Size | Steps | Done when |
+|---|---|---|---|---|
+| 1 | **C4 stage log** (start now, the block comes later) | S now, M for the block | 1. `SongMeta.stageLog: {stage, atMs}[]`, appended by every stage change (drawer, board drag, kit, crew pull), capped (last 50). 2. Workspace migration adds an empty log; a song's first entry is today, never a guess. 3. Later: `pace()` in `src/lib/tendencies.ts` (median days per stage, the stage where songs stall) and a hidden-by-default **Pace** block. Personal only, never shared, no release stats (guardrail 6). | Every stage change lands in the log (unit tests); the block appears once a few weeks of history exist. |
+| 2 | **C1 delete a crew** (desktop) | M | 1. Migration: `delete_crew(crew_id)` security definer, owner only, `set search_path = ''`; deletes the crew (songs, releases, columns, invites, members cascade) with the `after_member_left` trigger skipped during the cascade (session flag), so it doesn't try to hand the crew over mid-delete. 2. Drop the direct `crews_delete` policy: the function is the only way. 3. pgTAP: owner deletes; member, outsider and anon can't; nothing of another crew is touched; trigger doesn't fire. 4. Desktop: "Delete crew" in Crew settings (owner), typed-name confirm, says what goes (shared rows) and what stays (everything local); sync stops, the app goes solo. | `supabase test db` green; deleting from one computer sends every member to solo mode on their next pull. |
+| 3 | **C1 owner actions on the website** | M | Reuse the desktop's calls (`src/lib/crewSync.ts`, the RPCs): invite code make/copy/revoke, remove a member, rename, columns, delete. Fix the web's dead-end texts (audit §6 A4, §7 B2-B3). Data still goes browser → Supabase, never through Vercel. | An owner can run the crew from the website alone. |
+| 4 | **C5 "In your prods" everywhere** | M | 1. `matchBeat` accepts every format `is_beat_file` knows (wav, mp3, ogg, flac) plus aiff and m4a. 2. Settings → Saved prods: a "Downloads" toggle and picked folders (`Settings.prodMatchFolders`, picked in Rust; `Scope::prod_match`, read-only). 3. A Rust command lists those folders' audio names (no content read, depth-limited). 4. The lead shows where the file was found; when it's outside the beats folders, "Move to beats folder" (a Rust move into the first beats folder, never overwrite). Still never downloads. | A prod converted to FLAC into Downloads shows "In your prods (Downloads)" and moves in one click. |
+| 5 | **C2 stems, guided** | S | FL's command line renders the master only (checked), so Hivo can't export stems itself. Instead: a "Export stems" helper in the drawer opens the project and shows the 4 clicks in FL (File → Export → Split mixer tracks) with the song's stems folder ready; Hivo then detects the stems as it does today. | The helper gets a song from "no stems" to stems detected without leaving Hivo's instructions. |
+| 6 | **C3 per-distributor formats** | M per distributor | `src/lib/distributors.ts`: per distributor the fields, order, limits (title length, genres list, ISRC/UPC rules) and the file layout; the Launch Kit export gets a distributor picker; checks warn on a field that breaks a limit. Generic stays the default. | Needs your answer first (below). |
+
+**Open questions for you**
+- **C3:** which distributors does the crew actually use (DistroKid, TuneCore, CD Baby, Amuse, Spinnup, Believe/TuneCore, Ditto, other)? Nothing starts on C3 before the list.
+- **C1:** should a member see "your crew was deleted by the owner" once, or just land in solo mode? Default: one line, once.
+- **C5:** is Downloads enough as the default extra place, or do converters drop files somewhere else for you? Default: Downloads plus folders you pick.
+
