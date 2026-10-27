@@ -26,7 +26,7 @@ use std::fs;
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
@@ -61,6 +61,9 @@ const SEEN_WRITE_EVERY_MS: i64 = 60_000;
 const AAD_PREFIX: &str = "hivo-sync-v1|";
 pub const REQUEST_EVENT: &str = "phone-sync-request";
 const FORWARDED: [&str; 2] = ["/v1/snapshot", "/v1/notes"];
+/// v1.1 (step 4): answered here from the phone inbox (crate::phone_inbox).
+const INBOX_PATHS: [&str; 5] = ["/v1/ideas", "/v1/upload/start", "/v1/upload/chunk", "/v1/upload/finish", "/v1/inbox"];
+pub const INBOX_EVENT: &str = "phone-inbox-changed";
 
 fn now_ms() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
@@ -339,6 +342,8 @@ pub trait Host: Send + Sync {
     fn forward(&self, request: &ForwardedRequest) -> bool;
     fn hivo_version(&self) -> String;
     fn desktop_name(&self) -> String;
+    /// Something new is in the phone inbox (the desktop's Inbox refreshes).
+    fn inbox_changed(&self) {}
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -366,6 +371,18 @@ pub struct Inner {
     in_flight: AtomicUsize,
     next_id: AtomicU64,
     error: Mutex<Option<String>>,
+    pub inbox: Arc<crate::phone_inbox::Inbox>,
+    /// The webview says so when it shows sample data: uploads are refused.
+    demo: AtomicBool,
+}
+
+/// `<config dir>/phone-inbox` next to `phone-sync.json` (tests: `<file>.inbox`).
+fn inbox_root(path: &Path) -> PathBuf {
+    if path.file_name().is_some_and(|n| n == "phone-sync.json") {
+        path.with_file_name("phone-inbox")
+    } else {
+        path.with_extension("inbox")
+    }
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -375,7 +392,10 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 impl Inner {
     pub fn new(path: PathBuf) -> Arc<Inner> {
         let store = read_store(&path);
+        let inbox = Arc::new(crate::phone_inbox::Inbox::open(inbox_root(&path)));
         Arc::new(Inner {
+            inbox,
+            demo: AtomicBool::new(false),
             path,
             store: Mutex::new(store),
             listener: Mutex::new(None),
@@ -557,7 +577,7 @@ fn handle(inner: &Arc<Inner>, host: &dyn Host, mut req: tiny_http::Request) {
             let _ = req.respond(json_response(200, &json!({ "app": "hivo", "v": 1 })));
             return;
         }
-        (tiny_http::Method::Post, "/v1/hello" | "/v1/snapshot" | "/v1/notes") => {
+        (tiny_http::Method::Post, p) if p == "/v1/hello" || FORWARDED.contains(&p) || INBOX_PATHS.contains(&p) => {
             let device = header(&req, "X-Hivo-Device").map(str::to_string);
             let too_big = req.body_length().is_some_and(|n| n > MAX_BODY_BYTES);
             if too_big {
@@ -606,6 +626,11 @@ pub fn handle_sealed(inner: &Arc<Inner>, host: &dyn Host, path: &str, device_id:
             inner.touch(device_id, Some(name.unwrap_or_else(|| "Phone".to_string())), version);
             Ok(json!({ "desktopName": host.desktop_name(), "hivoVersion": host.hivo_version() }))
         }
+        p if INBOX_PATHS.contains(&p) => {
+            inner.touch(device_id, None, None);
+            let phone = device.name.clone().unwrap_or_else(|| "Phone".to_string());
+            answer_inbox(inner, host, p, device_id, &phone, &sealed.body)
+        }
         p if FORWARDED.contains(&p) => {
             inner.touch(device_id, None, None);
             match check_payload(p, &sealed.body) {
@@ -626,6 +651,38 @@ pub fn handle_sealed(inner: &Arc<Inner>, host: &dyn Host, path: &str, device_id:
     match seal(&key, &aad(device_id, &resp_path(path)), &bytes) {
         Ok(env) => Outcome::Sealed(env),
         Err(_) => Outcome::Status(500),
+    }
+}
+
+/// The v1.1 endpoints. Sample data never receives anything ("demo").
+fn answer_inbox(inner: &Inner, host: &dyn Host, path: &str, device_id: &str, phone: &str, body: &Value) -> Reply {
+    if !body.is_object() {
+        return Err("bad request".to_string());
+    }
+    if path == "/v1/inbox" {
+        return Ok(inner.inbox.status_for(device_id));
+    }
+    if inner.demo.load(Ordering::Relaxed) {
+        return Err("demo".to_string());
+    }
+    let now = now_ms();
+    match path {
+        "/v1/ideas" => {
+            let r = inner.inbox.push_ideas(device_id, phone, body, now);
+            if r.is_ok() {
+                host.inbox_changed();
+            }
+            r
+        }
+        "/v1/upload/start" => inner.inbox.upload_start(device_id, phone, body, now),
+        "/v1/upload/chunk" => inner.inbox.upload_chunk(device_id, body),
+        "/v1/upload/finish" => inner.inbox.upload_finish(device_id, body, now).map(|(v, ready)| {
+            if ready {
+                host.inbox_changed();
+            }
+            v
+        }),
+        _ => Err("bad request".to_string()),
     }
 }
 
@@ -673,6 +730,9 @@ impl Host for TauriHost {
     }
     fn desktop_name(&self) -> String {
         desktop_name()
+    }
+    fn inbox_changed(&self) {
+        let _ = self.app.emit(INBOX_EVENT, ());
     }
 }
 
@@ -818,6 +878,89 @@ pub fn phone_sync_reply(app: AppHandle, id: String, body: Option<Value>, error: 
     };
     inner.reply(&id, reply);
     Ok(())
+}
+
+// ---- Phone inbox commands (v1.1, the desktop's Inbox page) ----
+
+/// The webview shows sample data (or stops): uploads and ideas are refused while on.
+#[tauri::command]
+pub fn phone_sync_set_demo(app: AppHandle, on: bool) -> Result<(), String> {
+    state_inner(&app)?.demo.store(on, Ordering::Relaxed);
+    Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxList {
+    pub items: Vec<crate::phone_inbox::InboxView>,
+    /// Items still arriving (not listed yet).
+    pub receiving: usize,
+}
+
+/// Everything the phones sent, newest first. The inbox's files folder is
+/// allowed for playback (asset protocol), like the beats folders.
+#[tauri::command]
+pub fn phone_inbox_list(app: AppHandle) -> Result<InboxList, String> {
+    let inner = state_inner(&app)?;
+    let dir = inner.inbox.files_dir();
+    if dir.is_dir() {
+        let _ = app.asset_protocol_scope().allow_directory(&dir, true);
+    }
+    Ok(InboxList { items: inner.inbox.list(), receiving: inner.inbox.receiving() })
+}
+
+/// "File as a new song": `<parent_folder>/<name>/BandLab/` (a linked folder
+/// only). Returns the sketch's key.
+#[tauri::command]
+pub async fn phone_inbox_file_sketch(app: AppHandle, id: String, parent_folder: String, name: String) -> Result<String, String> {
+    let scope = crate::scope::Scope::load(&app)?;
+    if scope.folders().is_empty() {
+        return Err("Link a project folder in Settings first.".to_string());
+    }
+    let parent = scope.folder_in_roots(&parent_folder)?;
+    let inner = state_inner(&app)?;
+    tauri::async_runtime::spawn_blocking(move || inner.inbox.file_sketch(&id, &parent, &name)).await.map_err(|e| format!("filing failed: {e}"))?
+}
+
+/// The folder of a song: its project's folder, or a sketch's song folder.
+fn song_folder(scope: &crate::scope::Scope, key: &str) -> Result<PathBuf, String> {
+    if let Ok(p) = scope.project(key) {
+        return p.parent().map(Path::to_path_buf).ok_or_else(|| "invalid project path".to_string());
+    }
+    let dir = scope.folder_in_roots(key).map_err(|_| "This song's folder isn't there any more.".to_string())?;
+    if dir.file_name().is_some_and(|n| n == crate::sketch::SKETCH_DIR) {
+        return dir.parent().map(Path::to_path_buf).ok_or_else(|| "invalid sketch path".to_string());
+    }
+    Err("That isn't a song in a linked folder.".to_string())
+}
+
+/// Copies a memo into `<song folder>/Voice memos/`. Returns the copies.
+#[tauri::command]
+pub async fn phone_inbox_attach_song(app: AppHandle, id: String, song_path: String) -> Result<Vec<String>, String> {
+    let scope = crate::scope::Scope::load(&app)?;
+    let folder = song_folder(&scope, &song_path)?;
+    let inner = state_inner(&app)?;
+    tauri::async_runtime::spawn_blocking(move || inner.inbox.attach_to_song_folder(&id, &folder)).await.map_err(|e| format!("copy failed: {e}"))?
+}
+
+/// Status from the desktop: an idea appended to a note, a memo linked to a
+/// beat or a prod ("filed" + where), "dismissed", or back to "new".
+#[tauri::command]
+pub fn phone_inbox_mark(app: AppHandle, id: String, status: String, filed_to: Option<String>) -> Result<(), String> {
+    use crate::phone_inbox::Status;
+    let status = match status.as_str() {
+        "new" => Status::New,
+        "filed" => Status::Filed,
+        "dismissed" => Status::Dismissed,
+        _ => return Err(format!("unknown status: {status}")),
+    };
+    state_inner(&app)?.inbox.mark(&id, status, filed_to)
+}
+
+/// Removes an item and its files from the inbox (never anything filed into a song folder).
+#[tauri::command]
+pub fn phone_inbox_remove(app: AppHandle, id: String) -> Result<(), String> {
+    state_inner(&app)?.inbox.remove(&id)
 }
 
 #[cfg(test)]
@@ -1085,5 +1228,46 @@ mod tests {
         let inner = Inner::new(std::env::temp_dir().join(format!("hivo-phone-deaf-{}.json", std::process::id())));
         assert_eq!(inner.forward(&Deaf, "/v1/snapshot", json!({}), "p".into()), Err("busy".to_string()));
         assert!(lock(&inner.pending).is_empty());
+    }
+
+    #[test]
+    fn live_upload_of_a_memo_and_demo_refusal() {
+        let dir = std::env::temp_dir().join(format!("hivo-phone-upload-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("phone-sync.json");
+        let inner = Inner::new(path.clone());
+        let dev = add_device(&mut lock(&inner.store), now_ms()).unwrap();
+        lock(&inner.store).devices[0].name = Some("Pixel".into());
+        let host = Arc::new(FakeHost { inner: Mutex::new(Some(inner.clone())) });
+        let port = start(&inner, host, IpAddr::V4(Ipv4Addr::LOCALHOST)).unwrap();
+        let hdr = [("X-Hivo-Device", dev.id.as_str()), ("Content-Type", "application/json")];
+        let mut n = 0;
+        let mut call = |p: &str, body: Value| {
+            n += 1;
+            let req = sealed_request(&dev, p, now_ms(), &format!("n{n}"), body);
+            let (s, b) = http(port, "POST", p, &hdr, &req);
+            assert_eq!(s, 200, "{p}");
+            open_reply(&dev, p, &b)
+        };
+        let start_body = json!({ "itemId": "memo1", "itemType": "memo", "title": "Flow", "fileIndex": 0, "fileCount": 1, "name": "rec.m4a", "size": 5 });
+        assert_eq!(call("/v1/upload/start", start_body.clone()), json!({ "ok": true, "body": { "offset": 0 } }));
+        let chunk = json!({ "itemId": "memo1", "fileIndex": 0, "offset": 0, "data": B64.encode(b"hello") });
+        assert_eq!(call("/v1/upload/chunk", chunk.clone()), json!({ "ok": true, "body": { "offset": 5 } }));
+        assert_eq!(call("/v1/upload/chunk", chunk), json!({ "ok": false, "error": "offset:5" }));
+        let fin = call("/v1/upload/finish", json!({ "itemId": "memo1", "fileIndex": 0 }));
+        assert_eq!(fin["body"]["status"], "stored");
+        assert_eq!(call("/v1/inbox", json!({}))["body"]["items"][0]["status"], "new");
+        let listed = inner.inbox.list();
+        assert_eq!(listed[0].item.phone_name, "Pixel");
+        assert_eq!(fs::read(&listed[0].files[0].path).unwrap(), b"hello");
+        assert!(dir.join("phone-inbox").join("index.json").is_file(), "next to phone-sync.json");
+        // Sample data on the desktop: nothing is received, the status still answers.
+        inner.demo.store(true, Ordering::Relaxed);
+        assert_eq!(call("/v1/ideas", json!({ "ideas": [{ "id": "i1", "title": "t" }] })), json!({ "ok": false, "error": "demo" }));
+        assert_eq!(call("/v1/upload/start", json!({ "itemId": "m2", "itemType": "memo", "fileIndex": 0, "fileCount": 1, "name": "a.m4a", "size": 1 }))["error"], "demo");
+        assert_eq!(call("/v1/inbox", json!({}))["ok"], true);
+        stop(&inner);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

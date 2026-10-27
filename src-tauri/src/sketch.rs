@@ -136,7 +136,7 @@ fn import_into(parent: &Path, name: &str, files: &[PathBuf]) -> Result<String, S
 
 /// Copies each file into `dir`, never over an existing one (two picks with
 /// the same name become `name (2).ext`).
-fn copy_all(files: &[PathBuf], dir: &Path) -> Result<(), String> {
+pub(crate) fn copy_all(files: &[PathBuf], dir: &Path) -> Result<(), String> {
     for from in files {
         let file_name = from.file_name().ok_or("invalid file name")?;
         let stem = Path::new(file_name).file_stem().unwrap_or_default().to_string_lossy().to_string();

@@ -18,7 +18,7 @@ pub(crate) fn validate_name(name: &str) -> Result<&str, String> {
 }
 
 /// `<dir>/<base>.<ext>`, or `<base> (2).<ext>`, `(3)`… if taken.
-fn free_path(dir: &Path, base: &str, ext: &str) -> PathBuf {
+pub(crate) fn free_path(dir: &Path, base: &str, ext: &str) -> PathBuf {
     let first = dir.join(format!("{base}.{ext}"));
     if !first.exists() {
         return first;

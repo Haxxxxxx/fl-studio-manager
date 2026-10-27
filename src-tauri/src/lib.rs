@@ -14,6 +14,7 @@ mod flp_metadata;
 mod models;
 mod package;
 mod paths;
+mod phone_inbox;
 mod phone_sync;
 mod render;
 mod resolve;
@@ -101,6 +102,12 @@ pub fn run() {
             phone_sync::phone_sync_pair,
             phone_sync::phone_sync_forget,
             phone_sync::phone_sync_reply,
+            phone_sync::phone_sync_set_demo,
+            phone_sync::phone_inbox_list,
+            phone_sync::phone_inbox_file_sketch,
+            phone_sync::phone_inbox_attach_song,
+            phone_sync::phone_inbox_mark,
+            phone_sync::phone_inbox_remove,
             paths::open_project,
             paths::reveal_path,
         ])
