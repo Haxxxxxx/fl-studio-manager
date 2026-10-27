@@ -1,19 +1,20 @@
 # Hivo (formerly FL Manager): Roadmap and status
 
-> Status as of **25 October 2026** (v0.5.4 released; next steps in [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md)). Hard rules for any work: [GUARDRAILS.md](GUARDRAILS.md). This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
+> Status as of **27 October 2026** (v0.6.1 released; next steps in [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md)). Hard rules for any work: [GUARDRAILS.md](GUARDRAILS.md). This replaces the original vision document: the vision and principles are kept, and every feature now says where it stands. Written to be read aloud or pasted into a chat.
 
 ---
 
 ## 1. Where we are, in one minute
 
-- **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion, with a web dashboard for the crew.
-- **Releases.** **v0.5.4** is the latest (2026-10-24): Mac universal .dmg and Windows setup .exe, downloadable from the website. Installed apps **update themselves** (signed updates from the Supabase `releases` bucket, Settings → Check for updates). Builds run on the Mac (self-hosted GitHub runner) when a version tag is pushed.
-- **Phases.** Phase 0, 1a, 1b and 1c are built (checklist in section 7). One Phase 0 item remains: the crew pitch (prepared outside the repo). The git history was scrubbed on 2026-10-25.
-- **What's next: [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md).** In order:
-  - **Part A:** verify the crew flow end to end with two accounts and fix the "shared song not showing" report (guardrail 4.1);
-  - **Part A2:** finish the initial brief (Launch Kit hand-off fixes and history scrub done; Windows test and pitch left);
-  - **Part B, after that:** the mobile creation companion (BandLab exports into projects first, then a native app syncing over Wi-Fi).
-- **Ready but not released:** everything merged since 0.5.4 ships as **0.5.5** when you say so (Digger saved prods and converter, People profiles, "Include artist IDs" in the kit, the Library folder tree).
+- **What it is.** A desktop app (Mac and Windows) that watches the crew's music project folders and follows every song from the first session to release and promotion, with a web dashboard for the crew and an Android phone app for notes and lyrics.
+- **Releases.** **v0.6.1** is the latest (2026-10-25): Mac universal .dmg, Windows setup .exe and the Android APK, downloadable from the website. Installed apps **update themselves** (signed updates from the Supabase `releases` bucket, Settings → Check for updates); website APKs show an update banner. Builds run on the Mac (self-hosted GitHub runner) when a version tag is pushed.
+- **Release cadence (decided 2026-10-27):** no release per small fix. Fixes wait on `main` and ship together when a whole step is done; a patch release only for something that breaks installed apps with no workaround. Next release: **0.7.0**, with phase B step 4.
+- **Phases.** Phase 0, 1a, 1b, 1c and 1d are built (checklist in section 7). Two human items remain: the crew pitch (in progress, outside the repo) and the Windows test on a real PC (later; the Mac build is the reference for now, both builds come from the same code). The git history was scrubbed on 2026-10-25.
+- **What's next: [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md).**
+  - **Part A** (crew verified end to end) and **part A2** (finish the brief) are done, except the two human items above.
+  - **Part B, the mobile companion:** steps 1-3 shipped in 0.6.0-0.6.1 (desktop notes, phone sync, the Android app; pairing works on a real phone). Step 4 is next: BandLab exports from the phone, sketch → FL, voice memos, ideas inbox, session view.
+  - **Part C, the backlog** (added 2026-10-27): delete a crew and owner actions on the website, stems, per-distributor export formats, the Pace tendency block, and the "In your prods" check for prods in other formats or folders.
+- **Ready but not released:** on `main` since 0.6.1, the QR scanner fix for Android 11+ (it now sees Google Play). Ships with 0.7.0.
 
 ---
 
@@ -23,15 +24,18 @@
 - **Stack:**
   - desktop: Tauri 2 (Rust backend) with React 19, TypeScript, Zustand and Tailwind;
   - web dashboard: Vite on Vercel;
+  - phone app: Expo / React Native (Android), syncing with the desktop over the local Wi-Fi only;
   - crew backend: Supabase in the EU (Ireland).
-- **Tests** (as of 2026-10-25):
-  - 221 unit tests for the app logic;
-  - 183 Rust tests (scanning, files, audio, AI, Digger, leads, lookups);
+- **Tests** (as of 2026-10-27):
+  - 241 unit tests for the app logic;
+  - 193 Rust tests (scanning, files, audio, AI, Digger, leads, lookups, phone sync);
+  - 63 phone app tests (pairing, encryption, sync, notes, build plugins);
   - 175 database tests covering crew rules, privacy, limits, stage versions, crew columns, the releases bucket and the feedback form.
   - Both builds are clean; CI runs all of it on every PR, plus npm and cargo audits.
-- **Pull requests:** 125 merged. Open: the November plan (#136), a design-system docs pointer (#132), and Dependabot bumps held back on purpose (#99, #100, #104, #105, #117).
+- **Pull requests:** 147 merged. Open: the BandLab sketch import (#143, draft), to be reworked as the desktop's receiving side in phase B step 4.
 - **Live:**
-  - crew website: https://www.hi-vo.fr, with `/download/mac` and `/download/windows`;
+  - crew website: https://www.hi-vo.fr, with `/download/mac`, `/download/windows`, `/download/android` and the privacy policy (`/en/privacy`, `/fr/privacy`);
+  - Google Play: app "Hi-Vo" (`fr.hivo.mobile`) created, not published yet (setup in progress);
   - installers and update manifest: the public Supabase `releases` bucket, plus GitHub releases (public repo);
   - sign-in emails: sent through Brevo from the hi-vo.fr domain (Supabase custom SMTP);
   - Claude Design project "fl-Manager": holds the synced components, in the Hivo / System 02 look.
@@ -129,31 +133,42 @@
 - Hivo name and hive-cell logo everywhere: the app, its icons, the website, the link preview, the sign-in emails.
 - Mac (universal) and Windows installers on the website and GitHub. The Mac app isn't notarized, so expect a one-time "Open Anyway" on first launch.
 
+**Notes and lyrics (desktop)**
+- Notes on every saved prod, beat and song, in a side panel in the Digger with a preview, section headers (`[Verse 1]`, `[Hook]`) and a syllable count per line. Stored in the workspace, never shared with the crew or sent to the server.
+
+**The phone app (Android)**
+- Settings → Phone sync on the desktop (off by default) shows a pairing QR code; the phone scans it once (or the phone's camera opens the pairing link).
+- The phone lists your saved prods, beats and songs, and you write notes and lyrics on any of them, offline. They sync with the desktop over the same Wi-Fi, encrypted with the pairing key; a note changed on both sides keeps both copies to merge by hand.
+- Nothing written on the phone goes through Hivo's server.
+- APK on the website with an update banner; Google Play listing in progress. No iOS release for now (tested in the Simulator).
+
 ### In progress (see [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md))
 
-- **Human test of the crew flow** (guardrail 4.1): two accounts, the nine-step checklist, and the "shared song not showing" report (2026-10-24).
-- **Testing on real songs and a real PC.**
-  - The hook detection was tested on synthetic audio, not yet on the crew's tracks.
-  - The Windows installer was cross-built on a Mac and hasn't been run on a Windows PC yet.
+- **The crew pitch (Phase 0).** Being written with Claude on the web, outside this repo: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
+- **Google Play.** The app exists in the Play Console; next is app signing with your own key, an internal testing release with the AAB, and the App content forms.
+- **Phase B step 4** (next, ships as 0.7.0): BandLab exports from the phone, sketch → FL, voice memos, ideas inbox, session view.
 - **Launch Kit, the rest of audit §3** (A5-A6 and the B items: readiness per release, two-dates confusion, modal and drawer friction): only where they block the path to release.
 
-### Blocked
+### Later, on purpose
 
-- **The crew pitch (Phase 0).** Being prepared with Claude on the web, outside this repo: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
+- **The Windows installer on a real PC.** Cross-built on the Mac from the same code, not run on Windows yet. The Mac build is the reference for now; the test happens when a PC is at hand.
 
 ### Decisions waiting on you
 
-- **Ship 0.5.5** (what's merged since 0.5.4).
 - **Apple Developer account (99 USD a year):** would remove the Mac warning (notarization) and is required for TestFlight when the iOS app comes. Not done: free stack.
+
+### Backlog (part C of the November plan, added 2026-10-27)
+
+- **Deleting a crew** (today: remove everyone, then leave) and **owner actions on the website** (invite code, remove member, rename, columns).
+- **Exporting stems from the app.** Stems are detected and shown, not created.
+- **Distributor-specific export formats** (per-distributor templates instead of one universal sheet).
+- **The Pace tendency block.** Needs a log of stage changes first (when each song entered each stage).
+- **"In your prods" for every prod.** A saved prod is marked "In your prods" only when a WAV or MP3 with a matching name sits in a beats folder from Settings. It should also confirm prods in other audio formats and prods saved in another folder (Downloads, a converter's folder), and say where the file was found.
 
 ### Thought about, not built
 
-- **The mobile creation companion:** planned in [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md), part B (after part A).
 - **Logic Pro.** Not readable today. The link-preview design mentioned it, so the rendered image lists FL Studio, Ableton Live, REAPER and Pro Tools instead.
 - **Render and package for DAWs other than FL Studio.** Today the app tells you where to export in your DAW instead.
-- **Exporting stems from the app.** Stems are detected and shown, not created.
-- **Distributor-specific export formats** (per-distributor templates instead of one universal sheet).
-- **Deleting a crew** (today: remove everyone, then leave) and **owner actions on the website** (invite, remove, rename, columns).
 - **Phase 2, in full:**
   - **Plugin recommendations:** suggest plugins by stage, knowing what's installed. Today the app knows which plugins each song uses and whether this computer has them.
   - **Hardware awareness:** identify connected interfaces, controllers and synths (USB IDs, MIDI and audio device names).
@@ -196,7 +211,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] Repo clean enough to be public (history rewritten 2026-10-25: real names replaced by placeholders, personal email replaced by the GitHub no-reply address, every branch and tag)
 - [x] Setup guide
 - [x] Polished demo stats
-- [ ] Crew pitch (being prepared with Claude on the web, outside this repo)
+- [ ] Crew pitch (in progress, with Claude on the web, outside this repo)
 
 **Phase 1a: shared crew dashboard**
 - [x] Each member's songs visible to the group (opt-in, metadata only, EU)
@@ -223,15 +238,23 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 **Phase 1d: shipping**
 - [x] Signed in-app updates, website downloads
 - [x] Feedback form
-- [ ] Windows installer run on a real PC (planned in the coming days)
+- [x] Android phone app: APK on the website, signed AAB for Google Play (0.6.0)
+- [ ] Google Play listing live (internal testing first; set up by hand in the Play Console)
+- [ ] Windows installer run on a real PC (later: the Mac build is the reference for now)
 
-**Phase 2: ecosystem**: not started (see "Thought about, not built"). The mobile companion is planned separately (NOVEMBER-PLAN part B).
+**Mobile companion** (NOVEMBER-PLAN part B)
+- [x] Desktop notes on saved prods, beats and songs (step 1)
+- [x] Phone sync over the local Wi-Fi, encrypted, nothing on the server (step 2)
+- [x] Android app: pairing, lists, offline notes, sync; pairing tested on a real phone (step 3)
+- [ ] BandLab exports from the phone, sketch → FL, voice memos, ideas inbox, session view (step 4, 0.7.0)
+
+**Phase 2: ecosystem**: not started (see "Thought about, not built").
 
 ---
 
 ## 8. Next steps
 
-The ordered list lives in **[NOVEMBER-PLAN.md](NOVEMBER-PLAN.md)**: part A (crew verification and the share report), part A2 (finish the initial brief), then part B (mobile). Update that file as items close, and tick section 7 here.
+The ordered list lives in **[NOVEMBER-PLAN.md](NOVEMBER-PLAN.md)**: parts A and A2 are done; part B step 4 is next, then part C (the backlog). Update that file as items close, and tick section 7 here.
 
 ## 9. Notes for Claude Code
 
