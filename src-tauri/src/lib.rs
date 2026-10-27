@@ -21,6 +21,7 @@ mod resolve;
 mod scanner;
 mod scope;
 mod sections;
+mod session;
 mod settings;
 mod shorts;
 mod sketch;
@@ -77,6 +78,7 @@ pub fn run() {
             actions::restore_backup,
             actions::trash_backups,
             sketch::continue_sketch,
+            session::open_session_window,
             actions::backups_on_risky_volumes,
             package::package_preview,
             package::package_projects,

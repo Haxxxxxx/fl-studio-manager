@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, Pause, Play, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, MonitorPlay, Pause, Play, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { useDigger } from "../store/useDigger";
 import * as api from "../lib/tauri";
@@ -7,6 +7,7 @@ import { dict, tr } from "../i18n";
 import type { BeatFile, SavedLead } from "../types";
 import { NotesEditor } from "./NotesEditor";
 import { PhoneMemos } from "./PhoneMemos";
+import { openSession } from "../store/sessionBridge";
 import { usePhoneInbox } from "../store/usePhoneInbox";
 import { memosFor } from "../lib/phoneInbox";
 import { label, secondary } from "./DigResults";
@@ -32,6 +33,8 @@ const T = dict(
     openTitle: (title: string) => `Open ${title} in the browser`,
     local: "Your file",
     bpm: (n: number) => `${Math.round(n)} BPM`,
+    session: "Session view",
+    sessionTitle: "The notes large, in a window kept on top of FL Studio",
   },
   {
     title: "Notes",
@@ -48,6 +51,8 @@ const T = dict(
     openTitle: (title: string) => `Ouvrir ${title} dans le navigateur`,
     local: "Ton fichier",
     bpm: (n: number) => `${Math.round(n)} BPM`,
+    session: "Vue session",
+    sessionTitle: "Les notes en grand, dans une fenêtre gardée devant FL Studio",
   },
 );
 
@@ -135,6 +140,23 @@ export function DigNotesPanel({ target, player, onClose }: { target: NotesTarget
           )}
         </div>
       )}
+
+      <div>
+        <button
+          type="button"
+          title={t.sessionTitle}
+          className={`${secondary} flex items-center gap-1`}
+          onClick={() =>
+            void openSession(
+              target.kind === "beat"
+                ? { kind: "beat", id: target.beat.path, title, bpm: dig?.beats.find((x) => x.name === target.beat.name)?.bpm ?? null }
+                : { kind: "prod", id: target.lead.hash, title, bpm: target.lead.bpm ?? null },
+            ).catch(() => {})
+          }
+        >
+          <MonitorPlay size={11} aria-hidden /> {t.session}
+        </button>
+      </div>
 
       <PhoneMemos memos={target.kind === "beat" ? memosFor(inboxItems, "beat", target.beat.path) : memosFor(inboxItems, "prod", target.lead.hash)} />
 

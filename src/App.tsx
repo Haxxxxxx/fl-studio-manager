@@ -26,6 +26,7 @@ import { appLocation } from "./lib/tauri";
 import { UPDATES_ENABLED } from "./lib/updater";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
 import { startPhoneSyncBridge } from "./store/phoneSyncBridge";
+import { startSessionBridge } from "./store/sessionBridge";
 import { useCrewStore, useInCrew } from "./store/useCrewStore";
 import { StatusDot, btnPrimary, btnQuiet } from "./ui";
 
@@ -256,6 +257,9 @@ export default function App() {
     if (!isTauri()) return;
     return startPhoneSyncBridge();
   }, []);
+
+  // The session view's window gets its lyrics from here.
+  useEffect(() => startSessionBridge(), []);
 
   // Closing the window right after an edit: write the pending save first.
   useEffect(() => {

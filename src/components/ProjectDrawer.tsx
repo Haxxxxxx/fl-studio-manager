@@ -17,6 +17,7 @@ import {
   Rocket,
   RotateCcw,
   Star,
+  MonitorPlay,
   Trash2,
   X,
 } from "lucide-react";
@@ -31,6 +32,7 @@ import { ShareToggle, StageConflictBanner } from "./CrewPanel";
 import { FilesPanel } from "./FilesPanel";
 import { NotesEditor } from "./NotesEditor";
 import { PhoneMemos } from "./PhoneMemos";
+import { openSession } from "../store/sessionBridge";
 import { usePhoneInbox } from "../store/usePhoneInbox";
 import { memosForSong } from "../lib/phoneInbox";
 import { canRenderInApp, dawOf, isSketch } from "../lib/daws";
@@ -72,6 +74,8 @@ const T = dict(
     tags: "Tags",
     notes: "Notes",
     notesPlaceholder: "Ideas, lyrics, what's left to do…",
+    session: "Session view",
+    sessionTitle: "The lyrics large, in a window kept on top of FL Studio",
     project: "Project",
     tempo: "Tempo",
     timeSig: "Time sig",
@@ -165,6 +169,8 @@ const T = dict(
     tags: "Tags",
     notes: "Notes",
     notesPlaceholder: "Idées, paroles, ce qu'il reste à faire…",
+    session: "Vue session",
+    sessionTitle: "Le texte en grand, dans une fenêtre gardée devant FL Studio",
     project: "Projet",
     tempo: "Tempo",
     timeSig: "Signature",
@@ -478,6 +484,19 @@ export function ProjectDrawer() {
             onChange={(notes) => updateSong(project.path, { notes })}
             placeholder={t.notesPlaceholder}
           />
+          <div className="mt-2 flex">
+            <button
+              className={btn}
+              title={t.sessionTitle}
+              onClick={() =>
+                void openSession({ kind: "song", id: project.path, title: project.name, bpm: project.tempoBpm ?? null }).catch((e) =>
+                  setMessage({ kind: "error", text: e instanceof Error ? e.message : String(e) }),
+                )
+              }
+            >
+              <MonitorPlay size={14} /> {t.session}
+            </button>
+          </div>
           <div className="mt-3">
             <PhoneMemos memos={songMemos} />
           </div>
