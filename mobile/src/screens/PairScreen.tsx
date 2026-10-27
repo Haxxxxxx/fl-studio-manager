@@ -2,8 +2,10 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button, Engrave } from "../components/ui";
+import { UpdateCheck } from "../components/UpdateCheck";
 import { tr } from "../lib/i18n";
 import { parsePairingUrl } from "../lib/pairing";
+import { scannerFailure } from "../lib/scanner";
 import { pair, sync } from "../store";
 import { pairErrorText, T } from "../strings";
 import { C, FONT, RADIUS } from "../theme";
@@ -14,6 +16,7 @@ export function PairScreen() {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const handled = useRef(false);
   const t = tr(T);
 
@@ -40,6 +43,7 @@ export function PairScreen() {
 
   async function startScan() {
     setError(null);
+    setNotice(null);
     // Android: Google Play services' code scanner (the in-view analysis saw
     // nothing on a real phone while the system camera read the same code).
     // It brings its own full-screen UI and needs no camera permission here.
@@ -50,12 +54,19 @@ export function PairScreen() {
       });
       try {
         await CameraView.launchScanner({ barcodeTypes: ["qr"] });
+        return;
       } catch (e) {
         sub.remove();
-        setError(e instanceof Error ? e.message : String(e));
+        if (scannerFailure(e) === "cancelled") return;
+        // Google's scanner didn't start: use the camera here instead.
+        console.warn("code scanner failed, using the in-app camera:", e instanceof Error ? e.message : String(e));
+        setNotice(t.scanFallback);
       }
-      return;
     }
+    await openCamera();
+  }
+
+  async function openCamera() {
     if (!permission?.granted) {
       const p = await requestPermission();
       if (!p.granted) {
@@ -96,7 +107,9 @@ export function PairScreen() {
         />
         {/* Right under the camera, so a refused code is never hidden below the fold. */}
         {busy ? <Text style={styles.status}>{t.codeRead}</Text> : null}
+        {notice && !busy ? <Text style={styles.status}>{notice}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Text style={styles.tip}>{t.scanTip}</Text>
 
         <Engrave style={{ marginTop: 28, marginBottom: 6 }}>{t.pasteLabel}</Engrave>
         <TextInput
@@ -110,6 +123,9 @@ export function PairScreen() {
           style={styles.input}
         />
         <Button label={busy ? t.pairing : t.pair} onPress={() => void submit(text)} disabled={busy || !text.trim()} style={{ marginTop: 10 }} />
+
+        {/* Here too: an app that can't pair must still be able to update. */}
+        <UpdateCheck style={{ marginTop: 32 }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -135,4 +151,5 @@ const styles = StyleSheet.create({
   },
   error: { color: C.missing, marginTop: 12, fontSize: 14 },
   status: { color: C.cream, marginTop: 12, fontSize: 14 },
+  tip: { color: C.engrave, marginTop: 10, fontSize: 13, lineHeight: 18 },
 });

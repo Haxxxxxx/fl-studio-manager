@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHECK_EVERY_MS, checkDue, compareSemver, MANIFEST_URL, parseSemver, pickUpdate, RELEASES_BASE } from "./update";
+import { CHECK_EVERY_MS, checkDue, compareSemver, MANIFEST_URL, manualCheck, parseSemver, pickUpdate, PLAY_URL, RELEASES_BASE } from "./update";
 
 const apk = `${RELEASES_BASE}v0.6.1/Hivo-0.6.1-android-arm64.apk`;
 
@@ -64,5 +64,19 @@ describe("checkDue", () => {
   it("checks again when the clock went back", () => {
     expect(checkDue(now + 60_000, now)).toBe(true);
     expect(checkDue(Number.NaN, now)).toBe(true);
+  });
+});
+
+describe("manualCheck", () => {
+  it("offers a newer version, even one dismissed with Later", () => {
+    expect(manualCheck({ version: "0.6.1", apk }, "0.6.0")).toEqual({ kind: "update", update: { version: "0.6.1", apk } });
+  });
+  it("says this is the latest otherwise, a missing manifest included", () => {
+    expect(manualCheck({ version: "0.6.0", apk }, "0.6.0")).toEqual({ kind: "latest", version: "0.6.0" });
+    expect(manualCheck(null, "0.6.0")).toEqual({ kind: "latest", version: "0.6.0" });
+    expect(manualCheck({ version: "0.7.0", apk: "https://example.com/Hivo.apk" }, "0.6.0")).toEqual({ kind: "latest", version: "0.6.0" });
+  });
+  it("points Play builds at the app's own Play page", () => {
+    expect(PLAY_URL).toBe("https://play.google.com/store/apps/details?id=fr.hivo.mobile");
   });
 });

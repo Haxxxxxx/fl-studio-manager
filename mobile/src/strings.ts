@@ -59,6 +59,14 @@ export const T = dict(
     updateAvailable: (v: string) => `Hivo ${v} is available. Download it and install it over this one: your notes stay.`,
     updateDownload: "Download",
     updateLater: "Later",
+    checkUpdates: "Check for updates",
+    checkingUpdates: "Checking…",
+    upToDate: (v: string) => `Hivo ${v} is the latest version.`,
+    updateOffline: "Couldn't reach the update server. Check the connection and try again.",
+    openPlay: "Updates: open Google Play",
+    // Scanner
+    scanFallback: "Google's scanner didn't start, so the camera opens here instead. Hold the code inside the square.",
+    scanTip: "Scanner not working? Open your phone's camera app on the QR code: it opens Hivo and pairs.",
     // Stages
     stage: { creation: "Creation", production: "Production", prep: "Prep", release: "Release", promotion: "Promotion" } as Record<string, string>,
   },
@@ -111,6 +119,13 @@ export const T = dict(
     updateAvailable: (v: string) => `Hivo ${v} est dispo. Télécharge-le et installe-le par-dessus celui-ci${NB}: tes notes restent.`,
     updateDownload: "Télécharger",
     updateLater: "Plus tard",
+    checkUpdates: "Chercher une mise à jour",
+    checkingUpdates: "Recherche…",
+    upToDate: (v: string) => `Hivo ${v} est la dernière version.`,
+    updateOffline: "Impossible de joindre le serveur de mises à jour. Vérifie la connexion et réessaie.",
+    openPlay: `Mises à jour${NB}: ouvrir Google Play`,
+    scanFallback: "Le scanner de Google n'a pas démarré, la caméra s'ouvre ici à la place. Garde le code dans le carré.",
+    scanTip: `Le scanner ne marche pas${NB}? Ouvre l'appareil photo du téléphone sur le QR code${NB}: il ouvre Hivo et l'associe.`,
     stage: { creation: "Création", production: "Production", prep: "Prépa", release: "Sortie", promotion: "Promo" } as Record<string, string>,
   },
 );
