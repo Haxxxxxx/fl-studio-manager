@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatBytes, formatRelative } from "../lib/format";
+import { localDayMs } from "../lib/launchKit";
 import { openInFlStudio, revealInFileManager } from "../lib/tauri";
 import { isSketch } from "../lib/daws";
 import {
@@ -572,7 +573,7 @@ function MyDashboard({ editing }: { editing: boolean }) {
                       <span className="block truncate text-sm text-cream">{a.title}</span>
                       <span className="block text-[11px] text-engrave">
                         {t.done(done, a.trackPaths.length)}
-                        {a.releaseDate && ` · ${formatRelative(new Date(a.releaseDate).getTime())}`}
+                        {localDayMs(a.releaseDate) !== null && ` · ${formatRelative(localDayMs(a.releaseDate) as number)}`}
                       </span>
                     </span>
                     <span className="flex-1">
@@ -953,7 +954,7 @@ function PitchesCard() {
         {followUps.length === 0 ? (
           <div className="text-xs text-engrave">{t.nothingWaiting}</div>
         ) : (
-          followUps.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={formatRelative(new Date(x.pitch.date).getTime())} />)
+          followUps.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={localDayMs(x.pitch.date) !== null ? formatRelative(localDayMs(x.pitch.date) as number) : ""} />)
         )}
       </Card>
       <Card title={t.wins(wins.length)}>

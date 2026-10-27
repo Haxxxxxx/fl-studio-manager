@@ -6,11 +6,13 @@ const T = dict(
   {
     exporting: "Exporting projects...",
     complete: "Export complete",
+    finishedErrors: (n: number) => `Finished with ${n} error${n === 1 ? "" : "s"}`,
     summary: (done: number, failed: number) => `${done} done${failed > 0 ? `, ${failed} failed` : ""}`,
   },
   {
     exporting: "Export des projets...",
     complete: "Export terminé",
+    finishedErrors: (n: number) => `Terminé avec ${n} erreur${n === 1 ? "" : "s"}`,
     summary: (done: number, failed: number) =>
       `${done} terminé${done > 1 ? "s" : ""}${failed > 0 ? `, ${failed} en échec` : ""}`,
   },
@@ -31,7 +33,7 @@ export function RenderPanel() {
     <div className="absolute bottom-4 right-4 w-80 rounded-lg border border-rule bg-raised shadow-2xl">
       <div className="flex items-center justify-between border-b border-rule px-4 py-3">
         <div className="text-sm font-medium text-cream">
-          {rendering ? tr(T).exporting : tr(T).complete}
+          {rendering ? tr(T).exporting : errored > 0 ? tr(T).finishedErrors(errored) : tr(T).complete}
         </div>
         {!rendering && (
           <button

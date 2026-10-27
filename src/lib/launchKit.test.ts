@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Album, Person, ProjectInfo, SongMeta } from "../types";
-import { artistLine, buildKit, captionLanguageIssue, kitArtists, kitFiles, kitGuide, kitReadme, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
+import { artistLine, buildKit, localDayMs, captionLanguageIssue, kitArtists, kitFiles, kitGuide, kitReadme, kitSnippets, kitTitleFor, masterBaseName, verify, type KitInput } from "./launchKit";
 
 const today = new Date(2026, 9, 13); // Tue 13 Oct 2026
 const people: Person[] = [
@@ -248,5 +248,19 @@ describe("caption language", () => {
     const drafts = { captions: "ANNOUNCE\nOut now.", coverBrief: "x", model: "m", atMs: 1, basis: { title: "Night Run", artists: "Ana", releaseDate: "2026-11-20", language: "en" as const } };
     const kit = buildKit(input({ ...meta, launchKit: { ...meta.launchKit, ai: { drafts } } }, { captionLanguage: "fr" }));
     expect(kit.find((f) => f.id === "captions")!.check?.message).toMatch(/another title, artist, date or language/);
+  });
+});
+
+describe("localDayMs", () => {
+  it("reads YYYY-MM-DD as local midnight, not UTC", () => {
+    const ms = localDayMs("2026-11-06") as number;
+    const d = new Date(ms);
+    expect([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()]).toEqual([2026, 10, 6, 0]);
+  });
+  it("is null for nothing or a malformed date", () => {
+    expect(localDayMs(undefined)).toBeNull();
+    expect(localDayMs("")).toBeNull();
+    expect(localDayMs("2026-02-30")).toBeNull();
+    expect(localDayMs("6 Nov")).toBeNull();
   });
 });

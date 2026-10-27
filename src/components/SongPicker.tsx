@@ -11,8 +11,8 @@ import { dict, tr } from "../i18n";
 
 const T = dict(
   {
-    freshLabel: "Ready to launch",
-    freshHint: "Mixdown is up to date",
+    freshLabel: "Mixdown up to date",
+    freshHint: "Rendered after the last save in FL",
     staleLabel: "Mixdown outdated",
     staleHint: "Saved in FL after the last mixdown",
     noneLabel: "No mixdown yet",
@@ -31,8 +31,8 @@ const T = dict(
     keys: "↑ ↓ to move · Enter to open · Esc to close",
   },
   {
-    freshLabel: "Prêts à sortir",
-    freshHint: "Le mixdown est à jour",
+    freshLabel: "Mixdown à jour",
+    freshHint: "Rendu après la dernière sauvegarde dans FL",
     staleLabel: "Mixdown pas à jour",
     staleHint: "Sauvegardé dans FL après le dernier mixdown",
     noneLabel: "Pas encore de mixdown",
