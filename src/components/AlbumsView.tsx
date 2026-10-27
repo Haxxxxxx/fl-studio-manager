@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, Disc3, Download, Package, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Disc3, Download, Package, Plus, Rocket, Search, Trash2, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
 import { localDayMs } from "../lib/launchKit";
@@ -39,6 +39,7 @@ const T = dict(
     noTracks: "No tracks yet — add songs from your library.",
     missing: (file: string) => `Missing: ${file} (moved or renamed?)`,
     removeTrack: "Remove from release",
+    openKit: "Open its Launch Kit",
     notes: "Notes",
     notesPlaceholder: "Concept, artwork ideas, features, release plan…",
     deleteRelease: "Delete release",
@@ -76,6 +77,7 @@ const T = dict(
     noTracks: "Pas encore de morceaux — ajoute des sons depuis ta bibliothèque.",
     missing: (file: string) => `Introuvable : ${file} (déplacé ou renommé ?)`,
     removeTrack: "Retirer de la sortie",
+    openKit: "Ouvrir son Launch Kit",
     notes: "Notes",
     notesPlaceholder: "Concept, idées de visuels, feats, plan de sortie…",
     deleteRelease: "Supprimer la sortie",
@@ -431,6 +433,14 @@ function AlbumDetail({ album }: { album: Album }) {
                     <span className="w-20">
                       <MixdownBadge project={t} />
                     </span>
+                    <button
+                      onClick={() => useAppStore.getState().openLaunchKit(t.path)}
+                      title={tr(T).openKit}
+                      aria-label={tr(T).openKit}
+                      className="text-body opacity-0 hover:text-cream group-hover:opacity-100"
+                    >
+                      <Rocket size={13} />
+                    </button>
                   </>
                 ) : (
                   <span className="flex-1 truncate text-engrave" title={path}>

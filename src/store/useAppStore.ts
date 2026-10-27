@@ -316,6 +316,28 @@ let realFavorites: string[] | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let scanSeq = 0;
 
+/** Errors the store throws (shown as they are in the UI). */
+const STORE_ERRORS = dict(
+  {
+    sampleExport: "This is sample data: link a real project folder in Settings before exporting.",
+    sample: "This is sample data: link a real project folder first.",
+    needFl: "Set your FL Studio executable path in Settings first.",
+    needExport: "Set an export folder in Settings first.",
+    needExportForPackages: "Set an export folder in Settings first: packages go in <export folder>/Packages.",
+    exportRunning: "An export is already running.",
+    packaging: "Already packaging.",
+  },
+  {
+    sampleExport: "Ce sont des données d'exemple : lie un vrai dossier de projets dans les Réglages avant d'exporter.",
+    sample: "Ce sont des données d'exemple : lie d'abord un vrai dossier de projets.",
+    needFl: "Indique d'abord le chemin de FL Studio dans les Réglages.",
+    needExport: "Choisis d'abord un dossier d'export dans les Réglages.",
+    needExportForPackages: "Choisis d'abord un dossier d'export dans les Réglages : les paquets vont dans <dossier d'export>/Packages.",
+    exportRunning: "Un export est déjà en cours.",
+    packaging: "Paquet déjà en cours.",
+  },
+);
+
 const STORE_TEXT = dict(
   { renderFlOnly: (daw: string, tip: string) => `Rendering from Hivo works with FL Studio projects. Export this one from ${daw}: ${tip}` },
   { renderFlOnly: (daw: string, tip: string) => `Le rendu depuis Hivo marche avec les projets FL Studio. Exporte celui-ci depuis ${daw} : ${tip}` },
@@ -687,19 +709,17 @@ export const useAppStore = create<AppState>((set, get) => {
     startRender: async (paths, options) => {
       const { settings, selected, demoMode } = get();
       if (demoMode) {
-        throw new Error(
-          "This is sample data — link a real project folder in Settings before exporting.",
-        );
+        throw new Error(tr(STORE_ERRORS).sampleExport);
       }
       if (!settings.flStudioPath) {
-        throw new Error("Set your FL Studio executable path in Settings first.");
+        throw new Error(tr(STORE_ERRORS).needFl);
       }
       if (!settings.outputFolder) {
-        throw new Error("Set an export output folder in Settings first.");
+        throw new Error(tr(STORE_ERRORS).needExport);
       }
       const requested = paths ?? Array.from(selected);
       if (requested.length === 0) return;
-      if (get().rendering) throw new Error("An export is already running.");
+      if (get().rendering) throw new Error(tr(STORE_ERRORS).exportRunning);
       // Rendering from the app drives FL Studio; other DAWs' songs are
       // listed as skipped with where to export them instead.
       const byPath = new Map(get().projects.map((p) => [p.path, p]));
@@ -755,12 +775,16 @@ export const useAppStore = create<AppState>((set, get) => {
         selected: new Set(),
         detailPath: null,
         openAlbumId: null,
-        view: "dashboard",
+        launchPath: null,
+        // Stay on the page (from Settings, show the data: the Dashboard).
+        view: get().view === "settings" ? "dashboard" : get().view,
       });
+      get().resetLibraryFilters();
     },
 
     exitDemoMode: async () => {
-      set({ demoMode: false, selected: new Set(), detailPath: null, openAlbumId: null });
+      set({ demoMode: false, selected: new Set(), detailPath: null, openAlbumId: null, launchPath: null });
+      get().resetLibraryFilters();
       restoreRealFavorites();
       await loadWorkspace();
       await get().rescan();
@@ -791,9 +815,9 @@ export const useAppStore = create<AppState>((set, get) => {
 
     startPackage: async (paths, subfolder) => {
       const { settings, demoMode, packaging } = get();
-      if (demoMode) throw new Error("This is sample data — link a real project folder first.");
-      if (!settings.outputFolder) throw new Error("Set an export folder in Settings first — packages go in <export folder>\\Packages.");
-      if (packaging) throw new Error("Already packaging.");
+      if (demoMode) throw new Error(tr(STORE_ERRORS).sample);
+      if (!settings.outputFolder) throw new Error(tr(STORE_ERRORS).needExportForPackages);
+      if (packaging) throw new Error(tr(STORE_ERRORS).packaging);
       if (paths.length === 0) return;
       // Packages are FL's flat .flp + samples zips; other DAWs are reported as skipped.
       const byPath = new Map(get().projects.map((p) => [p.path, p]));
@@ -1062,7 +1086,7 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     fileInboxSketch: async ({ itemId, parentFolder, name, bandlabUrl }) => {
-      if (get().demoMode) throw new Error("This is sample data — link a real project folder first.");
+      if (get().demoMode) throw new Error(tr(STORE_ERRORS).sample);
       const key = await api.phoneInboxFileSketch(itemId, parentFolder, name);
       get().updateSong(key, { status: "creation", ...(bandlabUrl ? { bandlabUrl } : {}) });
       await get().rescan();
@@ -1070,7 +1094,7 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     continueSketch: async (sketchPath, templatePath) => {
-      if (get().demoMode) throw new Error("This is sample data — link a real project folder first.");
+      if (get().demoMode) throw new Error(tr(STORE_ERRORS).sample);
       const done = await api.continueSketch(sketchPath, templatePath);
       // Exactly a rename: the sketch's record now belongs to the .flp.
       if (get().workspaceWritable) followRelinks([{ from: sketchPath, to: done.flp, reason: "renamed" }]);

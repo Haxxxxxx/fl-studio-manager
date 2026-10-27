@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, ChevronDown, Info, Plus } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
-import { buildCalendar, monthLabel, type CalendarEntry } from "../lib/calendar";
+import { buildCalendar, monthLabel, undatedReleased, type CalendarEntry } from "../lib/calendar";
 import { formatRelative } from "../lib/format";
 import { btn, btnPrimary } from "./ui";
 import { Meter } from "../ui";
@@ -15,6 +15,7 @@ const T = dict(
     mixtape: "Mixtape",
     title: "Release calendar",
     planRelease: "Plan a release",
+    undated: (n: number) => `${n} song${n === 1 ? "" : "s"} in Release or Promotion ${n === 1 ? "has" : "have"} no date, so ${n === 1 ? "it isn't" : "they aren't"} on the calendar. Give ${n === 1 ? "it" : "them"} a date in the Launch Kit or on a release.`,
     noDates: "No release dates yet",
     noDatesHint: "Give a release a date in Releases, or set a release date in a song's Launch Kit. It shows up here with how ready it is.",
     nothingPlanned: (when: string) => `Nothing planned. The last release was ${when}.`,
@@ -34,6 +35,7 @@ const T = dict(
     mixtape: "Mixtape",
     title: "Calendrier des sorties",
     planRelease: "Prévoir une sortie",
+    undated: (n: number) => `${n} son${n === 1 ? "" : "s"} en Sortie ou Promo ${n === 1 ? "n'a" : "n'ont"} pas de date, donc pas dans le calendrier. Donne-${n === 1 ? "lui" : "leur"} une date dans le Launch Kit ou sur une sortie.`,
     noDates: "Pas encore de date de sortie",
     noDatesHint:
       "Donne une date à une sortie dans Sorties, ou mets une date de sortie dans le Launch Kit d'un son. Elle s'affiche ici avec où elle en est.",
@@ -59,6 +61,7 @@ export function CalendarView() {
   const t = tr(T);
 
   const entries = useMemo(() => buildCalendar(projects, workspace), [projects, workspace]);
+  const undated = useMemo(() => undatedReleased(projects, workspace), [projects, workspace]);
   const upcoming = entries.filter((e) => e.daysAway >= 0);
   const past = entries.filter((e) => e.daysAway < 0).reverse();
   const months = useMemo(() => {
@@ -99,6 +102,8 @@ export function CalendarView() {
             </button>
           </div>
         )}
+
+        {undated > 0 && <div className="rounded-lg border border-rule bg-panel px-4 py-3 text-xs text-body">{t.undated(undated)}</div>}
 
         {upcoming.length === 0 && entries.length > 0 && (
           <div className="rounded-lg border border-rule bg-panel px-4 py-3 text-xs text-engrave">{t.nothingPlanned(formatRelative(past[0].dateMs))}</div>

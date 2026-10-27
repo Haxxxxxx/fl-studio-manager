@@ -54,6 +54,8 @@ const T = dict(
     copied: "Copied",
     updateNow: "Update and restart",
     retry: "Retry",
+    sampleData: "Sample data: nothing is saved and export is off. Link a real folder anytime.",
+    exitSample: "Exit sample data",
     later: "Later",
     notSaving: "Changes aren't being saved",
   },
@@ -80,6 +82,8 @@ const T = dict(
     copied: "Copié",
     updateNow: "Mettre à jour et redémarrer",
     retry: "Réessayer",
+    sampleData: "Données d'exemple : rien n'est enregistré et l'export est coupé. Lie un vrai dossier quand tu veux.",
+    exitSample: "Quitter les données d'exemple",
     later: "Plus tard",
     notSaving: "Les modifications ne sont pas enregistrées",
   },
@@ -182,6 +186,22 @@ function LocationNotice() {
 
 /** Stays up while the workspace can't be read or saved (the red banner
  * above is one-off and dismissable; this one isn't). */
+/** Sample data on screen: says so on every page, with the way out. */
+function DemoStrip() {
+  const demoMode = useAppStore((s) => s.demoMode);
+  const exitDemoMode = useAppStore((s) => s.exitDemoMode);
+  if (!demoMode) return null;
+  return (
+    <div role="status" className="flex shrink-0 items-center gap-3 border-b border-hot/40 bg-hot/10 px-4 py-1.5 text-xs text-cream">
+      <StatusDot color="var(--color-hot)" size={6} />
+      <span className="flex-1">{tr(T).sampleData}</span>
+      <button onClick={() => void exitDemoMode()} className="rounded border border-rule-strong px-2 py-0.5 text-body hover:bg-raised hover:text-cream">
+        {tr(T).exitSample}
+      </button>
+    </div>
+  );
+}
+
 function NotSavingStrip() {
   const writable = useAppStore((s) => s.workspaceWritable);
   const saveError = useAppStore((s) => s.saveError);
@@ -296,6 +316,7 @@ export default function App() {
           with its own overflow, so it still scrolls). */}
       <div className="flex min-w-0 flex-1 flex-col">
         <UpdateNotice />
+        <DemoStrip />
         <NotSavingStrip />
         <LocationNotice />
         {view === "dashboard" && <Dashboard />}

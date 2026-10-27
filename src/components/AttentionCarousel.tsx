@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { AttentionItem } from "../lib/attention";
-import { dawOf } from "../lib/daws";
+import { canRenderInApp, dawOf } from "../lib/daws";
+import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
 import { statusInfo } from "../lib/songs";
 import { StatusDot } from "../ui";
@@ -14,6 +15,7 @@ const T = dict(
     previous: "Previous songs",
     more: "More songs",
     list: "Songs that need attention",
+    renderNow: "Render now",
     lastActivity: (when: string) => `Last activity ${when}`,
   },
   {
@@ -22,6 +24,7 @@ const T = dict(
     previous: "Sons précédents",
     more: "Plus de sons",
     list: "Sons qui demandent ton attention",
+    renderNow: "Faire le rendu maintenant",
     lastActivity: (when: string) => `Dernière activité ${when}`,
   },
 );
@@ -38,6 +41,8 @@ const LEVEL: Record<string, string> = {
 export function AttentionCarousel({ items, label, onOpen }: { items: AttentionItem[]; label: (i: AttentionItem) => string; onOpen: (path: string) => void }) {
   const row = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: true, end: true });
+  const demoMode = useAppStore((s) => s.demoMode);
+  const rendering = useAppStore((s) => s.rendering);
 
   const measure = () => {
     const el = row.current;
@@ -119,6 +124,21 @@ export function AttentionCarousel({ items, label, onOpen }: { items: AttentionIt
                 </span>
                 <span className="mt-auto text-[11px] text-engrave">{tr(T).lastActivity(formatRelative(i.lastActivityMs))}</span>
               </button>
+              {/* "No mixdown" / "outdated": render it from here (FL Studio projects). */}
+              {i.reasons.some((r) => r.kind === "no-mixdown" || r.kind === "stale-mixdown") && canRenderInApp(i.song) && !demoMode && (
+                <button
+                  onClick={() =>
+                    void useAppStore
+                      .getState()
+                      .startRender([i.song.path])
+                      .catch((e) => useAppStore.setState({ startupError: e instanceof Error ? e.message : String(e) }))
+                  }
+                  disabled={rendering}
+                  className="mt-1.5 w-full rounded border border-rule-strong px-2 py-1 text-[11px] text-body hover:bg-raised hover:text-cream disabled:opacity-50"
+                >
+                  {tr(T).renderNow}
+                </button>
+              )}
             </div>
           );
         })}

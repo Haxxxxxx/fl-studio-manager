@@ -1,7 +1,7 @@
 import type { Album, AlbumKind, ProjectInfo, Workspace } from "../types";
 import { dict, locale, tr } from "../i18n";
 import { parseDate } from "./launchKit";
-import { isFinished } from "./songs";
+import { isFinished, renderFreshness } from "./songs";
 
 // The release calendar (docs/ROADMAP.md, Phase 1a): every dated release,
 // planned and past, with how ready it is. Sources: releases (albums, EPs,
@@ -45,6 +45,8 @@ const T = dict(
     kitNotAccepted: (n: number) => `Launch Kit not accepted for ${n} track${s(n)}`,
     stuckInPrep: (n: number) => `Released, but ${n} track${n === 1 ? " is" : "s are"} still in Prep: move to Release or Promotion`,
     notFound: (n: number) => `${n} track${s(n)} not found (moved or renamed)`,
+    mixdownNotReady: (n: number) => `${n} track${s(n)}: mixdown outdated or missing (render before you export the kit)`,
+    otherKitDate: (n: number) => `${n} track${s(n)} ${n === 1 ? "has" : "have"} another date in ${n === 1 ? "its" : "their"} Launch Kit: the release's date is the one used`,
   },
   {
     notFriday: "Pas un vendredi : les nouveaux sons sortent partout le vendredi",
@@ -54,6 +56,8 @@ const T = dict(
     stuckInPrep: (n: number) =>
       `Sorti, mais ${n} morceau${n === 1 ? " est" : "x sont"} encore en Prépa : passe-${n === 1 ? "le" : "les"} en Sortie ou Promo`,
     notFound: (n: number) => `${n} morceau${n === 1 ? " introuvable" : "x introuvables"} (déplacé${s(n)} ou renommé${s(n)})`,
+    mixdownNotReady: (n: number) => `${n} morceau${n === 1 ? "" : "x"} : mixdown pas à jour ou absent (fais le rendu avant d'exporter le kit)`,
+    otherKitDate: (n: number) => `${n} morceau${n === 1 ? " a" : "x ont"} une autre date dans ${n === 1 ? "son" : "leur"} Launch Kit : c'est la date de la sortie qui compte`,
   },
 );
 
@@ -61,7 +65,8 @@ function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-function checksFor(e: Omit<CalendarEntry, "checks">, ws: Workspace): CalendarCheck[] {
+/** `releaseDate`: the album's date, for a dated release (its tracks' own kit dates are ignored). */
+function checksFor(e: Omit<CalendarEntry, "checks">, ws: Workspace, releaseDate?: string): CalendarCheck[] {
   const out: CalendarCheck[] = [];
   const d = new Date(e.dateMs);
   const total = e.tracks.length;
@@ -78,6 +83,16 @@ function checksFor(e: Omit<CalendarEntry, "checks">, ws: Workspace): CalendarChe
   const stuckInPrep = e.tracks.filter((track) => ws.songs[track.path]?.status === "prep").length;
   if (e.daysAway < 0 && stuckInPrep) {
     out.push({ level: "info", message: t.stuckInPrep(stuckInPrep) });
+  }
+  // Readiness also needs a mixdown made after the last save (the kit's master and snippets).
+  const notRendered = e.tracks.filter((track) => renderFreshness(track) !== "fresh").length;
+  if (e.daysAway >= 0 && notRendered) out.push({ level: e.daysAway < 14 ? "warn" : "info", message: t.mixdownNotReady(notRendered) });
+  if (releaseDate) {
+    const other = e.tracks.filter((track) => {
+      const own = ws.songs[track.path]?.launchKit?.edits?.releaseDate;
+      return !!own && own !== releaseDate;
+    }).length;
+    if (other) out.push({ level: "info", message: t.otherKitDate(other) });
   }
   if (e.missingTracks) out.push({ level: "warn", message: t.notFound(e.missingTracks) });
   return out;
@@ -103,7 +118,7 @@ export function buildCalendar(projects: ProjectInfo[], ws: Workspace, today = ne
       finished: tracks.filter((t) => isFinished(ws.songs[t.path]?.status)).length,
       kitsAccepted: tracks.filter((t) => ws.songs[t.path]?.launchKit?.acceptedAtMs).length,
     };
-    return { ...e, checks: checksFor(e, ws) };
+    return { ...e, checks: checksFor(e, ws, base.source.type === "album" ? base.date : undefined) };
   };
 
   for (const a of ws.albums as Album[]) {
@@ -121,6 +136,16 @@ export function buildCalendar(projects: ProjectInfo[], ws: Workspace, today = ne
     if (e) entries.push(e);
   }
   return entries.sort((a, b) => a.dateMs - b.dateMs);
+}
+
+/** Songs in Release or Promotion with no date anywhere (not on a dated
+ * release, no kit date): the Calendar can't show them, so it says how many. */
+export function undatedReleased(projects: ProjectInfo[], ws: Workspace): number {
+  const dated = new Set((ws.albums as Album[]).filter((a) => a.releaseDate).flatMap((a) => a.trackPaths));
+  return projects.filter((p) => {
+    const meta = ws.songs[p.path];
+    return !p.isTemplate && !meta?.archived && (meta?.status === "release" || meta?.status === "promotion") && !dated.has(p.path) && !meta?.launchKit?.edits?.releaseDate;
+  }).length;
 }
 
 /** "December 2026" group label. */
