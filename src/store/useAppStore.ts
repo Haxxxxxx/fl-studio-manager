@@ -4,6 +4,7 @@ import * as api from "../lib/tauri";
 import * as updater from "../lib/updater";
 import { generateSampleProjects, generateSampleWorkspace } from "../lib/sampleData";
 import { ALBUM_COLORS, EMPTY_WORKSPACE, migrateWorkspace, newId } from "../lib/songs";
+import { logStageChanges } from "../lib/stageLog";
 import { addColumn, moveCard, moveColumn, removeColumn, renameColumn } from "../lib/pipeline";
 import type { DashboardLayout } from "../lib/dashboardLayout";
 import { applyRelinks, findRelinks, type Relink } from "../lib/relink";
@@ -348,7 +349,9 @@ export const useAppStore = create<AppState>((set, get) => {
    * notes doesn't write the file on every keystroke). Sample-data edits
    * stay in memory so they never clobber the real workspace. */
   function mutateWorkspace(fn: (ws: Workspace) => Workspace) {
-    const next = fn(get().workspace);
+    // Every stage change, from anywhere, lands in the song's stage log here.
+    const prev = get().workspace;
+    const next = logStageChanges(prev, fn(prev), Date.now());
     set({ workspace: next });
     if (get().demoMode || !get().workspaceWritable) return;
     if (saveTimer) clearTimeout(saveTimer);

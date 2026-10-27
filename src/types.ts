@@ -141,6 +141,12 @@ export interface RenderEvent {
 export type SongStatus = "creation" | "production" | "prep" | "release" | "promotion";
 
 /** "Ana moved it to Prep meanwhile": the two moves, until the owner picks one. */
+/** One stage change: the stage the song entered and when. */
+export interface StageLogEntry {
+  stage: SongStatus;
+  atMs: number;
+}
+
 export interface StageConflict {
   mine: SongStatus | null;
   theirs: SongStatus | null;
@@ -163,6 +169,9 @@ export interface SongMeta {
   stagePending?: boolean;
   /** A crewmate moved the song while this computer's move was waiting. */
   stageConflict?: StageConflict;
+  /** Every stage the song entered, oldest first (`src/lib/stageLog.ts`).
+   * Starts empty: nothing before the log existed is guessed. Local only. */
+  stageLog?: StageLogEntry[];
   /** Shared with the crew (opt-in per song). */
   shared?: boolean;
   /** Stable id of this song in the crew database, set on first share. Kept
