@@ -1,6 +1,8 @@
 # November plan: finish crew sharing; the mobile creation companion after
 
-Status: **draft, nothing built.** Asked for on 2026-10-25. Order decided by the user: part A (crew), then part A2 (finish the brief), then part B (mobile). Tracking: tick items here as they close, and the matching boxes in ROADMAP.md section 7.
+Status (2026-10-27): **parts A and A2 done** (except the crew pitch, in progress, and the Windows test, later); **part B steps 1-3 shipped** in 0.6.0-0.6.1, step 4 next; **part C** is the backlog added 2026-10-27. Asked for on 2026-10-25. Order decided by the user: part A (crew), then part A2 (finish the brief), then part B (mobile), then part C. Tracking: tick items here as they close, and the matching boxes in ROADMAP.md section 7.
+
+**Release cadence (2026-10-27):** releases are batched. Fixes wait on `main` and ship with the next finished step; step 4 ships as **0.7.0**. A patch release only for something that breaks installed apps with no workaround.
 
 ---
 
@@ -31,10 +33,9 @@ Steps: reproduce with two accounts (yours plus a test account added in the Supab
 | 9 | Remove the member | desktop (owner) | they lose access; old invite codes stop working |
 
 ### A3. Open crew items found in the code
-- **Deleting a crew** doesn't exist (only "remove everyone, then leave").
-- **The website has no owner actions** (invite, remove, rename, columns); it sends people to the desktop.
-- **Sign-in emails** already go through Brevo (custom SMTP, per the roadmap): step 1 of the checklist confirms the codes arrive.
-- **Needs you:** a second account (add a test email in the Supabase dashboard → Authentication → Users; sign-up is closed).
+- **Deleting a crew** and **owner actions on the website**: moved to part C (C1).
+- ✅ **Sign-in emails** go through Brevo (custom SMTP); the codes arrived during the test.
+- ✅ **A second account** was used for the test (2026-10-25).
 
 ### A4. Done when (✅ passed 2026-10-25: the flow works with several accounts; the only finding was the invite copy button being too small, fixed)
 All nine checklist steps pass with two real accounts and A1 is fixed. Then part A2.
@@ -48,15 +49,15 @@ What's left of the original roadmap (see [ROADMAP.md](ROADMAP.md) section 7). Co
 | # | Item | Who | Notes |
 |---|---|---|---|
 | 1 | ✅ **Launch Kit hand-off** (audit §3 A1-A4, done 2026-10-25, PR fix/launch-kit-handoff): save the suggested release date on accept/export; stage control and a way back to the song in the kit header; remap the kit after a relink (never show another song); "Render now" / "Open Settings" on the no-mixdown and no-export-folder checks | Claude | The real breaks between "finished" and "released". Smaller audit §3 items (B1-B12) only where they sit on the same path. |
-| 2 | **Delete a crew**; **owner actions on the website** (invite code, remove member) | Claude | Parked: the part A test (2026-10-25) didn't need them. |
+| 2 | **Delete a crew**; **owner actions on the website** | Claude | Moved to part C (C1): the part A test (2026-10-25) didn't need them. |
 | 3 | ✅ **Hook detection on real songs** | You | Works on real tracks (2026-10-25). |
-| 4 | **Windows installer on a real PC** | You or a crewmate | Planned in the coming days. |
-| 5 | **Ship 0.5.5** (includes the A2 Launch Kit fixes) | You run the release commands yourself | |
-| 6 | **The crew pitch** (Phase 0) | You, with Claude on the web (outside this repo) | What it solves for them, six months out, what you need from them. November milestone: the crew lives in the board. |
+| 4 | **Windows installer on a real PC** | You or a crewmate | **Later** (2026-10-27): the Mac build is the reference for now; both builds come from the same code and the same release run. |
+| 5 | ✅ **Ship the brief's fixes** | You | Shipped in 0.5.5-0.6.1 (the Launch Kit fixes went out with 0.6.0). |
+| 6 | **The crew pitch** (Phase 0) | You, with Claude on the web (outside this repo) | **In progress.** What it solves for them, six months out, what you need from them. November milestone: the crew lives in the board. |
 | 7 | ✅ **Git history scrub** (Phase 0) | Done 2026-10-25: rewritten with git-filter-repo, pushed by you, verified clean on GitHub (26 refs) | Old commits in the public repo still contain artist names and a personal email. Rewrites every commit and force-pushes `main`. |
 
 ### A2 done when
-The roadmap's section 7 has no open box except Phase 2.
+The roadmap's section 7 has no open box except Phase 2, Google Play and the mobile step 4. Left: the pitch and the Windows test.
 
 ---
 
@@ -88,17 +89,17 @@ Hivo helps you untangle your notes on each beat you pick, and the rest of the wr
 ### B3. Feature list (v1)
 
 **Phone (native)**
-1. **Your prods and songs** (user, 2026-10-25: all three): the Digger's **saved prods** (link and facts), the **beats** in the beats folders, and the **songs** (projects), as the desktop sends them at sync (names, BPM, key, stage). New ideas can be named on the phone.
-2. **Notes and lyrics per saved prod, beat or song:** plain text with section headers (`[Verse 1]`, `[Hook]`…), a syllable count per line, a bar estimate from the BPM. Works offline.
-3. **Ideas inbox:** punchlines, titles, concepts without a beat; attach them later.
-4. **Voice memos:** record a flow or melody, attached to a beat, a song or an idea.
-5. **Receive BandLab exports (and other sketches):** "Share to Hivo" from BandLab's export (mixdown or stems) through the system share sheet; it's attached to a beat or kept as a new sketch, and goes to the desktop at the next sync.
-6. **Sync status** and the paired desktop's name.
+1. ✅ **Your prods and songs** (user, 2026-10-25: all three): the Digger's **saved prods** (link and facts), the **beats** in the beats folders, and the **songs** (projects), as the desktop sends them at sync (names, BPM, key, stage). New ideas can be named on the phone (with the ideas inbox, step 4).
+2. ✅ **Notes and lyrics per saved prod, beat or song:** plain text with section headers (`[Verse 1]`, `[Hook]`…), a syllable count per line, a bar estimate from the BPM. Works offline.
+3. **Ideas inbox:** punchlines, titles, concepts without a beat; attach them later. (Step 4.)
+4. **Voice memos:** record a flow or melody, attached to a beat, a song or an idea. (Step 4.)
+5. **Receive BandLab exports (and other sketches):** "Share to Hivo" from BandLab's export (mixdown or stems) through the system share sheet; it's attached to a beat or kept as a new sketch, and goes to the desktop at the next sync. (Step 4.)
+6. ✅ **Sync status** and the paired desktop's name.
 
 **Desktop**
-1. **Notes on saved prods and beats** in the Digger (stored in the workspace, not in the lead files, so re-saving a prod never wipes them), and the song's existing notes in its drawer. When a beat becomes a song (a new FL project), its notes move with it. The desktop holds every note; the phone syncs to it.
-2. **Phone sync** in Settings: on/off, pairing QR code, paired phones, last sync.
-3. **Inbox:** what came from the phone and isn't attached yet (ideas, sketches), to assign to a beat or a song.
+1. ✅ **Notes on saved prods and beats** in the Digger (stored in the workspace, not in the lead files, so re-saving a prod never wipes them; side panel with preview), and the song's existing notes in its drawer. When a beat becomes a song (a new FL project), its notes move with it. The desktop holds every note; the phone syncs to it.
+2. ✅ **Phone sync** in Settings: on/off, pairing QR code, paired phones, last sync.
+3. **Inbox:** what came from the phone and isn't attached yet (ideas, sketches), to assign to a beat or a song. (Step 4.)
 4. **Session view (teleprompter):** a window kept on top of FL Studio, showing the lyrics large, section by section; arrow keys or auto-scroll at the BPM.
 5. **Sketch → FL:** a BandLab export from the phone becomes a sketch song in a project folder, exactly like "Import a BandLab export" (B-now), then "Continue in FL Studio".
 
@@ -109,13 +110,27 @@ Hivo helps you untangle your notes on each beat you pick, and the rest of the wr
 ### B4. Rough timeline (starts when part A is done)
 | Step | Work |
 |---|---|
-| 1 | Desktop: notes on saved prods and beats (songs already have notes). Order confirmed 2026-10-25: notes → sync → Android APK. |
-| 2 | ✅ **Built 2026-10-25, not shipped** (branch `feature/phone-sync-desktop`): Phone sync server (pairing QR, encrypted envelope with the pairing key instead of pinned TLS, replay protection, snapshot + notes), with tests. mDNS left out of v1. |
-| 3 | Phone (Expo): pairing, saved prods / beats / songs lists, notes editor offline, ideas, sync. **Android APK** to install for testing; iOS in the Simulator. |
-| 4 | BandLab share target on the phone, file transfer, the desktop's sketch filing and "Continue in FL" (from #143), voice memos; session view on desktop. |
-| 5 | Distribution (decided 2026-10-25): Android **APK on the website** + **Google Play** (AAB from the release workflow, uploaded by hand; internal testing first), both apps at **0.6.0**; privacy policy at `/privacy` for the Play listing. **iOS not now.** |
+| 1 | ✅ **Shipped in 0.6.0** (#148 for the side panel): desktop notes on saved prods and beats (songs already had notes). Order confirmed 2026-10-25: notes → sync → Android APK. |
+| 2 | ✅ **Shipped in 0.6.0** (#146): phone sync server (pairing QR, encrypted envelope with the pairing key instead of pinned TLS, replay protection, snapshot + notes), with tests. mDNS left out of v1. |
+| 3 | ✅ **Shipped in 0.6.0-0.6.1** (#147, #150): phone (Expo) pairing, saved prods / beats / songs lists, offline notes editor, sync. Android APK on the website; iOS in the Simulator. Pairing verified on a real Android phone (2026-10-27); the Android 11+ Play-services fix (#152) is on `main` and ships with 0.7.0. |
+| 4 | **Next, ships as 0.7.0:** BandLab share target on the phone, file transfer, the desktop's sketch filing and "Continue in FL" (from #143), voice memos, the ideas inbox on both sides; session view on desktop. |
+| 5 | Distribution (decided 2026-10-25): Android **APK on the website** ✅ + **Google Play** (AAB from the release workflow, uploaded by hand; internal testing first; **Play Console setup in progress**); privacy policy at `/en/privacy` and `/fr/privacy` ✅. **iOS not now.** |
 
-Step 1 is about a week; steps 2 to 4 are several weeks of part-time work. Native isn't a November promise.
+Steps 1 to 3 took about two days; step 4 is the largest (file transfer and the share target are new on both sides). Native isn't a November promise.
 
 ### B5. Done when
 You write a verse on the phone for a beat, walk into the studio, the phone syncs over Wi-Fi, and the session view shows it next to FL; a BandLab export becomes a new song folder with its stems; nothing touched Hivo's server.
+
+---
+
+## Part C: the backlog (added 2026-10-27, after part B step 4)
+
+Asked for on 2026-10-27. Not ordered yet: pick the order when step 4 ships. Each item says what it needs first.
+
+| # | Item | What it means | Needs first |
+|---|---|---|---|
+| C1 | **Delete a crew; owner actions on the website** | The owner can delete the crew (every member loses access, shared rows go, nothing local is touched). The website gets the owner's tools: invite code (make, copy, revoke), remove a member, rename, columns. | A security-definer function + pgTAP tests for the delete; the website reuses the desktop's calls. |
+| C2 | **Stems** | Export stems from the app (today they're detected and shown, not created). FL Studio only at first, like render. | A check of what FL's command line can export per mixer track. |
+| C3 | **Per-distributor export formats** | The Launch Kit writes the sheet in each distributor's own layout (fields, order, limits) instead of one universal sheet. | The list of distributors the crew actually uses. |
+| C4 | **The Pace tendency block** | How long your songs stay in each stage, and where they stall. | A log of stage changes (when each song entered each stage), kept in the workspace from now on: no history exists before it. |
+| C5 | **"In your prods" for every prod** | Today a saved prod is marked "In your prods" only when a WAV or MP3 with a matching name sits in a beats folder from Settings. It should also confirm prods in other audio formats (FLAC, AIFF, M4A, OGG) and prods saved in another folder (Downloads, a converter's folder), and say where the file was found, with "Move to beats folder" when it's outside. Hivo still never downloads. | Which extra folders to look in: a "Downloads" toggle plus folders picked in Settings (path scoping stays in Rust). |
