@@ -808,8 +808,8 @@ function SketchPanel({ project }: { project: ProjectInfo }) {
       // The drawer moves to the new .flp once this returns, so an open
       // failure is reported in the app's error banner.
       const done = await continueSketch(project.path, templatePath);
-      // What landed in the project (or why the audio isn't in it), in the banner.
-      if (done.note || done.clips === 0) useAppStore.setState({ startupError: t.continueNote(project.name, done.clips, done.note) });
+      // Only a real problem goes in the (red) banner: the audio not in the project.
+      if (done.clips === 0) useAppStore.setState({ startupError: t.continueNote(project.name, done.clips, done.note) });
       await openInFlStudio(done.flp).catch((e) =>
         useAppStore.setState({ startupError: t.continueOpenFailed(project.name, e instanceof Error ? e.message : String(e)) }),
       );
