@@ -12,6 +12,7 @@ import {
   progress,
   resetOut,
   retry,
+  sharedName,
   toSend,
   uploadItem,
   type OutItem,
@@ -160,6 +161,31 @@ describe("uploadItem", () => {
     desk.knobs.refuse = "";
     // The file was removed from the phone.
     expect((await uploadItem(io(desk, { b: data.b }), item(), () => {})).error).toBe("missing-file");
+  });
+});
+
+describe("sharedName", () => {
+  it("keeps names that already say what they are", () => {
+    expect(sharedName("Night Run.m4a", "audio/mp4")).toBe("Night Run.m4a");
+    expect(sharedName("stems.ZIP", null)).toBe("stems.ZIP");
+  });
+  it("names an M4A that came without its extension, or as .mp4", () => {
+    expect(sharedName("Night Run", "audio/mp4")).toBe("Night Run.m4a");
+    expect(sharedName("Night Run", "audio/x-m4a")).toBe("Night Run.m4a");
+    expect(sharedName("shared-1", "audio/mpeg; charset=binary")).toBe("shared-1.mp3");
+    expect(sharedName("Night Run v1.2", "audio/mp4")).toBe("Night Run v1.2.m4a");
+    expect(sharedName("Night Run.mp4", "audio/mp4")).toBe("Night Run.m4a");
+    expect(sharedName("Night Run.mp4", "video/mp4")).toBe("Night Run.m4a");
+    expect(sharedName("Night Run.mp4", null)).toBe("Night Run.m4a");
+  });
+  it("leaves what it can't tell, so it's refused with its type", () => {
+    expect(sharedName("notes.txt", "text/plain")).toBe("notes.txt");
+    expect(sharedName("clip.3gp", "audio/3gpp")).toBe("clip.3gp");
+    expect(sharedName("mystery", null)).toBe("mystery");
+  });
+  it("lets the fixed names through the share check", () => {
+    const files = [{ name: "Night Run", size: 10, mime: "audio/mp4" }].map((f) => ({ ...f, name: sharedName(f.name, f.mime) }));
+    expect(checkShared(files).ok.map((f) => f.name)).toEqual(["Night Run.m4a"]);
   });
 });
 

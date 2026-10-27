@@ -69,11 +69,11 @@ export function removeItemFiles(id: string): void {
   }
 }
 
-export type Picked = { uri: string; name: string; size: number | null };
+export type Picked = { uri: string; name: string; size: number | null; mime: string | null };
 
-/** The system file picker (audio and zips), several at once; [] when cancelled. */
+/** The system file picker, several at once; [] when cancelled. Audio, zips, and MPEG-4 / untyped files (an M4A is often saved as either): Hivo checks each one after. */
 export async function pickFiles(): Promise<Picked[]> {
-  const r = await File.pickFileAsync({ multipleFiles: true, mimeTypes: ["audio/*", "application/zip", "application/x-zip-compressed"] });
+  const r = await File.pickFileAsync({ multipleFiles: true, mimeTypes: ["audio/*", "video/mp4", "application/zip", "application/x-zip-compressed", "application/octet-stream"] });
   if (r.canceled || !r.result) return [];
-  return r.result.map((f) => ({ uri: f.uri, name: f.name, size: f.size ?? null }));
+  return r.result.map((f) => ({ uri: f.uri, name: f.name, size: f.size ?? null, mime: f.type || null }));
 }

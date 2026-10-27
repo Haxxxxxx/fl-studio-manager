@@ -59,7 +59,46 @@ export function allowed(type: OutType, name: string): boolean {
   return type === "memo" ? isAudio(name) : isAudio(name) || isZip(name);
 }
 
-export type Refused = { name: string; reason: "type" | "too-big" | "unreadable" | "space" };
+/** File types apps send with a share, and the extension they mean. */
+const MIME_EXT: Record<string, string> = {
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/m4a": "m4a",
+  "audio/aac": "aac",
+  "audio/x-aac": "aac",
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/wave": "wav",
+  "audio/vnd.wave": "wav",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/ogg": "ogg",
+  "audio/aiff": "aiff",
+  "audio/x-aiff": "aiff",
+  "application/zip": "zip",
+  "application/x-zip-compressed": "zip",
+};
+
+/**
+ * The name to keep for a shared file. Apps don't always name it the way
+ * the file is: BandLab's M4A can come without an extension, or as ".mp4"
+ * (the same MPEG-4 container). The type sent with the share fills the gap.
+ */
+export function sharedName(name: string, mime: string | null | undefined): string {
+  const ext = extOf(name);
+  if (AUDIO_EXTS.includes(ext) || ext === "zip") return name;
+  const type = (mime ?? "").toLowerCase().split(";")[0].trim();
+  // An MPEG-4 file shared as audio, or named .mp4 (audio-only exports): M4A.
+  if (ext === "mp4" && (type === "" || type.startsWith("audio/") || type === "video/mp4" || type === "application/octet-stream")) return name.replace(/\.mp4$/i, ".m4a");
+  const fromType = MIME_EXT[type];
+  if (!fromType) return name;
+  // No extension, or one that isn't one (".Night Run v2"): add the right one.
+  return `${name}.${fromType}`;
+}
+
+export type Refused ={ name: string; reason: "type" | "too-big" | "unreadable" | "space" };
 
 /** Which shared files can go: audio or zip, ≤ 500 MB each, at most 20. */
 export function checkShared<F extends { name: string; size: number | null }>(files: F[]): { ok: F[]; refused: Refused[]; dropped: number } {

@@ -7,13 +7,14 @@ import { adopt, SpaceError } from "../files";
 import { s } from "../inboxStrings";
 import { tr } from "../lib/i18n";
 import type { IdeaTarget } from "../lib/ideas";
-import { checkShared, isZip, type OutFile } from "../lib/outbox";
+import { checkShared, isZip, sharedName, type OutFile } from "../lib/outbox";
 import { addIdea, addOutItem, newOutId, requestSync, useApp } from "../store";
 import { T } from "../strings";
 import { C, FONT, RADIUS } from "../theme";
 
 export type IncomingShare = {
-  files: { uri: string; name: string; size: number | null }[];
+  /** `mime`: the type the sharing app sent (fills in a missing or odd extension). */
+  files: { uri: string; name: string; size: number | null; mime?: string | null }[];
   skipped: { name: string; reason: string }[];
   text: string | null;
   subject: string | null;
@@ -36,7 +37,10 @@ function nameFromFile(file: string): string {
 /** What another app shared with Hivo (or files picked here): send it to the computer. */
 export function ShareScreen({ share, onDone, onIdea }: { share: IncomingShare; onDone: () => void; onIdea: (id: string) => void }) {
   const paired = useApp((st) => st.pairing !== null);
-  const check = useMemo(() => checkShared(share.files), [share.files]);
+  // Names as the files are (BandLab's M4A may come without an extension, or as .mp4).
+  const files = useMemo(() => share.files.map((f) => ({ ...f, name: sharedName(f.name, f.mime) })), [share.files]);
+  const check = useMemo(() => checkShared(files), [files]);
+  const typeOf = (name: string) => files.find((f) => f.name === name)?.mime ?? null;
   const firstLine = (share.text ?? "").split("\n").find((l) => l.trim())?.trim() ?? "";
   const [title, setTitle] = useState(() => (share.subject?.trim() || (check.ok[0] ? nameFromFile(check.ok[0].name) : "") || "").slice(0, 200));
   const [target, setTarget] = useState<IdeaTarget | null>(null);
@@ -104,6 +108,7 @@ export function ShareScreen({ share, onDone, onIdea }: { share: IncomingShare; o
           {skipped.map((k, i) => (
             <Text key={`${k.name}-${i}`} style={styles.file}>
               {k.name} · {s().skip[k.reason] ?? k.reason}
+              {k.reason === "type" && typeOf(k.name) ? ` (${typeOf(k.name)})` : ""}
             </Text>
           ))}
         </View>
