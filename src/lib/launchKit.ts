@@ -355,6 +355,9 @@ export function isoDate(d: Date): string {
 }
 
 /** yyyy-mm-dd → local Date, or null. */
+/** A YYYY-MM-DD day as local midnight in ms (not UTC: `new Date("2026-11-06")` is UTC and can flip a day). */
+export const localDayMs = (value: string | undefined | null): number | null => (value ? (parseDate(value)?.getTime() ?? null) : null);
+
 export function parseDate(value: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!m) return null;

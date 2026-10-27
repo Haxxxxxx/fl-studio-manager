@@ -35,7 +35,7 @@ import { useVisibleSongs } from "./LibraryView";
 import { SongPicker } from "./SongPicker";
 import { ShortsPanel } from "./ShortsPanel";
 import { CoverConcepts } from "./CoverConcepts";
-import { StatusSelect, btn, btnPrimary } from "./ui";
+import { ConfirmButton, StatusSelect, btn, btnPrimary } from "./ui";
 import { canRenderInApp } from "../lib/daws";
 import { Card, CheckLine, FieldRow, KitStatus } from "../ui";
 
@@ -79,6 +79,9 @@ const T = dict(
     showFolder: "Show folder",
     useSuggestions: (n: number) => `Use all ${n} AI suggestion${plural(n)}`,
     resetConfirm: "Undo every change you made in this kit?",
+    clickAgain: "Sure? Click again",
+    exportAnyway: "Export anyway",
+    cancel: "Cancel",
     resetAll: "Reset all edits",
     blankConfirm: "Clear every pre-filled value so you can fill the kit in by hand? (Reset all edits brings them back.)",
     startBlank: "Start blank",
@@ -169,6 +172,9 @@ const T = dict(
     showFolder: "Ouvrir le dossier",
     useSuggestions: (n: number) => (n === 1 ? "Utiliser la suggestion de l'IA" : `Utiliser les ${n} suggestions de l'IA`),
     resetConfirm: "Annuler tous tes changements dans ce kit ?",
+    clickAgain: "Sûr ? Clique encore",
+    exportAnyway: "Exporter quand même",
+    cancel: "Annuler",
     resetAll: "Annuler toutes les modifs",
     blankConfirm: "Vider toutes les valeurs pré-remplies pour remplir le kit à la main ? (« Annuler toutes les modifs » les remet.)",
     startBlank: "Partir de zéro",
@@ -305,6 +311,9 @@ export function LaunchKitView() {
   const [guide, setGuide] = useState<{ guide: KitGuide; lang: KitLang; dir: string } | null>(null);
 
   const t = tr(T);
+  // "Export anyway" step when fields are still open (before any early return: hooks).
+  const [exportArmed, setExportArmed] = useState(false);
+
   if (!project) {
     if (unavailable && songs.length > 0) {
       return (
@@ -403,7 +412,12 @@ export function LaunchKitView() {
   async function handleExport() {
     if (!project) return;
     if (!settings.outputFolder) return setExportState({ status: "error", message: t.needExportFolder });
-    if (missing + ai.flagged > 0 && !window.confirm(t.exportConfirm(missing, ai.flagged))) return;
+    // Open items: ask once, inline (a second press of Export anyway goes on).
+    if (missing + ai.flagged > 0 && !exportArmed) {
+      setExportArmed(true);
+      return;
+    }
+    setExportArmed(false);
     keepReleaseDate();
     const title = byId("title").value || project.name;
     setExportState({ status: "running" });
@@ -478,6 +492,18 @@ export function LaunchKitView() {
           </div>
         </header>
 
+        {exportArmed && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-warn/40 bg-panel px-4 py-2.5 text-sm text-cream" role="alertdialog">
+            <span className="min-w-0 flex-1">{t.exportConfirm(missing, ai.flagged)}</span>
+            <button onClick={() => setExportArmed(false)} className="text-body hover:text-cream">
+              {t.cancel}
+            </button>
+            <button onClick={handleExport} className={btnPrimary}>
+              {t.exportAnyway}
+            </button>
+          </div>
+        )}
+
         {exportState.status === "done" && (
           <div className="flex items-center gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200">
             <CheckCircle2 size={16} /> {t.exported(missing + warnings)}
@@ -524,22 +550,18 @@ export function LaunchKitView() {
             </button>
           )}
           {Object.keys(edits).length > 0 && (
-            <button
-              onClick={() => window.confirm(t.resetConfirm) && setKitEdits(project.path, null)}
-              className="hover:text-cream"
-            >
-              {t.resetAll}
-            </button>
+            <span title={t.resetConfirm}>
+              <ConfirmButton label={t.resetAll} confirmLabel={t.clickAgain} onConfirm={() => setKitEdits(project.path, null)} className="hover:text-cream" />
+            </span>
           )}
-          <button
-            onClick={() =>
-              window.confirm(t.blankConfirm) &&
-              setKitEdits(project.path, Object.fromEntries(fields.filter((f) => f.kind !== "multiline").map((f) => [f.id, ""])))
-            }
-            className="hover:text-cream"
-          >
-            {t.startBlank}
-          </button>
+          <span title={t.blankConfirm}>
+            <ConfirmButton
+              label={t.startBlank}
+              confirmLabel={t.clickAgain}
+              onConfirm={() => setKitEdits(project.path, Object.fromEntries(fields.filter((f) => f.kind !== "multiline").map((f) => [f.id, ""])))}
+              className="hover:text-cream"
+            />
+          </span>
         </div>
 
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-5">

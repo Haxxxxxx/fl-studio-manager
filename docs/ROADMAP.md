@@ -147,7 +147,7 @@
 - **The crew pitch (Phase 0).** Being written with Claude on the web, outside this repo: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
 - **Google Play.** The app exists in the Play Console; next is app signing with your own key, an internal testing release with the AAB, and the App content forms.
 - **Phase B step 4** (built, ships as 0.7.0, waiting for your test): BandLab exports shared to Hivo on the phone, sketch → FL, voice memos, ideas inbox on both sides, the session view.
-- **Launch Kit, the rest of audit §3** (A5-A6 and the B items: readiness per release, two-dates confusion, modal and drawer friction): only where they block the path to release.
+- ✅ **Launch Kit, the rest of audit §3** (A5-A6, B1-B13: readiness per release, undated releases, modal stack, drawer kept across views, demo strip), closed 2026-10-27.
 
 ### Later, on purpose
 
@@ -230,6 +230,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] Export a distributor-ready kit (one universal format; per-distributor formats not built)
 - [x] **Hand-off into Release** (date saved on accept/export, stage control and "Move to Release" in the kit, relink-safe; audit §3 A1-A4)
 - [x] Tested on real songs (hook detection works, 2026-10-25)
+- [x] The rest of audit §3 (readiness, undated releases, modals, drawer, demo mode; 2026-10-27)
 
 **Phase 1c: design identity**
 - [x] A visual identity for the crew (System 02, Hivo brand)

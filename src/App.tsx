@@ -54,6 +54,8 @@ const T = dict(
     copied: "Copied",
     updateNow: "Update and restart",
     retry: "Retry",
+    sampleData: "Sample data: nothing is saved and export is off. Link a real folder anytime.",
+    exitSample: "Exit sample data",
     later: "Later",
     notSaving: "Changes aren't being saved",
   },
@@ -80,6 +82,8 @@ const T = dict(
     copied: "Copié",
     updateNow: "Mettre à jour et redémarrer",
     retry: "Réessayer",
+    sampleData: "Données d'exemple : rien n'est enregistré et l'export est coupé. Lie un vrai dossier quand tu veux.",
+    exitSample: "Quitter les données d'exemple",
     later: "Plus tard",
     notSaving: "Les modifications ne sont pas enregistrées",
   },
@@ -182,6 +186,22 @@ function LocationNotice() {
 
 /** Stays up while the workspace can't be read or saved (the red banner
  * above is one-off and dismissable; this one isn't). */
+/** Sample data on screen: says so on every page, with the way out. */
+function DemoStrip() {
+  const demoMode = useAppStore((s) => s.demoMode);
+  const exitDemoMode = useAppStore((s) => s.exitDemoMode);
+  if (!demoMode) return null;
+  return (
+    <div role="status" className="flex shrink-0 items-center gap-3 border-b border-hot/40 bg-hot/10 px-4 py-1.5 text-xs text-cream">
+      <StatusDot color="var(--color-hot)" size={6} />
+      <span className="flex-1">{tr(T).sampleData}</span>
+      <button onClick={() => void exitDemoMode()} className="rounded border border-rule-strong px-2 py-0.5 text-body hover:bg-raised hover:text-cream">
+        {tr(T).exitSample}
+      </button>
+    </div>
+  );
+}
+
 function NotSavingStrip() {
   const writable = useAppStore((s) => s.workspaceWritable);
   const saveError = useAppStore((s) => s.saveError);
@@ -204,7 +224,7 @@ function RelinkNotice() {
   const dismiss = useAppStore((s) => s.dismissRelinked);
   if (!relinked.length) return null;
   return (
-    <div role="status" className="absolute bottom-3 right-3 z-40 max-w-sm rounded-md border border-rule bg-raised px-4 py-3 text-xs text-body shadow-xl">
+    <div role="status" className="max-w-sm rounded-md border border-rule bg-raised px-4 py-3 text-xs text-body shadow-xl">
       <div className="mb-1.5 flex items-center justify-between gap-3">
         <span className="font-medium text-cream">
           {tr(T).kept(relinked.length)}
@@ -296,6 +316,7 @@ export default function App() {
           with its own overflow, so it still scrolls). */}
       <div className="flex min-w-0 flex-1 flex-col">
         <UpdateNotice />
+        <DemoStrip />
         <NotSavingStrip />
         <LocationNotice />
         {view === "dashboard" && <Dashboard />}
@@ -313,11 +334,13 @@ export default function App() {
         {view === "crewMembers" && <CrewMembersView />}
         {view === "crewSettings" && <CrewSettingsView />}
       </div>
-      {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
-      {view !== "settings" && view !== "launch" && <ProjectDrawer key={detailPath ?? ""} />}
+      {/* Keyed so per-song drawer state (messages, inputs) resets on switch. Settings and the
+          Launch Kit only hide it, so its tab and edits are still there on the way back. */}
+      <div className="contents" hidden={view === "settings" || view === "launch"}>
+        <ProjectDrawer key={detailPath ?? ""} />
+      </div>
       <NewProjectModal />
       <FeedbackModal />
-      <RenderPanel />
       <PackagePanel />
       <PackageConfirm />
       {!isTauri() && (
@@ -326,7 +349,11 @@ export default function App() {
           <code className="rounded bg-black/30 px-1">npm run tauri dev</code> {tr(T).browserAfter}
         </div>
       )}
-      <RelinkNotice />
+      {/* Bottom-right notices share one column so they never overlap. */}
+      <div className="pointer-events-none absolute bottom-3 right-3 z-40 flex flex-col items-end gap-2 [&>*]:pointer-events-auto">
+        <RelinkNotice />
+        <RenderPanel />
+      </div>
       {(startupError || saveError) && (
         <div role="alert" className="absolute left-1/2 top-3 z-40 flex max-w-xl -translate-x-1/2 items-start gap-3 rounded-md border border-red-500/40 bg-[#2a1215] px-4 py-2 text-xs text-red-200 shadow-xl">
           <span>{saveError ?? startupError}</span>

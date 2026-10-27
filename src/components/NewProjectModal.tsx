@@ -148,7 +148,7 @@ export function NewProjectModal() {
   const L = tr(T);
 
   return (
-    <Modal title={L.title} onClose={close}>
+    <Modal title={L.title} onClose={busy ? () => {} : close}>
       <form
         onSubmit={(e) => {
           e.preventDefault();

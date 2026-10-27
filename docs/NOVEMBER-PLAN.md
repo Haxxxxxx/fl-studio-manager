@@ -48,7 +48,7 @@ What's left of the original roadmap (see [ROADMAP.md](ROADMAP.md) section 7). Co
 
 | # | Item | Who | Notes |
 |---|---|---|---|
-| 1 | ✅ **Launch Kit hand-off** (audit §3 A1-A4, done 2026-10-25, PR fix/launch-kit-handoff): save the suggested release date on accept/export; stage control and a way back to the song in the kit header; remap the kit after a relink (never show another song); "Render now" / "Open Settings" on the no-mixdown and no-export-folder checks | Claude | The real breaks between "finished" and "released". Smaller audit §3 items (B1-B12) only where they sit on the same path. |
+| 1 | ✅ **Launch Kit hand-off** (audit §3 A1-A4, done 2026-10-25, PR fix/launch-kit-handoff): save the suggested release date on accept/export; stage control and a way back to the song in the kit header; remap the kit after a relink (never show another song); "Render now" / "Open Settings" on the no-mixdown and no-export-folder checks | Claude | The real breaks between "finished" and "released". The rest of §3 (A5-A6, B1-B13) closed 2026-10-27 (PR fix/launch-kit-loose-ends). |
 | 2 | **Delete a crew**; **owner actions on the website** | Claude | Moved to part C (C1): the part A test (2026-10-25) didn't need them. |
 | 3 | ✅ **Hook detection on real songs** | You | Works on real tracks (2026-10-25). |
 | 4 | **Windows installer on a real PC** | You or a crewmate | **Later** (2026-10-27): the Mac build is the reference for now; both builds come from the same code and the same release run. |

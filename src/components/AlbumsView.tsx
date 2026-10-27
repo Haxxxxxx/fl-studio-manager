@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, Disc3, Download, Package, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Disc3, Download, Package, Plus, Rocket, Search, Trash2, X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatRelative } from "../lib/format";
+import { localDayMs } from "../lib/launchKit";
 import { ALBUM_COLORS, STATUSES, UNSORTED, formatBpm, isFinished, renderFreshness, statusInfo } from "../lib/songs";
 import type { Album, AlbumKind, ProjectInfo, Workspace } from "../types";
 import { ConfirmButton, Modal, StatusDot, StatusSelect, btn, btnPrimary, input, sectionLabel } from "./ui";
@@ -38,6 +39,7 @@ const T = dict(
     noTracks: "No tracks yet — add songs from your library.",
     missing: (file: string) => `Missing: ${file} (moved or renamed?)`,
     removeTrack: "Remove from release",
+    openKit: "Open its Launch Kit",
     notes: "Notes",
     notesPlaceholder: "Concept, artwork ideas, features, release plan…",
     deleteRelease: "Delete release",
@@ -75,6 +77,7 @@ const T = dict(
     noTracks: "Pas encore de morceaux — ajoute des sons depuis ta bibliothèque.",
     missing: (file: string) => `Introuvable : ${file} (déplacé ou renommé ?)`,
     removeTrack: "Retirer de la sortie",
+    openKit: "Ouvrir son Launch Kit",
     notes: "Notes",
     notesPlaceholder: "Concept, idées de visuels, feats, plan de sortie…",
     deleteRelease: "Supprimer la sortie",
@@ -190,7 +193,7 @@ function AlbumCard({
       </div>
       <div className="mt-0.5 text-xs text-engrave">
         {tr(T).cardLine(tracks.length, done)}
-        {album.releaseDate && ` · ${formatRelative(new Date(album.releaseDate).getTime())}`}
+        {localDayMs(album.releaseDate) !== null && ` · ${formatRelative(localDayMs(album.releaseDate) as number)}`}
       </div>
       <div className="mt-2">
         <ProgressBar trackPaths={album.trackPaths} workspace={workspace} height={6} />
@@ -259,7 +262,7 @@ function AlbumDetail({ album }: { album: Album }) {
   const done = album.trackPaths.filter((p) => isFinished(workspace.songs[p]?.status)).length;
   const mixed = present.filter((t) => renderFreshness(t) === "fresh").length;
   const bpms = present.map((t) => t.tempoBpm).filter((b): b is number => b != null);
-  const releaseMs = album.releaseDate ? new Date(album.releaseDate).getTime() : null;
+  const releaseMs = localDayMs(album.releaseDate);
   const t = tr(T);
 
   async function exportAlbum() {
@@ -430,6 +433,14 @@ function AlbumDetail({ album }: { album: Album }) {
                     <span className="w-20">
                       <MixdownBadge project={t} />
                     </span>
+                    <button
+                      onClick={() => useAppStore.getState().openLaunchKit(t.path)}
+                      title={tr(T).openKit}
+                      aria-label={tr(T).openKit}
+                      className="text-body opacity-0 hover:text-cream group-hover:opacity-100"
+                    >
+                      <Rocket size={13} />
+                    </button>
                   </>
                 ) : (
                   <span className="flex-1 truncate text-engrave" title={path}>

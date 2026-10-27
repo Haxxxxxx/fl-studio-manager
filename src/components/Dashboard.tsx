@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatBytes, formatRelative } from "../lib/format";
+import { localDayMs } from "../lib/launchKit";
 import { openInFlStudio, revealInFileManager } from "../lib/tauri";
 import { isSketch } from "../lib/daws";
 import {
@@ -92,6 +93,7 @@ const T = dict(
     finished: "Finished",
     releases: "Releases",
     pickUp: "Pick up where you left off",
+    kitToDo: "Launch Kit to do",
     open: "Open",
     studioActivity: "Studio activity — saves per week, last 12 months",
     studioHeatmap: "Studio activity — saves per day, last 12 months",
@@ -185,6 +187,7 @@ const T = dict(
     finished: "Finis",
     releases: "Sorties",
     pickUp: "Reprends là où tu t'es arrêté",
+    kitToDo: "Launch Kit à faire",
     open: "Ouvrir",
     studioActivity: "Activité studio — sauvegardes par semaine, 12 derniers mois",
     studioHeatmap: "Activité studio — sauvegardes par jour, 12 derniers mois",
@@ -270,7 +273,6 @@ function MyDashboard({ editing }: { editing: boolean }) {
   const workspace = useAppStore((s) => s.workspace);
   const demoMode = useAppStore((s) => s.demoMode);
   const loadDemoData = useAppStore((s) => s.loadDemoData);
-  const exitDemoMode = useAppStore((s) => s.exitDemoMode);
   const setView = useAppStore((s) => s.setView);
   const openDetail = useAppStore((s) => s.openDetail);
   const openAlbum = useAppStore((s) => s.openAlbum);
@@ -315,8 +317,14 @@ function MyDashboard({ editing }: { editing: boolean }) {
   }).length;
   const finished = pipeline.filter((s) => isFinished(s.id)).reduce((t, s) => t + s.count, 0);
 
+  // Songs still being made first; then songs in Prep whose Launch Kit isn't
+  // accepted yet (the second half of the journey), so the block never goes empty.
   const continueWith = useMemo(
-    () => songs.filter((p) => !isFinished(statusOf(p.path))).slice(0, 4),
+    () =>
+      [
+        ...songs.filter((p) => !isFinished(statusOf(p.path))).map((p) => ({ p, kit: false })),
+        ...songs.filter((p) => statusOf(p.path) === "prep" && !workspace.songs[p.path]?.launchKit?.acceptedAtMs).map((p) => ({ p, kit: true })),
+      ].slice(0, 4),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [songs, workspace.songs],
   );
@@ -401,10 +409,19 @@ function MyDashboard({ editing }: { editing: boolean }) {
           <div className="flex flex-col gap-2">
             <div className="flex justify-end">{control}</div>
             <div className="grid grid-cols-4 gap-3">
-              <StatTile icon={<Music2 size={15} />} label={t.songs} value={songs.length} />
-              <StatTile icon={<Sparkles size={15} />} label={t.inProgress} value={inProgress} />
-              <StatTile icon={<Trophy size={15} />} label={t.finished} value={finished} />
-              <StatTile icon={<Disc3 size={15} />} label={t.releases} value={workspace.albums.length} />
+              {/* Each figure opens where it's counted. */}
+              <TileLink onClick={() => (useAppStore.getState().resetLibraryFilters(), setView("library"))}>
+                <StatTile icon={<Music2 size={15} />} label={t.songs} value={songs.length} />
+              </TileLink>
+              <TileLink onClick={() => setView("pipeline")}>
+                <StatTile icon={<Sparkles size={15} />} label={t.inProgress} value={inProgress} />
+              </TileLink>
+              <TileLink onClick={() => setView("pipeline")}>
+                <StatTile icon={<Trophy size={15} />} label={t.finished} value={finished} />
+              </TileLink>
+              <TileLink onClick={() => useAppStore.getState().openAlbum(null)}>
+                <StatTile icon={<Disc3 size={15} />} label={t.releases} value={workspace.albums.length} />
+              </TileLink>
             </div>
           </div>
         );
@@ -413,17 +430,18 @@ function MyDashboard({ editing }: { editing: boolean }) {
         return (
           <Card title={t.pickUp} className="h-full">
             <div className="grid grid-cols-4 gap-2">
-              {continueWith.map((p) => {
+              {continueWith.map(({ p, kit }) => {
                 const s = statusInfo(statusOf(p.path));
                 return (
                   <div
                     key={p.path}
-                    onClick={() => openDetail(p.path)}
+                    onClick={() => (kit ? useAppStore.getState().openLaunchKit(p.path) : openDetail(p.path))}
                     className="group cursor-pointer rounded-lg border border-rule bg-raised p-3 hover:border-rule-strong"
                   >
                     <div className="truncate text-sm font-medium text-cream">{p.name}</div>
                     <div className="mt-1 flex items-center gap-1.5 text-[11px] text-body">
                       <StatusDot color={s.color} size={6} /> {s.label}
+                      {kit && <span className="text-engrave">· {t.kitToDo}</span>}
                     </div>
                     <div className="mt-2 flex items-center justify-between text-[11px] text-engrave">
                       <span>{formatRelative(lastSaveMs(p))}</span>
@@ -572,7 +590,7 @@ function MyDashboard({ editing }: { editing: boolean }) {
                       <span className="block truncate text-sm text-cream">{a.title}</span>
                       <span className="block text-[11px] text-engrave">
                         {t.done(done, a.trackPaths.length)}
-                        {a.releaseDate && ` · ${formatRelative(new Date(a.releaseDate).getTime())}`}
+                        {localDayMs(a.releaseDate) !== null && ` · ${formatRelative(localDayMs(a.releaseDate) as number)}`}
                       </span>
                     </span>
                     <span className="flex-1">
@@ -598,14 +616,6 @@ function MyDashboard({ editing }: { editing: boolean }) {
   return (
     <div className="min-w-0 flex-1 overflow-auto px-8 py-7">
       <div className="mx-auto flex max-w-5xl flex-col gap-5">
-        {demoMode && (
-          <div className="flex items-center justify-between rounded-md border border-orange-400/30 bg-orange-500/10 px-4 py-2.5 text-sm text-orange-200">
-            <span>{t.showingSample}</span>
-            <button onClick={exitDemoMode} className="rounded border border-orange-400/40 px-2.5 py-1 text-xs font-medium hover:bg-orange-500/20">
-              {t.exitDemo}
-            </button>
-          </div>
-        )}
 
         <div className="grid grid-cols-12 gap-x-4 gap-y-5">
           {shown.map((id, i) => (
@@ -953,7 +963,7 @@ function PitchesCard() {
         {followUps.length === 0 ? (
           <div className="text-xs text-engrave">{t.nothingWaiting}</div>
         ) : (
-          followUps.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={formatRelative(new Date(x.pitch.date).getTime())} />)
+          followUps.slice(0, 6).map((x) => <Row key={x.pitch.id} x={x} right={localDayMs(x.pitch.date) !== null ? formatRelative(localDayMs(x.pitch.date) as number) : ""} />)
         )}
       </Card>
       <Card title={t.wins(wins.length)}>
@@ -1266,5 +1276,14 @@ function CrewDashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+/** A dashboard figure that opens the list it counts. */
+function TileLink({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className="rounded text-left transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-cream">
+      {children}
+    </button>
   );
 }

@@ -173,13 +173,13 @@ function columns(): { key: SortKey | null; label: string; className?: string }[]
   ];
 }
 
-/** Songs shown in the library, board and stats. Templates only when their
- * toggle is on; archived songs never — except in the library's Archived
- * view (`followArchivedToggle`), which shows only them. */
+/** Songs shown in the library, board and stats. Templates and archived songs
+ * only in the Library table (`followArchivedToggle`), when their toggles are
+ * on: never in the Dashboard, the stats, the pipeline or the kit picker. */
 export function useVisibleSongs(followArchivedToggle = false): ProjectInfo[] {
   const projects = useAppStore((s) => s.projects);
   const songs = useAppStore((s) => s.workspace.songs);
-  const showTemplates = useAppStore((s) => s.showTemplates);
+  const showTemplates = useAppStore((s) => s.showTemplates) && followArchivedToggle;
   const showArchived = useAppStore((s) => s.showArchived) && followArchivedToggle;
   return useMemo(
     () =>
@@ -489,11 +489,6 @@ export function LibraryView() {
         </div>
       )}
 
-      {demoMode && (
-        <div className="mx-6 mt-3 rounded-md border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-200">
-          {t.demoBanner}
-        </div>
-      )}
       {error && (
         <div className="mx-6 mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
           {error}
