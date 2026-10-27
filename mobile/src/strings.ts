@@ -67,6 +67,9 @@ export const T = dict(
     // Scanner
     scanFallback: "Google's scanner didn't start, so the camera opens here instead. Hold the code inside the square.",
     scanTip: "Scanner not working? Open your phone's camera app on the QR code: it opens Hivo and pairs.",
+    scanTimeoutHint: (s: number) => `Nothing read after ${s} seconds? The phone's camera app opens instead.`,
+    useCameraApp: "Use the phone's camera app",
+    cameraAppOpened: "Point the camera at the QR code on the computer, then tap the link it shows: Hivo opens and pairs.",
     // Stages
     stage: { creation: "Creation", production: "Production", prep: "Prep", release: "Release", promotion: "Promotion" } as Record<string, string>,
   },
@@ -126,6 +129,9 @@ export const T = dict(
     openPlay: `Mises à jour${NB}: ouvrir Google Play`,
     scanFallback: "Le scanner de Google n'a pas démarré, la caméra s'ouvre ici à la place. Garde le code dans le carré.",
     scanTip: `Le scanner ne marche pas${NB}? Ouvre l'appareil photo du téléphone sur le QR code${NB}: il ouvre Hivo et l'associe.`,
+    scanTimeoutHint: (s: number) => `Rien de lu après ${s} secondes${NB}? L'appareil photo du téléphone s'ouvre à la place.`,
+    useCameraApp: "Utiliser l'appareil photo du téléphone",
+    cameraAppOpened: `Vise le QR code sur l'ordi, puis touche le lien qui s'affiche${NB}: Hivo s'ouvre et s'associe.`,
     stage: { creation: "Création", production: "Production", prep: "Prépa", release: "Sortie", promotion: "Promo" } as Record<string, string>,
   },
 );

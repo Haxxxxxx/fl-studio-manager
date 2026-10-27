@@ -1,11 +1,11 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button, Engrave } from "../components/ui";
 import { UpdateCheck } from "../components/UpdateCheck";
 import { tr } from "../lib/i18n";
 import { parsePairingUrl } from "../lib/pairing";
-import { scannerFailure } from "../lib/scanner";
+import { CAMERA_APP_INTENT, SCAN_TIMEOUT_MS, scannerFailure } from "../lib/scanner";
 import { pair, sync } from "../store";
 import { pairErrorText, T } from "../strings";
 import { C, FONT, RADIUS } from "../theme";
@@ -78,6 +78,30 @@ export function PairScreen() {
     setScanning(true);
   }
 
+  // The phone's own camera app reads the QR and opens the hivo:// link,
+  // which pairs (App.tsx). Android only: iOS has no intent for it.
+  async function openCameraApp() {
+    setScanning(false);
+    setError(null);
+    try {
+      await Linking.sendIntent(CAMERA_APP_INTENT);
+      setNotice(t.cameraAppOpened);
+    } catch (e) {
+      console.warn("couldn't open the camera app:", e instanceof Error ? e.message : String(e));
+      setNotice(t.scanTip);
+    }
+  }
+
+  // Nothing read after SCAN_TIMEOUT_MS: hand over to the camera app.
+  useEffect(() => {
+    if (!scanning || Platform.OS !== "android") return;
+    const timer = setTimeout(() => {
+      if (!handled.current) void openCameraApp();
+    }, SCAN_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanning]);
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.wrap} keyboardShouldPersistTaps="handled">
@@ -109,6 +133,10 @@ export function PairScreen() {
         {busy ? <Text style={styles.status}>{t.codeRead}</Text> : null}
         {notice && !busy ? <Text style={styles.status}>{notice}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {scanning && Platform.OS === "android" ? <Text style={styles.tip}>{t.scanTimeoutHint(SCAN_TIMEOUT_MS / 1000)}</Text> : null}
+        {Platform.OS === "android" ? (
+          <Button label={t.useCameraApp} variant="secondary" onPress={() => void openCameraApp()} style={{ marginTop: 10 }} />
+        ) : null}
         <Text style={styles.tip}>{t.scanTip}</Text>
 
         <Engrave style={{ marginTop: 28, marginBottom: 6 }}>{t.pasteLabel}</Engrave>

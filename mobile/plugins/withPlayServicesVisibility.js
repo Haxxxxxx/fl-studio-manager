@@ -7,9 +7,15 @@
 //   that have it (seen on a real phone, 2026-10-25).
 // - com.google.mlkit.vision.DEPENDENCIES = barcode_ui: Play services fetches
 //   the scanner module at install time instead of on the first scan.
+// - an <intent> query for the camera app (STILL_IMAGE_CAMERA): when nothing
+//   is read for a while, the pairing screen opens the phone's own camera
+//   app (it reads the QR and opens the hivo:// link), and React Native's
+//   Linking.sendIntent checks resolveActivity first, which Android 11+ also
+//   filters.
 const { withAndroidManifest } = require("expo/config-plugins");
 
 const PACKAGES = ["com.android.vending", "com.google.android.gms"];
+const INTENTS = ["android.media.action.STILL_IMAGE_CAMERA"];
 const MLKIT_KEY = "com.google.mlkit.vision.DEPENDENCIES";
 
 function addQueries(manifest) {
@@ -19,6 +25,11 @@ function addQueries(manifest) {
   q.package = q.package ?? [];
   for (const name of PACKAGES) {
     if (!q.package.some((p) => p.$?.["android:name"] === name)) q.package.push({ $: { "android:name": name } });
+  }
+  q.intent = q.intent ?? [];
+  for (const action of INTENTS) {
+    const has = q.intent.some((i) => (i.action ?? []).some((a) => a.$?.["android:name"] === action));
+    if (!has) q.intent.push({ action: [{ $: { "android:name": action } }] });
   }
   return manifest;
 }

@@ -3,6 +3,12 @@
 // Services is not available", whatever the real cause, so every failure but
 // a cancel falls back to the in-app camera instead of a dead end.
 
+/** How long the in-app camera tries before handing over to the camera app. */
+export const SCAN_TIMEOUT_MS = 12_000;
+
+/** Opens the phone's camera app; declared in <queries> by plugins/withPlayServicesVisibility.js. */
+export const CAMERA_APP_INTENT = "android.media.action.STILL_IMAGE_CAMERA";
+
 export type ScannerFailure = "cancelled" | "fallback";
 
 export function scannerFailure(e: unknown): ScannerFailure {
