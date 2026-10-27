@@ -45,7 +45,7 @@ const T = dict(
     testRenderHint:
       "FL Studio's command-line renderer is a community-verified, lightly documented feature. Run one test render on a real project before trusting a big batch export.",
     macOnly:
-      "Only verified on Windows so far. If FL Studio opens normally instead of rendering, quit it — the render gives up after 15 minutes.",
+      "On a Mac, FL Studio opens its window while it renders and quits by itself when the file is written (a few minutes for a long song). Quit FL Studio before starting. If it stays open without rendering, quit it: the render gives up after 15 minutes.",
     rendering: "Rendering...",
     renderRecent: "Render most recent project",
     demoDisabled: "Disabled while viewing sample data — link a real folder first.",
@@ -122,7 +122,7 @@ const T = dict(
     testRenderHint:
       "Le rendu en ligne de commande de FL Studio est une fonction validée par la communauté mais peu documentée. Fais un rendu test sur un vrai projet avant de te fier à un gros export groupé.",
     macOnly:
-      "Vérifié seulement sur Windows pour l'instant. Si FL Studio s'ouvre normalement au lieu de faire le rendu, quitte-le — le rendu abandonne au bout de 15 minutes.",
+      "Sur Mac, FL Studio ouvre sa fenêtre pendant le rendu et se ferme tout seul quand le fichier est écrit (quelques minutes pour un long morceau). Quitte FL Studio avant de lancer. S'il reste ouvert sans faire le rendu, quitte-le : le rendu abandonne au bout de 15 minutes.",
     rendering: "Rendu en cours...",
     renderRecent: "Faire le rendu du projet le plus récent",
     demoDisabled: "Désactivé avec les données d'exemple — relie d'abord un vrai dossier.",
