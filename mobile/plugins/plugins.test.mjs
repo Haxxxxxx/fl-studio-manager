@@ -13,6 +13,13 @@ describe("withPlayServicesVisibility", () => {
     const names = m.manifest.queries[0].package.map((p) => p.$["android:name"]);
     expect(names).toEqual(["com.android.vending", "com.google.android.gms"]);
   });
+  it("can find the camera app, once, keeping other intent queries", () => {
+    const m = base();
+    m.manifest.queries = [{ intent: [{ action: [{ $: { "android:name": "android.intent.action.VIEW" } }] }] }];
+    const out = addQueries(addQueries(m));
+    const actions = out.manifest.queries[0].intent.map((i) => i.action[0].$["android:name"]);
+    expect(actions).toEqual(["android.intent.action.VIEW", "android.media.action.STILL_IMAGE_CAMERA"]);
+  });
   it("asks Play services to fetch the barcode UI module at install, keeping other values", () => {
     const m = base();
     m.manifest.application[0]["meta-data"].push({ $: { "android:name": "com.google.mlkit.vision.DEPENDENCIES", "android:value": "ocr" } });

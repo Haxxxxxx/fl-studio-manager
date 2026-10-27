@@ -4,7 +4,7 @@
 // policy requires. Nothing is sent but a plain GET of a public file.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
-import { checkDue, MANIFEST_URL, pickUpdate, type Update } from "./lib/update";
+import { checkDue, manualCheck, MANIFEST_URL, pickUpdate, type ManualCheck, type Update } from "./lib/update";
 import { appVersion } from "./store";
 
 const LAST_CHECK_KEY = "hivo.update.lastCheck.v1";
@@ -15,32 +15,48 @@ export function checksForUpdates(): boolean {
   return Constants.expoConfig?.extra?.distribution !== "play";
 }
 
+/**
+ * A plain GET of the public manifest; never throws. An HTTP error (404
+ * before the first phone release) is a real answer: `manifest: null`.
+ * Only a network failure or a timeout is `ok: false`.
+ */
+async function fetchManifest(): Promise<{ ok: true; manifest: unknown } | { ok: false; error: string }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(MANIFEST_URL, { signal: ctrl.signal, cache: "no-store" });
+    return { ok: true, manifest: res.ok ? await res.json() : null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** The update to offer now, or null (Play build, checked today, offline, nothing newer, dismissed). */
 export async function checkForUpdate(now = Date.now()): Promise<Update | null> {
   if (!checksForUpdates()) return null;
   const [last, dismissed] = await Promise.all([AsyncStorage.getItem(LAST_CHECK_KEY), AsyncStorage.getItem(DISMISSED_KEY)]);
   if (!checkDue(last === null ? null : Number(last), now)) return null;
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  let manifest: unknown;
-  try {
-    const res = await fetch(MANIFEST_URL, { signal: ctrl.signal, cache: "no-store" });
-    // 404 before the first phone release: a real answer, counts as checked.
-    if (!res.ok) {
-      await AsyncStorage.setItem(LAST_CHECK_KEY, String(now));
-      return null;
-    }
-    manifest = await res.json();
-  } catch (e) {
+  const got = await fetchManifest();
+  if (!got.ok) {
     // Offline or timed out: try again on the next launch, say nothing.
-    console.warn("update check failed:", e instanceof Error ? e.message : String(e));
+    console.warn("update check failed:", got.error);
     return null;
-  } finally {
-    clearTimeout(timer);
   }
   await AsyncStorage.setItem(LAST_CHECK_KEY, String(now));
-  return pickUpdate(manifest, appVersion(), dismissed);
+  return pickUpdate(got.manifest, appVersion(), dismissed);
+}
+
+/**
+ * "Check for updates" (Settings and the pairing screen, website builds):
+ * always asks, and offers a version even if "Later" was tapped on it.
+ */
+export async function checkForUpdateNow(now = Date.now()): Promise<ManualCheck> {
+  const got = await fetchManifest();
+  if (!got.ok) return { kind: "offline" };
+  await AsyncStorage.setItem(LAST_CHECK_KEY, String(now));
+  return manualCheck(got.manifest, appVersion());
 }
 
 /** "Later": this version isn't offered again; a newer one will be. */

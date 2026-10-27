@@ -1,5 +1,6 @@
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button, Engrave } from "../components/ui";
+import { UpdateCheck } from "../components/UpdateCheck";
 import { tr } from "../lib/i18n";
 import { appVersion, phoneName, unpair, useApp } from "../store";
 import { T } from "../strings";
@@ -32,6 +33,8 @@ export function SettingsScreen({ onBack }: { onBack: () => void }) {
         <Fact label={t.version} value={appVersion()} mono />
       </View>
       <Text style={styles.note}>{t.language}</Text>
+
+      <UpdateCheck style={{ marginTop: 20 }} />
 
       <Button label={t.forget} variant="danger" onPress={confirmUnpair} style={{ marginTop: 24 }} />
     </ScrollView>

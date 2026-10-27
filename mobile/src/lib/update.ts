@@ -47,6 +47,21 @@ export function pickUpdate(manifest: unknown, current: string, dismissed: string
   return { version: version.trim().replace(/^v/, ""), apk };
 }
 
+export type ManualCheck = { kind: "update"; update: Update } | { kind: "latest"; version: string } | { kind: "offline" };
+
+/**
+ * The answer to "Check for updates": a newer, well-formed manifest is an
+ * update (whatever "Later" said before); anything else, a missing manifest
+ * included, means this is the latest.
+ */
+export function manualCheck(manifest: unknown, current: string): ManualCheck {
+  const update = pickUpdate(manifest, current, null);
+  return update ? { kind: "update", update } : { kind: "latest", version: current };
+}
+
+/** Google Play's page for the app: Play builds update from there, never from the website. */
+export const PLAY_URL = "https://play.google.com/store/apps/details?id=fr.hivo.mobile";
+
 /** True when the last check is a day old (or never happened, or the clock went back). */
 export function checkDue(lastCheckAt: number | null, now: number): boolean {
   if (lastCheckAt === null || !Number.isFinite(lastCheckAt)) return true;
