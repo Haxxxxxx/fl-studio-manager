@@ -344,6 +344,97 @@ pub(crate) fn write_wav(path: &Path, samples: &[f32], channels: u16, rate: u32) 
     w.flush()
 }
 
+/// A file's length in milliseconds (decodes it: some formats don't say).
+pub fn duration_ms(path: &Path) -> Result<f64, String> {
+    let (mut frames, mut rate) = (0u64, 0u32);
+    decode(path, |samples, channels, sr| {
+        rate = sr;
+        frames += (samples.len() / channels.max(1)) as u64;
+        true
+    })?;
+    if rate == 0 || frames == 0 {
+        return Err(format!("{} has no audio", path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()));
+    }
+    Ok(frames as f64 * 1000.0 / rate as f64)
+}
+
+/// Longest audio converted to WAV (30 min: a 16-bit stereo WAV stays under 4 GB).
+const MAX_CONVERT_SECS: u64 = 30 * 60;
+
+/// Decodes `src` (an M4A, AAC…) into a 16-bit WAV at `dst`, streamed, never
+/// over an existing file. Returns the length in milliseconds.
+pub fn convert_to_wav(src: &Path, dst: &Path) -> Result<f64, String> {
+    let file = std::fs::OpenOptions::new().write(true).create_new(true).open(dst).map_err(|e| format!("could not create {}: {e}", dst.display()))?;
+    let mut w = BufWriter::new(file);
+    let (mut frames, mut rate, mut chans) = (0u64, 0u32, 0usize);
+    let mut io_err: Option<std::io::Error> = None;
+    let mut too_long = false;
+    // Header now (sizes fixed at the end).
+    fn header(w: &mut impl Write, channels: u16, rate: u32, data_len: u32) -> std::io::Result<()> {
+        w.write_all(b"RIFF")?;
+        w.write_all(&(36u32.saturating_add(data_len)).to_le_bytes())?;
+        w.write_all(b"WAVEfmt ")?;
+        w.write_all(&16u32.to_le_bytes())?;
+        w.write_all(&1u16.to_le_bytes())?;
+        w.write_all(&channels.to_le_bytes())?;
+        w.write_all(&rate.to_le_bytes())?;
+        w.write_all(&(rate * channels as u32 * 2).to_le_bytes())?;
+        w.write_all(&(channels * 2).to_le_bytes())?;
+        w.write_all(&16u16.to_le_bytes())?;
+        w.write_all(b"data")?;
+        w.write_all(&data_len.to_le_bytes())
+    }
+    let result = decode(src, |samples, channels, sr| {
+        if chans == 0 {
+            chans = channels;
+            rate = sr;
+            if let Err(e) = header(&mut w, channels as u16, sr, 0) {
+                io_err = Some(e);
+                return false;
+            }
+        }
+        if channels != chans || sr != rate {
+            return true; // a format change mid-file: skip the odd chunk
+        }
+        for s in samples {
+            if let Err(e) = w.write_all(&((s.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes()) {
+                io_err = Some(e);
+                return false;
+            }
+        }
+        frames += (samples.len() / channels.max(1)) as u64;
+        if frames > MAX_CONVERT_SECS * rate as u64 {
+            too_long = true;
+            return false;
+        }
+        true
+    });
+    let finish = (|| -> Result<f64, String> {
+        result?;
+        if let Some(e) = io_err {
+            return Err(crate::phone_inbox::io_error(&e, "could not write the WAV"));
+        }
+        if too_long {
+            return Err(format!("{} is over 30 minutes: not converted", src.display()));
+        }
+        if chans == 0 || frames == 0 {
+            return Err(format!("{} has no audio", src.display()));
+        }
+        let data_len = (frames * chans as u64 * 2) as u32;
+        w.flush().map_err(|e| crate::phone_inbox::io_error(&e, "could not write the WAV"))?;
+        let mut file = w.into_inner().map_err(|e| e.to_string())?;
+        std::io::Seek::seek(&mut file, std::io::SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+        let mut fix = BufWriter::new(&mut file);
+        header(&mut fix, chans as u16, rate, data_len).map_err(|e| e.to_string())?;
+        fix.flush().map_err(|e| e.to_string())?;
+        Ok(frames as f64 * 1000.0 / rate as f64)
+    })();
+    if finish.is_err() {
+        let _ = std::fs::remove_file(dst);
+    }
+    finish
+}
+
 /// File-system-safe version of a user-facing name.
 pub fn safe_name(name: &str) -> String {
     let cleaned: String = name

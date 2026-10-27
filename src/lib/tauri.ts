@@ -152,7 +152,14 @@ export async function createProject(args: {
 // (phoneInboxFileSketch below).
 /** Copies the template to `<song>/<song>.flp` beside the sketch's BandLab
  * folder; returns the new .flp path. */
-export const continueSketch = (sketchPath: string, templatePath: string): Promise<string> => invoke("continue_sketch", { sketchPath, templatePath });
+/** What "Continue in FL Studio" made: the new .flp, the clips laid out on its
+ * playlist (0 = the template alone), and why / what was converted. */
+export interface Continued {
+  flp: string;
+  clips: number;
+  note: string | null;
+}
+export const continueSketch = (sketchPath: string, templatePath: string): Promise<Continued> => invoke("continue_sketch", { sketchPath, templatePath });
 
 export async function duplicateProject(projectPath: string, newName: string): Promise<string> {
   return invoke("duplicate_project", { projectPath, newName });

@@ -136,7 +136,9 @@ const T = dict(
     continueTemplate: "Start the FL project from",
     continueFl: "Continue in FL Studio",
     continuing: "Creating…",
-    continueHint: "Drag the BandLab audio into FL's playlist: Hivo never writes inside .flp files.",
+    continueHint: "Hivo makes a new FL project from this template, with each BandLab file on its own playlist track from bar 1. Your existing projects are never changed.",
+    continueNote: (name: string, clips: number, note: string | null) =>
+      clips > 0 ? `${name}: ${clips} BandLab file${clips === 1 ? "" : "s"} on the playlist.${note ? ` ${note}.` : ""}` : `${name} is created. ${note ?? ""}.`,
     continueOpenFailed: (name: string, err: string) => `Created ${name}, but FL Studio didn't open: ${err}. Open it from the song panel.`,
   },
   {
@@ -232,7 +234,9 @@ const T = dict(
     continueTemplate: "Démarrer le projet FL avec",
     continueFl: "Continuer dans FL Studio",
     continuing: "Création…",
-    continueHint: "Glisse l'audio BandLab dans la playlist de FL : Hivo n'écrit jamais dans les fichiers .flp.",
+    continueHint: "Hivo crée un nouveau projet FL à partir de ce modèle, avec chaque fichier BandLab sur sa propre piste de la playlist dès la mesure 1. Tes projets existants ne sont jamais modifiés.",
+    continueNote: (name: string, clips: number, note: string | null) =>
+      clips > 0 ? `${name} : ${clips} fichier${clips === 1 ? "" : "s"} BandLab sur la playlist.${note ? ` ${note}.` : ""}` : `${name} est créé. ${note ?? ""}.`,
     continueOpenFailed: (name: string, err: string) => `${name} est créé, mais FL Studio ne s'est pas ouvert : ${err}. Ouvre-le depuis le panneau du son.`,
   },
 );
@@ -803,8 +807,10 @@ function SketchPanel({ project }: { project: ProjectInfo }) {
     try {
       // The drawer moves to the new .flp once this returns, so an open
       // failure is reported in the app's error banner.
-      const created = await continueSketch(project.path, templatePath);
-      await openInFlStudio(created).catch((e) =>
+      const done = await continueSketch(project.path, templatePath);
+      // What landed in the project (or why the audio isn't in it), in the banner.
+      if (done.note || done.clips === 0) useAppStore.setState({ startupError: t.continueNote(project.name, done.clips, done.note) });
+      await openInFlStudio(done.flp).catch((e) =>
         useAppStore.setState({ startupError: t.continueOpenFailed(project.name, e instanceof Error ? e.message : String(e)) }),
       );
     } catch (e) {

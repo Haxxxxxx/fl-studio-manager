@@ -10,6 +10,7 @@ mod key;
 mod leads;
 mod lookup;
 mod location;
+mod flp_build;
 mod flp_metadata;
 mod models;
 mod package;

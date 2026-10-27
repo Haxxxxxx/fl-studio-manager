@@ -299,7 +299,7 @@ interface AppState {
   /** "Continue in FL Studio": create the .flp from a template next to the
    * sketch and move the song's data (stage, notes, credits, share, release
    * slot, favorite) to it. Returns the new .flp path. */
-  continueSketch: (sketchPath: string, templatePath: string) => Promise<string>;
+  continueSketch: (sketchPath: string, templatePath: string) => Promise<api.Continued>;
   duplicateProject: (path: string, newName: string) => Promise<string>;
   restoreBackup: (backupPath: string, projectPath: string) => Promise<string>;
   trashBackups: (paths: string[], allowPermanent?: boolean) => Promise<number>;
@@ -1071,11 +1071,11 @@ export const useAppStore = create<AppState>((set, get) => {
 
     continueSketch: async (sketchPath, templatePath) => {
       if (get().demoMode) throw new Error("This is sample data — link a real project folder first.");
-      const created = await api.continueSketch(sketchPath, templatePath);
+      const done = await api.continueSketch(sketchPath, templatePath);
       // Exactly a rename: the sketch's record now belongs to the .flp.
-      if (get().workspaceWritable) followRelinks([{ from: sketchPath, to: created, reason: "renamed" }]);
+      if (get().workspaceWritable) followRelinks([{ from: sketchPath, to: done.flp, reason: "renamed" }]);
       await get().rescan();
-      return created;
+      return done;
     },
 
     duplicateProject: async (path, newName) => {
