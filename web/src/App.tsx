@@ -14,6 +14,7 @@ import { SIGN_IN } from "./landingCopy";
 import { cleanCode, isCodeComplete } from "@shared/lib/signInCode";
 import { pageLang, type Lang } from "./lang";
 import { W } from "./dashboardCopy";
+import { LeaveCrew, OwnerTools, RemoveMember } from "./OwnerTools";
 import { locale, tr } from "@shared/i18n";
 
 const input =
@@ -563,7 +564,8 @@ function Calendar() {
 }
 
 function Crew() {
-  const { members, songs, userId, crews } = useWeb();
+  const { members, songs, userId, crews, activeCrewId } = useWeb();
+  const isOwner = crews.find((c) => c.id === activeCrewId)?.role === "owner";
   const [adding, setAdding] = useState(false);
   // Built here, not at module level: stage names follow the language.
   const stages = [{ id: undefined as SongStatus | undefined, ...UNSORTED }, ...STATUSES];
@@ -580,6 +582,11 @@ function Crew() {
                 <span className="font-medium">{m.display_name}</span>
                 {m.role === "owner" && <span className="text-xs text-engrave">{tr(W).owner}</span>}
                 {m.user_id === userId && <span className="text-xs text-engrave">{tr(W).youLower}</span>}
+                {isOwner && m.user_id !== userId && (
+                  <span className="ml-auto">
+                    <RemoveMember userId={m.user_id} name={m.display_name} />
+                  </span>
+                )}
               </div>
               <div className="mt-1 text-xs text-body">
                 {tr(W).memberLine(theirs.length, active, last ? formatRelative(last) : null)}
@@ -614,6 +621,8 @@ function Crew() {
           {tr(W).addCrew}
         </button>
       )}
+      <OwnerTools />
+      <LeaveCrew />
     </div>
   );
 }

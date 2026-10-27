@@ -4,7 +4,7 @@ import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { crewErrorMessage, supabase } from "../lib/supabase";
 import { releasePayloads, releaseSharedHere, releaseTombstones, shareElsewhere, sharedHere, sharedPayloads, stageSync, staleReleaseIds, staleShareIds, type ShareScope, type StageSync } from "../lib/crewSync";
-import type { CrewColumnRow, CrewMemberRow, CrewReleaseRow, CrewSongRow, CrewSummary, PipelineConfig, SongStatus } from "../types";
+import type { CrewColumnRow, CrewInvite, CrewMemberRow, CrewReleaseRow, CrewSongRow, CrewSummary, PipelineConfig, SongStatus } from "../types";
 import { applyCardMove, columnsPayload, crewMove, crewPipeline, restoreSongs } from "../lib/crewBoard";
 import { useAppStore } from "./useAppStore";
 
@@ -23,13 +23,7 @@ const RETRY_MS = 30_000;
 const FOCUS_MIN_GAP_MS = 20_000;
 const SAFETY_SYNC_MS = 5 * 60_000;
 
-export interface CrewInvite {
-  code: string;
-  crew_id: string;
-  expires_at: string;
-  max_uses: number;
-  uses: number;
-}
+export type { CrewInvite } from "../types";
 
 type SyncState =
   | { kind: "idle" }

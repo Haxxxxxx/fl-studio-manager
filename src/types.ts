@@ -570,6 +570,15 @@ export interface CrewColumnRow {
   position: number;
 }
 
+/** An open invite code (owners only; row-level security returns none to members). */
+export interface CrewInvite {
+  code: string;
+  crew_id: string;
+  expires_at: string;
+  max_uses: number;
+  uses: number;
+}
+
 export interface CrewMemberRow {
   crew_id: string;
   user_id: string;
