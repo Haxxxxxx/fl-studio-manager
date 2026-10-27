@@ -47,6 +47,10 @@ pub enum Daw {
     ProTools,
     Cubase,
     Bitwig,
+    /// A BandLab export (mp3/wav) in `<song>/BandLab/` with no project yet: a
+    /// sketch. Found by folder in the scanner (`sketch_of`), never by file
+    /// extension, so `of_project` never returns it.
+    Bandlab,
 }
 
 impl Daw {
@@ -91,6 +95,7 @@ impl Daw {
             Daw::Cubase => &["auto saves"],
             Daw::Bitwig => &["backups", "auto-backups", "autobackups"],
             Daw::Reaper => &["backups"],
+            Daw::Bandlab => &[],
         }
     }
 
@@ -114,7 +119,7 @@ impl Daw {
             Daw::ProTools => &["Audio Files"],
             Daw::Cubase => &["Audio"],
             Daw::Bitwig => &["recordings"],
-            Daw::FlStudio => &[],
+            Daw::FlStudio | Daw::Bandlab => &[],
         }
     }
 }
@@ -221,6 +226,7 @@ pub fn backup_base_name(daw: Daw, file_name: &str) -> String {
         },
         // `Night Run (2)` (History/ versions, numbered backups)
         Daw::StudioOne | Daw::Bitwig => strip_copy_number(&base),
+        Daw::Bandlab => base,
     }
 }
 

@@ -18,6 +18,7 @@ import { PackageConfirm, PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { FeedbackModal } from "./components/FeedbackModal";
+import { InboxView } from "./components/InboxView";
 import { supabase } from "./lib/supabase";
 import { isReadOnlyInstallError } from "./lib/updaterErrors";
 import { scrubPaths } from "./lib/feedback";
@@ -25,6 +26,7 @@ import { appLocation } from "./lib/tauri";
 import { UPDATES_ENABLED } from "./lib/updater";
 import { flushWorkspace, useAppStore } from "./store/useAppStore";
 import { startPhoneSyncBridge } from "./store/phoneSyncBridge";
+import { startSessionBridge } from "./store/sessionBridge";
 import { useCrewStore, useInCrew } from "./store/useCrewStore";
 import { StatusDot, btnPrimary, btnQuiet } from "./ui";
 
@@ -256,6 +258,9 @@ export default function App() {
     return startPhoneSyncBridge();
   }, []);
 
+  // The session view's window gets its lyrics from here.
+  useEffect(() => startSessionBridge(), []);
+
   // Closing the window right after an edit: write the pending save first.
   useEffect(() => {
     if (!isTauri()) return;
@@ -302,6 +307,7 @@ export default function App() {
         {view === "calendar" && <CalendarView />}
         {view === "settings" && <SettingsView />}
         {view === "digger" && <DiggerView />}
+        {view === "inbox" && <InboxView />}
         {view === "crewBoard" && <CrewBoardView />}
         {view === "crewReleases" && <CrewReleasesView />}
         {view === "crewMembers" && <CrewMembersView />}

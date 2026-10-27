@@ -55,7 +55,8 @@ const en: PrivacyCopy = {
       title: "The phone app",
       body: [
         "It talks only to your own computer, over your local Wi-Fi, and everything it sends is encrypted with the key from the pairing QR code. There is no Hivo server in between, no account, no analytics, no ads and no tracking.",
-        "Your notes are stored on the phone and on your computer. The camera is used only to scan the pairing QR code: no photo is taken or kept.",
+        "Your notes, ideas and voice memos are stored on the phone and on your computer. The camera is used only to scan the pairing QR code: no photo is taken or kept. The microphone is used only while you record a voice memo, and the recording goes nowhere but your computer.",
+        "Files you share to Hivo from another app (a BandLab export, for example) are copied into Hivo on the phone, then sent to your computer the same way. An export is deleted from the phone once your computer has it.",
         "The version downloaded from this website checks once a day for a new version by downloading a public file from Hivo's release storage. Nothing about you is sent with it (like any web request, it reaches the server from your internet address). The Google Play version gets its updates from Google Play and doesn't do this check.",
       ],
     },
@@ -119,7 +120,8 @@ const fr: PrivacyCopy = {
       title: "L'appli du téléphone",
       body: [
         "Elle ne parle qu'à ton propre ordi, par ton Wi-Fi local, et tout ce qu'elle envoie est chiffré avec la clé du QR code d'association. Pas de serveur Hivo entre les deux, pas de compte, pas de statistiques, pas de pub, pas de pistage.",
-        "Tes notes sont gardées sur le téléphone et sur ton ordi. La caméra sert uniquement à scanner le QR code d'association : aucune photo n'est prise ni gardée.",
+        "Tes notes, idées et mémos vocaux sont gardés sur le téléphone et sur ton ordi. La caméra sert uniquement à scanner le QR code d'association : aucune photo n'est prise ni gardée. Le micro sert uniquement pendant que tu enregistres un mémo vocal, et l'enregistrement ne va nulle part ailleurs que sur ton ordi.",
+        "Les fichiers que tu partages vers Hivo depuis une autre appli (un export BandLab, par exemple) sont copiés dans Hivo sur le téléphone, puis envoyés à ton ordi de la même façon. Un export est supprimé du téléphone une fois que ton ordi l'a reçu.",
         "La version téléchargée sur ce site vérifie une fois par jour s'il y a une nouvelle version en téléchargeant un fichier public sur le stockage des versions de Hivo. Rien sur toi n'est envoyé avec (comme toute requête web, elle arrive au serveur depuis ton adresse internet). La version Google Play reçoit ses mises à jour par Google Play et ne fait pas cette vérification.",
       ],
     },

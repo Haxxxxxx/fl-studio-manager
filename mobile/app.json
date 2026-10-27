@@ -15,7 +15,7 @@
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         },
-        "NSLocalNetworkUsageDescription": "Hivo connects to the Hivo app on your computer over your Wi-Fi to sync your notes.",
+        "NSLocalNetworkUsageDescription": "Hivo connects to the Hivo app on your computer over your Wi-Fi to sync your notes, ideas and voice memos.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -29,12 +29,73 @@
       },
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.INTERNET"
-      ],
-      "blockedPermissions": [
+        "android.permission.INTERNET",
         "android.permission.RECORD_AUDIO"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "SEND",
+          "category": [
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "audio/*"
+            }
+          ]
+        },
+        {
+          "action": "SEND_MULTIPLE",
+          "category": [
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "audio/*"
+            }
+          ]
+        },
+        {
+          "action": "SEND",
+          "category": [
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "application/zip"
+            },
+            {
+              "mimeType": "application/x-zip-compressed"
+            }
+          ]
+        },
+        {
+          "action": "SEND_MULTIPLE",
+          "category": [
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "application/zip"
+            },
+            {
+              "mimeType": "application/x-zip-compressed"
+            }
+          ]
+        },
+        {
+          "action": "SEND",
+          "category": [
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ]
+        }
+      ]
     },
     "plugins": [
       [
@@ -45,13 +106,20 @@
           "recordAudioAndroid": false
         }
       ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Hivo uses the microphone to record voice memos (a flow, a melody) that you send to the Hivo app on your computer.",
+          "recordAudioAndroid": true
+        }
+      ],
       "expo-secure-store",
       [
         "expo-build-properties",
         {
           "android": {
             "usesCleartextTraffic": true,
-            "extraProguardRules": "# QR scanning (ML Kit barcode, Google code scanner, expo-camera): the native decoder and Play services reach these by name, so R8 must not rename or strip them.\n-keep class com.google.mlkit.** { *; }\n-keep class com.google.photos.vision.barhopper.** { *; }\n-keep class com.google.android.libraries.barhopper.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_barcode_bundled.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_common.** { *; }\n-keep class com.google.android.gms.internal.mlkit_code_scanner.** { *; }\n-keep class expo.modules.camera.** { *; }\n"
+            "extraProguardRules": "# QR scanning (ML Kit barcode, Google code scanner, expo-camera): the native decoder and Play services reach these by name, so R8 must not rename or strip them.\n-keep class com.google.mlkit.** { *; }\n-keep class com.google.photos.vision.barhopper.** { *; }\n-keep class com.google.android.libraries.barhopper.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_barcode_bundled.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_common.** { *; }\n-keep class com.google.android.gms.internal.mlkit_code_scanner.** { *; }\n-keep class expo.modules.camera.** { *; }\n-keep class expo.modules.hivoshare.** { *; }\n"
           }
         }
       ],

@@ -10,9 +10,45 @@ import { useSyncExternalStore } from "react";
 import { createClient, SyncError, type SyncErrorCode } from "./lib/client";
 import type { Pairing } from "./lib/pairing";
 import { dismissConflict, editNote, emptyState, forgetGone, runSync, type Kind, type SyncState } from "./lib/sync";
+import {
+  applyIdeaResults,
+  applyIdeaStatuses,
+  createIdea,
+  deleteIdea,
+  editIdea,
+  ideaPayload,
+  ideasToPush,
+  newId,
+  parseIdeaResults,
+  resetSent,
+  type Idea,
+  type IdeaTarget,
+} from "./lib/ideas";
+import {
+  applyOutStatuses,
+  HoldError,
+  parseInboxStatuses,
+  resetOut,
+  retry,
+  toSend,
+  uploadItem,
+  type HoldReason,
+  type OutFile,
+  type OutItem,
+  type OutType,
+} from "./lib/outbox";
+import { fileExists, readChunk, removeItemFiles } from "./files";
 
 const PAIRING_KEY = "hivo.pairing.v1";
 const CACHE_KEY = "hivo.sync.v1";
+// Kept across unpairing: they're what was written and recorded on the phone.
+const IDEAS_KEY = "hivo.ideas.v1";
+const OUTBOX_KEY = "hivo.outbox.v1";
+/** The computer (device id) the ideas' and outbox's "sent" marks are for. */
+const BOUND_KEY = "hivo.extras.device.v1";
+
+/** Why ideas / memos / exports didn't go (notes may have synced fine). */
+export type ExtrasError = "outdated" | "demo" | HoldReason;
 
 export type AppState = {
   loaded: boolean;
@@ -21,9 +57,26 @@ export type AppState = {
   syncing: boolean;
   error: SyncErrorCode | null;
   errorDetail: string | null;
+  ideas: Idea[];
+  outbox: OutItem[];
+  extrasError: ExtrasError | null;
+  /** The outbox item being sent right now. */
+  sending: string | null;
 };
 
-let state: AppState = { loaded: false, pairing: null, sync: emptyState(), syncing: false, error: null, errorDetail: null };
+let state: AppState = {
+  loaded: false,
+  pairing: null,
+  sync: emptyState(),
+  syncing: false,
+  error: null,
+  errorDetail: null,
+  ideas: [],
+  outbox: [],
+  extrasError: null,
+  sending: null,
+};
+let boundDevice: string | null = null;
 const listeners = new Set<() => void>();
 
 function setState(patch: Partial<AppState>): void {
@@ -66,6 +119,98 @@ function setSync(sync: SyncState): void {
   persistSoon();
 }
 
+// Ideas and the outbox, saved on their own (kept when unpairing).
+let extrasTimer: ReturnType<typeof setTimeout> | null = null;
+function persistExtrasSoon(): void {
+  if (extrasTimer) clearTimeout(extrasTimer);
+  extrasTimer = setTimeout(() => void flushExtras(), 300);
+}
+
+export async function flushExtras(): Promise<void> {
+  if (extrasTimer) clearTimeout(extrasTimer);
+  extrasTimer = null;
+  try {
+    await AsyncStorage.multiSet([
+      [IDEAS_KEY, JSON.stringify(state.ideas)],
+      [OUTBOX_KEY, JSON.stringify(state.outbox)],
+      [BOUND_KEY, boundDevice ?? ""],
+    ]);
+  } catch (e) {
+    console.warn("Hivo: could not save ideas and memos", e);
+  }
+}
+
+function setIdeas(ideas: Idea[]): void {
+  setState({ ideas });
+  persistExtrasSoon();
+}
+
+function setOutbox(outbox: OutItem[]): void {
+  setState({ outbox });
+  persistExtrasSoon();
+}
+
+function replaceOut(item: OutItem): void {
+  setOutbox(state.outbox.map((i) => (i.id === item.id ? item : i)));
+}
+
+const randomId = () => newId(getRandomBytes);
+
+// ---- Ideas ----
+
+/** A new idea (empty ones aren't sent); returns its id. */
+export function addIdea(init: { title?: string; text?: string; target?: IdeaTarget | null } = {}): string {
+  const id = randomId();
+  setIdeas([createIdea(id, Date.now(), init), ...state.ideas]);
+  return id;
+}
+
+export function updateIdea(id: string, patch: Partial<Pick<Idea, "title" | "text" | "target">>): void {
+  setIdeas(editIdea(state.ideas, id, patch, Date.now()));
+}
+
+export function removeIdea(id: string): void {
+  setIdeas(deleteIdea(state.ideas, id, Date.now()));
+}
+
+// ---- Outbox (memos and shared files) ----
+
+/** Adds files already moved into the outbox folder (files.ts `adopt`) as one item. */
+export function addOutItem(id: string, type: OutType, files: OutFile[], init: { title?: string; target?: IdeaTarget | null; durationMs?: number | null } = {}): void {
+  const item: OutItem = {
+    id,
+    type,
+    title: (init.title ?? "").slice(0, 200),
+    target: init.target ?? null,
+    createdAt: Date.now(),
+    durationMs: init.durationMs ?? null,
+    files,
+    state: "waiting",
+    error: null,
+    sentBytes: 0,
+    status: null,
+    filedTo: null,
+    sentAt: null,
+  };
+  setOutbox([item, ...state.outbox]);
+}
+
+export const newOutId = randomId;
+
+export function retryOut(id: string): void {
+  setOutbox(state.outbox.map((i) => (i.id === id ? retry(i) : i)));
+}
+
+/** Removes an item from the phone (and its files). What the computer got stays there. */
+export function removeOut(id: string): void {
+  removeItemFiles(id);
+  setOutbox(state.outbox.filter((i) => i.id !== id));
+}
+
+export function renameOut(id: string, title: string): void {
+  setOutbox(state.outbox.map((i) => (i.id === id && i.state !== "sent" ? { ...i, title: title.slice(0, 200) } : i)));
+}
+
 function isPairing(v: unknown): v is Pairing {
   if (!v || typeof v !== "object") return false;
   const p = v as Record<string, unknown>;
@@ -81,6 +226,20 @@ function isSyncState(v: unknown): v is SyncState {
 export async function load(): Promise<void> {
   let pairing: Pairing | null = null;
   let sync = emptyState();
+  let ideas: Idea[] = [];
+  let outbox: OutItem[] = [];
+  try {
+    const [[, rawIdeas], [, rawOut], [, bound]] = await AsyncStorage.multiGet([IDEAS_KEY, OUTBOX_KEY, BOUND_KEY]);
+    const i: unknown = rawIdeas ? JSON.parse(rawIdeas) : [];
+    const o: unknown = rawOut ? JSON.parse(rawOut) : [];
+    ideas = Array.isArray(i) ? (i as Idea[]).filter((x) => x && typeof x.id === "string") : [];
+    // An upload cut by the app being killed: back to waiting.
+    outbox = Array.isArray(o) ? (o as OutItem[]).filter((x) => x && typeof x.id === "string").map((x) => (x.state === "sending" ? { ...x, state: "waiting" } : x)) : [];
+    boundDevice = bound || null;
+  } catch (e) {
+    console.warn("Hivo: could not read ideas and memos", e);
+  }
+  setState({ ideas, outbox });
   try {
     const raw = await SecureStore.getItemAsync(PAIRING_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : null;
@@ -131,6 +290,53 @@ export function appVersion(): string {
   return Constants.expoConfig?.version ?? "0.0.0";
 }
 
+/**
+ * After the notes: ideas, then the outbox (memos, exports), then what the
+ * computer did with them. "outdated" (an older Hivo on the computer), "demo"
+ * and a full inbox/disk stop only this part; offline & co. stop the sync.
+ */
+async function runExtras(call: (path: string, payload: unknown) => Promise<unknown>, deviceId: string): Promise<void> {
+  // Another computer than last time: it has none of them yet.
+  if (boundDevice !== deviceId) {
+    boundDevice = deviceId;
+    setIdeas(resetSent(state.ideas));
+    setOutbox(resetOut(state.outbox));
+  }
+  try {
+    for (let round = 0; round < 20; round++) {
+      const push = ideasToPush(state.ideas);
+      if (push.length === 0) break;
+      const results = parseIdeaResults(await call("/v1/ideas", { ideas: push.map(ideaPayload) }));
+      if (!results) throw new SyncError("outdated", "bad ideas response");
+      setIdeas(applyIdeaResults(state.ideas, push, results));
+    }
+    const io = { call, read: readChunk, exists: fileExists, sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)), now: Date.now };
+    for (const item of toSend(state.outbox)) {
+      // Removed from the phone while an earlier item was sending.
+      if (!state.outbox.some((i) => i.id === item.id)) continue;
+      setState({ sending: item.id });
+      const done = await uploadItem(io, item, replaceOut);
+      replaceOut(done);
+      // An export is on the computer now: free the phone (memos stay, to replay).
+      if (done.state === "sent" && done.type === "sketch") {
+        removeItemFiles(done.id);
+        replaceOut({ ...done, purged: true });
+      }
+    }
+    const statuses = parseInboxStatuses(await call("/v1/inbox", {}));
+    setIdeas(applyIdeaStatuses(state.ideas, statuses));
+    setOutbox(applyOutStatuses(state.outbox, statuses));
+    setState({ extrasError: null });
+  } catch (e) {
+    if (e instanceof HoldError) setState({ extrasError: e.reason });
+    else if (e instanceof SyncError && (e.code === "outdated" || e.code === "demo")) setState({ extrasError: e.code });
+    else throw e;
+  } finally {
+    setState({ sending: null, outbox: state.outbox.map((i) => (i.state === "sending" ? { ...i, state: "waiting" } : i)) });
+    await flushExtras();
+  }
+}
+
 /** Push queued notes, then pull the snapshot. Never throws: errors land in state. */
 export async function sync(): Promise<boolean> {
   const pairing = state.pairing;
@@ -139,6 +345,7 @@ export async function sync(): Promise<boolean> {
   try {
     const call = createClient({ pairing, transport: (url, init) => fetch(url, init), random: getRandomBytes, now: Date.now });
     const res = await runSync(call, () => state.sync, setSync, { phoneName: phoneName(), appVersion: appVersion() }, Date.now);
+    await runExtras(call, pairing.deviceId);
     if (res.desktopName && state.pairing && res.desktopName !== state.pairing.desktopName) {
       const updated = { ...state.pairing, desktopName: res.desktopName };
       setState({ pairing: updated });
@@ -148,11 +355,25 @@ export async function sync(): Promise<boolean> {
     // sync; the saved order stays the desktop's (its best address first).
     await flush();
     setState({ syncing: false });
+    if (again) {
+      again = false;
+      void sync();
+    }
     return true;
   } catch (e) {
     const code: SyncErrorCode = e instanceof SyncError ? e.code : "server";
+    again = false;
     setState({ syncing: false, error: code, errorDetail: e instanceof Error ? e.message : String(e) });
     await flush();
     return false;
   }
+}
+
+let again = false;
+
+/** Sync now, or right after the one running (something new to send). */
+export function requestSync(): void {
+  if (!state.pairing) return;
+  if (state.syncing) again = true;
+  else void sync();
 }

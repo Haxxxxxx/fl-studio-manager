@@ -1,6 +1,6 @@
 # November plan: finish crew sharing; the mobile creation companion after
 
-Status (2026-10-27): **parts A and A2 done** (except the crew pitch, in progress, and the Windows test, later); **part B steps 1-3 shipped** in 0.6.0-0.6.1, step 4 next; **part C** is the backlog added 2026-10-27. Asked for on 2026-10-25. Order decided by the user: part A (crew), then part A2 (finish the brief), then part B (mobile), then part C. Tracking: tick items here as they close, and the matching boxes in ROADMAP.md section 7.
+Status (2026-10-27): **parts A and A2 done** (except the crew pitch, in progress, and the Windows test, later); **part B steps 1-3 shipped** in 0.6.0-0.6.1, **step 4 built** (ships as 0.7.0); **part C** is the backlog added 2026-10-27. Asked for on 2026-10-25. Order decided by the user: part A (crew), then part A2 (finish the brief), then part B (mobile), then part C. Tracking: tick items here as they close, and the matching boxes in ROADMAP.md section 7.
 
 **Release cadence (2026-10-27):** releases are batched. Fixes wait on `main` and ship with the next finished step; step 4 ships as **0.7.0**. A patch release only for something that breaks installed apps with no workaround.
 
@@ -67,7 +67,7 @@ The roadmap's section 7 has no open box except Phase 2, Google Play and the mobi
 Hivo helps you untangle your notes on each beat you pick, and the rest of the writing and creation process: lyrics, ideas, voice memos. You write on the phone; the desktop has it while you work in FL Studio. BandLab projects (and other mobile sketches) can be sent to FL through Hivo for detailed work.
 
 ### B-now. BandLab exports (clarified 2026-10-25)
-**BandLab import belongs to the phone app**, next to taking notes on the prods stored on the desktop. A desktop "Import from BandLab" button was built by mistake (PR #143, draft, not shipped). What stays from it is the **desktop's receiving side**: a BandLab export sent from the phone is filed as a **sketch song** in a project folder (`<project folder>/<name>/BandLab/`, listed by the scanner, playable, with notes and credits), and **"Continue in FL Studio"** turns it into an `.flp` from a template next to the audio (Hivo never writes inside `.flp` files). The desktop Library button is dropped when #143 is reworked for step 4.
+**BandLab import belongs to the phone app**, next to taking notes on the prods stored on the desktop. A desktop "Import from BandLab" button was built by mistake (PR #143, draft, not shipped). What stays from it is the **desktop's receiving side**: a BandLab export sent from the phone is filed as a **sketch song** in a project folder (`<project folder>/<name>/BandLab/`, listed by the scanner, playable, with notes and credits), and **"Continue in FL Studio"** turns it into a new `.flp` from a template next to the audio, with each BandLab file already on its own playlist track (user override 2026-10-27: Hivo writes only new sketch projects, never an existing `.flp`). The desktop Library button is dropped when #143 is reworked for step 4.
 
 ### B1. Decisions made (2026-10-25)
 - **Nothing written on the phone goes to Hivo's server.** No lyrics, notes, ideas or voice memos in Supabase.
@@ -91,17 +91,17 @@ Hivo helps you untangle your notes on each beat you pick, and the rest of the wr
 **Phone (native)**
 1. ✅ **Your prods and songs** (user, 2026-10-25: all three): the Digger's **saved prods** (link and facts), the **beats** in the beats folders, and the **songs** (projects), as the desktop sends them at sync (names, BPM, key, stage). New ideas can be named on the phone (with the ideas inbox, step 4).
 2. ✅ **Notes and lyrics per saved prod, beat or song:** plain text with section headers (`[Verse 1]`, `[Hook]`…), a syllable count per line, a bar estimate from the BPM. Works offline.
-3. **Ideas inbox:** punchlines, titles, concepts without a beat; attach them later. (Step 4.)
-4. **Voice memos:** record a flow or melody, attached to a beat, a song or an idea. (Step 4.)
-5. **Receive BandLab exports (and other sketches):** "Share to Hivo" from BandLab's export (mixdown or stems) through the system share sheet; it's attached to a beat or kept as a new sketch, and goes to the desktop at the next sync. (Step 4.)
+3. ✅ **Ideas inbox:** punchlines, titles, concepts without a beat; attach them later.
+4. ✅ **Voice memos:** record a flow or melody, attached to a beat or a song (up to 15 min).
+5. **Receive BandLab exports (and other sketches):** "Share to Hivo" from BandLab's export (mixdown or stems) through the system share sheet; it's attached to a beat or kept as a new sketch, and goes to the desktop at the next sync. ✅ (Android; no iOS share target yet.)
 6. ✅ **Sync status** and the paired desktop's name.
 
 **Desktop**
 1. ✅ **Notes on saved prods and beats** in the Digger (stored in the workspace, not in the lead files, so re-saving a prod never wipes them; side panel with preview), and the song's existing notes in its drawer. When a beat becomes a song (a new FL project), its notes move with it. The desktop holds every note; the phone syncs to it.
 2. ✅ **Phone sync** in Settings: on/off, pairing QR code, paired phones, last sync.
-3. **Inbox:** what came from the phone and isn't attached yet (ideas, sketches), to assign to a beat or a song. (Step 4.)
-4. **Session view (teleprompter):** a window kept on top of FL Studio, showing the lyrics large, section by section; arrow keys or auto-scroll at the BPM.
-5. **Sketch → FL:** a BandLab export from the phone becomes a sketch song in a project folder, exactly like "Import a BandLab export" (B-now), then "Continue in FL Studio".
+3. ✅ **Inbox:** what came from the phone and isn't attached yet (ideas, memos, sketches), to assign to a beat or a song.
+4. ✅ **Session view (teleprompter):** a window kept on top of FL Studio, showing the lyrics large, section by section; arrow keys or auto-scroll at the BPM.
+5. ✅ **Sketch → FL:** a BandLab export from the phone becomes a sketch song in a project folder, exactly like "Import a BandLab export" (B-now), then "Continue in FL Studio".
 
 **Later (each needs a yes):** rhyme suggestions, lyrics in the Launch Kit, sharing one song's lyrics with a featured artist, sync away from home (would need a relay: the server question again).
 
@@ -113,7 +113,7 @@ Hivo helps you untangle your notes on each beat you pick, and the rest of the wr
 | 1 | ✅ **Shipped in 0.6.0** (#148 for the side panel): desktop notes on saved prods and beats (songs already had notes). Order confirmed 2026-10-25: notes → sync → Android APK. |
 | 2 | ✅ **Shipped in 0.6.0** (#146): phone sync server (pairing QR, encrypted envelope with the pairing key instead of pinned TLS, replay protection, snapshot + notes), with tests. mDNS left out of v1. |
 | 3 | ✅ **Shipped in 0.6.0-0.6.1** (#147, #150): phone (Expo) pairing, saved prods / beats / songs lists, offline notes editor, sync. Android APK on the website; iOS in the Simulator. Pairing verified on a real Android phone (2026-10-27); the Android 11+ Play-services fix (#152) is on `main` and ships with 0.7.0. |
-| 4 | **Next, ships as 0.7.0:** BandLab share target on the phone, file transfer, the desktop's sketch filing and "Continue in FL" (from #143), voice memos, the ideas inbox on both sides; session view on desktop. |
+| 4 | ✅ **Built 2026-10-27, ships as 0.7.0** (branch `feature/phase-b-step4`): "Share to Hivo" on Android (audio, `.zip` stems, text → an idea) and "Add a file", resumable chunked uploads, voice memos (15 min), ideas with a target, the phone's Inbox tab; the desktop's Phone inbox page (idea → note, memo → song's `Voice memos/` or a beat/prod, export → sketch song with Continue in FL), the session view window. Error states decided up front in PHONE-SYNC.md v1.1. Tested: unit tests both sides, the real Rust server against the phone's real client (`scripts/e2e-phone-sync.sh`), and the APK on an Android emulator against that server (share from the Files app, recording, idea; bytes identical on arrival). |
 | 5 | Distribution (decided 2026-10-25): Android **APK on the website** ✅ + **Google Play** (AAB from the release workflow, uploaded by hand; internal testing first; **Play Console setup in progress**); privacy policy at `/en/privacy` and `/fr/privacy` ✅. **iOS not now.** |
 
 Steps 1 to 3 took about two days; step 4 is the largest (file transfer and the share target are new on both sides). Native isn't a November promise.

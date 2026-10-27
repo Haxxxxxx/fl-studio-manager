@@ -12,7 +12,7 @@
 - **Phases.** Phase 0, 1a, 1b, 1c and 1d are built (checklist in section 7). Two human items remain: the crew pitch (in progress, outside the repo) and the Windows test on a real PC (later; the Mac build is the reference for now, both builds come from the same code). The git history was scrubbed on 2026-10-25.
 - **What's next: [NOVEMBER-PLAN.md](NOVEMBER-PLAN.md).**
   - **Part A** (crew verified end to end) and **part A2** (finish the brief) are done, except the two human items above.
-  - **Part B, the mobile companion:** steps 1-3 shipped in 0.6.0-0.6.1 (desktop notes, phone sync, the Android app; pairing works on a real phone). Step 4 is next: BandLab exports from the phone, sketch → FL, voice memos, ideas inbox, session view.
+  - **Part B, the mobile companion:** steps 1-3 shipped in 0.6.0-0.6.1 (desktop notes, phone sync, the Android app; pairing works on a real phone). Step 4 is built (ships as 0.7.0): BandLab exports from the phone, sketch → FL, voice memos, ideas inbox, session view.
   - **Part C, the backlog** (added 2026-10-27): delete a crew and owner actions on the website, stems, per-distributor export formats, the Pace tendency block, and the "In your prods" check for prods in other formats or folders.
 - **Ready but not released:** on `main` since 0.6.1, the QR scanner fix for Android 11+ (it now sees Google Play). Ships with 0.7.0.
 
@@ -146,7 +146,7 @@
 
 - **The crew pitch (Phase 0).** Being written with Claude on the web, outside this repo: what problem it solves for the crew, what it looks like in six months, what you need from them, and the label questions to bring as questions, not answers.
 - **Google Play.** The app exists in the Play Console; next is app signing with your own key, an internal testing release with the AAB, and the App content forms.
-- **Phase B step 4** (next, ships as 0.7.0): BandLab exports from the phone, sketch → FL, voice memos, ideas inbox, session view.
+- **Phase B step 4** (built, ships as 0.7.0, waiting for your test): BandLab exports shared to Hivo on the phone, sketch → FL, voice memos, ideas inbox on both sides, the session view.
 - **Launch Kit, the rest of audit §3** (A5-A6 and the B items: readiness per release, two-dates confusion, modal and drawer friction): only where they block the path to release.
 
 ### Later, on purpose
@@ -246,7 +246,7 @@ Every song is in exactly one stage: **Creation** (rough beat and lyrics), **Prod
 - [x] Desktop notes on saved prods, beats and songs (step 1)
 - [x] Phone sync over the local Wi-Fi, encrypted, nothing on the server (step 2)
 - [x] Android app: pairing, lists, offline notes, sync; pairing tested on a real phone (step 3)
-- [ ] BandLab exports from the phone, sketch → FL, voice memos, ideas inbox, session view (step 4, 0.7.0)
+- [x] BandLab exports from the phone, sketch → FL, voice memos, ideas inbox, session view (step 4, built 2026-10-27, ships as 0.7.0)
 
 **Phase 2: ecosystem**: not started (see "Thought about, not built").
 

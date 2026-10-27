@@ -159,3 +159,86 @@ Precisions the phone can rely on (nothing here changes the formats above):
   carry no analysis), prod `subtitle` is `producer · year` without empty parts.
 - **Port:** chosen by the OS on first start, saved in `phone-sync.json` and
   reused while free. The QR always carries the current one.
+
+## v1.1: phase B step 4 (ideas, voice memos, BandLab exports, session view)
+
+Same pairing, envelope, replay window and bare statuses as v1. The phone
+only adds endpoints; an older desktop answers them with a bare 404, which
+the phone shows as "update the computer's Hivo" (`outdated`).
+
+### What travels
+- **Ideas**: a title and/or text written on the phone (punchlines, titles,
+  concepts), optionally aimed at a prod/beat/song. What's shared to Hivo as
+  text (a BandLab link, a lyric copied from elsewhere) also becomes an idea.
+- **Voice memos**: an `.m4a` recorded in the app, optionally aimed at a
+  prod/beat/song.
+- **Sketches**: files shared to Hivo from BandLab (or any app): audio
+  (`wav mp3 m4a aac flac ogg aif aiff`) or a `.zip` of stems. One share = one
+  sketch, up to 20 files.
+
+All of it lands in the desktop's **phone inbox** (`<app data>/phone-inbox/`,
+Rust-owned, never in workspace.json, never under a project folder until the
+user files it). Nothing goes through a server.
+
+### `/v1/ideas` — payload `{"ideas": Idea[]}` (≤ 200 per push)
+```
+Idea = { "id": "<phone uuid>", "title": string (≤ 200), "text": string (≤ 20 000),
+         "target": {"kind","id","title"} | null, "createdAt": ms, "updatedAt": ms,
+         "deleted": bool }
+```
+→ `{"results": [{"id", "status": "stored"|"filed"|"dismissed"|"deleted", "filedTo": string|null}]}`
+- New or newer (`updatedAt`) ideas are stored; an older copy never overwrites.
+- An idea the desktop already **filed** (appended to a note) or **dismissed**
+  isn't changed any more: the phone shows its status and stops editing it.
+- `deleted: true` removes an unfiled idea from the inbox (a filed one stays filed).
+
+### Uploads (voice memos and sketches), all in Rust
+Files go in chunks so a big export survives a flaky Wi-Fi: each chunk is an
+ordinary encrypted request (≤ 1 MB body), so every byte is authenticated.
+- `/v1/upload/start` `{"itemId", "itemType": "memo"|"sketch", "title", "target": {"kind","id","title"}|null,
+  "createdAt", "durationMs": number|null, "fileIndex", "fileCount", "name", "size"}`
+  → `{"offset": <bytes already received>}`. Starting again resumes: same
+  `itemId`/`fileIndex`/`size` = the offset so far; a file already complete
+  answers its size.
+- `/v1/upload/chunk` `{"itemId", "fileIndex", "offset", "data": "<b64url, ≤ 393 216 raw bytes>"}`
+  → `{"offset": <new offset>}`. A chunk whose `offset` isn't the current one
+  is refused with `"offset:<current>"`, so the phone re-sends from there.
+- `/v1/upload/finish` `{"itemId", "fileIndex"}` → `{"status": "stored"|"waiting", "received": n, "of": fileCount}`.
+  Checks the size; the item shows in the inbox when all `fileCount` files are in.
+- `/v1/inbox` `{}` → `{"items": [{"id", "type", "status": "new"|"filed"|"dismissed", "filedTo"}]}`
+  (what this phone sent that the desktop still knows, for its status badges).
+
+Limits (paired constants, Rust `phone_inbox.rs` ↔ phone `src/lib/outbox.ts`):
+`MAX_FILE_BYTES` 500 MB, `MAX_ITEM_FILES` 20, `MAX_CHUNK_BYTES` 393 216,
+`MAX_INBOX_BYTES` 4 GB (everything in the inbox, filed items included until
+removed), `MAX_IDEAS_PER_PUSH` 200, `MAX_TITLE_CHARS` 200, `MAX_MEMO_MS` 15 min.
+Unfinished uploads are dropped after 7 days.
+
+### Error states, decided up front
+Inside the envelope (`ok: false`), on top of v1's:
+| error | when | the phone says / does |
+|---|---|---|
+| `demo` | desktop in sample-data mode | "Hivo on the computer shows sample data" (kept in the outbox) |
+| `inbox full` | `MAX_INBOX_BYTES` reached | "The computer's phone inbox is full: file or remove items there" (kept, retried at next sync) |
+| `disk full` | the desktop's disk refused a write | "The computer's disk is full" (kept, retried) |
+| `too big` | file > 500 MB, > 20 files, chunk > max | "Too big to send (500 MB per file, 20 files)" (failed, the user can remove it) |
+| `type` | not an allowed audio/zip name | "Hivo only takes audio files and .zip stems" (failed) |
+| `offset:<n>` | chunk out of order (lost reply, resume) | silently re-sends from `n` |
+| `unknown upload` | chunk/finish without a start, or dropped after 7 days | silently starts that file again from 0 |
+| `size` | finish with fewer/more bytes than declared | starts that file again from 0 (once), then failed |
+| `bad request` | malformed payload | `outdated` |
+
+Bare statuses as v1 (401 `forgotten`, 413, 429/503 `busy`: the uploader waits and goes on).
+
+On the phone, before anything is sent:
+- **Share**: not audio/zip/text → "Hivo takes audio, .zip stems or text"; more than 20 files → the first 20 + a warning; a file the phone can't read (revoked permission, cloud file not downloaded) → that file is skipped and named; a file over 500 MB → refused with its size; the phone's storage full while copying → "Not enough space on the phone"; not paired yet → kept in the outbox, "Pair with your computer to send it".
+- **Recording**: microphone refused → "Allow the microphone in the phone's settings" with a button to them; under 1 s → discarded ("Too short"); 15 min → stops by itself and keeps it; a call or another app taking the mic → the recording stops and what was recorded is kept.
+- **Ideas**: empty title and text → not kept; text capped at 20 000 characters (as notes).
+- **Outbox**: every item shows its state: waiting (not on the same Wi-Fi), sending n %, on the computer, filed, failed (reason, Retry / Remove). Nothing is deleted from the phone until the desktop said `stored`.
+
+On the desktop:
+- **File a sketch** → `<project folder>/<name>/BandLab/` (zip stems are unpacked there: audio entries only, flat, no paths kept, 2 GB unpacked max): name empty/invalid → refused; name taken → "already exists, pick another"; no linked project folder → "Link a project folder in Settings first"; folder not writable / disk full → the half-made folder is removed and the error shown; a zip without audio → "No audio in this zip".
+- **Attach a memo to a song** → copied into `<song folder>/Voice memos/` (never over a file); the song's folder gone → "This song's folder isn't there any more". To a beat or a prod: the memo stays in the inbox, marked filed to it.
+- **File an idea** → appended to the target's note under a `--- idea from <phone> ---` marker; target gone → pick another; the note would pass 20 000 characters → refused, "the note is full".
+- **Inbox file missing** (deleted by hand) → the item says "file missing" and can only be removed.
+- **Session view**: no lyrics → "Nothing written yet" + a button to the note; the song removed while open → the window keeps the last text and says so.

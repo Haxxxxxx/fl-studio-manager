@@ -14,7 +14,9 @@ export interface StemsInfo {
   newestMs: number;
 }
 
-export type DawId = "fl-studio" | "ableton" | "reaper" | "studio-one" | "pro-tools" | "cubase" | "bitwig";
+/** "bandlab" = a BandLab sketch: `<song>/BandLab/` audio with no project yet
+ * (keyed by that folder's path, see src-tauri/src/sketch.rs). */
+export type DawId = "fl-studio" | "ableton" | "reaper" | "studio-one" | "pro-tools" | "cubase" | "bitwig" | "bandlab";
 
 /** A DAW's default projects folder found on this computer (Settings → Auto-detect DAWs). */
 export interface DetectedFolder {
@@ -185,6 +187,9 @@ export interface SongMeta {
   credits?: Credit[];
   pitches?: Pitch[];
   launchKit?: LaunchKitMeta;
+  /** The song's BandLab project link (https only, see src/lib/sketch.ts).
+   * Local only: never shared with the crew. */
+  bandlabUrl?: string;
 }
 
 // ---- Launch Kit ----
@@ -691,6 +696,54 @@ export interface PhonePairing {
 }
 
 /** A decrypted /v1/snapshot or /v1/notes request, forwarded by Rust. */
+/** Phone inbox (docs/PHONE-SYNC.md v1.1, src-tauri/src/phone_inbox.rs). */
+export type InboxItemType = "idea" | "memo" | "sketch";
+export type InboxStatus = "new" | "filed" | "dismissed";
+
+export interface InboxTarget {
+  kind: "prod" | "beat" | "song";
+  id: string;
+  title: string;
+}
+
+export interface InboxFile {
+  /** The phone's file name. */
+  name: string;
+  size: number;
+  /** In the inbox folder (playable through the asset protocol). */
+  path: string;
+  /** Deleted by hand since it arrived. */
+  missing: boolean;
+}
+
+export interface InboxItem {
+  /** `<deviceId>.<itemId>`. */
+  id: string;
+  itemId: string;
+  deviceId: string;
+  phoneName: string;
+  itemType: InboxItemType;
+  title: string;
+  text: string;
+  /** What the phone aimed it at, if anything. */
+  target: InboxTarget | null;
+  createdAt: number;
+  updatedAt: number;
+  receivedAt: number | null;
+  durationMs: number | null;
+  status: InboxStatus;
+  /** Where it went: a sketch's BandLab folder, a memo's copy, or `<kind>:<id>`. */
+  filedTo: string | null;
+  filedAt: number | null;
+  files: InboxFile[];
+}
+
+export interface InboxList {
+  items: InboxItem[];
+  /** Still arriving (not listed yet). */
+  receiving: number;
+}
+
 export interface PhoneSyncRequest {
   id: string;
   path: string;

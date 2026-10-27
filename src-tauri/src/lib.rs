@@ -10,18 +10,22 @@ mod key;
 mod leads;
 mod lookup;
 mod location;
+mod flp_build;
 mod flp_metadata;
 mod models;
 mod package;
 mod paths;
+mod phone_inbox;
 mod phone_sync;
 mod render;
 mod resolve;
 mod scanner;
 mod scope;
 mod sections;
+mod session;
 mod settings;
 mod shorts;
+mod sketch;
 mod workspace;
 mod youtube;
 
@@ -74,6 +78,8 @@ pub fn run() {
             actions::duplicate_project,
             actions::restore_backup,
             actions::trash_backups,
+            sketch::continue_sketch,
+            session::open_session_window,
             actions::backups_on_risky_volumes,
             package::package_preview,
             package::package_projects,
@@ -97,6 +103,12 @@ pub fn run() {
             phone_sync::phone_sync_pair,
             phone_sync::phone_sync_forget,
             phone_sync::phone_sync_reply,
+            phone_sync::phone_sync_set_demo,
+            phone_sync::phone_inbox_list,
+            phone_sync::phone_inbox_file_sketch,
+            phone_sync::phone_inbox_attach_song,
+            phone_sync::phone_inbox_mark,
+            phone_sync::phone_inbox_remove,
             paths::open_project,
             paths::reveal_path,
         ])

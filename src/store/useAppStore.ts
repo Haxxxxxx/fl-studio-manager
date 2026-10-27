@@ -59,6 +59,8 @@ export type View =
   // The crew section of the menu (CrewSection).
   // Raw beats + finding similar ones (DiggerView).
   | "digger"
+  // Ideas, memos and BandLab exports from the phone (InboxView).
+  | "inbox"
   | "crewBoard"
   | "crewReleases"
   | "crewMembers"
@@ -291,6 +293,13 @@ interface AppState {
     albumId: string | null;
     status: SongStatus;
   }) => Promise<string>;
+  /** File a sketch from the phone inbox into `<parentFolder>/<name>/BandLab/`
+   * (a sketch song in Creation); returns its key. */
+  fileInboxSketch: (args: { itemId: string; parentFolder: string; name: string; bandlabUrl?: string }) => Promise<string>;
+  /** "Continue in FL Studio": create the .flp from a template next to the
+   * sketch and move the song's data (stage, notes, credits, share, release
+   * slot, favorite) to it. Returns the new .flp path. */
+  continueSketch: (sketchPath: string, templatePath: string) => Promise<api.Continued>;
   duplicateProject: (path: string, newName: string) => Promise<string>;
   restoreBackup: (backupPath: string, projectPath: string) => Promise<string>;
   trashBackups: (paths: string[], allowPermanent?: boolean) => Promise<number>;
@@ -373,6 +382,22 @@ export const useAppStore = create<AppState>((set, get) => {
     }
     keepPaths(saved);
     await scanOrReport();
+  }
+
+  /** Records moved to new paths (lib/relink.ts): the workspace, favorites,
+   * and the open drawer and Launch Kit follow. */
+  function followRelinks(relinks: Relink[]) {
+    const map = new Map(relinks.map((r) => [r.from, r.to]));
+    mutateWorkspace((ws) => applyRelinks(ws, relinks));
+    const favs = get().settings.favorites;
+    if (favs.some((f) => map.has(f))) void get().updateSettings({ favorites: favs.map((f) => map.get(f) ?? f) });
+    const open = get().detailPath;
+    const kit = get().launchPath;
+    set({
+      detailPath: open && map.has(open) ? map.get(open)! : open,
+      // The Launch Kit follows a "Save as" too, instead of showing another song.
+      launchPath: kit && map.has(kit) ? map.get(kit)! : kit,
+    });
   }
 
   function scanOrReport() {
@@ -637,18 +662,8 @@ export const useAppStore = create<AppState>((set, get) => {
           // writable workspace, never sample data.
           const relinks = get().workspaceWritable ? findRelinks(projects, get().workspace, folders) : [];
           if (relinks.length) {
-            const map = new Map(relinks.map((r) => [r.from, r.to]));
-            mutateWorkspace((ws) => applyRelinks(ws, relinks));
-            const favs = get().settings.favorites;
-            if (favs.some((f) => map.has(f))) void get().updateSettings({ favorites: favs.map((f) => map.get(f) ?? f) });
-            const open = get().detailPath;
-            const kit = get().launchPath;
-            set({
-              relinked: [...get().relinked, ...relinks],
-              detailPath: open && map.has(open) ? map.get(open)! : open,
-              // The Launch Kit follows a "Save as" too, instead of showing another song.
-              launchPath: kit && map.has(kit) ? map.get(kit)! : kit,
-            });
+            followRelinks(relinks);
+            set({ relinked: [...get().relinked, ...relinks] });
           }
           set({ projects });
         }
@@ -1044,6 +1059,23 @@ export const useAppStore = create<AppState>((set, get) => {
       if (albumId) get().addTracks(albumId, [path]);
       await get().rescan();
       return path;
+    },
+
+    fileInboxSketch: async ({ itemId, parentFolder, name, bandlabUrl }) => {
+      if (get().demoMode) throw new Error("This is sample data — link a real project folder first.");
+      const key = await api.phoneInboxFileSketch(itemId, parentFolder, name);
+      get().updateSong(key, { status: "creation", ...(bandlabUrl ? { bandlabUrl } : {}) });
+      await get().rescan();
+      return key;
+    },
+
+    continueSketch: async (sketchPath, templatePath) => {
+      if (get().demoMode) throw new Error("This is sample data — link a real project folder first.");
+      const done = await api.continueSketch(sketchPath, templatePath);
+      // Exactly a rename: the sketch's record now belongs to the .flp.
+      if (get().workspaceWritable) followRelinks([{ from: sketchPath, to: done.flp, reason: "renamed" }]);
+      await get().rescan();
+      return done;
     },
 
     duplicateProject: async (path, newName) => {

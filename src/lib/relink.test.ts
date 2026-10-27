@@ -53,6 +53,15 @@ describe("findRelinks", () => {
   it("never targets templates", () => {
     expect(findRelinks([proj("/music/Projects/A/T.flp", true)], ws({ "/music/Projects/A/A.flp": { status: "creation" } }), W)).toEqual([]);
   });
+
+  it("tells BandLab sketches apart by their song folder", () => {
+    // Every sketch's key ends in /BandLab: a gone sketch isn't another one.
+    const gone = { "/music/Projects/Old idea/BandLab": { status: "creation" as const } };
+    expect(findRelinks([proj("/music/Projects/New idea/BandLab")], ws(gone), W)).toEqual([]);
+    // The same song folder moved elsewhere is still followed.
+    const moved = findRelinks([proj("/music/Projects/2026/Old idea/BandLab")], ws(gone), W);
+    expect(moved).toEqual([{ from: "/music/Projects/Old idea/BandLab", to: "/music/Projects/2026/Old idea/BandLab", reason: "moved" }]);
+  });
 });
 
 describe("applyRelinks", () => {
@@ -64,5 +73,15 @@ describe("applyRelinks", () => {
     expect(out.songs["/b/Old.flp"]).toEqual({ status: "prep", shared: true, shareId: "s1" });
     expect(out.songs["/a/Old.flp"]).toBeUndefined();
     expect(out.albums[0].trackPaths).toEqual(["/a/Other.flp", "/b/Old.flp"]);
+  });
+
+  it("moves a sketch's record to its new .flp (Continue in FL Studio)", () => {
+    const album = { id: "al", title: "", kind: "single" as const, color: "", releaseDate: null, notes: "", trackPaths: ["/p/Idea/BandLab"], createdAtMs: 0 };
+    const out = applyRelinks(ws({ "/p/Idea/BandLab": { status: "creation", notes: "verse 1", bandlabUrl: "https://www.bandlab.com/x" } }, [album]), [
+      { from: "/p/Idea/BandLab", to: "/p/Idea/Idea.flp", reason: "renamed" },
+    ]);
+    expect(out.songs["/p/Idea/Idea.flp"]).toEqual({ status: "creation", notes: "verse 1", bandlabUrl: "https://www.bandlab.com/x" });
+    expect(out.songs["/p/Idea/BandLab"]).toBeUndefined();
+    expect(out.albums[0].trackPaths).toEqual(["/p/Idea/Idea.flp"]);
   });
 });

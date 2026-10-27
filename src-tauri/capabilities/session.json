@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "session",
+  "description": "The session view (teleprompter): events from the main window, keep-on-top and close. Nothing else.",
+  "windows": [
+    "session"
+  ],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-close"
+  ]
+}
