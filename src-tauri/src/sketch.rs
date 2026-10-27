@@ -229,6 +229,19 @@ mod tests {
         assert!(samples.iter().any(|s| s.ends_with("BandLab/2 - Vocals.wav")), "{samples:?}");
     }
 
+    /// A real phone export: `HIVO_M4A=<file.m4a> cargo test real_m4a -- --ignored`.
+    /// Converts a copy in a temp folder (the file itself is only read).
+    #[test]
+    #[ignore]
+    fn converts_a_real_m4a() {
+        let src = PathBuf::from(std::env::var("HIVO_M4A").expect("HIVO_M4A"));
+        let d = temp("real-m4a");
+        let out = d.0.join("converted.wav");
+        let ms = crate::audio::convert_to_wav(&src, &out).unwrap();
+        println!("converted {:.1} s, {} bytes", ms / 1000.0, fs::metadata(&out).unwrap().len());
+        assert!(ms > 0.0);
+    }
+
     #[test]
     fn converts_what_fl_studio_wouldnt_play() {
         let d = temp("convert");
