@@ -5,9 +5,11 @@ import { tr } from "../lib/i18n";
 import { findItem, isGone, itemKey, MAX_NOTE_CHARS, noteFor, type Kind } from "../lib/sync";
 import { clearConflict, flush, removeGone, setNote, useApp } from "../store";
 import { T } from "../strings";
+import { s } from "../inboxStrings";
+import type { IdeaTarget } from "../lib/ideas";
 import { C, FONT, RADIUS } from "../theme";
 
-export function NoteScreen({ kind, id, onBack }: { kind: Kind; id: string; onBack: () => void }) {
+export function NoteScreen({ kind, id, onBack, onRecord, onIdea }: { kind: Kind; id: string; onBack: () => void; onRecord: (t: IdeaTarget) => void; onIdea: (t: IdeaTarget) => void }) {
   const item = useApp((s) => s.sync.gone[itemKey(kind, id)] ?? findItem(s.sync, kind, id));
   const gone = useApp((s) => isGone(s.sync, kind, id));
   const stored = useApp((s) => noteFor(s.sync, kind, id));
@@ -76,9 +78,17 @@ export function NoteScreen({ kind, id, onBack }: { kind: Kind; id: string; onBac
             <Engrave style={{ marginLeft: item?.subtitle ? 10 : 0 }}>{[item?.bpm != null ? `${Math.round(item.bpm)} BPM` : null, item?.key].filter(Boolean).join(" · ")}</Engrave>
           ) : null}
         </View>
-        {item?.kind === "prod" && item.url ? (
-          <Button label={t.openLink} onPress={() => void Linking.openURL(item.url as string)} style={{ alignSelf: "flex-start", marginTop: 10, paddingVertical: 6 }} />
-        ) : null}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+          {item?.kind === "prod" && item.url ? (
+            <Button label={t.openLink} onPress={() => void Linking.openURL(item.url as string)} style={{ paddingVertical: 6 }} />
+          ) : null}
+          {item && !gone ? (
+            <>
+              <Button label={s().recordForThis} onPress={() => onRecord({ kind, id, title: item.title })} style={{ paddingVertical: 6 }} />
+              <Button label={s().ideaForThis} onPress={() => onIdea({ kind, id, title: item.title })} style={{ paddingVertical: 6 }} />
+            </>
+          ) : null}
+        </View>
       </View>
 
       {gone ? (

@@ -1230,6 +1230,61 @@ mod tests {
         assert!(lock(&inner.pending).is_empty());
     }
 
+    /// Cross-language check with the phone's real client (mobile/src/lib/
+    /// e2e.test.ts): run with HIVO_E2E_DIR set, then the phone test, which
+    /// writes `stop` when done. `cargo test e2e_server -- --ignored`.
+    #[test]
+    #[ignore]
+    fn e2e_server_for_the_phone_client() {
+        let dir = PathBuf::from(std::env::var("HIVO_E2E_DIR").expect("HIVO_E2E_DIR"));
+        let port: u16 = std::env::var("HIVO_E2E_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(48123);
+        fs::create_dir_all(&dir).unwrap();
+        let inner = Inner::new(dir.join("phone-sync.json"));
+        {
+            let mut store = lock(&inner.store);
+            store.port = Some(port);
+            store.devices = vec![StoredDevice {
+                id: "e2eDevice0000000000000".into(),
+                key: B64.encode([9u8; 32]),
+                name: Some("E2E phone".into()),
+                app_version: None,
+                paired_at_ms: now_ms(),
+                last_seen_ms: Some(now_ms()),
+            }];
+        }
+        // Answers like an empty library, so a real phone app can sync against it.
+        struct E2eHost {
+            inner: Mutex<Option<Arc<Inner>>>,
+        }
+        impl Host for E2eHost {
+            fn forward(&self, request: &ForwardedRequest) -> bool {
+                let inner = lock(&self.inner).clone().unwrap();
+                let r = request.clone();
+                let body = if r.path == "/v1/snapshot" { json!({ "items": [], "generatedAt": now_ms() }) } else { json!({ "results": [] }) };
+                std::thread::spawn(move || inner.reply(&r.id, Ok(body)));
+                true
+            }
+            fn hivo_version(&self) -> String {
+                "0.7.0".into()
+            }
+            fn desktop_name(&self) -> String {
+                "Test desk".into()
+            }
+        }
+        let host = Arc::new(E2eHost { inner: Mutex::new(Some(inner.clone())) });
+        start(&inner, host, IpAddr::V4(Ipv4Addr::LOCALHOST)).unwrap();
+        fs::write(dir.join("ready"), port.to_string()).unwrap();
+        let secs: u64 = std::env::var("HIVO_E2E_SECS").ok().and_then(|s| s.parse().ok()).unwrap_or(120);
+        let started = Instant::now();
+        while !dir.join("stop").exists() && started.elapsed() < Duration::from_secs(secs) {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let list = inner.inbox.list();
+        fs::write(dir.join("result.json"), serde_json::to_vec_pretty(&list).unwrap()).unwrap();
+        stop(&inner);
+        assert!(dir.join("stop").exists(), "the phone test never finished");
+    }
+
     #[test]
     fn live_upload_of_a_memo_and_demo_refusal() {
         let dir = std::env::temp_dir().join(format!("hivo-phone-upload-{}", std::process::id()));
