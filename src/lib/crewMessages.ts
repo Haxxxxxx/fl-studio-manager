@@ -60,8 +60,16 @@ const TEXT = {
     fr: "Ta connexion a expiré. Reconnecte-toi.",
   },
   ownThree: {
-    en: "You already own 3 crews. Hand one over first.",
-    fr: "Tu possèdes déjà 3 crews. Passe-en un à quelqu'un d'autre d'abord.",
+    en: "You already own 3 crews. Hand one over or delete one first.",
+    fr: "Tu possèdes déjà 3 crews. Passe-en un à quelqu'un d'autre ou supprimes-en un d'abord.",
+  },
+  deleteName: {
+    en: "Type the crew's name exactly to delete it.",
+    fr: "Tape le nom exact du crew pour le supprimer.",
+  },
+  deleteOwnerOnly: {
+    en: "Only the crew's owner can delete it.",
+    fr: "Seul le propriétaire du crew peut le supprimer.",
   },
   inTen: {
     en: "You're already in 10 crews. Leave one first.",
@@ -112,6 +120,8 @@ export function crewErrorMessage(e: unknown, lang: UiLang = currentUiLang()): st
   if (/rate limit|too many/i.test(msg)) return t("tooManyTries");
   if (/jwt expired|invalid jwt|refresh token/i.test(msg)) return t("expired");
   if (/own 3 crews/i.test(msg)) return t("ownThree");
+  if (/type the crew name/i.test(msg)) return t("deleteName");
+  if (/only the owner can delete/i.test(msg)) return t("deleteOwnerOnly");
   if (/already in 10 crews/i.test(msg)) return t("inTen");
   if (/failed to fetch|network/i.test(msg)) return t("offline");
   return msg;

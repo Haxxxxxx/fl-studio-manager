@@ -72,6 +72,8 @@ interface CrewState {
   /** Owner: remove a crewmate (their shared songs leave with them). */
   removeMember: (userId: string) => Promise<void>;
   leaveCrew: () => Promise<void>;
+  /** Owner: delete the active crew for everyone (the crew's name typed back). */
+  deleteCrew: (confirmName: string) => Promise<void>;
   /** Share or stop sharing songs with the active crew. Songs shared with
    * another crew are left alone (see moveShares). */
   /** Returns how many songs were skipped because they're shared with another crew. */
@@ -145,6 +147,26 @@ export const useCrewStore = create<CrewState>((set, get) => {
     const { activeCrewId, userId } = get();
     return activeCrewId && userId ? { crewId: activeCrewId, userId } : null;
   };
+
+  /** After leaving or deleting a crew: the server already removed my songs
+   * and releases from it, so forget those shares here and go back to the
+   * crew list. */
+  async function forgetCrew(sc: ShareScope) {
+    const app = useAppStore.getState();
+    for (const [path, meta] of Object.entries(app.workspace.songs)) {
+      if (meta.shareId && sharedHere({ ...meta, shared: true }, sc)) {
+        app.updateSong(path, { shared: false, shareId: undefined, shareCrewId: undefined, shareUserId: undefined });
+      }
+    }
+    for (const a of app.workspace.albums) {
+      if (a.shareId && releaseSharedHere({ ...a, shared: true }, sc)) {
+        app.updateAlbum(a.id, { shared: false, shareId: undefined, shareCrewId: undefined, shareUserId: undefined });
+      }
+    }
+    app.clearDeletedReleaseShares(releaseTombstones(useAppStore.getState().workspace, sc));
+    writeActiveCrew(null);
+    await get().loadCrews();
+  }
 
   /** Signed in, a crew chosen, the real workspace loaded (never sample data,
    * never an empty stand-in after a failed load). */
@@ -614,22 +636,16 @@ export const useCrewStore = create<CrewState>((set, get) => {
       if (!supabase || !sc) return;
       const { error } = await supabase.from("crew_members").delete().eq("crew_id", sc.crewId).eq("user_id", sc.userId);
       if (error) throw new Error(crewErrorMessage(error));
-      // The server removed my songs from that crew; forget those shares here.
-      const app = useAppStore.getState();
-      for (const [path, meta] of Object.entries(app.workspace.songs)) {
-        if (meta.shareId && sharedHere({ ...meta, shared: true }, sc)) {
-          app.updateSong(path, { shared: false, shareId: undefined, shareCrewId: undefined, shareUserId: undefined });
-        }
-      }
-      // My releases left with me too (after_member_left).
-      for (const a of app.workspace.albums) {
-        if (a.shareId && releaseSharedHere({ ...a, shared: true }, sc)) {
-          app.updateAlbum(a.id, { shared: false, shareId: undefined, shareCrewId: undefined, shareUserId: undefined });
-        }
-      }
-      app.clearDeletedReleaseShares(releaseTombstones(useAppStore.getState().workspace, sc));
-      writeActiveCrew(null);
-      await get().loadCrews();
+      await forgetCrew(sc);
+    },
+
+    deleteCrew: async (confirmName) => {
+      const sc = scope();
+      if (!supabase || !sc) return;
+      // Everything shared in it goes on the server (delete_crew); nothing local is touched.
+      const { error } = await supabase.rpc("delete_crew", { p_crew: sc.crewId, p_confirm_name: confirmName });
+      if (error) throw new Error(crewErrorMessage(error));
+      await forgetCrew(sc);
     },
 
     setShared: (paths, shared) => {

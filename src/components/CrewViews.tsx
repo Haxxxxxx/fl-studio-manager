@@ -3,6 +3,7 @@ import { useCrewStore, useInCrew } from "../store/useCrewStore";
 import { PipelinePage } from "./pipeline/PipelinePage";
 import { useCrewSource } from "./pipeline/crew";
 import { CrewAccount, CrewInvites, CrewMembers, CrewStatus } from "./CrewPanel";
+import { DeleteCrew } from "./DeleteCrew";
 import { releaseTracks, sortCrewReleases } from "../lib/crewSync";
 import { formatRelative } from "../lib/format";
 import { isFinished, statusInfo } from "../lib/songs";
@@ -137,6 +138,7 @@ export function CrewSettingsView() {
         <div className="flex max-w-3xl flex-col gap-6 overflow-y-auto p-6">
           <CrewStatus />
           <CrewAccount />
+          <DeleteCrew />
         </div>
       )}
     </Page>
