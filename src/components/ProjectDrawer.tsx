@@ -30,6 +30,9 @@ import { SongCredits, SongPitches } from "./SongPeople";
 import { ShareToggle, StageConflictBanner } from "./CrewPanel";
 import { FilesPanel } from "./FilesPanel";
 import { NotesEditor } from "./NotesEditor";
+import { PhoneMemos } from "./PhoneMemos";
+import { usePhoneInbox } from "../store/usePhoneInbox";
+import { memosForSong } from "../lib/phoneInbox";
 import { canRenderInApp, dawOf, isSketch } from "../lib/daws";
 import { MAX_BANDLAB_URL, cleanBandlabUrl } from "../lib/sketch";
 import { TemplateSelect, useFactoryTemplates } from "./NewProjectModal";
@@ -261,6 +264,7 @@ export function ProjectDrawer() {
       for (const t of meta.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
   }, [workspace.songs]);
+  const inboxItems = usePhoneInbox((s) => s.items);
 
   if (!detailPath || !project) return null;
 
@@ -274,6 +278,7 @@ export function ProjectDrawer() {
   const oldBackups = project.backups.slice(KEEP_BACKUPS);
   const visibleBackups = showAllBackups ? project.backups : project.backups.slice(0, 6);
   const sketch = isSketch(project);
+  const songMemos = memosForSong(inboxItems, project.path);
 
   async function run(action: () => Promise<string | number>, ok: (r: string | number) => string) {
     setMessage(null);
@@ -473,6 +478,9 @@ export function ProjectDrawer() {
             onChange={(notes) => updateSong(project.path, { notes })}
             placeholder={t.notesPlaceholder}
           />
+          <div className="mt-3">
+            <PhoneMemos memos={songMemos} />
+          </div>
         </Section>
 
         {!sketch && (

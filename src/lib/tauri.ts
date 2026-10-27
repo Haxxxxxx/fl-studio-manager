@@ -9,7 +9,8 @@ import type {
   CoverStatus,
   PackagePlan,
   PackageResult,
-  PickedAudio,
+  InboxList,
+  InboxStatus,
   ProjectInfo,
   RenderEvent,
   Settings,
@@ -147,13 +148,8 @@ export async function createProject(args: {
   return invoke("create_project", args);
 }
 
-// BandLab sketches (src-tauri/src/sketch.rs). The picker runs in Rust and
-// keeps the files' paths; the webview only sees names and sizes.
-/** Native multi-file audio picker; [] when cancelled (the previous pick is kept). */
-export const pickBandlabFiles = (): Promise<PickedAudio[]> => invoke("pick_bandlab_files");
-/** Copies the picked files to `<parentFolder>/<name>/BandLab/`; returns the
- * sketch's key (that folder's path). Refuses a name that already exists. */
-export const importBandlab = (parentFolder: string, name: string): Promise<string> => invoke("import_bandlab", { parentFolder, name });
+// BandLab sketches (src-tauri/src/sketch.rs): they arrive from the phone
+// (phoneInboxFileSketch below).
 /** Copies the template to `<song>/<song>.flp` beside the sketch's BandLab
  * folder; returns the new .flp path. */
 export const continueSketch = (sketchPath: string, templatePath: string): Promise<string> => invoke("continue_sketch", { sketchPath, templatePath });
@@ -325,4 +321,21 @@ export const phoneSyncReply = (id: string, reply: { body: unknown } | { error: s
   invoke("phone_sync_reply", { id, body: "body" in reply ? reply.body : null, error: "error" in reply ? reply.error : null });
 export function onPhoneSyncRequest(handler: (request: PhoneSyncRequest) => void): Promise<UnlistenFn> {
   return listen<PhoneSyncRequest>("phone-sync-request", (e) => handler(e.payload));
+}
+
+// Phone inbox (src-tauri/src/phone_inbox.rs, docs/PHONE-SYNC.md v1.1). Items
+// are named by id; Rust resolves every path from Settings.
+/** Sample data on screen: the phone's uploads and ideas are refused while on. */
+export const phoneSyncSetDemo = (on: boolean): Promise<void> => invoke("phone_sync_set_demo", { on });
+export const phoneInboxList = (): Promise<InboxList> => invoke("phone_inbox_list");
+/** `<parentFolder>/<name>/BandLab/` with the sketch's audio (zips unpacked); returns the sketch's key. */
+export const phoneInboxFileSketch = (id: string, parentFolder: string, name: string): Promise<string> =>
+  invoke("phone_inbox_file_sketch", { id, parentFolder, name });
+/** Copies a memo (or a sketch's audio) into `<song folder>/Voice memos/`; returns the copies. */
+export const phoneInboxAttachSong = (id: string, songPath: string): Promise<string[]> => invoke("phone_inbox_attach_song", { id, songPath });
+export const phoneInboxMark = (id: string, status: InboxStatus, filedTo: string | null = null): Promise<void> =>
+  invoke("phone_inbox_mark", { id, status, filedTo });
+export const phoneInboxRemove = (id: string): Promise<void> => invoke("phone_inbox_remove", { id });
+export function onPhoneInboxChanged(handler: () => void): Promise<UnlistenFn> {
+  return listen("phone-inbox-changed", () => handler());
 }

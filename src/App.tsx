@@ -17,8 +17,8 @@ import { RenderPanel } from "./components/RenderPanel";
 import { PackageConfirm, PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
-import { BandlabImportModal } from "./components/BandlabImportModal";
 import { FeedbackModal } from "./components/FeedbackModal";
+import { InboxView } from "./components/InboxView";
 import { supabase } from "./lib/supabase";
 import { isReadOnlyInstallError } from "./lib/updaterErrors";
 import { scrubPaths } from "./lib/feedback";
@@ -303,6 +303,7 @@ export default function App() {
         {view === "calendar" && <CalendarView />}
         {view === "settings" && <SettingsView />}
         {view === "digger" && <DiggerView />}
+        {view === "inbox" && <InboxView />}
         {view === "crewBoard" && <CrewBoardView />}
         {view === "crewReleases" && <CrewReleasesView />}
         {view === "crewMembers" && <CrewMembersView />}
@@ -311,7 +312,6 @@ export default function App() {
       {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
       {view !== "settings" && view !== "launch" && <ProjectDrawer key={detailPath ?? ""} />}
       <NewProjectModal />
-      <BandlabImportModal />
       <FeedbackModal />
       <RenderPanel />
       <PackagePanel />

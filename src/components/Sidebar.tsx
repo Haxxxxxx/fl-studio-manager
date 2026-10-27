@@ -1,8 +1,9 @@
-import { CalendarDays, Disc3, KanbanSquare, LayoutDashboard, Library, MessageSquare, Plus, Rocket, Settings as SettingsIcon, Shovel, Users } from "lucide-react";
+import { CalendarDays, Disc3, Inbox, KanbanSquare, LayoutDashboard, Library, MessageSquare, Plus, Rocket, Settings as SettingsIcon, Shovel, Users } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { isTauri } from "@tauri-apps/api/core";
 import { useAppStore } from "../store/useAppStore";
 import { useDigger } from "../store/useDigger";
+import { useInboxNewCount, usePhoneInbox } from "../store/usePhoneInbox";
 import { btnPrimary, engrave, StatusDot, Wordmark } from "../ui";
 import { CrewSection } from "./CrewSection";
 import { useCrewStore, useInCrew } from "../store/useCrewStore";
@@ -26,6 +27,7 @@ const T = dict(
     peopleCredits: "People & credits",
     joinCrew: "Join your crew",
     feedback: "Report a bug or send feedback",
+    inbox: "Phone inbox",
   },
   {
     dashboard: "Tableau de bord",
@@ -41,6 +43,7 @@ const T = dict(
     peopleCredits: "Personnes et crédits",
     joinCrew: "Rejoindre ton crew",
     feedback: "Signaler un bug ou donner ton avis",
+    inbox: "Boîte du téléphone",
   },
 );
 
@@ -60,6 +63,9 @@ export function Sidebar() {
   const openFeedback = useAppStore((s) => s.openFeedback);
   // A dig finished while another view was open: "needs you" on the entry.
   const digUnseen = useDigger((s) => s.unseen);
+  // The phone inbox shows once phone sync is on, a phone is paired, or something arrived.
+  const inboxNew = useInboxNewCount();
+  const showInbox = usePhoneInbox((s) => s.syncOn || s.paired > 0 || s.items.length > 0 || s.receiving > 0);
   const t = tr(T);
 
   // The in-app form (FeedbackModal) when this build has a backend; else the
@@ -80,6 +86,7 @@ export function Sidebar() {
     { id: "pipeline" as const, label: t.pipeline, icon: KanbanSquare },
     // Raw beats and finding similar ones: fuel for the Creation stage.
     { id: "digger" as const, label: "Digger", icon: Shovel },
+    ...(showInbox ? [{ id: "inbox" as const, label: t.inbox, icon: Inbox, badge: inboxNew }] : []),
     { id: "albums" as const, label: t.releases, icon: Disc3, badge: albums.length },
     { id: "calendar" as const, label: t.calendar, icon: CalendarDays },
     // Solo: People (credits, collaborators) moves down the list, see below.

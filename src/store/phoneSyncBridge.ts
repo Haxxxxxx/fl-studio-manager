@@ -8,6 +8,7 @@ import * as api from "../lib/tauri";
 import { applyNoteChanges, buildSnapshot, noteLookup, parseChanges, type SyncSources } from "../lib/phoneSync";
 import type { PhoneSyncRequest } from "../types";
 import { useAppStore } from "./useAppStore";
+import { startPhoneInbox } from "./usePhoneInbox";
 
 type Reply = { body: unknown } | { error: string };
 
@@ -40,10 +41,18 @@ export async function answerPhoneRequest(req: PhoneSyncRequest): Promise<Reply> 
   return { body: { results } };
 }
 
-/** Starts answering; returns the stop function (App.tsx mounts it once). */
+/** Starts answering; returns the stop function (App.tsx mounts it once).
+ * Also tells Rust when sample data is on screen (the phone's uploads and
+ * ideas are refused then) and keeps the phone inbox list fresh. */
 export function startPhoneSyncBridge(): () => void {
   let unlisten: UnlistenFn | null = null;
   let stopped = false;
+  const tellDemo = (on: boolean) => void api.phoneSyncSetDemo(on).catch(() => {});
+  tellDemo(useAppStore.getState().demoMode);
+  const unsubDemo = useAppStore.subscribe((s, prev) => {
+    if (s.demoMode !== prev.demoMode) tellDemo(s.demoMode);
+  });
+  const stopInbox = startPhoneInbox();
   api
     .onPhoneSyncRequest((req) => {
       void answerPhoneRequest(req)
@@ -59,5 +68,7 @@ export function startPhoneSyncBridge(): () => void {
   return () => {
     stopped = true;
     unlisten?.();
+    unsubDemo();
+    stopInbox();
   };
 }

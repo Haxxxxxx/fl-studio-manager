@@ -3,6 +3,15 @@ import { cleanTitle } from "./launchKit";
 // BandLab sketches (src-tauri/src/sketch.rs): a phone export imported as a
 // song in a project folder, `<song>/BandLab/`, until "Continue in FL Studio".
 
+/** Same list as `SKETCH_AUDIO_EXTS` in src-tauri/src/sketch.rs. */
+export const SKETCH_AUDIO_EXTS = ["wav", "mp3", "m4a", "aac", "flac", "ogg", "aif", "aiff"];
+
+/** An audio file a sketch or a memo can hold (not a zip of stems). */
+export function isSketchAudioName(name: string): boolean {
+  const ext = /\.([a-z0-9]{1,5})$/i.exec(name)?.[1]?.toLowerCase();
+  return !!ext && SKETCH_AUDIO_EXTS.includes(ext);
+}
+
 /** Same limit as the link field's `maxLength`. */
 export const MAX_BANDLAB_URL = 300;
 

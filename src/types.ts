@@ -85,12 +85,6 @@ export interface SampleInfo {
   status: SampleStatus;
 }
 
-/** A file the BandLab import picker returned (Rust keeps the path). */
-export interface PickedAudio {
-  name: string;
-  sizeBytes: number;
-}
-
 export interface TemplateInfo {
   name: string;
   category: string;
@@ -702,6 +696,54 @@ export interface PhonePairing {
 }
 
 /** A decrypted /v1/snapshot or /v1/notes request, forwarded by Rust. */
+/** Phone inbox (docs/PHONE-SYNC.md v1.1, src-tauri/src/phone_inbox.rs). */
+export type InboxItemType = "idea" | "memo" | "sketch";
+export type InboxStatus = "new" | "filed" | "dismissed";
+
+export interface InboxTarget {
+  kind: "prod" | "beat" | "song";
+  id: string;
+  title: string;
+}
+
+export interface InboxFile {
+  /** The phone's file name. */
+  name: string;
+  size: number;
+  /** In the inbox folder (playable through the asset protocol). */
+  path: string;
+  /** Deleted by hand since it arrived. */
+  missing: boolean;
+}
+
+export interface InboxItem {
+  /** `<deviceId>.<itemId>`. */
+  id: string;
+  itemId: string;
+  deviceId: string;
+  phoneName: string;
+  itemType: InboxItemType;
+  title: string;
+  text: string;
+  /** What the phone aimed it at, if anything. */
+  target: InboxTarget | null;
+  createdAt: number;
+  updatedAt: number;
+  receivedAt: number | null;
+  durationMs: number | null;
+  status: InboxStatus;
+  /** Where it went: a sketch's BandLab folder, a memo's copy, or `<kind>:<id>`. */
+  filedTo: string | null;
+  filedAt: number | null;
+  files: InboxFile[];
+}
+
+export interface InboxList {
+  items: InboxItem[];
+  /** Still arriving (not listed yet). */
+  receiving: number;
+}
+
 export interface PhoneSyncRequest {
   id: string;
   path: string;

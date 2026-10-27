@@ -59,6 +59,8 @@ export type View =
   // The crew section of the menu (CrewSection).
   // Raw beats + finding similar ones (DiggerView).
   | "digger"
+  // Ideas, memos and BandLab exports from the phone (InboxView).
+  | "inbox"
   | "crewBoard"
   | "crewReleases"
   | "crewMembers"
@@ -144,8 +146,6 @@ interface AppState {
   /** Song shown in the Launch Kit view. */
   launchPath: string | null;
   newProject: NewProjectDraft | null;
-  /** The "Import from BandLab" modal is open. */
-  bandlabImport: boolean;
   /** What the feedback form opens on ("Report this" on an error prefills it). */
   feedback: FeedbackDraft | null;
   update: UpdateState;
@@ -241,8 +241,6 @@ interface AppState {
   refreshCoverStatus: () => Promise<void>;
   openNewProject: (draft?: Partial<NewProjectDraft>) => void;
   closeNewProject: () => void;
-  openBandlabImport: () => void;
-  closeBandlabImport: () => void;
   openFeedback: (draft?: Partial<FeedbackDraft>) => void;
   closeFeedback: () => void;
 
@@ -295,9 +293,9 @@ interface AppState {
     albumId: string | null;
     status: SongStatus;
   }) => Promise<string>;
-  /** Copy the picked BandLab export into `<parentFolder>/<name>/BandLab/`
+  /** File a sketch from the phone inbox into `<parentFolder>/<name>/BandLab/`
    * (a sketch song in Creation); returns its key. */
-  importBandlab: (args: { parentFolder: string; name: string; bandlabUrl?: string }) => Promise<string>;
+  fileInboxSketch: (args: { itemId: string; parentFolder: string; name: string; bandlabUrl?: string }) => Promise<string>;
   /** "Continue in FL Studio": create the .flp from a template next to the
    * sketch and move the song's data (stage, notes, credits, share, release
    * slot, favorite) to it. Returns the new .flp path. */
@@ -483,7 +481,6 @@ export const useAppStore = create<AppState>((set, get) => {
     openPersonId: null,
     launchPath: null,
     newProject: null,
-    bandlabImport: false,
     feedback: null,
     update: { status: "idle" },
 
@@ -914,8 +911,6 @@ export const useAppStore = create<AppState>((set, get) => {
     openNewProject: (draft) =>
       set({ newProject: { albumId: null, status: "creation", ...draft } }),
     closeNewProject: () => set({ newProject: null }),
-    openBandlabImport: () => set({ bandlabImport: true }),
-    closeBandlabImport: () => set({ bandlabImport: false }),
     openFeedback: (draft) => set({ feedback: { category: "idea", message: "", ...draft } }),
     closeFeedback: () => set({ feedback: null }),
 
@@ -1066,9 +1061,9 @@ export const useAppStore = create<AppState>((set, get) => {
       return path;
     },
 
-    importBandlab: async ({ parentFolder, name, bandlabUrl }) => {
+    fileInboxSketch: async ({ itemId, parentFolder, name, bandlabUrl }) => {
       if (get().demoMode) throw new Error("This is sample data — link a real project folder first.");
-      const key = await api.importBandlab(parentFolder, name);
+      const key = await api.phoneInboxFileSketch(itemId, parentFolder, name);
       get().updateSong(key, { status: "creation", ...(bandlabUrl ? { bandlabUrl } : {}) });
       await get().rescan();
       return key;

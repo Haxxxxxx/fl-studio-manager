@@ -5,7 +5,6 @@ import {
   ArrowUpDown,
   CheckSquare,
   ChevronRight,
-  FileAudio,
   Folder,
   Download,
   FolderSearch,
@@ -56,8 +55,6 @@ const T = dict(
     colAlbum: "Album",
     searchPlaceholder: "Search songs, tags, notes, plugins, samples…",
     rescan: "Rescan folders",
-    importBandlab: "Import from BandLab",
-    importBandlabTitle: "Add a song from a BandLab export (MP3 or WAV) as a sketch in a project folder",
     favorites: "Favorites",
     issues: (n: number) => `Issues (${n})`,
     archived: (n: number) => `Archived (${n})`,
@@ -112,8 +109,6 @@ const T = dict(
     colAlbum: "Album",
     searchPlaceholder: "Cherche des sons, tags, notes, plugins, samples…",
     rescan: "Rescanner les dossiers",
-    importBandlab: "Importer depuis BandLab",
-    importBandlabTitle: "Ajouter un son à partir d'un export BandLab (MP3 ou WAV), comme sketch dans un dossier de projets",
     favorites: "Favoris",
     issues: (n: number) => `Problèmes (${n})`,
     archived: (n: number) => `Archivés (${n})`,
@@ -214,7 +209,6 @@ export function LibraryView() {
   const selectAll = useAppStore((s) => s.selectAll);
   const clearSelection = useAppStore((s) => s.clearSelection);
   const rescan = useAppStore((s) => s.rescan);
-  const openBandlabImport = useAppStore((s) => s.openBandlabImport);
   const startRender = useAppStore((s) => s.startRender);
   const rendering = useAppStore((s) => s.rendering);
   const settings = useAppStore((s) => s.settings);
@@ -365,9 +359,6 @@ export function LibraryView() {
           title={t.rescan}
         >
           <RefreshCw size={14} className={scanning ? "animate-spin" : ""} />
-        </button>
-        <button onClick={openBandlabImport} disabled={demoMode} className={btn} title={t.importBandlabTitle}>
-          <FileAudio size={14} /> {t.importBandlab}
         </button>
         <Toggle active={favoritesOnly} onClick={() => setFavoritesOnly(!favoritesOnly)}>
           <Star size={14} /> {t.favorites}

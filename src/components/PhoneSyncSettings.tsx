@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import * as api from "../lib/tauri";
 import { formatDateTime } from "../lib/format";
 import type { PhonePairing, PhoneSyncStatus } from "../types";
+import { usePhoneInbox } from "../store/usePhoneInbox";
 import { dict, tr } from "../i18n";
 
 const T = dict(
@@ -95,6 +96,8 @@ export function PhoneSyncSettings() {
     setError(null);
     try {
       setStatus(await fn());
+      // The menu's Phone inbox entry follows phone sync being on / paired.
+      void usePhoneInbox.getState().refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

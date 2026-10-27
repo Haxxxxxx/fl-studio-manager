@@ -6,6 +6,9 @@ import { youtubeId } from "../lib/digger";
 import { dict, tr } from "../i18n";
 import type { BeatFile, SavedLead } from "../types";
 import { NotesEditor } from "./NotesEditor";
+import { PhoneMemos } from "./PhoneMemos";
+import { usePhoneInbox } from "../store/usePhoneInbox";
+import { memosFor } from "../lib/phoneInbox";
 import { label, secondary } from "./DigResults";
 
 // The Digger's right column while a beat or a saved prod is selected: what
@@ -76,6 +79,7 @@ export function DigNotesPanel({ target, player, onClose }: { target: NotesTarget
   const leadNote = useAppStore((s) => (target.kind === "lead" ? s.workspace.leadNotes?.[target.lead.hash] : undefined));
   const setBeatNote = useAppStore((s) => s.setBeatNote);
   const setLeadNote = useAppStore((s) => s.setLeadNote);
+  const inboxItems = usePhoneInbox((s) => s.items);
 
   let title: string;
   let facts: string[];
@@ -131,6 +135,8 @@ export function DigNotesPanel({ target, player, onClose }: { target: NotesTarget
           )}
         </div>
       )}
+
+      <PhoneMemos memos={target.kind === "beat" ? memosFor(inboxItems, "beat", target.beat.path) : memosFor(inboxItems, "prod", target.lead.hash)} />
 
       <div className="flex min-h-0 flex-1 flex-col border-t border-rule pt-3">
         <NotesEditor

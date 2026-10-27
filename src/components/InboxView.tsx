@@ -1,0 +1,441 @@
+import { useEffect, useMemo, useState } from "react";
+import { FileAudio, FolderOpen, Inbox as InboxIcon, Lightbulb, Mic, Smartphone, Trash2, Undo2 } from "lucide-react";
+import { useAppStore } from "../store/useAppStore";
+import { usePhoneInbox } from "../store/usePhoneInbox";
+import * as api from "../lib/tauri";
+import { audioSrc } from "../lib/tauri";
+import { formatBytes, formatDateTime } from "../lib/format";
+import { bandlabLink, duration, filterInbox, knownTarget, newCount, parseTargetKey, sketchName, targetOptions, type InboxFilter, type TargetOption } from "../lib/phoneInbox";
+import { isSketchAudioName } from "../lib/sketch";
+import type { BeatFile, InboxItem, InboxTarget, SavedLead } from "../types";
+import { ConfirmButton, btn, btnPrimary, btnQuiet, engrave, input } from "./ui";
+import { StatusDot } from "../ui";
+import { dict, tr } from "../i18n";
+
+// The phone inbox (docs/PHONE-SYNC.md v1.1): ideas, voice memos and BandLab
+// exports sent from the phone. Each card files its item: an idea into a
+// note, a memo into a song's "Voice memos" folder (or onto a beat or a
+// prod), a sketch into a new song folder. Errors stay on their card.
+
+const T = dict(
+  {
+    title: "Phone inbox",
+    intro: "Ideas, voice memos and BandLab exports from your phone. They stay on this computer: nothing goes through a server.",
+    filterNew: (n: number) => `New (${n})`,
+    filterFiled: "Filed",
+    filterAll: "All",
+    receiving: (n: number) => (n === 1 ? "Receiving 1 item from the phone…" : `Receiving ${n} items from the phone…`),
+    sample: "Sample data is on screen: the phone inbox is off. Switch to your library to receive.",
+    notPaired: "No phone paired yet. Turn on Phone sync in Settings and scan the QR code with the Hivo phone app.",
+    openSettings: "Open Phone sync",
+    emptyNew: "Nothing new. On the phone: share a BandLab export to Hivo, record a voice memo, or write an idea.",
+    emptyOther: "Nothing here.",
+    idea: "Idea",
+    memo: "Voice memo",
+    sketch: "BandLab export",
+    from: (phone: string, when: string) => `From ${phone} · ${when}`,
+    aimedAt: (title: string) => `Written for ${title}`,
+    aimedGone: (title: string) => `Written for ${title}, which isn't on this computer any more: pick another.`,
+    pickTarget: "Pick a song, beat or prod",
+    songs: "Songs",
+    beats: "Beats",
+    prods: "Saved prods",
+    addToNote: "Add to its notes",
+    attach: "Attach",
+    attachHintSong: "A song: the memo is copied into its “Voice memos” folder.",
+    fileAsSong: "File as a new song",
+    songName: "Song name",
+    folder: "In",
+    noFolders: "Link a project folder in Settings first: the song folder is created there.",
+    orAttach: "Or attach the audio to a song:",
+    dismiss: "Dismiss",
+    restore: "Back to new",
+    remove: "Remove",
+    removeConfirm: "Remove from inbox?",
+    removeHint: "Removes it from the inbox only: what was filed into a song folder stays.",
+    filedNote: (title: string) => `Added to the notes of ${title}`,
+    filedSketch: "Filed as a new song",
+    filedMemo: "Copied into the song's Voice memos folder",
+    filedLink: (title: string) => `Linked to ${title}`,
+    dismissed: "Dismissed",
+    openSong: "Open the song",
+    reveal: "Show in folder",
+    missing: "File missing (deleted by hand?): this item can only be removed.",
+    files: (n: number) => (n === 1 ? "1 file" : `${n} files`),
+    zip: "zip of stems: unpacked when filed",
+    working: "Working…",
+    unknown: "something on this computer",
+  },
+  {
+    title: "Boîte du téléphone",
+    intro: "Idées, mémos vocaux et exports BandLab venus de ton téléphone. Ils restent sur cet ordi : rien ne passe par un serveur.",
+    filterNew: (n: number) => `Nouveaux (${n})`,
+    filterFiled: "Rangés",
+    filterAll: "Tout",
+    receiving: (n: number) => (n === 1 ? "Réception d'1 élément du téléphone…" : `Réception de ${n} éléments du téléphone…`),
+    sample: "Les données d'exemple sont affichées : la boîte du téléphone est coupée. Passe à ta bibliothèque pour recevoir.",
+    notPaired: "Aucun téléphone associé. Active la synchro téléphone dans les Réglages et scanne le QR code avec l'app Hivo du téléphone.",
+    openSettings: "Ouvrir la synchro téléphone",
+    emptyNew: "Rien de nouveau. Sur le téléphone : partage un export BandLab vers Hivo, enregistre un mémo vocal ou écris une idée.",
+    emptyOther: "Rien ici.",
+    idea: "Idée",
+    memo: "Mémo vocal",
+    sketch: "Export BandLab",
+    from: (phone: string, when: string) => `De ${phone} · ${when}`,
+    aimedAt: (title: string) => `Écrit pour ${title}`,
+    aimedGone: (title: string) => `Écrit pour ${title}, qui n'est plus sur cet ordi : choisis-en un autre.`,
+    pickTarget: "Choisis un son, une prod ou une prod enregistrée",
+    songs: "Sons",
+    beats: "Prods",
+    prods: "Prods enregistrées",
+    addToNote: "Ajouter à ses notes",
+    attach: "Joindre",
+    attachHintSong: "Un son : le mémo est copié dans son dossier « Voice memos ».",
+    fileAsSong: "Ranger comme nouveau son",
+    songName: "Nom du son",
+    folder: "Dans",
+    noFolders: "Lie d'abord un dossier de projets dans les Réglages : le dossier du son y est créé.",
+    orAttach: "Ou joindre l'audio à un son :",
+    dismiss: "Écarter",
+    restore: "Remettre en nouveau",
+    remove: "Retirer",
+    removeConfirm: "Retirer de la boîte ?",
+    removeHint: "Le retire de la boîte seulement : ce qui a été rangé dans un dossier de son y reste.",
+    filedNote: (title: string) => `Ajouté aux notes de ${title}`,
+    filedSketch: "Rangé comme nouveau son",
+    filedMemo: "Copié dans le dossier Voice memos du son",
+    filedLink: (title: string) => `Lié à ${title}`,
+    dismissed: "Écarté",
+    openSong: "Ouvrir le son",
+    reveal: "Afficher dans le dossier",
+    missing: "Fichier manquant (supprimé à la main ?) : cet élément peut seulement être retiré.",
+    files: (n: number) => (n === 1 ? "1 fichier" : `${n} fichiers`),
+    zip: "zip de stems : décompressé au rangement",
+    working: "En cours…",
+    unknown: "un élément de cet ordi",
+  },
+);
+
+export function InboxView() {
+  const t = tr(T);
+  const items = usePhoneInbox((s) => s.items);
+  const receiving = usePhoneInbox((s) => s.receiving);
+  const paired = usePhoneInbox((s) => s.paired);
+  const loadError = usePhoneInbox((s) => s.error);
+  const refresh = usePhoneInbox((s) => s.refresh);
+  const demoMode = useAppStore((s) => s.demoMode);
+  const setView = useAppStore((s) => s.setView);
+  const projects = useAppStore((s) => s.projects);
+  const workspace = useAppStore((s) => s.workspace);
+  const [filter, setFilter] = useState<InboxFilter>("new");
+  const [beats, setBeats] = useState<BeatFile[]>([]);
+  const [leads, setLeads] = useState<SavedLead[]>([]);
+
+  useEffect(() => {
+    void refresh();
+    let live = true;
+    // Targets for ideas and memos: beats and saved prods are read fresh.
+    void Promise.all([api.scanBeats().catch(() => []), api.listLeads().catch(() => [])]).then(([b, l]) => {
+      if (live) {
+        setBeats(b);
+        setLeads(l);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [refresh]);
+
+  const options = useMemo(() => targetOptions(projects, workspace, beats, leads), [projects, workspace, beats, leads]);
+  const shown = filterInbox(items, filter);
+
+  return (
+    <div className="min-w-0 flex-1 overflow-auto px-8 py-7">
+      <div className="mx-auto flex max-w-4xl flex-col gap-5">
+        <header className="flex items-center gap-3">
+          <InboxIcon size={18} className="text-engrave" />
+          <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-cream">{t.title}</h1>
+        </header>
+        <p className="-mt-2 text-sm text-body">{t.intro}</p>
+
+        {demoMode && <Notice>{t.sample}</Notice>}
+        {loadError && <Notice error>{loadError}</Notice>}
+        {receiving > 0 && (
+          <div className="flex items-center gap-2 text-sm text-body">
+            <StatusDot color="var(--color-warn)" size={7} /> {t.receiving(receiving)}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          {(["new", "filed", "all"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded px-3 py-1 text-sm ${filter === f ? "bg-cream font-medium text-chassis" : "text-body hover:bg-raised hover:text-cream"}`}
+            >
+              {f === "new" ? t.filterNew(newCount(items)) : f === "filed" ? t.filterFiled : t.filterAll}
+            </button>
+          ))}
+        </div>
+
+        {shown.length === 0 && (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-rule bg-panel px-6 py-10 text-center text-sm text-body">
+            <Smartphone size={22} className="text-engrave" />
+            {paired === 0 && items.length === 0 ? (
+              <>
+                <p>{t.notPaired}</p>
+                <button className={btn} onClick={() => setView("settings", "phone-sync")}>
+                  {t.openSettings}
+                </button>
+              </>
+            ) : (
+              <p>{filter === "new" ? t.emptyNew : t.emptyOther}</p>
+            )}
+          </div>
+        )}
+
+        {shown.map((item) => (
+          <InboxCard key={item.id} item={item} options={options} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Notice({ children, error = false }: { children: React.ReactNode; error?: boolean }) {
+  return (
+    <div className={`rounded border px-3 py-2 text-sm ${error ? "border-missing/50 text-missing" : "border-rule-strong text-body"}`}>{children}</div>
+  );
+}
+
+function TargetSelect({
+  options,
+  value,
+  onChange,
+  songsOnly = false,
+}: {
+  options: TargetOption[];
+  value: string;
+  onChange: (key: string) => void;
+  songsOnly?: boolean;
+}) {
+  const t = tr(T);
+  const groups: Array<[TargetOption["kind"], string]> = songsOnly
+    ? [["song", t.songs]]
+    : [
+        ["song", t.songs],
+        ["beat", t.beats],
+        ["prod", t.prods],
+      ];
+  return (
+    <select className={`${input} max-w-sm py-1.5`} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{t.pickTarget}</option>
+      {groups.map(([kind, label]) => {
+        const list = options.filter((o) => o.kind === kind);
+        if (list.length === 0) return null;
+        return (
+          <optgroup key={kind} label={label}>
+            {list.map((o) => (
+              <option key={`${o.kind}:${o.id}`} value={`${o.kind}:${o.id}`}>
+                {o.title}
+                {o.detail ? ` · ${o.detail}` : ""}
+              </option>
+            ))}
+          </optgroup>
+        );
+      })}
+    </select>
+  );
+}
+
+function optionFor(options: TargetOption[], key: string): InboxTarget | null {
+  const k = parseTargetKey(key);
+  return k ? (options.find((o) => o.kind === k.kind && o.id === k.id) ?? null) : null;
+}
+
+function InboxCard({ item, options }: { item: InboxItem; options: TargetOption[] }) {
+  const t = tr(T);
+  const fileIdea = usePhoneInbox((s) => s.fileIdea);
+  const attachMemo = usePhoneInbox((s) => s.attachMemo);
+  const fileSketch = usePhoneInbox((s) => s.fileSketch);
+  const dismiss = usePhoneInbox((s) => s.dismiss);
+  const restore = usePhoneInbox((s) => s.restore);
+  const remove = usePhoneInbox((s) => s.remove);
+  const openDetail = useAppStore((s) => s.openDetail);
+  const folders = useAppStore((s) => s.settings.watchedFolders);
+  const projects = useAppStore((s) => s.projects);
+
+  const aimed = knownTarget(item, options);
+  const [targetKey, setTargetKey] = useState(aimed ? `${aimed.kind}:${aimed.id}` : "");
+  const [name, setName] = useState(() => sketchName(item));
+  const [folder, setFolder] = useState(folders[0] ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const missing = item.files.some((f) => f.missing);
+  const isNew = item.status === "new";
+  const firstAudio = item.files.find((f) => !f.missing && isSketchAudioName(f.name));
+  const Icon = item.itemType === "idea" ? Lightbulb : item.itemType === "memo" ? Mic : FileAudio;
+  const kindLabel = item.itemType === "idea" ? t.idea : item.itemType === "memo" ? t.memo : t.sketch;
+
+  async function run(work: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await work();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg === "disk full" ? "This computer's disk is full." : msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const chosen = optionFor(options, targetKey);
+  const filedTarget = parseTargetKey(item.filedTo);
+  const filedTitle = filedTarget ? (options.find((o) => o.kind === filedTarget.kind && o.id === filedTarget.id)?.title ?? t.unknown) : null;
+  // A sketch filed as a song: its key is the BandLab folder; open it if scanned.
+  const filedSong = item.itemType === "sketch" && item.filedTo && projects.some((p) => p.path === item.filedTo) ? item.filedTo : null;
+
+  return (
+    <article className={`flex flex-col gap-3 rounded-lg border bg-panel p-4 ${isNew ? "border-rule-strong" : "border-rule opacity-80"}`}>
+      <div className="flex items-start gap-3">
+        <Icon size={18} className="mt-0.5 shrink-0 text-engrave" />
+        <div className="min-w-0 flex-1">
+          <div className={engrave}>{kindLabel}</div>
+          <div className="truncate font-medium text-cream">{item.title || (item.itemType === "idea" ? item.text.split("\n")[0] : item.files[0]?.name) || kindLabel}</div>
+          <div className="text-xs text-engrave">{t.from(item.phoneName || "Phone", formatDateTime(item.receivedAt ?? item.createdAt))}</div>
+        </div>
+        {!isNew && (
+          <span className="flex shrink-0 items-center gap-1.5 text-xs text-body">
+            <StatusDot color={item.status === "filed" ? "var(--color-ok)" : "var(--color-engrave)"} size={6} />
+            {item.status === "dismissed" ? t.dismissed : item.itemType === "sketch" && !filedTarget ? t.filedSketch : item.itemType === "idea" && filedTitle ? t.filedNote(filedTitle) : filedTitle ? t.filedLink(filedTitle) : t.filedMemo}
+          </span>
+        )}
+      </div>
+
+      {item.itemType === "idea" && item.text && <p className="whitespace-pre-wrap rounded bg-chassis px-3 py-2 text-sm text-body">{item.text}</p>}
+
+      {item.itemType !== "idea" && (
+        <div className="flex flex-col gap-2">
+          {firstAudio && <audio controls preload="none" src={audioSrc(firstAudio.path)} className="h-9 w-full max-w-md" />}
+          <div className="text-xs text-engrave">
+            {item.durationMs ? `${duration(item.durationMs)} · ` : ""}
+            {t.files(item.files.length)} · {formatBytes(item.files.reduce((n, f) => n + f.size, 0))}
+          </div>
+          {item.itemType === "sketch" && item.files.length > 1 && (
+            <ul className="text-xs text-body">
+              {item.files.map((f) => (
+                <li key={f.path} className={f.missing ? "text-missing" : ""}>
+                  {f.name} {f.name.toLowerCase().endsWith(".zip") ? `(${t.zip})` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {missing && <Notice error>{t.missing}</Notice>}
+
+      {item.target && isNew && <div className="text-xs text-body">{aimed ? t.aimedAt(aimed.title) : t.aimedGone(item.target.title || item.target.id)}</div>}
+
+      {isNew && !missing && item.itemType === "idea" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <TargetSelect options={options} value={targetKey} onChange={setTargetKey} />
+          <button className={btnPrimary} disabled={busy || !chosen} onClick={() => chosen && void run(() => fileIdea(item, chosen))}>
+            {busy ? t.working : t.addToNote}
+          </button>
+        </div>
+      )}
+
+      {isNew && !missing && item.itemType === "memo" && (
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <TargetSelect options={options} value={targetKey} onChange={setTargetKey} />
+            <button className={btnPrimary} disabled={busy || !chosen} onClick={() => chosen && void run(() => attachMemo(item, chosen))}>
+              {busy ? t.working : t.attach}
+            </button>
+          </div>
+          {chosen?.kind === "song" && <span className="text-xs text-engrave">{t.attachHintSong}</span>}
+        </div>
+      )}
+
+      {isNew && !missing && item.itemType === "sketch" && (
+        <div className="flex flex-col gap-3">
+          {folders.length === 0 ? (
+            <Notice>{t.noFolders}</Notice>
+          ) : (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className={engrave}>{t.songName}</span>
+                <input className={`${input} w-56 py-1.5`} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className={engrave}>{t.folder}</span>
+                <select className={`${input} max-w-xs py-1.5`} value={folder} onChange={(e) => setFolder(e.target.value)}>
+                  {folders.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className={btnPrimary}
+                disabled={busy || !name.trim() || !folder}
+                onClick={() =>
+                  void run(async () => {
+                    const key = await fileSketch(item, folder, name.trim(), bandlabLink(item) ?? undefined);
+                    openDetail(key);
+                  })
+                }
+              >
+                {busy ? t.working : t.fileAsSong}
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-body">
+            {t.orAttach}
+            <TargetSelect options={options} value={targetKey.startsWith("song:") ? targetKey : ""} onChange={setTargetKey} songsOnly />
+            <button className={btn} disabled={busy || chosen?.kind !== "song"} onClick={() => chosen && void run(() => attachMemo(item, chosen))}>
+              {t.attach}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <Notice error>{error}</Notice>}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {filedSong && (
+          <button className={btn} onClick={() => openDetail(filedSong)}>
+            <FolderOpen size={14} /> {t.openSong}
+          </button>
+        )}
+        {isNew && !missing && (
+          <button className={btnQuiet} disabled={busy} onClick={() => void run(() => dismiss(item))}>
+            {t.dismiss}
+          </button>
+        )}
+        {item.status === "dismissed" && (
+          <button className={btnQuiet} disabled={busy} onClick={() => void run(() => restore(item))}>
+            <Undo2 size={14} /> {t.restore}
+          </button>
+        )}
+        <span className="ml-auto" title={t.removeHint}>
+          <ConfirmButton
+            label={
+              <>
+                <Trash2 size={14} /> {t.remove}
+              </>
+            }
+            confirmLabel={t.removeConfirm}
+            onConfirm={() => void run(() => remove(item))}
+            className={btnQuiet}
+            disabled={busy}
+          />
+        </span>
+      </div>
+    </article>
+  );
+}
