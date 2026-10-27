@@ -241,7 +241,7 @@ describe("what a shared song sends (allow-list)", () => {
     samples: ["/Users/someone/Samples/kick.wav"],
     modifiedAtMs: Date.UTC(2026, 9, 1),
   } as unknown as ProjectInfo;
-  const meta = { shared: true, shareId: "s1", notes: "private lyric", tags: ["dark"], key: "Am" };
+  const meta = { shared: true, shareId: "s1", notes: "private lyric", tags: ["dark"], key: "Am", bandlabUrl: "https://www.bandlab.com/track/private-sketch" };
 
   it("sends exactly the listed fields, never notes, paths, samples or track names", () => {
     const [payload] = sharedPayloads([p], ws({ [p.path]: meta }), scope);
@@ -249,7 +249,7 @@ describe("what a shared song sends (allow-list)", () => {
       ["bpm", "credits", "crew_id", "has_mixdown", "id", "kit_accepted", "last_saved_at", "musical_key", "release_date", "stage", "tags", "title"].sort(),
     );
     const all = JSON.stringify(payload);
-    for (const leak of ["private lyric", "/Users/", "SomePack", "kick.wav"]) expect(all).not.toContain(leak);
+    for (const leak of ["private lyric", "/Users/", "SomePack", "kick.wav", "bandlab.com"]) expect(all).not.toContain(leak);
     expect(payload.title).toBe("Night Run");
     expect(payload.has_mixdown).toBe(true);
   });

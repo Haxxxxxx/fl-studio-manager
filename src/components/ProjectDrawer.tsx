@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Archive,
@@ -7,6 +7,8 @@ import {
   Copy,
   Disc3,
   Download,
+  ExternalLink,
+  FileAudio,
   FolderInput,
   FolderOpen,
   History,
@@ -20,7 +22,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatBytes, formatDateTime, trashName } from "../lib/format";
-import { audioSrc, backupsOnRiskyVolumes, openInFlStudio, revealInFileManager } from "../lib/tauri";
+import { audioSrc, backupsOnRiskyVolumes, openExternal, openInFlStudio, revealInFileManager } from "../lib/tauri";
 import { KEYS, albumsOf, backupsBytes, formatBpm, lastSaveMs, missingPlugins, renderFreshness } from "../lib/songs";
 import type { ProjectInfo } from "../types";
 import { detectKey } from "../lib/people";
@@ -28,7 +30,9 @@ import { SongCredits, SongPitches } from "./SongPeople";
 import { ShareToggle, StageConflictBanner } from "./CrewPanel";
 import { FilesPanel } from "./FilesPanel";
 import { NotesEditor } from "./NotesEditor";
-import { canRenderInApp, dawOf } from "../lib/daws";
+import { canRenderInApp, dawOf, isSketch } from "../lib/daws";
+import { MAX_BANDLAB_URL, cleanBandlabUrl } from "../lib/sketch";
+import { TemplateSelect, useFactoryTemplates } from "./NewProjectModal";
 import { ConfirmButton, StatusSelect, TagEditor, btn, btnPrimary, input, sectionLabel } from "./ui";
 import { Fact, Section } from "../ui";
 import { dict, tr } from "../i18n";
@@ -115,6 +119,18 @@ const T = dict(
     moved: (n: number) => `${n} moved`,
     missing: (n: number) => `${n} missing`,
     toggleProblems: (open: boolean, n: number) => `${open ? "Hide" : "Show"} ${n} not at their stored path`,
+    revealSketch: "Show in folder",
+    sketch: "BandLab sketch",
+    sketchNote: "Audio exported from BandLab, no project yet. Its stage, notes and credits move to the FL project when you continue it.",
+    bandlabLink: "BandLab link",
+    linkPlaceholder: "https://www.bandlab.com/…",
+    badLink: "The link must start with https:// (300 characters max). Not saved.",
+    openLink: "Open in the browser",
+    continueTemplate: "Start the FL project from",
+    continueFl: "Continue in FL Studio",
+    continuing: "Creating…",
+    continueHint: "Drag the BandLab audio into FL's playlist: Hivo never writes inside .flp files.",
+    continueOpenFailed: (name: string, err: string) => `Created ${name}, but FL Studio didn't open: ${err}. Open it from the song panel.`,
   },
   {
     couldntOpen: (err: string) => `Impossible de l'ouvrir : ${err}`,
@@ -197,6 +213,18 @@ const T = dict(
     missing: (n: number) => `${n} manquant${n > 1 ? "s" : ""}`,
     toggleProblems: (open: boolean, n: number) =>
       `${open ? "Masquer" : "Afficher"} les ${n} qui ne sont pas à leur chemin enregistré`,
+    revealSketch: "Afficher le dossier",
+    sketch: "Sketch BandLab",
+    sketchNote: "De l'audio exporté depuis BandLab, pas encore de projet. Son étape, ses notes et ses crédits passent au projet FL quand tu le continues.",
+    bandlabLink: "Lien BandLab",
+    linkPlaceholder: "https://www.bandlab.com/…",
+    badLink: "Le lien doit commencer par https:// (300 caractères max). Pas enregistré.",
+    openLink: "Ouvrir dans le navigateur",
+    continueTemplate: "Démarrer le projet FL avec",
+    continueFl: "Continuer dans FL Studio",
+    continuing: "Création…",
+    continueHint: "Glisse l'audio BandLab dans la playlist de FL : Hivo n'écrit jamais dans les fichiers .flp.",
+    continueOpenFailed: (name: string, err: string) => `${name} est créé, mais FL Studio ne s'est pas ouvert : ${err}. Ouvre-le depuis le panneau du son.`,
   },
 );
 
@@ -245,6 +273,7 @@ export function ProjectDrawer() {
   const latestRender = project.renders[0];
   const oldBackups = project.backups.slice(KEEP_BACKUPS);
   const visibleBackups = showAllBackups ? project.backups : project.backups.slice(0, 6);
+  const sketch = isSketch(project);
 
   async function run(action: () => Promise<string | number>, ok: (r: string | number) => string) {
     setMessage(null);
@@ -280,16 +309,25 @@ export function ProjectDrawer() {
 
       <div className="flex-1 overflow-auto px-5 py-4">
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => openInFlStudio(project.path).catch((e) => setMessage({ kind: "error", text: t.couldntOpen(e instanceof Error ? e.message : String(e)) }))}
-            disabled={demoMode}
-            className={btnPrimary}
-          >
-            <PlayCircle size={14} /> {t.openIn(dawOf(project).short === "FL" ? "FL" : dawOf(project).label)}
-          </button>
-          <button onClick={() => revealInFileManager(project.path)} disabled={demoMode} className={btn}>
-            <FolderOpen size={14} /> {t.reveal}
-          </button>
+          {sketch ? (
+            // No project to open yet: show the BandLab folder instead.
+            <button onClick={() => revealInFileManager(project.path)} disabled={demoMode} className={btn}>
+              <FolderOpen size={14} /> {t.revealSketch}
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => openInFlStudio(project.path).catch((e) => setMessage({ kind: "error", text: t.couldntOpen(e instanceof Error ? e.message : String(e)) }))}
+                disabled={demoMode}
+                className={btnPrimary}
+              >
+                <PlayCircle size={14} /> {t.openIn(dawOf(project).short === "FL" ? "FL" : dawOf(project).label)}
+              </button>
+              <button onClick={() => revealInFileManager(project.path)} disabled={demoMode} className={btn}>
+                <FolderOpen size={14} /> {t.reveal}
+              </button>
+            </>
+          )}
           <button onClick={() => openLaunchKit(project.path)} className={btn} title={t.launchKitTitle}>
             <Rocket size={14} /> Launch Kit
           </button>
@@ -350,6 +388,8 @@ export function ProjectDrawer() {
             </button>
           </div>
         )}
+
+        {(sketch || meta.bandlabUrl) && <SketchPanel project={project} />}
 
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div>
@@ -435,25 +475,27 @@ export function ProjectDrawer() {
           />
         </Section>
 
-        <Section label={t.project}>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-            <Fact label={t.tempo} value={project.tempoBpm ? `${formatBpm(project.tempoBpm)} BPM` : "—"} />
-            <Fact
-              label={t.timeSig}
-              value={project.timeSigNum ? `${project.timeSigNum}/${project.timeSigDenom}` : "—"}
-            />
-            <Fact label={t.lastSaved} value={formatDateTime(lastSaveMs(project))} />
-            <Fact
-              label={t.dawVersion(dawOf(project).label)}
-              value={(project.flVersion?.split(".").slice(0, 3).join(".") ?? project.dawVersion?.replace(/^(Ableton Live|Studio One|REAPER)\s*/i, "")) || "—"}
-            />
-            <Fact
-              label={t.recordings}
-              value={project.recordingsCount ? `${project.recordingsCount} · ${formatBytes(project.recordingsBytes)}` : t.none}
-            />
-            <Fact label={t.projectFile} value={formatBytes(project.sizeBytes)} />
-          </dl>
-        </Section>
+        {!sketch && (
+          <Section label={t.project}>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              <Fact label={t.tempo} value={project.tempoBpm ? `${formatBpm(project.tempoBpm)} BPM` : "—"} />
+              <Fact
+                label={t.timeSig}
+                value={project.timeSigNum ? `${project.timeSigNum}/${project.timeSigDenom}` : "—"}
+              />
+              <Fact label={t.lastSaved} value={formatDateTime(lastSaveMs(project))} />
+              <Fact
+                label={t.dawVersion(dawOf(project).label)}
+                value={(project.flVersion?.split(".").slice(0, 3).join(".") ?? project.dawVersion?.replace(/^(Ableton Live|Studio One|REAPER)\s*/i, "")) || "—"}
+              />
+              <Fact
+                label={t.recordings}
+                value={project.recordingsCount ? `${project.recordingsCount} · ${formatBytes(project.recordingsBytes)}` : t.none}
+              />
+              <Fact label={t.projectFile} value={formatBytes(project.sizeBytes)} />
+            </dl>
+          </Section>
+        )}
 
         <Section label={t.credits}>
           <SongCredits project={project} />
@@ -463,7 +505,7 @@ export function ProjectDrawer() {
           <SongPitches project={project} />
         </Section>
 
-        <PluginsAndSamples project={project} />
+        {!sketch && <PluginsAndSamples project={project} />}
 
         <Section label={t.files}>
           <FilesPanel project={project} />
@@ -502,109 +544,111 @@ export function ProjectDrawer() {
           )}
         </Section>
 
-        <Section label={t.versions(project.backups.length, formatBytes(backupsBytes(project)))}>
-          {versionName === null ? (
-            <button onClick={() => setVersionName(`${project.name} v2`)} disabled={demoMode} className={btn}>
-              <Copy size={14} /> {t.saveVersion}
-            </button>
-          ) : (
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const name = versionName;
-                setVersionName(null);
-                run(() => duplicateProject(project.path, name), (p) => t.created(fileName(String(p))));
-              }}
-            >
-              <input autoFocus value={versionName} onChange={(e) => setVersionName(e.target.value)} className={`${input} py-1.5`} />
-              <button type="submit" className={btn}>
-                {t.create}
+        {!sketch && (
+          <Section label={t.versions(project.backups.length, formatBytes(backupsBytes(project)))}>
+            {versionName === null ? (
+              <button onClick={() => setVersionName(`${project.name} v2`)} disabled={demoMode} className={btn}>
+                <Copy size={14} /> {t.saveVersion}
               </button>
-              <button type="button" onClick={() => setVersionName(null)} className="text-engrave hover:text-cream">
-                <X size={14} />
-              </button>
-            </form>
-          )}
+            ) : (
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const name = versionName;
+                  setVersionName(null);
+                  run(() => duplicateProject(project.path, name), (p) => t.created(fileName(String(p))));
+                }}
+              >
+                <input autoFocus value={versionName} onChange={(e) => setVersionName(e.target.value)} className={`${input} py-1.5`} />
+                <button type="submit" className={btn}>
+                  {t.create}
+                </button>
+                <button type="button" onClick={() => setVersionName(null)} className="text-engrave hover:text-cream">
+                  <X size={14} />
+                </button>
+              </form>
+            )}
 
-          {project.backups.length > 0 && (
-            <ol className="mt-3 border-l border-rule pl-3">
-              {visibleBackups.map((b) => (
-                <li key={b.path} className="group relative flex items-center gap-2 py-1 text-xs">
-                  <span className="absolute -left-[15.5px] h-2 w-2 rounded-full bg-rule-strong" />
-                  <History size={12} className="text-body" />
-                  <span className="flex-1 text-body">{formatDateTime(b.modifiedAtMs)}</span>
-                  <span className="text-body">{formatBytes(b.sizeBytes)}</span>
+            {project.backups.length > 0 && (
+              <ol className="mt-3 border-l border-rule pl-3">
+                {visibleBackups.map((b) => (
+                  <li key={b.path} className="group relative flex items-center gap-2 py-1 text-xs">
+                    <span className="absolute -left-[15.5px] h-2 w-2 rounded-full bg-rule-strong" />
+                    <History size={12} className="text-body" />
+                    <span className="flex-1 text-body">{formatDateTime(b.modifiedAtMs)}</span>
+                    <span className="text-body">{formatBytes(b.sizeBytes)}</span>
+                    <button
+                      title={t.restoreTitle}
+                      disabled={demoMode}
+                      onClick={() => run(() => restoreBackup(b.path, project.path), (p) => t.restoredAs(fileName(String(p))))}
+                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-engrave opacity-0 hover:bg-rule hover:text-cream group-hover:opacity-100"
+                    >
+                      <RotateCcw size={11} /> {t.restore}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {project.backups.length > visibleBackups.length && (
+              <button onClick={() => setShowAllBackups(true)} className="mt-1 text-[11px] text-engrave hover:text-body">
+                {t.showAll(project.backups.length)}
+              </button>
+            )}
+            {oldBackups.length > 0 && (
+              <ConfirmButton
+                disabled={demoMode}
+                label={
+                  <>
+                    <Trash2 size={13} /> {t.cleanUp(oldBackups.length, formatBytes(backupsBytes({ ...project, backups: oldBackups })))}
+                  </>
+                }
+                confirmLabel={t.confirmTrash(oldBackups.length, trashName())}
+                onConfirm={() =>
+                  run(
+                    async () => {
+                      const paths = oldBackups.map((b) => b.path);
+                      // Removable or network drive: no Recycle Bin, so ask first.
+                      const risky = await backupsOnRiskyVolumes(paths);
+                      if (risky.length > 0) {
+                        setPermanent({ project: project.path, paths, risky: risky.length });
+                        return -1;
+                      }
+                      return trashBackups(paths);
+                    },
+                    (n) => (n === -1 ? t.nothingDeleted : t.movedToTrash(Number(n), trashName())),
+                  )
+                }
+                className={`${btn} mt-3 text-xs`}
+              />
+            )}
+            {permanent && permanent.project === project.path && (
+              <div className="mt-2 rounded-md border border-red-400/30 bg-red-500/[0.06] px-3 py-2 text-xs text-red-200/90">
+                {permanent.risky === permanent.paths.length ? t.riskyAll : t.riskySome(permanent.risky)}
+                {t.riskyRest(trashName())}
+                <b className="font-semibold">{t.deletedPermanently}</b>.
+                <div className="mt-2 flex gap-2">
                   <button
-                    title={t.restoreTitle}
-                    disabled={demoMode}
-                    onClick={() => run(() => restoreBackup(b.path, project.path), (p) => t.restoredAs(fileName(String(p))))}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-engrave opacity-0 hover:bg-rule hover:text-cream group-hover:opacity-100"
+                    onClick={() => {
+                      const paths = permanent.paths;
+                      setPermanent(null);
+                      void run(() => trashBackups(paths, true), (n) => t.deleted(Number(n)));
+                    }}
+                    className="rounded border border-red-400/40 px-2 py-1 text-red-200 hover:bg-red-500/10"
                   >
-                    <RotateCcw size={11} /> {t.restore}
+                    {t.deletePermanently}
                   </button>
-                </li>
-              ))}
-            </ol>
-          )}
-          {project.backups.length > visibleBackups.length && (
-            <button onClick={() => setShowAllBackups(true)} className="mt-1 text-[11px] text-engrave hover:text-body">
-              {t.showAll(project.backups.length)}
-            </button>
-          )}
-          {oldBackups.length > 0 && (
-            <ConfirmButton
-              disabled={demoMode}
-              label={
-                <>
-                  <Trash2 size={13} /> {t.cleanUp(oldBackups.length, formatBytes(backupsBytes({ ...project, backups: oldBackups })))}
-                </>
-              }
-              confirmLabel={t.confirmTrash(oldBackups.length, trashName())}
-              onConfirm={() =>
-                run(
-                  async () => {
-                    const paths = oldBackups.map((b) => b.path);
-                    // Removable or network drive: no Recycle Bin, so ask first.
-                    const risky = await backupsOnRiskyVolumes(paths);
-                    if (risky.length > 0) {
-                      setPermanent({ project: project.path, paths, risky: risky.length });
-                      return -1;
-                    }
-                    return trashBackups(paths);
-                  },
-                  (n) => (n === -1 ? t.nothingDeleted : t.movedToTrash(Number(n), trashName())),
-                )
-              }
-              className={`${btn} mt-3 text-xs`}
-            />
-          )}
-          {permanent && permanent.project === project.path && (
-            <div className="mt-2 rounded-md border border-red-400/30 bg-red-500/[0.06] px-3 py-2 text-xs text-red-200/90">
-              {permanent.risky === permanent.paths.length ? t.riskyAll : t.riskySome(permanent.risky)}
-              {t.riskyRest(trashName())}
-              <b className="font-semibold">{t.deletedPermanently}</b>.
-              <div className="mt-2 flex gap-2">
-                <button
-                  onClick={() => {
-                    const paths = permanent.paths;
-                    setPermanent(null);
-                    void run(() => trashBackups(paths, true), (n) => t.deleted(Number(n)));
-                  }}
-                  className="rounded border border-red-400/40 px-2 py-1 text-red-200 hover:bg-red-500/10"
-                >
-                  {t.deletePermanently}
-                </button>
-                <button onClick={() => setPermanent(null)} className="rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised">
-                  {t.keepThem}
-                </button>
+                  <button onClick={() => setPermanent(null)} className="rounded border border-rule-strong px-2 py-1 text-body hover:bg-raised">
+                    {t.keepThem}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-          {oldBackups.length > 0 && (
-            <div className="mt-1 text-[11px] text-engrave">{t.keepsRecent(KEEP_BACKUPS)}</div>
-          )}
-        </Section>
+            )}
+            {oldBackups.length > 0 && (
+              <div className="mt-1 text-[11px] text-engrave">{t.keepsRecent(KEEP_BACKUPS)}</div>
+            )}
+          </Section>
+        )}
       </div>
     </aside>
   );
@@ -701,5 +745,78 @@ function PluginsAndSamples({ project }: { project: ProjectInfo }) {
         )}
       </Section>
     </>
+  );
+}
+
+/** A BandLab sketch's link and "Continue in FL Studio" (src/lib/sketch.ts,
+ * src-tauri/src/sketch.rs). Songs continued from a sketch keep the link. */
+function SketchPanel({ project }: { project: ProjectInfo }) {
+  const saved = useAppStore((s) => s.workspace.songs[project.path]?.bandlabUrl ?? "");
+  const updateSong = useAppStore((s) => s.updateSong);
+  const continueSketch = useAppStore((s) => s.continueSketch);
+  const demoMode = useAppStore((s) => s.demoMode);
+  const sketch = isSketch(project);
+  const [link, setLink] = useState(saved);
+  const [templatePath, setTemplatePath] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const factory = useFactoryTemplates(sketch, setTemplatePath);
+  useEffect(() => setLink(saved), [saved]);
+  const clean = cleanBandlabUrl(link);
+  const t = tr(T);
+
+  function saveLink() {
+    if (clean === null || clean === saved) return;
+    updateSong(project.path, { bandlabUrl: clean || undefined });
+  }
+
+  async function continueInFl() {
+    setBusy(true);
+    setError(null);
+    try {
+      // The drawer moves to the new .flp once this returns, so an open
+      // failure is reported in the app's error banner.
+      const created = await continueSketch(project.path, templatePath);
+      await openInFlStudio(created).catch((e) =>
+        useAppStore.setState({ startupError: t.continueOpenFailed(project.name, e instanceof Error ? e.message : String(e)) }),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section label={sketch ? t.sketch : t.bandlabLink}>
+      {sketch && <p className="mb-3 text-[11px] leading-relaxed text-engrave">{t.sketchNote}</p>}
+      {sketch && <div className={`${sectionLabel} mb-1.5`}>{t.bandlabLink}</div>}
+      <div className="flex gap-2">
+        <input
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          onBlur={saveLink}
+          onKeyDown={(e) => e.key === "Enter" && saveLink()}
+          placeholder={t.linkPlaceholder}
+          maxLength={MAX_BANDLAB_URL}
+          className={`${input} py-1.5 text-xs`}
+        />
+        <button onClick={() => saved && openExternal(saved)} disabled={!saved} title={t.openLink} className={btn}>
+          <ExternalLink size={13} />
+        </button>
+      </div>
+      {clean === null && <div className="mt-1 text-[11px] text-warn">{t.badLink}</div>}
+
+      {sketch && (
+        <div className="mt-4">
+          <div className={`${sectionLabel} mb-1.5`}>{t.continueTemplate}</div>
+          <TemplateSelect value={templatePath} onChange={setTemplatePath} factory={factory} className="py-1.5 text-xs" />
+          <button onClick={continueInFl} disabled={demoMode || busy || !templatePath} className={`${btnPrimary} mt-2`}>
+            <FileAudio size={14} /> {busy ? t.continuing : t.continueFl}
+          </button>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-engrave">{t.continueHint}</p>
+          {error && <div className="mt-2 rounded border border-missing/30 bg-missing/10 px-3 py-2 text-xs text-missing">{error}</div>}
+        </div>
+      )}
+    </Section>
   );
 }

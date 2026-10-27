@@ -144,6 +144,8 @@ interface AppState {
   /** Song shown in the Launch Kit view. */
   launchPath: string | null;
   newProject: NewProjectDraft | null;
+  /** The "Import from BandLab" modal is open. */
+  bandlabImport: boolean;
   /** What the feedback form opens on ("Report this" on an error prefills it). */
   feedback: FeedbackDraft | null;
   update: UpdateState;
@@ -239,6 +241,8 @@ interface AppState {
   refreshCoverStatus: () => Promise<void>;
   openNewProject: (draft?: Partial<NewProjectDraft>) => void;
   closeNewProject: () => void;
+  openBandlabImport: () => void;
+  closeBandlabImport: () => void;
   openFeedback: (draft?: Partial<FeedbackDraft>) => void;
   closeFeedback: () => void;
 
@@ -291,6 +295,13 @@ interface AppState {
     albumId: string | null;
     status: SongStatus;
   }) => Promise<string>;
+  /** Copy the picked BandLab export into `<parentFolder>/<name>/BandLab/`
+   * (a sketch song in Creation); returns its key. */
+  importBandlab: (args: { parentFolder: string; name: string; bandlabUrl?: string }) => Promise<string>;
+  /** "Continue in FL Studio": create the .flp from a template next to the
+   * sketch and move the song's data (stage, notes, credits, share, release
+   * slot, favorite) to it. Returns the new .flp path. */
+  continueSketch: (sketchPath: string, templatePath: string) => Promise<string>;
   duplicateProject: (path: string, newName: string) => Promise<string>;
   restoreBackup: (backupPath: string, projectPath: string) => Promise<string>;
   trashBackups: (paths: string[], allowPermanent?: boolean) => Promise<number>;
@@ -375,6 +386,22 @@ export const useAppStore = create<AppState>((set, get) => {
     await scanOrReport();
   }
 
+  /** Records moved to new paths (lib/relink.ts): the workspace, favorites,
+   * and the open drawer and Launch Kit follow. */
+  function followRelinks(relinks: Relink[]) {
+    const map = new Map(relinks.map((r) => [r.from, r.to]));
+    mutateWorkspace((ws) => applyRelinks(ws, relinks));
+    const favs = get().settings.favorites;
+    if (favs.some((f) => map.has(f))) void get().updateSettings({ favorites: favs.map((f) => map.get(f) ?? f) });
+    const open = get().detailPath;
+    const kit = get().launchPath;
+    set({
+      detailPath: open && map.has(open) ? map.get(open)! : open,
+      // The Launch Kit follows a "Save as" too, instead of showing another song.
+      launchPath: kit && map.has(kit) ? map.get(kit)! : kit,
+    });
+  }
+
   function scanOrReport() {
     return get()
       .rescan()
@@ -456,6 +483,7 @@ export const useAppStore = create<AppState>((set, get) => {
     openPersonId: null,
     launchPath: null,
     newProject: null,
+    bandlabImport: false,
     feedback: null,
     update: { status: "idle" },
 
@@ -637,18 +665,8 @@ export const useAppStore = create<AppState>((set, get) => {
           // writable workspace, never sample data.
           const relinks = get().workspaceWritable ? findRelinks(projects, get().workspace, folders) : [];
           if (relinks.length) {
-            const map = new Map(relinks.map((r) => [r.from, r.to]));
-            mutateWorkspace((ws) => applyRelinks(ws, relinks));
-            const favs = get().settings.favorites;
-            if (favs.some((f) => map.has(f))) void get().updateSettings({ favorites: favs.map((f) => map.get(f) ?? f) });
-            const open = get().detailPath;
-            const kit = get().launchPath;
-            set({
-              relinked: [...get().relinked, ...relinks],
-              detailPath: open && map.has(open) ? map.get(open)! : open,
-              // The Launch Kit follows a "Save as" too, instead of showing another song.
-              launchPath: kit && map.has(kit) ? map.get(kit)! : kit,
-            });
+            followRelinks(relinks);
+            set({ relinked: [...get().relinked, ...relinks] });
           }
           set({ projects });
         }
@@ -896,6 +914,8 @@ export const useAppStore = create<AppState>((set, get) => {
     openNewProject: (draft) =>
       set({ newProject: { albumId: null, status: "creation", ...draft } }),
     closeNewProject: () => set({ newProject: null }),
+    openBandlabImport: () => set({ bandlabImport: true }),
+    closeBandlabImport: () => set({ bandlabImport: false }),
     openFeedback: (draft) => set({ feedback: { category: "idea", message: "", ...draft } }),
     closeFeedback: () => set({ feedback: null }),
 
@@ -1044,6 +1064,23 @@ export const useAppStore = create<AppState>((set, get) => {
       if (albumId) get().addTracks(albumId, [path]);
       await get().rescan();
       return path;
+    },
+
+    importBandlab: async ({ parentFolder, name, bandlabUrl }) => {
+      if (get().demoMode) throw new Error("This is sample data — link a real project folder first.");
+      const key = await api.importBandlab(parentFolder, name);
+      get().updateSong(key, { status: "creation", ...(bandlabUrl ? { bandlabUrl } : {}) });
+      await get().rescan();
+      return key;
+    },
+
+    continueSketch: async (sketchPath, templatePath) => {
+      if (get().demoMode) throw new Error("This is sample data — link a real project folder first.");
+      const created = await api.continueSketch(sketchPath, templatePath);
+      // Exactly a rename: the sketch's record now belongs to the .flp.
+      if (get().workspaceWritable) followRelinks([{ from: sketchPath, to: created, reason: "renamed" }]);
+      await get().rescan();
+      return created;
     },
 
     duplicateProject: async (path, newName) => {

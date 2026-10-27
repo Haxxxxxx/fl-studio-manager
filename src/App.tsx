@@ -17,6 +17,7 @@ import { RenderPanel } from "./components/RenderPanel";
 import { PackageConfirm, PackagePanel } from "./components/PackagePanel";
 import { ProjectDrawer } from "./components/ProjectDrawer";
 import { NewProjectModal } from "./components/NewProjectModal";
+import { BandlabImportModal } from "./components/BandlabImportModal";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { supabase } from "./lib/supabase";
 import { isReadOnlyInstallError } from "./lib/updaterErrors";
@@ -310,6 +311,7 @@ export default function App() {
       {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
       {view !== "settings" && view !== "launch" && <ProjectDrawer key={detailPath ?? ""} />}
       <NewProjectModal />
+      <BandlabImportModal />
       <FeedbackModal />
       <RenderPanel />
       <PackagePanel />

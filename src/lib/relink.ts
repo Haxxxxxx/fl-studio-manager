@@ -17,7 +17,13 @@ export interface Relink {
 }
 
 const norm = (p: string) => p.replace(/\\/g, "/").toLowerCase();
-const base = (p: string) => norm(p).split("/").pop() ?? "";
+/** The file name; for a BandLab sketch (keyed by its `<song>/BandLab`
+ * folder) the song folder too, or every sketch would share one name. */
+const base = (p: string) => {
+  const parts = norm(p).split("/");
+  const last = parts.pop() ?? "";
+  return last === "bandlab" ? `${parts.pop() ?? ""}/${last}` : last;
+};
 const parent = (p: string) => norm(p).split("/").slice(0, -1).join("/");
 
 function underWatched(path: string, watched: string[]): boolean {

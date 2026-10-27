@@ -176,6 +176,8 @@ fn scan_with(folders: &[String], output_folder: Option<&str>, mut resolver: Reso
     let mut projects: Vec<ProjectInfo> = Vec::new();
     // (file, DAW, backup-only file type)
     let mut backups: Vec<(PathBuf, Daw, bool)> = Vec::new();
+    // (`<song>/BandLab` folder, its linked root)
+    let mut sketch_dirs: Vec<(PathBuf, String)> = Vec::new();
 
     for root in folders {
         let root_path = Path::new(root);
@@ -188,6 +190,12 @@ fn scan_with(folders: &[String], output_folder: Option<&str>, mut resolver: Reso
         });
         for entry in walker.filter_map(|e| e.ok()) {
             let path = entry.path();
+            // `<song>/BandLab/` below the root: maybe a sketch (checked
+            // once every project is known, see `sketch_of`).
+            if entry.file_type().is_dir() && entry.depth() >= 2 && entry.file_name() == crate::sketch::SKETCH_DIR {
+                sketch_dirs.push((path.to_path_buf(), root.clone()));
+                continue;
+            }
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -389,9 +397,72 @@ fn scan_with(folders: &[String], output_folder: Option<&str>, mut resolver: Reso
         }
     }
 
+    // Sketches last: they're not in `by_folder`, so the render pass above
+    // never sees them (their audio is listed by `sketch_of`).
+    for (dir, root) in sketch_dirs {
+        if !seen.insert(dir.to_string_lossy().to_lowercase()) {
+            continue;
+        }
+        if let Some(sketch) = sketch_of(&dir, &root) {
+            projects.push(sketch);
+        }
+    }
+
     merge_plugin_aliases(&mut projects);
     projects.sort_by(|a, b| b.modified_at_ms.cmp(&a.modified_at_ms));
     projects
+}
+
+/// A BandLab sketch: `X/BandLab/` holding at least one audio file, with no
+/// DAW project directly in X (once there's one, X is that project's folder
+/// and BandLab/ just holds its source audio). Keyed by the BandLab folder's
+/// path; named after X. Nothing is read from inside the audio here.
+fn sketch_of(bandlab: &Path, root: &str) -> Option<ProjectInfo> {
+    let song = bandlab.parent()?;
+    if bandlab.components().any(|c| c.as_os_str() == "__MACOSX") {
+        return None;
+    }
+    let hidden = |p: &Path| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.'));
+    if read_files(song).iter().any(|p| !hidden(p) && Daw::of_project(p).is_some()) {
+        return None;
+    }
+    let mut audio: Vec<FileEntry> = read_files(bandlab)
+        .iter()
+        .filter(|p| !hidden(p) && crate::sketch::is_sketch_audio(p))
+        .filter_map(|p| file_entry(p))
+        .collect();
+    if audio.is_empty() {
+        return None;
+    }
+    audio.sort_by(by_newest);
+    Some(ProjectInfo {
+        path: bandlab.to_string_lossy().to_string(),
+        read_error: None,
+        name: song.file_name()?.to_string_lossy().to_string(),
+        folder: song.to_string_lossy().to_string(),
+        size_bytes: audio.iter().map(|f| f.size_bytes).sum(),
+        modified_at_ms: audio[0].modified_at_ms,
+        root: root.to_string(),
+        genre: None,
+        artist: None,
+        tempo_bpm: None,
+        time_sig_num: None,
+        time_sig_denom: None,
+        fl_version: None,
+        daw: Daw::Bandlab,
+        daw_version: None,
+        is_template: false,
+        backups: Vec::new(),
+        renders: audio,
+        recordings_count: 0,
+        recordings_bytes: 0,
+        flp_title: None,
+        comment: None,
+        stems: None,
+        plugins: Vec::new(),
+        samples: Vec::new(),
+        track_names: Vec::new(),
+    })
 }
 
 /// The same plugin reports different names per format — FabFilter's CLAP
@@ -512,6 +583,44 @@ pub fn is_listed_backup(path: &Path) -> bool {
 mod tests {
     use super::*;
     use crate::models::SampleStatus;
+
+    #[test]
+    fn a_bandlab_folder_without_a_project_is_a_sketch() {
+        let root = std::env::temp_dir().join(format!("flsm-sketch-scan-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let w = |rel: &str| {
+            let p = root.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, b"x").unwrap();
+        };
+        // A sketch: BandLab/ with audio, nothing else.
+        w("Night Run/BandLab/Night Run mixdown.mp3");
+        w("Night Run/BandLab/Vox stem.wav");
+        w("Night Run/BandLab/notes.txt");
+        // Continued in FL: the .flp makes it the FL project, BandLab/ is its source audio.
+        w("Envy/Envy.flp");
+        w("Envy/BandLab/Envy idea.mp3");
+        // BandLab/ with no audio isn't anything.
+        w("Empty/BandLab/readme.txt");
+        // Directly in the linked folder: not a song folder.
+        w("BandLab/Loose.mp3");
+        let projects = scan(&[root.to_string_lossy().to_string()], None);
+        let _ = fs::remove_dir_all(&root);
+        let names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(projects.len(), 2, "{names:?}");
+
+        let sketch = projects.iter().find(|p| p.name == "Night Run").expect("the sketch is listed");
+        assert_eq!(sketch.daw, Daw::Bandlab);
+        assert!(sketch.path.ends_with("BandLab"), "{}", sketch.path);
+        assert!(Path::new(&sketch.folder).ends_with("Night Run"));
+        assert_eq!(sketch.renders.len(), 2, "audio only: {:?}", sketch.renders);
+        assert_eq!(sketch.modified_at_ms, sketch.renders[0].modified_at_ms);
+        assert!(sketch.plugins.is_empty() && sketch.samples.is_empty() && sketch.backups.is_empty() && !sketch.is_template);
+
+        let envy = projects.iter().find(|p| p.name == "Envy").unwrap();
+        assert_eq!(envy.daw, Daw::FlStudio);
+        assert!(envy.renders.is_empty(), "BandLab audio isn't the FL project's mixdown");
+    }
 
     #[test]
     fn launch_kit_copies_are_not_renders() {

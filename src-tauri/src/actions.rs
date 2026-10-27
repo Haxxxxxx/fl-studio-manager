@@ -3,7 +3,7 @@ use crate::models::TemplateInfo;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn validate_name(name: &str) -> Result<&str, String> {
+pub(crate) fn validate_name(name: &str) -> Result<&str, String> {
     let name = name.trim();
     if name.is_empty() {
         return Err("name can't be empty".to_string());
@@ -29,7 +29,7 @@ fn free_path(dir: &Path, base: &str, ext: &str) -> PathBuf {
         .expect("unbounded range always yields a free path")
 }
 
-fn copy_file(from: &Path, to: &Path) -> Result<(), String> {
+pub(crate) fn copy_file(from: &Path, to: &Path) -> Result<(), String> {
     fs::copy(from, to)
         .map(|_| ())
         .map_err(|e| format!("could not copy {} → {}: {e}", from.display(), to.display()))
@@ -59,7 +59,7 @@ fn factory_templates_dir(fl_studio_path: &str) -> Option<PathBuf> {
 }
 
 /// FL Studio from Settings, if it's set and is FL Studio.
-fn fl_from_settings(app: &tauri::AppHandle) -> Option<String> {
+pub(crate) fn fl_from_settings(app: &tauri::AppHandle) -> Option<String> {
     crate::scope::Scope::load(app).ok()?.fl_studio().ok().map(|p| p.to_string_lossy().to_string())
 }
 
@@ -151,7 +151,7 @@ pub fn create_project(app: tauri::AppHandle, template_path: String, parent_folde
 
 /// A template is an .flp from FL's factory templates, FL's own default
 /// template, or a project in a linked folder. Nothing else is copied.
-fn check_template(scope: &crate::scope::Scope, fl: Option<String>, template_path: &str) -> Result<(), String> {
+pub(crate) fn check_template(scope: &crate::scope::Scope, fl: Option<String>, template_path: &str) -> Result<(), String> {
     let template = Path::new(template_path);
     let is_flp = template.extension().is_some_and(|e| e.eq_ignore_ascii_case("flp"));
     let real = template.canonicalize().map_err(|_| format!("template not found: {template_path}"))?;

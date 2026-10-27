@@ -22,6 +22,7 @@ mod scope;
 mod sections;
 mod settings;
 mod shorts;
+mod sketch;
 mod workspace;
 mod youtube;
 
@@ -74,6 +75,9 @@ pub fn run() {
             actions::duplicate_project,
             actions::restore_backup,
             actions::trash_backups,
+            sketch::pick_bandlab_files,
+            sketch::import_bandlab,
+            sketch::continue_sketch,
             actions::backups_on_risky_volumes,
             package::package_preview,
             package::package_projects,
