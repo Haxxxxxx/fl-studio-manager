@@ -224,7 +224,7 @@ function RelinkNotice() {
   const dismiss = useAppStore((s) => s.dismissRelinked);
   if (!relinked.length) return null;
   return (
-    <div role="status" className="absolute bottom-3 right-3 z-40 max-w-sm rounded-md border border-rule bg-raised px-4 py-3 text-xs text-body shadow-xl">
+    <div role="status" className="max-w-sm rounded-md border border-rule bg-raised px-4 py-3 text-xs text-body shadow-xl">
       <div className="mb-1.5 flex items-center justify-between gap-3">
         <span className="font-medium text-cream">
           {tr(T).kept(relinked.length)}
@@ -334,11 +334,13 @@ export default function App() {
         {view === "crewMembers" && <CrewMembersView />}
         {view === "crewSettings" && <CrewSettingsView />}
       </div>
-      {/* Keyed so per-song drawer state (messages, inputs) resets on switch. */}
-      {view !== "settings" && view !== "launch" && <ProjectDrawer key={detailPath ?? ""} />}
+      {/* Keyed so per-song drawer state (messages, inputs) resets on switch. Settings and the
+          Launch Kit only hide it, so its tab and edits are still there on the way back. */}
+      <div className="contents" hidden={view === "settings" || view === "launch"}>
+        <ProjectDrawer key={detailPath ?? ""} />
+      </div>
       <NewProjectModal />
       <FeedbackModal />
-      <RenderPanel />
       <PackagePanel />
       <PackageConfirm />
       {!isTauri() && (
@@ -347,7 +349,11 @@ export default function App() {
           <code className="rounded bg-black/30 px-1">npm run tauri dev</code> {tr(T).browserAfter}
         </div>
       )}
-      <RelinkNotice />
+      {/* Bottom-right notices share one column so they never overlap. */}
+      <div className="pointer-events-none absolute bottom-3 right-3 z-40 flex flex-col items-end gap-2 [&>*]:pointer-events-auto">
+        <RelinkNotice />
+        <RenderPanel />
+      </div>
       {(startupError || saveError) && (
         <div role="alert" className="absolute left-1/2 top-3 z-40 flex max-w-xl -translate-x-1/2 items-start gap-3 rounded-md border border-red-500/40 bg-[#2a1215] px-4 py-2 text-xs text-red-200 shadow-xl">
           <span>{saveError ?? startupError}</span>

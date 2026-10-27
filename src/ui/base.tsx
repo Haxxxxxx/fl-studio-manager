@@ -3,7 +3,7 @@
 // Claude Design as the app's design system). Styling is System 02 ("built
 // like a rack unit"): solid warm-grey panels, engraved mono labels, LED
 // status, condensed caps on buttons, one hot orange. Tokens: src/theme.css.
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { STATUSES, UNSORTED, statusInfo } from "../lib/songs";
 import type { SongStatus } from "../types";
@@ -125,6 +125,10 @@ export function TagEditor({
   );
 }
 
+/** Open dialogs, oldest first (the last one is on top). */
+const MODAL_STACK: symbol[] = [];
+const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function Modal({
   title,
   onClose,
@@ -136,17 +140,54 @@ export function Modal({
   children: ReactNode;
   width?: string;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  // Open dialogs stack: only the top one answers Escape and keeps the focus;
+  // closing it hands the focus back to what had it before.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const id = Symbol("modal");
+    MODAL_STACK.push(id);
+    const before = document.activeElement as HTMLElement | null;
+    box.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (MODAL_STACK[MODAL_STACK.length - 1] !== id) return;
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close.current();
+        return;
+      }
+      if (e.key !== "Tab" || !box.current) return;
+      const focusable = Array.from(box.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.hasAttribute("disabled"));
+      if (focusable.length === 0) return e.preventDefault();
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const inside = box.current.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      const at = MODAL_STACK.indexOf(id);
+      if (at >= 0) MODAL_STACK.splice(at, 1);
+      if (before && document.contains(before)) before.focus();
+    };
+  }, []);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onMouseDown={onClose}>
       <div
+        ref={box}
+        tabIndex={-1}
         role="dialog"
+        aria-modal="true"
         aria-label={title}
-        className={`flex max-h-full w-full ${width} flex-col rounded border border-rule-strong bg-raised shadow-[0_24px_48px_rgb(0_0_0/0.6)]`}
+        className={`flex max-h-full w-full ${width} flex-col rounded border border-rule-strong bg-raised shadow-[0_24px_48px_rgb(0_0_0/0.6)] outline-none`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-4 px-5 pb-1 pt-5">
