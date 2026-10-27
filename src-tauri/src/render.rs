@@ -24,6 +24,25 @@ pub(crate) fn unique_output_path(output_folder: &Path, base_name: &str, ext: &st
     }
 }
 
+/// FL Studio's command-line switch prefix: `/R /Emp3 /F<folder>` on Windows,
+/// `-R -Emp3 -F<folder>` on macOS (Image-Line's manual, "Command line export
+/// options"). With `/` on a Mac, FL took `/F/var/folders/…` for a file to
+/// open and said it "could not be found".
+#[cfg(target_os = "macos")]
+const SWITCH: char = '-';
+#[cfg(not(target_os = "macos"))]
+const SWITCH: char = '/';
+
+/// Render every project in `folder` (the staging folder, which holds one).
+/// The folder ends with a separator, as in the manual's examples.
+fn render_args(switch: char, format: &str, folder: &Path) -> Vec<String> {
+    let mut dir = folder.display().to_string();
+    if !dir.ends_with(std::path::MAIN_SEPARATOR) {
+        dir.push(std::path::MAIN_SEPARATOR);
+    }
+    vec![format!("{switch}R"), format!("{switch}E{format}"), format!("{switch}F{dir}")]
+}
+
 fn emit(app: &AppHandle, event: RenderEvent) {
     let _ = app.emit("render-progress", event);
 }
@@ -66,9 +85,7 @@ fn render_one(
     }
 
     let mut child = match Command::new(fl_studio_path)
-        .arg("/R")
-        .arg(format!("/E{format}"))
-        .arg(format!("/F{}", temp_dir.display()))
+        .args(render_args(SWITCH, format, &temp_dir))
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -234,5 +251,36 @@ fn render_all(
                 },
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn render_args_use_the_platform_switch() {
+        let dir = std::env::temp_dir().join("flsm-render-1-2-3");
+        let sep = std::path::MAIN_SEPARATOR;
+        let mac = render_args('-', "mp3", &dir);
+        assert_eq!(mac, vec!["-R".to_string(), "-Emp3".to_string(), format!("-F{}{sep}", dir.display())]);
+        let win = render_args('/', "wav", &dir);
+        assert_eq!(win[..2], ["/R".to_string(), "/Ewav".to_string()]);
+        assert!(win[2].starts_with("/F") && win[2].ends_with(sep));
+        // Already ends with a separator: not doubled.
+        let with_sep = PathBuf::from(format!("{}{sep}", dir.display()));
+        assert_eq!(render_args('-', "wav", &with_sep)[2], format!("-F{}{sep}", dir.display()));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_uses_dashes() {
+        assert_eq!(SWITCH, '-');
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_uses_slashes() {
+        assert_eq!(SWITCH, '/');
     }
 }
