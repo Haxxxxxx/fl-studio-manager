@@ -67,6 +67,10 @@ const TEXT = {
     en: "Type the crew's name exactly to delete it.",
     fr: "Tape le nom exact du crew pour le supprimer.",
   },
+  ownerOnly: {
+    en: "Only the crew's owner can do that.",
+    fr: "Seul le propriétaire du crew peut faire ça.",
+  },
   deleteOwnerOnly: {
     en: "Only the crew's owner can delete it.",
     fr: "Seul le propriétaire du crew peut le supprimer.",
@@ -84,8 +88,8 @@ const TEXT = {
     fr: "Tu es connecté en tant que {email}, mais tu n'es pas encore dans un crew. Entre le code d'invitation que ton crew t'a envoyé (8 lettres et chiffres).",
   },
   noInviteYet: {
-    en: "No code yet? Ask your crew's owner to make one in Hivo (Crew → Members & invites → New invite code).",
-    fr: "Pas encore de code ? Demande au propriétaire du crew d'en créer un dans Hivo (Crew → Membres et invitations → Nouveau code d'invitation).",
+    en: "No code yet? Ask your crew's owner to make one in Hivo (Crew → Members & invites) or on hi-vo.fr (Crew tab → New invite code).",
+    fr: "Pas encore de code ? Demande au propriétaire du crew d'en créer un dans Hivo (Crew → Membres et invitations) ou sur hi-vo.fr (onglet Crew → Nouveau code d'invitation).",
   },
   movedMeanwhile: {
     en: "{who} moved it to {stage} just before you. Move it again if you still want to.",

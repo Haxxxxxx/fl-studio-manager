@@ -2,7 +2,7 @@ import { statusInfo } from "@shared/lib/songs";
 import { crewText } from "@shared/lib/crewMessages";
 import { create } from "zustand";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { CrewColumnRow, CrewMemberRow, CrewReleaseRow, CrewSongRow, CrewSummary, SongStatus } from "@shared/types";
+import type { CrewColumnRow, CrewInvite, CrewMemberRow, CrewReleaseRow, CrewSongRow, CrewSummary, SongStatus } from "@shared/types";
 import { applyCardMove, crewMove, crewPipeline, restoreSongs } from "@shared/lib/crewBoard";
 import { errorMessage, supabase } from "./supabase";
 import { tr } from "@shared/i18n";
@@ -43,6 +43,19 @@ interface WebState {
   moveSong: (songId: string, stage: SongStatus | null) => Promise<void>;
   /** Move a card to a column, before another card (or at the end). */
   moveCard: (songId: string, columnId: string, beforeId: string | null) => Promise<void>;
+
+  // Owner tools (the same calls as the desktop app). Row-level security and
+  // the server functions check the owner again.
+  /** Open invite codes of the active crew (owners only; members get none). */
+  invites: CrewInvite[];
+  loadInvites: () => Promise<void>;
+  createInvite: () => Promise<string>;
+  revokeInvite: (code: string) => Promise<void>;
+  removeMember: (userId: string) => Promise<void>;
+  renameCrew: (name: string) => Promise<void>;
+  /** Owner: delete the active crew for everyone (the name typed back). */
+  deleteCrew: (confirmName: string) => Promise<void>;
+  leaveCrew: () => Promise<void>;
 }
 
 let channel: RealtimeChannel | null = null;
@@ -175,6 +188,7 @@ export const useWeb = create<WebState>((set, get) => {
     members: [],
     error: null,
     live: true,
+    invites: [],
 
     init: async () => {
       if (initialized) return;
@@ -243,7 +257,7 @@ export const useWeb = create<WebState>((set, get) => {
 
     selectCrew: async (id) => {
       remember(id);
-      set({ activeCrewId: id, songs: [], members: [], columns: [], releases: [], error: null });
+      set({ activeCrewId: id, songs: [], members: [], columns: [], releases: [], invites: [], error: null });
       subscribe(id);
       if (id) await loadCrewData().catch((e) => set({ error: errorMessage(e) }));
     },
@@ -343,6 +357,73 @@ export const useWeb = create<WebState>((set, get) => {
         }
       }
       set({ error: null });
+    },
+
+    loadInvites: async () => {
+      const crewId = get().activeCrewId;
+      if (!supabase || !crewId) return;
+      const { data, error } = await supabase
+        .from("crew_invites")
+        .select("code, crew_id, expires_at, max_uses, uses")
+        .eq("crew_id", crewId)
+        .order("expires_at");
+      if (error) throw new Error(errorMessage(error));
+      if (get().activeCrewId !== crewId) return;
+      const now = Date.now();
+      set({ invites: (data as CrewInvite[]).filter((i) => Date.parse(i.expires_at) > now && i.uses < i.max_uses) });
+    },
+
+    createInvite: async () => {
+      const crewId = get().activeCrewId;
+      if (!supabase || !crewId) throw new Error(tr(W).notConnected);
+      const { data, error } = await supabase.rpc("create_invite", { p_crew: crewId, p_max_uses: 10 });
+      if (error) throw new Error(errorMessage(error));
+      await get().loadInvites();
+      return data as string;
+    },
+
+    revokeInvite: async (code) => {
+      if (!supabase) return;
+      const { error } = await supabase.from("crew_invites").delete().eq("code", code);
+      if (error) throw new Error(errorMessage(error));
+      set({ invites: get().invites.filter((i) => i.code !== code) });
+    },
+
+    removeMember: async (userId) => {
+      const crewId = get().activeCrewId;
+      if (!supabase || !crewId || userId === get().userId) return;
+      // Their shared songs leave with them (after_member_left on the server).
+      const { error } = await supabase.from("crew_members").delete().eq("crew_id", crewId).eq("user_id", userId);
+      if (error) throw new Error(errorMessage(error));
+      await loadCrewData();
+    },
+
+    renameCrew: async (name) => {
+      const crewId = get().activeCrewId;
+      if (!supabase || !crewId) return;
+      // Only the owner's update matches a row (crews_update); select() tells "no row" from success.
+      const { data, error } = await supabase.from("crews").update({ name: name.trim() }).eq("id", crewId).select("id");
+      if (error) throw new Error(errorMessage(error));
+      if (!data?.length) throw new Error(crewText("ownerOnly"));
+      set({ crews: get().crews.map((c) => (c.id === crewId ? { ...c, name: name.trim() } : c)) });
+    },
+
+    deleteCrew: async (confirmName) => {
+      const crewId = get().activeCrewId;
+      if (!supabase || !crewId) return;
+      const { error } = await supabase.rpc("delete_crew", { p_crew: crewId, p_confirm_name: confirmName });
+      if (error) throw new Error(errorMessage(error));
+      remember(null);
+      await get().loadCrews();
+    },
+
+    leaveCrew: async () => {
+      const crewId = get().activeCrewId;
+      if (!supabase || !crewId) return;
+      const { error } = await supabase.from("crew_members").delete().eq("crew_id", crewId).eq("user_id", get().userId!);
+      if (error) throw new Error(errorMessage(error));
+      remember(null);
+      await get().loadCrews();
     },
   };
 });
