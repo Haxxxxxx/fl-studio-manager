@@ -9,7 +9,7 @@ Severity:
 
 Rule references are to `docs/GUARDRAILS.md`.
 
-**Status (2026-10-25):** sections 1-2 and 4-7 were worked through in the 0.5.x releases. §3 A1-A4 (the Launch Kit hand-off) fixed on 2026-10-25; the rest of §3 (A5-A6, B1-B13) closed on 2026-10-27 (PR fix/launch-kit-loose-ends; A5-A6 by sensible defaults: the release date wins, readiness counts mixdown freshness and other kit dates, undated releases get a Calendar line). Also open, from §6 **A3** (no "delete a crew") and **A4** (no owner actions on the website), part A2 item 2. Line numbers below are from v0.4.0 and have moved since.
+**Status (2026-10-25):** sections 1-2 and 4-7 were worked through in the 0.5.x releases. §3 A1-A4 (the Launch Kit hand-off) fixed on 2026-10-25; the rest of §3 (A5-A6, B1-B13) closed on 2026-10-27 (PR fix/launch-kit-loose-ends; A5-A6 by sensible defaults: the release date wins, readiness counts mixdown freshness and other kit dates, undated releases get a Calendar line). §6 **A3** (no "delete a crew") fixed 2026-10-27 (`delete_crew`). Still open, from §6 **A4** (no owner actions on the website), part A2 item 2. Line numbers below are from v0.4.0 and have moved since.
 
 ---
 

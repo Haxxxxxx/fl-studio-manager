@@ -60,6 +60,11 @@ describe("onboarding messages", () => {
     expect(crewErrorMessage({ message: "something else" }, "en")).toBe("something else");
   });
 
+  it("deleting a crew: wrong name, not the owner", () => {
+    expect(crewErrorMessage({ message: "type the crew name to delete it" }, "en")).toBe("Type the crew's name exactly to delete it.");
+    expect(crewErrorMessage({ message: "only the owner can delete the crew" }, "fr")).toMatch(/Seul le propriétaire/);
+  });
+
   it("the website can pin the language (/fr, /en) over the browser's", () => {
     setUiLang("fr");
     expect(currentUiLang()).toBe("fr");
