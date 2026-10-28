@@ -991,8 +991,11 @@ mod tests {
         assert!(open(&key(), &aad("dev1", "/v1/snapshot"), &env).is_none());
         assert!(open(&key(), &aad("dev2", "/v1/notes"), &env).is_none());
         assert!(open(&key(), &aad("dev1", &resp_path("/v1/notes")), &env).is_none());
+        // Tamper with the first character; never replace it with itself (the
+        // ciphertext is random, so it starts with 'A' one time in 64).
         let mut bad = env.clone();
-        bad.c = format!("A{}", &env.c[1..]);
+        let swap = if env.c.starts_with('A') { 'B' } else { 'A' };
+        bad.c = format!("{swap}{}", &env.c[1..]);
         assert!(open(&key(), &aad("dev1", "/v1/notes"), &bad).is_none());
         assert!(open(&key(), &aad("dev1", "/v1/notes"), &Envelope { n: "short".into(), c: env.c }).is_none());
     }
